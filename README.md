@@ -12,7 +12,7 @@ You may obtain a copy of the License at
 
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](https://github.com/dell/csm/blob/main/docs/CODE_OF_CONDUCT.md)
 [![License](https://img.shields.io/github/license/dell/csm-replication)](LICENSE)
-[![Docker Pulls](https://img.shields.io/docker/pulls/dellemc/csm-replication)](https://hub.docker.com/r/dellemc/csm-replication)
+[![Docker Pulls](https://img.shields.io/docker/pulls/dellemc/dell-csi-replicator)](https://hub.docker.com/r/dellemc/dell-csi-replicator)
 [![Go version](https://img.shields.io/github/go-mod/go-version/dell/csm-replication)](go.mod)
 [![GitHub release (latest by date including pre-releases)](https://img.shields.io/github/v/release/dell/csm-replication?include_prereleases&label=latest&style=flat-square)](https://github.com/dell/csm-replication/releases/latest)
 
@@ -21,6 +21,7 @@ Dell EMC CSM for Replication is part of the [CSM (Container Storage Modules)](ht
 This project aims at extending native Kubernetes functionality to support _Disaster Recovery_ workflows by utilizing storage array based replication.
 
 CSM for Replication includes the following components:
+
 * Dell Replication CRDs - [Custom Resource definitions](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/)
 * Dell CSI Replication - sidecar container for CSI drivers
 * Dell Replication Controller - Multi-Cluster Controller
