@@ -1,6 +1,22 @@
+<!--
+Copyright (c) 2021 Dell Inc., or its subsidiaries. All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+-->
+
 # Dell EMC Container Storage Modules (CSM) for Replication
 
-CSM for Replication is part of the [CSM (Container Storage Modules)](https://github.com/dell/csm) open-source suite of Kubernetes storage enablers for Dell EMC products.
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](https://github.com/dell/csm/blob/main/docs/CODE_OF_CONDUCT.md)
+[![License](https://img.shields.io/github/license/dell/csm-replication)](LICENSE)
+[![Docker Pulls](https://img.shields.io/docker/pulls/dellemc/csm-replication)](https://hub.docker.com/r/dellemc/csm-replication)
+[![Go version](https://img.shields.io/github/go-mod/go-version/dell/csm-replication)](go.mod)
+[![GitHub release (latest by date including pre-releases)](https://img.shields.io/github/v/release/dell/csm-replication?include_prereleases&label=latest&style=flat-square)](https://github.com/dell/csm-replication/releases/latest)
+
+Dell EMC CSM for Replication is part of the [CSM (Container Storage Modules)](https://github.com/dell/csm) open-source suite of Kubernetes storage enablers for Dell EMC products.
 
 This project aims at extending native Kubernetes functionality to support _Disaster Recovery_ workflows by utilizing storage array based replication.
 
