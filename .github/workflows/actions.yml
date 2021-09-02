@@ -73,6 +73,7 @@ jobs:
         run: make images 
   image_security_scan:
     name: Image Scanner
+    needs: build_images    
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
