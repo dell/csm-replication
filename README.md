@@ -29,7 +29,7 @@ CSM Replication project includes the following components:
 _*CSM Replication*_ sidecar is installed as part of the CSI driver controller plugin and utilizes custom Dell CSI extensions to communicate
 with Dell CSI drivers. It includes a set of Kubernetes controllers which keep watch on requests related to Persistent Volumes (PVs)
  and Persistent Volume Claims(PVCs). It uses `dell-csi-extensions` APIs to perform replication related actions.
-You can read more about the extensions [here](https://eos2git.cec.lab.emc.com/DevCon/dell-csi-extensions).
+You can read more about the extensions [here](https://github.com/dell/dell-csi-extensions).
 
 _*CSM Replication Controller*_ is a set of Kubernetes controllers which are _multi-cluster_ aware and can communicate with various Kubernetes API servers
 to reconcile state. These controllers are responsible for the syncing of objects and the associated metadata.
