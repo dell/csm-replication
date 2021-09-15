@@ -1,0 +1,18 @@
+{
+  "service": "Replication",
+  "method": "GetStorageProtectionGroupStatus",
+  "input": {
+    "contains": {
+      "protection_group_id": [
+        "l-group-id-1"
+      ]
+    }
+  },
+  "output": {
+    "data": {
+      "status": {
+        "state": 1
+      }
+    }
+  }
+}

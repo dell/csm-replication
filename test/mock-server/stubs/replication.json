@@ -1,0 +1,15 @@
+{
+  "service": "Replication",
+  "method": "ProbeController",
+  "input": {
+    "equals": {}
+  },
+  "output": {
+    "data": {
+      "name": "hostpath.csi.k8s.io",
+      "ready": {
+        "Value": true
+      }
+    }
+  }
+}

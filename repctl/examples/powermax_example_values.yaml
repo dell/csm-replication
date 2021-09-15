@@ -1,0 +1,20 @@
+targetClusterID: "target"
+sourceClusterID: "source"
+name: "powermax-replication"
+driver: "powermax"
+reclaimPolicy: "Retain"
+replicationPrefix: "replication.storage.dell.com"
+parameters:
+  rdfMode: "ASYNC"
+  srp:
+    source: "SRP_1"
+    target: "SRP_1"
+  symId:
+    source: "000000000001"
+    target: "000000000002"
+  serviceLevel:
+    source: "Bronze"
+    target: "Bronze"
+  rdfGroup:
+    source: "5"
+    target: "5"

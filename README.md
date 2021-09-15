@@ -136,7 +136,7 @@ The [RBAC](https://kubernetes.io/docs/reference/access-authn-authz/rbac/) permis
 You can also run the `dell-csi-replicator` process directly in your Kubernetes cluster by running the command `make run-sidecar`. 
 Make sure that the kubernetes user has the desired RBAC permissions as described above.
 
-### CMS Replication Controller
+### CSM Replication Controller
 
 #### Pre-requisites
 
@@ -164,3 +164,4 @@ Make sure that the kubernetes user has the desired RBAC permissions.
 ## Testing
 
 Click [here](/TESTING.md) for more details on how to test.
+

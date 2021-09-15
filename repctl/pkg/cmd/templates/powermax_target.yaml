@@ -1,0 +1,29 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  {{- if eq .TargetClusterID .SourceClusterID }}
+  name: {{ .Name }}-tgt
+  {{- else }}
+  name: {{ .Name }}
+  {{- end }}
+provisioner: csi-{{ .Driver }}.dellemc.com
+reclaimPolicy: {{ .ReclaimPolicy }}
+volumeBindingMode: Immediate
+parameters:
+  {{ .ReplicationPrefix }}/isReplicationEnabled: "true"
+  {{ .ReplicationPrefix }}/remoteStorageClassName: {{ .Name }}
+  {{- if eq .TargetClusterID .SourceClusterID }}
+  {{ .ReplicationPrefix }}/remoteClusterID: self
+  {{- else }}
+  {{ .ReplicationPrefix }}/remoteClusterID: {{ .SourceClusterID }}
+  {{- end }}
+  SRP: "{{ .Parameters.Srp.Target }}"
+  SYMID: "{{ .Parameters.SymId.Target }}"
+  ServiceLevel: "{{ .Parameters.ServiceLevel.Target }}"
+  {{ .ReplicationPrefix }}/RdfMode: "{{ .Parameters.RdfMode }}"
+  {{ .ReplicationPrefix }}/RemoteSRP: "{{ .Parameters.Srp.Source }}"
+  {{ .ReplicationPrefix }}/RemoteSYMID: "{{ .Parameters.SymId.Source }}"
+  {{ .ReplicationPrefix }}/RemoteServiceLevel: "{{ .Parameters.ServiceLevel.Source }}"
+  {{ .ReplicationPrefix }}/RdfGroup: "{{ .Parameters.RdfGroup.Target }}"
+  {{ .ReplicationPrefix }}/RemoteRDFGroup: "{{ .Parameters.RdfGroup.Source }}"
+

@@ -1,0 +1,5 @@
+resources:
+  - bases/replication.storage.dell.com_dellcsireplicationgroups.yaml
+
+configurations:
+  - kustomizeconfig.yaml
