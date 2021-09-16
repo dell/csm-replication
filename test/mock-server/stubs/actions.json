@@ -1,0 +1,37 @@
+{
+  "service": "Replication",
+  "method": "ExecuteAction",
+  "input": {
+    "contains": {
+      "protection_group_id": "l-group-id-1",
+      "ActionTypes": {
+        "Action": {
+          "action_types": 0
+        }
+      },
+      "protection_group_attributes": {
+        "RdfGroup": "2",
+        "RdfMode": "ASYNC",
+        "RemoteRDFGroup": "2",
+        "RemoteSYMID": "000000000002",
+        "RemoteServiceLevel": "Bronze",
+        "SRP": "SRP_1",
+        "SYMID": "000000000001",
+        "ServiceLevel": "Bronze",
+        "storage.dell.com/isReplicationEnabled": "true",
+        "storage.dell.com/remoteClusterID": "target",
+        "storage.dell.com/remoteStorageClassName": "hostpath-del",
+        "replication.storage.dell.com/remotePVRetentionPolicy": "delete"
+      }
+    }
+  },
+  "output": {
+    "data": {
+      "success": true,
+      "action_types": 0,
+      "status": {
+        "state": 1
+      }
+    }
+  }
+}

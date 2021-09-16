@@ -1,0 +1,57 @@
+{
+  "service": "Replication",
+  "method": "CreateStorageProtectionGroup",
+  "input": {
+    "contains": {
+      "volume_handle": "",
+      "parameters": {
+        "RdfGroup": "2",
+        "RdfMode": "ASYNC",
+        "RemoteRDFGroup": "2",
+        "RemoteSYMID": "000000000002",
+        "RemoteServiceLevel": "Bronze",
+        "SRP": "SRP_1",
+        "SYMID": "000000000001",
+        "ServiceLevel": "Bronze",
+        "replication.storage.dell.com/isReplicationEnabled": "true",
+        "replication.storage.dell.com/remoteClusterID": "target",
+        "replication.storage.dell.com/remoteStorageClassName": "hostpath-del",
+        "replication.storage.dell.com/remotePVRetentionPolicy": "delete"
+      }
+    }
+  },
+  "output": {
+    "data": {
+      "local_protection_group_id": "l-group-id-1",
+      "remote_protection_group_id": "r-group-id-1",
+      "local_protection_group_attributes": {
+        "RdfGroup": "2",
+        "RdfMode": "ASYNC",
+        "RemoteRDFGroup": "2",
+        "RemoteSYMID": "000000000002",
+        "RemoteServiceLevel": "Bronze",
+        "SRP": "SRP_1",
+        "SYMID": "000000000001",
+        "ServiceLevel": "Bronze",
+        "replication.storage.dell.com/isReplicationEnabled": "true",
+        "replication.storage.dell.com/remoteClusterID": "target",
+        "replication.storage.dell.com/remoteStorageClassName": "hostpath-del",
+        "replication.storage.dell.com/remotePVRetentionPolicy": "delete"
+      },
+      "remote_protection_group_attributes": {
+        "RdfGroup": "2",
+        "RdfMode": "ASYNC",
+        "RemoteRDFGroup": "2",
+        "RemoteSYMID": "000000000002",
+        "RemoteServiceLevel": "Bronze",
+        "SRP": "SRP_1",
+        "SYMID": "000000000001",
+        "ServiceLevel": "Bronze",
+        "replication.storage.dell.com/isReplicationEnabled": "true",
+        "replication.storage.dell.com/remoteClusterID": "source",
+        "replication.storage.dell.com/remoteStorageClassName": "hostpath-del",
+        "replication.storage.dell.com/remotePVRetentionPolicy": "delete"
+      }
+    }
+  }
+}

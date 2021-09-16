@@ -1,0 +1,3 @@
+domain: storage.dell.com
+repo: github.com/dell/csm-replication
+version: "2"

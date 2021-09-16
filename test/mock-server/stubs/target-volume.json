@@ -1,0 +1,45 @@
+{
+  "service": "Replication",
+  "method": "CreateRemoteVolume",
+  "input": {
+    "contains": {
+      "volume_handle": "",
+      "parameters": {
+        "RdfGroup": "2",
+        "RdfMode": "ASYNC",
+        "RemoteRDFGroup": "2",
+        "RemoteSYMID": "000000000002",
+        "RemoteServiceLevel": "Bronze",
+        "SRP": "SRP_1",
+        "SYMID": "000000000001",
+        "ServiceLevel": "Bronze",
+        "storage.dell.com/isReplicationEnabled": "true",
+        "storage.dell.com/remoteClusterID": "target",
+        "storage.dell.com/remoteStorageClassName": "hostpath-del",
+        "replication.storage.dell.com/remotePVRetentionPolicy": "delete"
+      }
+    }
+  },
+  "output": {
+    "data": {
+      "remote_volume": {
+        "capacity_bytes": 3000023,
+        "volume_id": "pvc-d559bbfa-6612-4b57-a542-5ca64c9625fe",
+        "volume_context": {
+          "RdfGroup": "2",
+          "RdfMode": "ASYNC",
+          "RemoteRDFGroup": "2",
+          "RemoteSYMID": "000000000002",
+          "RemoteServiceLevel": "Bronze",
+          "SRP": "SRP_1",
+          "SYMID": "000000000001",
+          "ServiceLevel": "Bronze",
+          "storage.dell.com/isReplicationEnabled": "true",
+          "storage.dell.com/remoteClusterID": "target",
+          "storage.dell.com/remoteStorageClassName": "hostpath-del",
+          "replication.storage.dell.com/remotePVRetentionPolicy": "delete"
+        }
+      }
+    }
+  }
+}

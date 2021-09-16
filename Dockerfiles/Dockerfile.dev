@@ -1,0 +1,17 @@
+# Base image for controller and sidecar
+FROM registry.access.redhat.com/ubi8/ubi-minimal:latest AS container-base
+RUN microdnf update -y \
+&& \
+microdnf clean all
+
+# Controller
+FROM container-base AS controller
+WORKDIR /
+COPY bin/dell-replication-controller ./
+ENTRYPOINT ["/dell-replication-controller"]
+
+# Sidecar
+FROM container-base AS sidecar
+WORKDIR /
+COPY bin/dell-csi-replicator ./
+ENTRYPOINT ["/dell-csi-replicator"]
