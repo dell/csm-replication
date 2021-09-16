@@ -65,12 +65,14 @@ jobs:
         id: go
       - name: Checkout the code
         uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
       - name: Install Mockgen
         run: go get github.com/golang/mock/mockgen@v1.4.4
       - name: Get dependencies
         run:  go mod download
       - name: Build csm-replication Docker Images
-        run: make images 
+        run: make images
   image_security_scan:
     name: Image Scanner
     needs: build_images    
