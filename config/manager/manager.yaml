@@ -21,7 +21,7 @@ spec:
         args:
         - --enable-leader-election
         - --prefix=replication.storage.dell.com
-        image: controller:latest
+        image: dellemc/dell-replication-controller:v1.0.0
         imagePullPolicy: Always
         name: manager
         env:
