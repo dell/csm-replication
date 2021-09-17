@@ -2,9 +2,9 @@ include semver.mk
 
 # Figure out if podman or docker should be used (use podman if found)
 ifneq (, $(shell which podman 2>/dev/null))
-        CONTAINER_TOOL=podman
+        CONTAINER_TOOL ?= podman
 else
-        CONTAINER_TOOL=docker
+        CONTAINER_TOOL ?= docker
 endif
 
 # Options for '--no-cache'
@@ -16,7 +16,7 @@ NOCACHE_ARG =
 endif
 
 # Version of the sidecar & common controller. e.g. - v1.0.0.001
-VERSION="v$(MAJOR).$(MINOR).$(PATCH).$(BUILD)"
+VERSION ?="v$(MAJOR).$(MINOR).$(PATCH).$(BUILD)"
 
 REGISTRY ?= "localhost:5000"
 
