@@ -49,78 +49,81 @@ type ReplicationGroupMonitoring struct {
 // from the driver.
 func (r *ReplicationGroupMonitoring) Monitor(ctx context.Context) error {
 	ticker := time.NewTicker(r.MonitoringInterval).C
-	go r.monitorReplicationGroups(ticker)
+	go func(<-chan time.Time) {
+		for {
+			r.monitorReplicationGroups(ticker)
+		}
+	}(ticker)
+
 	return nil
 }
 
 func (r *ReplicationGroupMonitoring) monitorReplicationGroups(ticker <-chan time.Time) {
 	dellCSIReplicationGroupsList := new(storagev1alpha1.DellCSIReplicationGroupList)
-	for {
-		select {
-		case <-ticker:
-			ctx, cancel := context.WithTimeout(context.Background(), r.MonitoringInterval)
-			defer cancel()
-			err := r.List(ctx, dellCSIReplicationGroupsList)
-			if err != nil {
-				r.Log.Error(err, "Error encountered while listing Dell CSI ReplicationGroups")
-				return
+	select {
+	case <-ticker:
+		ctx, cancel := context.WithTimeout(context.Background(), r.MonitoringInterval)
+		defer cancel()
+		err := r.List(ctx, dellCSIReplicationGroupsList)
+		if err != nil {
+			r.Log.Error(err, "Error encountered while listing Dell CSI ReplicationGroups")
+			return
+		}
+		for _, rg := range dellCSIReplicationGroupsList.Items {
+			rg := rg
+			if rg.Spec.DriverName != r.DriverName {
+				// silently ignore the RGs not owned by this sidecar
+				continue
 			}
-			for _, rg := range dellCSIReplicationGroupsList.Items {
-				rg := rg
-				if rg.Spec.DriverName != r.DriverName {
-					// silently ignore the RGs not owned by this sidecar
+			r.Log.V(common.DebugLevel).Info("Processing RG " + rg.Name + "for monitoring")
+			// Check if there are any PVs in the cluster with the RG label
+			var persistentVolumes v1.PersistentVolumeList
+			matchingLabels := make(map[string]string)
+			matchingLabels[controllers.DriverName] = r.DriverName
+			matchingLabels[controllers.ReplicationGroup] = rg.Name
+			err := r.List(ctx, &persistentVolumes, client.MatchingLabels(matchingLabels))
+			if err != nil {
+				// Log the error and continue
+				r.Log.Error(err, "failed to fetch associated PVs with this RG")
+			} else {
+				if len(persistentVolumes.Items) == 0 {
+					r.Log.V(common.DebugLevel).Info(
+						"Skipping RG " + rg.Name + "as there are no associated PVs")
 					continue
 				}
-				r.Log.V(common.DebugLevel).Info("Processing RG " + rg.Name + "for monitoring")
-				// Check if there are any PVs in the cluster with the RG label
-				var persistentVolumes v1.PersistentVolumeList
-				matchingLabels := make(map[string]string)
-				matchingLabels[controllers.DriverName] = r.DriverName
-				matchingLabels[controllers.ReplicationGroup] = rg.Name
-				err := r.List(ctx, &persistentVolumes, client.MatchingLabels(matchingLabels))
+			}
+
+			// Fetch the RG details once more as we may have a stale copy
+			var refreshedRG storagev1alpha1.DellCSIReplicationGroup
+			err = r.Get(ctx, types.NamespacedName{Name: rg.Name}, &refreshedRG)
+			if err != nil {
+				r.Log.Error(err, "Error encountered while getting RG details")
+				r.EventRecorder.Eventf(&rg, v1.EventTypeWarning, "Error", "Failed to get RG details")
+				continue
+			}
+
+			updateRequired := r.isUpdateRequired(refreshedRG)
+			if updateRequired {
+				r.Lock.Lock()
+				res, err := r.ReplicationClient.GetStorageProtectionGroupStatus(ctx, refreshedRG.Spec.ProtectionGroupID, refreshedRG.Spec.ProtectionGroupAttributes)
+				r.Lock.Unlock()
 				if err != nil {
-					// Log the error and continue
-					r.Log.Error(err, "failed to fetch associated PVs with this RG")
-				} else {
-					if len(persistentVolumes.Items) == 0 {
-						r.Log.V(common.DebugLevel).Info(
-							"Skipping RG " + rg.Name + "as there are no associated PVs")
+					r.Log.Error(err, "Error encountered while getting protection group status")
+					err = updateRGLinkStatus(ctx, r.Client, &refreshedRG,
+						replication.StorageProtectionGroupStatus_UNKNOWN.String(), refreshedRG.Status.ReplicationLinkState.IsSource,
+						err.Error(), r.Log)
+					if err != nil {
+						r.Log.Error(err, "Failed to update the RG Status")
 						continue
 					}
-				}
-
-				// Fetch the RG details once more as we may have a stale copy
-				var refreshedRG storagev1alpha1.DellCSIReplicationGroup
-				err = r.Get(ctx, types.NamespacedName{Name: rg.Name}, &refreshedRG)
-				if err != nil {
-					r.Log.Error(err, "Error encountered while getting RG details")
-					r.EventRecorder.Eventf(&rg, v1.EventTypeWarning, "Error", "Failed to get RG details")
 					continue
 				}
-
-				updateRequired := r.isUpdateRequired(refreshedRG)
-				if updateRequired {
-					r.Lock.Lock()
-					res, err := r.ReplicationClient.GetStorageProtectionGroupStatus(ctx, refreshedRG.Spec.ProtectionGroupID, refreshedRG.Spec.ProtectionGroupAttributes)
-					r.Lock.Unlock()
-					if err != nil {
-						r.Log.Error(err, "Error encountered while getting protection group status")
-						err = updateRGLinkStatus(ctx, r.Client, &refreshedRG,
-							replication.StorageProtectionGroupStatus_UNKNOWN.String(), refreshedRG.Status.ReplicationLinkState.IsSource,
-							err.Error(), r.Log)
-						if err != nil {
-							r.Log.Error(err, "Failed to update the RG Status")
-							continue
-						}
-						continue
-					}
-					newStatus := res.GetStatus().State.String()
-					// Update the LinkStatus only if it is required
-					err = updateRGLinkStatus(ctx, r.Client, &refreshedRG, newStatus, res.GetStatus().IsSource, "", r.Log)
-					if err != nil {
-						r.Log.Error(err, "Failed to update the RG status")
-						continue
-					}
+				newStatus := res.GetStatus().State.String()
+				// Update the LinkStatus only if it is required
+				err = updateRGLinkStatus(ctx, r.Client, &refreshedRG, newStatus, res.GetStatus().IsSource, "", r.Log)
+				if err != nil {
+					r.Log.Error(err, "Failed to update the RG status")
+					continue
 				}
 			}
 		}
