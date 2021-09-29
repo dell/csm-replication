@@ -18,6 +18,7 @@ package csi_replicator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	storagev1alpha1 "github.com/dell/csm-replication/api/v1alpha1"
 	"github.com/dell/csm-replication/controllers"
@@ -41,11 +42,11 @@ type MonitoringControllerTestSuite struct {
 }
 
 func (suite *MonitoringControllerTestSuite) SetupSuite() {
-	// do nothing
+	suite.Init()
 }
 
 func (suite *MonitoringControllerTestSuite) SetupTest() {
-	suite.Init()
+
 }
 
 func (suite *MonitoringControllerTestSuite) getRGs() []client.Object {
@@ -131,7 +132,9 @@ func (suite *MonitoringControllerTestSuite) TestMonitorReplicationGroupsWithErro
 		updateTimes[rg.Name] = rg.DeepCopy().Status.ReplicationLinkState.LastSuccessfulUpdate.Time
 	}
 	errorMsg := "failed to get status"
-	suite.repClient.InjectError(fmt.Errorf(errorMsg))
+	suite.rgMonitor.Lock.Lock()
+	suite.repClient.InjectError(errors.New(errorMsg))
+	suite.rgMonitor.Lock.Unlock()
 	suite.T().Log("Sleeping to allow another RG link update")
 	time.Sleep(3 * time.Second)
 	err = suite.client.List(context.Background(), &rgList)
