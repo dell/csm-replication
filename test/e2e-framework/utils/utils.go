@@ -37,31 +37,31 @@ import (
 
 const (
 	// FakePVName name of PV
-	FakePVName        = "fake-pv"
+	FakePVName = "fake-pv"
 	// FakePVCName name of PVC
-	FakePVCName       = "fake-pvc"
+	FakePVCName = "fake-pvc"
 	// FakeSCName name of SC
-	FakeSCName        = "fake-sc"
+	FakeSCName = "fake-sc"
 	// FakeDriverName name of driver
-	FakeDriverName    = "fake-csi-driver"
+	FakeDriverName = "fake-csi-driver"
 	// FakeRemoteSCName name of remote SC
-	FakeRemoteSCName  = "fake-remote-sc"
+	FakeRemoteSCName = "fake-remote-sc"
 	// FakeRGName name of remote RG
-	FakeRGName        = "fake-rg"
+	FakeRGName = "fake-rg"
 	// FakeNamespaceName name of namespace
 	FakeNamespaceName = "fake-namespace"
 	// Self this cluster
-	Self              = "self"
+	Self = "self"
 	// RemoteClusterID id remote cluster
-	RemoteClusterID   = "remoteCluster"
+	RemoteClusterID = "remoteCluster"
 	// SourceClusterID id source cluster
-	SourceClusterID   = "sourceCluster"
+	SourceClusterID = "sourceCluster"
 	// LocalPGID id of local protection group
-	LocalPGID         = "l-group-id"
+	LocalPGID = "l-group-id"
 	// RemotePGID id of remote protection group
-	RemotePGID        = "r-group-id"
+	RemotePGID = "r-group-id"
 	// ContextPrefix fake csi replication prefix
-	ContextPrefix     = "csi-fake"
+	ContextPrefix = "csi-fake"
 )
 
 // Driver mock implementation of the driver

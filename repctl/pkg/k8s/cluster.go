@@ -121,7 +121,7 @@ func (c *Cluster) GetKubeVersion() string {
 	return c.KubeVersion
 }
 
-// GetHost returns URL of master node
+// GetHost returns URL of primary node
 func (c *Cluster) GetHost() string {
 	return c.Host
 }
@@ -333,7 +333,7 @@ func (c *Cluster) CreatePersistentVolumeClaimsFromPVs(ctx context.Context, names
 			return err
 		}
 		fmt.Printf("Dry-Run: %v. Successfully created PVC with name: %s using PV: %s in the namespace: %s\n",
-				dryRun, pv.RemotePVCName, pv.Name, namespace)
+			dryRun, pv.RemotePVCName, pv.Name, namespace)
 	}
 	return nil
 }

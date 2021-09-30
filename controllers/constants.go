@@ -98,17 +98,17 @@ const (
 	remoteRGRetentionPolicy = "/remoteRGRetentionPolicy"
 
 	// FailOver failover replication action name
-	FailOver         = "failover"
+	FailOver = "failover"
 	// FailBack failback replication action name
-	FailBack         = "failback"
+	FailBack = "failback"
 	// Suspend suspend replication action name
-	Suspend          = "suspend"
+	Suspend = "suspend"
 	// Resume resume replication action name
-	Resume           = "resume"
+	Resume = "resume"
 	// Establish establish replication action name
-	Establish        = "establish"
+	Establish = "establish"
 	// TestFailOver test failover replication action name
-	TestFailOver     = "testfailover"
+	TestFailOver = "testfailover"
 	// TestFailOverStop stop test failover replication action name
 	TestFailOverStop = "testfailoverstop"
 )

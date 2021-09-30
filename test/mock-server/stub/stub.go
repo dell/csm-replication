@@ -22,7 +22,7 @@ const (
 	// DefaultAddress address of stub server
 	DefaultAddress = "localhost"
 	// DefaultPort port of stub server
-	DefaultPort    = "4771"
+	DefaultPort = "4771"
 )
 
 // RunStubServer runs mock grpc server

@@ -58,19 +58,19 @@ type conditionType string
 
 const (
 	// ExecuteActionWithoutStatus condition
-	ExecuteActionWithoutStatus  = conditionType("ExecuteActionWithoutStatus")
+	ExecuteActionWithoutStatus = conditionType("ExecuteActionWithoutStatus")
 	// ExecuteActionWithoutSuccess condition
 	ExecuteActionWithoutSuccess = conditionType("ExecuteActionWithoutSuccess")
 	// ExecuteActionWithSwap condition
-	ExecuteActionWithSwap       = conditionType("ExecuteActionWithSwap")
+	ExecuteActionWithSwap = conditionType("ExecuteActionWithSwap")
 	// CreatePGWithMissingPGID condition
-	CreatePGWithMissingPGID     = conditionType("CreatePGWithMissingPGID")
+	CreatePGWithMissingPGID = conditionType("CreatePGWithMissingPGID")
 	// CreatePGWithOutStatus condition
-	CreatePGWithOutStatus       = conditionType("CreatePGWithOutStatus")
+	CreatePGWithOutStatus = conditionType("CreatePGWithOutStatus")
 	// GetPGStatusForTarget condition
-	GetPGStatusForTarget        = conditionType("GetPGStatusForTarget")
+	GetPGStatusForTarget = conditionType("GetPGStatusForTarget")
 	// GetPGStatusInProgress condition
-	GetPGStatusInProgress       = conditionType("GetPGStatusInProgress")
+	GetPGStatusInProgress = conditionType("GetPGStatusInProgress")
 )
 
 // MockReplication is dummy implementation of Replication interface

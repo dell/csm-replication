@@ -46,9 +46,9 @@ const (
 	// ErrorLevel represents logrus error log level
 	ErrorLevel = logrusr.ErrorLevel
 	// WarnLevel represents logrus warning log level
-	WarnLevel  = logrusr.WarnLevel
+	WarnLevel = logrusr.WarnLevel
 	// InfoLevel represents logrus info log level
-	InfoLevel  = logrusr.InfoLevel
+	InfoLevel = logrusr.InfoLevel
 	// DebugLevel represents logrus debug log level
 	DebugLevel = logrusr.DebugLevel
 	// TraceLevel represents logrus trace log level

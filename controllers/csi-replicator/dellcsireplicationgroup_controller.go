@@ -47,23 +47,23 @@ import (
 
 const (
 	// ReadyState name of correct state of ReplicationGroup
-	ReadyState                 = "Ready"
+	ReadyState = "Ready"
 	// InvalidState name of invalid state of ReplicationGroup
-	InvalidState               = "Invalid"
+	InvalidState = "Invalid"
 	// ErrorState name of error state of ReplicationGroup
-	ErrorState                 = "Error"
+	ErrorState = "Error"
 	// NoState empty state of ReplicationGroup
-	NoState                    = ""
+	NoState = ""
 	// InProgress name of in progress state of ReplicationGroup
-	InProgress                 = "IN_PROGRESS"
+	InProgress = "IN_PROGRESS"
 	// DeletingState name deletion state of ReplicationGroup
-	DeletingState              = "Deleting"
+	DeletingState = "Deleting"
 	// Action name of action field
-	Action                     = "Action"
+	Action = "Action"
 	// MaxRetryDurationForActions maximum amount of time between retries of failed action
 	MaxRetryDurationForActions = 1 * time.Hour
 	// MaxNumberOfConditions maximum length of conditions list
-	MaxNumberOfConditions      = 20
+	MaxNumberOfConditions = 20
 )
 
 // ActionType represent replication action (FAILOVER, REPROTECT and etc.)

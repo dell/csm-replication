@@ -19,7 +19,6 @@ import (
 	"github.com/dell/dell-csi-extensions/replication"
 )
 
-
 type injectedError struct {
 	error        error
 	clearAfter   int
