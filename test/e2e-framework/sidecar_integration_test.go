@@ -59,6 +59,9 @@ func (suite *ReplicationTestSuite) SetupSuite() {
 }
 
 func TestReplicationTestSuite(t *testing.T) {
+	if testing.Short(){
+		t.Skip("Skipping as requested by short flag")
+	}
 	testSuite := new(ReplicationTestSuite)
 	suite.Run(t, testSuite)
 	testSuite.TearDownTestSuite()

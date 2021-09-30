@@ -419,5 +419,8 @@ func (ss *SidecarTestSuite) TestCreatePVC() {
 }
 
 func TestSidecar(t *testing.T) {
+	if testing.Short(){
+		t.Skip("Skipping as requested by short flag")
+	}
 	suite.Run(t, new(SidecarTestSuite))
 }
