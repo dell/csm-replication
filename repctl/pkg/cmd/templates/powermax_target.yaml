@@ -18,11 +18,11 @@ parameters:
   {{ .ReplicationPrefix }}/remoteClusterID: {{ .SourceClusterID }}
   {{- end }}
   SRP: "{{ .Parameters.Srp.Target }}"
-  SYMID: "{{ .Parameters.SymId.Target }}"
+  SYMID: "{{ .Parameters.SymID.Target }}"
   ServiceLevel: "{{ .Parameters.ServiceLevel.Target }}"
   {{ .ReplicationPrefix }}/RdfMode: "{{ .Parameters.RdfMode }}"
   {{ .ReplicationPrefix }}/RemoteSRP: "{{ .Parameters.Srp.Source }}"
-  {{ .ReplicationPrefix }}/RemoteSYMID: "{{ .Parameters.SymId.Source }}"
+  {{ .ReplicationPrefix }}/RemoteSYMID: "{{ .Parameters.SymID.Source }}"
   {{ .ReplicationPrefix }}/RemoteServiceLevel: "{{ .Parameters.ServiceLevel.Source }}"
   {{ .ReplicationPrefix }}/RdfGroup: "{{ .Parameters.RdfGroup.Target }}"
   {{ .ReplicationPrefix }}/RemoteRDFGroup: "{{ .Parameters.RdfGroup.Source }}"

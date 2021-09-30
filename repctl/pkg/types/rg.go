@@ -22,21 +22,24 @@ import (
 	"github.com/dell/repctl/pkg/metadata"
 )
 
+// RG represents Replication Group replication extension resource
 type RG struct {
 	Name              string `display:"Name"`
 	State             string `display:"State"`
-	ProtectionGroupId string
-	RemoteClusterId   string `display:"rClusterID"`
+	ProtectionGroupID string
+	RemoteClusterID   string `display:"rClusterID"`
 	DriverName        string `display:"Driver"`
 	RemoteRGName      string `display:"RemoteRG"`
 	IsSource          bool   `display:"IsSource"`
 	LinkState         string `display:"LinkState"`
 }
 
+// RGList list of RG objects
 type RGList struct {
 	RGList []RG
 }
 
+// Print prints list of replication groups to stdout as a table
 func (r *RGList) Print() {
 	// Form an empty object and create a new table writer
 	t, err := display.NewTableWriter(RG{}, os.Stdout)
@@ -50,15 +53,16 @@ func (r *RGList) Print() {
 	t.Done()
 }
 
+// GetRG converts extension DellCSIReplicationGroup type to custom representation
 func GetRG(group v1alpha1.DellCSIReplicationGroup) RG {
-	remoteClusterId := group.Annotations[metadata.RemoteClusterID]
+	remoteClusterID := group.Annotations[metadata.RemoteClusterID]
 	remoteRGName := group.Annotations[metadata.RemoteReplicationGroup]
 	myRG := RG{
 		Name:              group.Name,
 		State:             group.Status.State,
-		ProtectionGroupId: group.Spec.ProtectionGroupID,
+		ProtectionGroupID: group.Spec.ProtectionGroupID,
 		DriverName:        group.Spec.DriverName,
-		RemoteClusterId:   remoteClusterId,
+		RemoteClusterID:   remoteClusterID,
 		RemoteRGName:      remoteRGName,
 		IsSource:          group.Status.ReplicationLinkState.IsSource,
 		LinkState:         group.Status.ReplicationLinkState.State,

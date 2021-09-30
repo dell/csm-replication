@@ -26,6 +26,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+// GetFailbackCommand returns 'failback' cobra command
 /* #nosec G104 */
 func GetFailbackCommand() *cobra.Command {
 	failbackCmd := &cobra.Command{

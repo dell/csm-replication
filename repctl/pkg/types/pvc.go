@@ -21,6 +21,7 @@ import (
 	"os"
 )
 
+// PersistentVolumeClaim represents Persistent Volume Claim k8s resource
 type PersistentVolumeClaim struct {
 	Name               string `display:"Name"`
 	PVName             string
@@ -30,13 +31,15 @@ type PersistentVolumeClaim struct {
 	RemotePVCName      string `display:"rPVC"`
 	RemotePVName       string `display:"rPV"`
 	RemotePVCNamespace string `display:"rPVCNamespace"`
-	RemoteClusterId    string `display:"RemoteClusterID"`
+	RemoteClusterID    string `display:"RemoteClusterID"`
 }
 
+// PersistentVolumeClaimList list of PersistentVolumeClaim objects
 type PersistentVolumeClaimList struct {
 	PVCList []PersistentVolumeClaim
 }
 
+// Print prints list of persistent volumes claims to stdout as a table
 func (p *PersistentVolumeClaimList) Print() {
 	// Form an empty object and create a new table writer
 	t, err := display.NewTableWriter(PersistentVolumeClaim{}, os.Stdout)
@@ -50,12 +53,13 @@ func (p *PersistentVolumeClaimList) Print() {
 	t.Done()
 }
 
+// GetPVC converts k8s PersistentVolumeClaim type to custom representation
 func GetPVC(claim v1.PersistentVolumeClaim) PersistentVolumeClaim {
 	remotepvcName := claim.Annotations[metadata.RemotePVC]
 	remoteNamespace := claim.Annotations[metadata.RemotePVCNamespace]
 	remotepvName := claim.Annotations[metadata.RemotePV]
 	rgName := claim.Annotations[metadata.ReplicationGroup]
-	remoteClusterId := claim.Annotations[metadata.RemoteClusterID]
+	remoteClusterID := claim.Annotations[metadata.RemoteClusterID]
 	pvc := PersistentVolumeClaim{
 		Name:               claim.Name,
 		PVName:             claim.Spec.VolumeName,
@@ -65,7 +69,7 @@ func GetPVC(claim v1.PersistentVolumeClaim) PersistentVolumeClaim {
 		RemotePVCName:      remotepvcName,
 		RemotePVName:       remotepvName,
 		RGName:             rgName,
-		RemoteClusterId:    remoteClusterId,
+		RemoteClusterID:    remoteClusterID,
 	}
 	return pvc
 }

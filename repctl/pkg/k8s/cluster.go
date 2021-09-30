@@ -44,10 +44,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// Clusters represents all clusters currently managed by `repctl`
 type Clusters struct {
 	Clusters []ClusterInterface
 }
 
+// Print prints all currently managed clusters to stdout in form a table
 func (c *Clusters) Print() {
 	// Form an empty object and create a new table writer
 	t, err := display.NewTableWriter(Cluster{}, os.Stdout)
@@ -62,10 +64,12 @@ func (c *Clusters) Print() {
 	t.Done()
 }
 
+// ClientInterface is an interface that wraps around k8s client structure
 type ClientInterface interface {
 	client.Client
 }
 
+// ClusterInterface contains methods for interacting with k8s cluster via k8s client
 type ClusterInterface interface {
 	GetClient() ClientInterface
 	SetClient(ClientInterface)
@@ -97,6 +101,7 @@ type ClusterInterface interface {
 	CreateObject(context.Context, []byte) (runtime.Object, error)
 }
 
+// Cluster is implementation of ClusterInterface that represents some cluster
 type Cluster struct {
 	ClusterID      string `display:"ClusterId"`
 	KubeVersion    string `display:"Version"`
@@ -106,38 +111,47 @@ type Cluster struct {
 	restClient     ClientInterface
 }
 
+// GetID returns id of the cluster
 func (c *Cluster) GetID() string {
 	return c.ClusterID
 }
 
+// GetKubeVersion returns k8s version of cluster
 func (c *Cluster) GetKubeVersion() string {
 	return c.KubeVersion
 }
 
+// GetHost returns URL of master node
 func (c *Cluster) GetHost() string {
 	return c.Host
 }
 
+// GetKubeConfigFile returns path to kube config file
 func (c *Cluster) GetKubeConfigFile() string {
 	return c.kubeConfigFile
 }
 
+// GetClient returns ClientInterface that could be used for interaction with current cluster
 func (c *Cluster) GetClient() ClientInterface {
 	return c.client
 }
 
+// SetClient forces cluster to use provided client
 func (c *Cluster) SetClient(client ClientInterface) {
 	c.client = client
 }
 
+// PatchReplicationGroup patches replication group
 func (c *Cluster) PatchReplicationGroup(ctx context.Context, rg *v1alpha1.DellCSIReplicationGroup, patch client.Patch) error {
 	return c.client.Patch(ctx, rg, patch)
 }
 
+// UpdateReplicationGroup updates replication group
 func (c *Cluster) UpdateReplicationGroup(ctx context.Context, rg *v1alpha1.DellCSIReplicationGroup) error {
 	return c.client.Update(ctx, rg)
 }
 
+// GetPersistentVolume returns persistent volume object by querying cluster using persistent volume name
 func (c *Cluster) GetPersistentVolume(ctx context.Context, pvName string) (*v1.PersistentVolume, error) {
 	found := &v1.PersistentVolume{}
 	err := c.client.Get(ctx, apiTypes.NamespacedName{Name: pvName}, found)
@@ -147,6 +161,7 @@ func (c *Cluster) GetPersistentVolume(ctx context.Context, pvName string) (*v1.P
 	return found, nil
 }
 
+// ListPersistentVolumes returns list of all persistent volume objects that are currently in cluster
 func (c *Cluster) ListPersistentVolumes(ctx context.Context, opts ...client.ListOption) (*v1.PersistentVolumeList, error) {
 	found := &v1.PersistentVolumeList{}
 	err := c.client.List(ctx, found, opts...)
@@ -156,10 +171,11 @@ func (c *Cluster) ListPersistentVolumes(ctx context.Context, opts ...client.List
 	return found, nil
 }
 
-func (c *Cluster) FilterPersistentVolumes(ctx context.Context, driver, remoteClusterId, remoteNamespace, rgName string) ([]types.PersistentVolume, error) {
+// FilterPersistentVolumes returns filtered list of all persistent volume objects that are currently in cluster
+func (c *Cluster) FilterPersistentVolumes(ctx context.Context, driver, remoteClusterID, remoteNamespace, rgName string) ([]types.PersistentVolume, error) {
 	matchingLabels := make(map[string]string)
 	addLabelToLabelMap(matchingLabels, metadata.Driver, driver)
-	addLabelToLabelMap(matchingLabels, metadata.RemoteClusterID, remoteClusterId)
+	addLabelToLabelMap(matchingLabels, metadata.RemoteClusterID, remoteClusterID)
 	addLabelToLabelMap(matchingLabels, metadata.RemotePVCNamespace, remoteNamespace)
 	addLabelToLabelMap(matchingLabels, metadata.ReplicationGroup, rgName)
 	persistentVolumes, err := c.ListPersistentVolumes(ctx, client.MatchingLabels(matchingLabels))
@@ -178,6 +194,7 @@ func (c *Cluster) FilterPersistentVolumes(ctx context.Context, driver, remoteClu
 	return myPVList, nil
 }
 
+// GetNamespace returns namespace object by querying cluster using namespace name
 func (c *Cluster) GetNamespace(ctx context.Context, nsName string) (*v1.Namespace, error) {
 	found := &v1.Namespace{}
 	err := c.client.Get(ctx, apiTypes.NamespacedName{Name: nsName}, found)
@@ -187,10 +204,12 @@ func (c *Cluster) GetNamespace(ctx context.Context, nsName string) (*v1.Namespac
 	return found, nil
 }
 
+// CreateNamespace creates new namespace object in cluster
 func (c *Cluster) CreateNamespace(ctx context.Context, ns *v1.Namespace) error {
 	return c.GetClient().Create(ctx, ns)
 }
 
+// ListStorageClass returns list of all storage class objects that are currently in cluster
 func (c *Cluster) ListStorageClass(ctx context.Context, opts ...client.ListOption) (*storagev1.StorageClassList, error) {
 	found := &storagev1.StorageClassList{}
 	err := c.client.List(ctx, found, opts...)
@@ -200,6 +219,7 @@ func (c *Cluster) ListStorageClass(ctx context.Context, opts ...client.ListOptio
 	return found, nil
 }
 
+// FilterStorageClass returns filtered list of all storage class objects that are currently in cluster
 func (c *Cluster) FilterStorageClass(ctx context.Context, driverName string, noFilter bool) (*types.SCList, error) {
 	mySCList := make([]types.StorageClass, 0)
 	scList, err := c.ListStorageClass(ctx)
@@ -224,6 +244,7 @@ func (c *Cluster) FilterStorageClass(ctx context.Context, driverName string, noF
 	}, nil
 }
 
+// ListPersistentVolumeClaims returns list of all persistent volume claim objects that are currently in cluster
 func (c *Cluster) ListPersistentVolumeClaims(ctx context.Context, opts ...client.ListOption) (*v1.PersistentVolumeClaimList, error) {
 	found := &v1.PersistentVolumeClaimList{}
 	err := c.client.List(ctx, found, opts...)
@@ -233,11 +254,12 @@ func (c *Cluster) ListPersistentVolumeClaims(ctx context.Context, opts ...client
 	return found, nil
 }
 
-func (c *Cluster) FilterPersistentVolumeClaims(ctx context.Context, namespace, remoteClusterId,
+// FilterPersistentVolumeClaims returns filtered list of all persistent volume claim objects that are currently in cluster
+func (c *Cluster) FilterPersistentVolumeClaims(ctx context.Context, namespace, remoteClusterID,
 	remoteNamespace, rgName string) (*types.PersistentVolumeClaimList, error) {
 	matchingLabels := make(map[string]string)
-	if remoteClusterId != "" {
-		matchingLabels[metadata.RemoteClusterID] = remoteClusterId
+	if remoteClusterID != "" {
+		matchingLabels[metadata.RemoteClusterID] = remoteClusterID
 	}
 	if remoteNamespace != "" {
 		matchingLabels[metadata.RemotePVCNamespace] = remoteNamespace
@@ -259,6 +281,7 @@ func (c *Cluster) FilterPersistentVolumeClaims(ctx context.Context, namespace, r
 	}, nil
 }
 
+// CreatePersistentVolumeClaimsFromPVs uses list of persistent volume to create remote PVCs
 func (c *Cluster) CreatePersistentVolumeClaimsFromPVs(ctx context.Context, namespace string,
 	pvList []types.PersistentVolume, prefix string, dryRun bool) error {
 	// go through the PV list and create PVC objects
@@ -308,14 +331,16 @@ func (c *Cluster) CreatePersistentVolumeClaimsFromPVs(ctx context.Context, names
 		if err != nil {
 			fmt.Printf("Dry-run: %v. Failed to create PVC for PV: %s. Error: %s\n", dryRun, pv.Name, err.Error())
 			return err
-		} else {
-			fmt.Printf("Dry-Run: %v. Successfully created PVC with name: %s using PV: %s in the namespace: %s\n",
-				dryRun, pv.RemotePVCName, pv.Name, namespace)
 		}
+		fmt.Printf("Dry-Run: %v. Successfully created PVC with name: %s using PV: %s in the namespace: %s\n",
+				dryRun, pv.RemotePVCName, pv.Name, namespace)
 	}
 	return nil
 }
 
+// CreateObject creates k8s object from yaml file
+// Supported objects:
+// StorageClass, Namespace, CustomResourceDefinition, ClusterRole, ClusterRoleBinding, Service, Deployment and ConfigMap
 func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object, error) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
@@ -415,6 +440,7 @@ func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object
 	return runtimeObj, nil
 }
 
+// ListReplicationGroups returns list of all replication group objects that are currently in cluster
 func (c *Cluster) ListReplicationGroups(ctx context.Context, opts ...client.ListOption) (*v1alpha1.DellCSIReplicationGroupList, error) {
 	found := &v1alpha1.DellCSIReplicationGroupList{}
 	err := c.client.List(ctx, found, opts...)
@@ -424,10 +450,11 @@ func (c *Cluster) ListReplicationGroups(ctx context.Context, opts ...client.List
 	return found, nil
 }
 
-func (c *Cluster) FilterReplicationGroups(ctx context.Context, driverName, remoteClusterId string) (*types.RGList, error) {
+// FilterReplicationGroups returns filtered list of all replication group objects that are currently in cluster
+func (c *Cluster) FilterReplicationGroups(ctx context.Context, driverName, remoteClusterID string) (*types.RGList, error) {
 	matchingLabels := make(map[string]string)
-	if remoteClusterId != "" {
-		matchingLabels[metadata.RemoteClusterID] = remoteClusterId
+	if remoteClusterID != "" {
+		matchingLabels[metadata.RemoteClusterID] = remoteClusterID
 	}
 	if driverName != "" {
 		matchingLabels[metadata.Driver] = driverName
@@ -451,12 +478,15 @@ func addLabelToLabelMap(labels map[string]string, key, value string) {
 	}
 }
 
+// MultiClusterConfiguratorInterface wraps GetAllClusters method
 type MultiClusterConfiguratorInterface interface {
 	GetAllClusters([]string, string) (*Clusters, error)
 }
 
+// MultiClusterConfigurator is implementation of MultiClusterConfiguratorInterface
 type MultiClusterConfigurator struct{}
 
+// GetAllClusters initializes and returns clusters found in configDir
 func (*MultiClusterConfigurator) GetAllClusters(clusterIDs []string, configDir string) (*Clusters, error) {
 	strictCheck := len(clusterIDs) > 0
 
@@ -510,7 +540,8 @@ func newClientSet(kubeconfig string) (*kubernetes.Clientset, *rest.Config, error
 	return clientset, restConfig, nil
 }
 
-func CreateCluster(clusterId, kubeconfig string) (ClusterInterface, error) {
+// CreateCluster creates new k8s client for cluster
+func CreateCluster(clusterID, kubeconfig string) (ClusterInterface, error) {
 	k8sClient, err := getControllerRuntimeClient(kubeconfig)
 	if err != nil {
 		return nil, err
@@ -533,7 +564,7 @@ func CreateCluster(clusterId, kubeconfig string) (ClusterInterface, error) {
 		}
 	}
 	cluster := Cluster{
-		ClusterID:      clusterId,
+		ClusterID:      clusterID,
 		client:         k8sClient,
 		KubeVersion:    versionString,
 		kubeConfigFile: kubeconfig,
@@ -541,6 +572,8 @@ func CreateCluster(clusterId, kubeconfig string) (ClusterInterface, error) {
 	}
 	return &cluster, nil
 }
+
+// GetReplicationGroups returns replication group object by querying cluster using replication group name
 func (c *Cluster) GetReplicationGroups(ctx context.Context, rgID string) (*v1alpha1.DellCSIReplicationGroup, error) {
 	found := &v1alpha1.DellCSIReplicationGroup{}
 	err := c.client.Get(ctx, apiTypes.NamespacedName{Name: rgID}, found)

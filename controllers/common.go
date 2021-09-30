@@ -50,7 +50,7 @@ func AddLabel(obj metav1.Object, labelKey, labelValue string) {
 	obj.SetLabels(labels)
 }
 
-// AddFinalizer adds a finalizer to k8s resource, if it doesn't already exist and
+// AddFinalizerIfNotExist adds a finalizer to k8s resource, if it doesn't already exist and
 // returns true else returns false
 func AddFinalizerIfNotExist(obj metav1.Object, name string) bool {
 	finalizers := obj.GetFinalizers()
@@ -69,7 +69,7 @@ func AddFinalizerIfNotExist(obj metav1.Object, name string) bool {
 	return true
 }
 
-// RemoveFinalizer removes finalizer from k8s resource and returns true if
+// RemoveFinalizerIfExists removes finalizer from k8s resource and returns true if
 // exists, otherwise returns false
 func RemoveFinalizerIfExists(obj metav1.Object, name string) bool {
 	finalizerRemoved := false
@@ -114,11 +114,11 @@ func IsCSIFinalError(err error) bool {
 func IgnoreIfFinalError(err error) error {
 	if IsCSIFinalError(err) {
 		return nil
-	} else {
-		return err
 	}
+	return err
 }
 
+// UpdateConditions updates conditions status field by adding last action condition
 func UpdateConditions(rg *storagev1alpha1.DellCSIReplicationGroup, condition storagev1alpha1.LastAction, maxConditions int) {
 	rg.Status.Conditions = append([]storagev1alpha1.LastAction{condition}, rg.Status.Conditions...)
 	if len(rg.Status.Conditions) > maxConditions {
@@ -126,7 +126,7 @@ func UpdateConditions(rg *storagev1alpha1.DellCSIReplicationGroup, condition sto
 	}
 }
 
-// Publishes event to all contoller pods
+// PublishControllerEvent publishes event to all contoller pods
 func PublishControllerEvent(ctx context.Context, client ctrlClient.Client, recorder record.EventRecorder, eventType string, reason string, msg string) error {
 	pod := &v1.Pod{}
 	err := client.Get(ctx, types.NamespacedName{Name: GetPodNameFromEnv(), Namespace: GetPodNameSpaceFromEnv()}, pod)
@@ -138,12 +138,15 @@ func PublishControllerEvent(ctx context.Context, client ctrlClient.Client, recor
 	return nil
 }
 
+// GetPodNameFromEnv gets value of X_CSI_REPLICATION_POD_NAME env variable
 func GetPodNameFromEnv() string {
 	if p := os.Getenv("X_CSI_REPLICATION_POD_NAME"); p != "" {
 		return p
 	}
 	return ""
 }
+
+// GetPodNameSpaceFromEnv gets value of X_CSI_REPLICATION_POD_NAMESPACE env variable
 func GetPodNameSpaceFromEnv() string {
 	if p := os.Getenv("X_CSI_REPLICATION_POD_NAMESPACE"); p != "" {
 		return p
@@ -179,51 +182,40 @@ var (
 	// ProtectionGroupRemovedAnnotation - annotation added after the protection-group is successfully removed
 	// and is used as a flag by the utils controller to process the deletion of remote replication-group
 	ProtectionGroupRemovedAnnotation string
-	// DriverName
-	// useful for filtering out objects for a particular driver
+	// DriverName is useful for filtering out objects for a particular driver
 	DriverName string
-	// RemoteClusterId
-	// Contains the identifier of the remote cluster
+	// RemoteClusterID contains the identifier of the remote cluster
 	// Used in annotations to enable utils controller to connect to the remote cluster
 	// for syncing objects across clusters
 	// Used in labels to enable filtering out objects which are replicated to a particular cluster
-	RemoteClusterId string
-	// RemoteReplicationGroup
-	// Contains the name of the associated DellCSIReplicationGroup on the remote cluster
+	RemoteClusterID string
+	// RemoteReplicationGroup contains the name of the associated DellCSIReplicationGroup on the remote cluster
 	// Used in annotations as well as labels
 	RemoteReplicationGroup string
-	//RGSyncComplete
+	// RGSyncComplete indicates whether RGs are synced or not
 	RGSyncComplete string
-	// RemotePV
-	// Contains the name of the remotePV object
+	// RemotePV contains the name of the remotePV object
 	RemotePV string
-	// RemotePVC
-	// Contains the name of the remote PVC object
+	// RemotePVC contains the name of the remote PVC object
 	RemotePVC string
-	// RemotePVCNamespace
-	// Contains the namespace of the remote PVC object
+	// RemotePVCNamespace contains the namespace of the remote PVC object
 	RemotePVCNamespace string
-	// ReplicationGroup
-	// Contains the name of the local DellCSIReplicationGroup object
+	// ReplicationGroup contains the name of the local DellCSIReplicationGroup object
 	ReplicationGroup string
-	// CreatedBy
-	// Annotation which indicates that this object was created by the replication-controller-manager
+	// CreatedBy annotation which indicates that this object was created by the replication-controller-manager
 	CreatedBy string
-	// ResourceRequest string
-	// Contains the requested resource limits of the source PVC
+	// ResourceRequest contains the requested resource limits of the source PVC
 	// To be used while creating the remote PVC
 	ResourceRequest string
-	// DeletionRequested
-	// Annotation which will be set to the PV on the object deletion
+	// DeletionRequested annotation which will be set to the PV on the object deletion
 	DeletionRequested string
-	// RemotePVRetentionPolicy
-	// Indicates whether to retain or delete the target PV
+	// RemotePVRetentionPolicy indicates whether to retain or delete the target PV
 	RemotePVRetentionPolicy string
-	// RemoteRGRetentionPolicy
-	// Indicates whether to retain or delete the target RG
+	// RemoteRGRetentionPolicy indicates whether to retain or delete the target RG
 	RemoteRGRetentionPolicy string
 )
 
+// InitLabelsAndAnnotations initializes package visible constants by using customizable domain variable
 func InitLabelsAndAnnotations(domain string) {
 	StorageClassReplicationParam = domain + storageClassReplicationParam
 	StorageClassRemoteStorageClassParam = domain + storageClassRemoteStorageClassParam
@@ -239,7 +231,7 @@ func InitLabelsAndAnnotations(domain string) {
 	ContextPrefix = domain + contextPrefix
 	ProtectionGroupRemovedAnnotation = domain + protectionGroupRemovedAnnotation
 	DriverName = domain + driverName
-	RemoteClusterId = domain + remoteClusterId
+	RemoteClusterID = domain + remoteClusterID
 	RemoteReplicationGroup = domain + remoteReplicationGroup
 	RGSyncComplete = domain + rGSyncComplete
 	RemotePV = domain + remotePV

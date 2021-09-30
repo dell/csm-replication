@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi"
 )
 
+// Options server options
 type Options struct {
 	Port     string
 	BindAddr string
@@ -18,10 +19,13 @@ type Options struct {
 }
 
 const (
+	// DefaultAddress address of stub server
 	DefaultAddress = "localhost"
+	// DefaultPort port of stub server
 	DefaultPort    = "4771"
 )
 
+// RunStubServer runs mock grpc server
 func RunStubServer(opt Options) {
 	if opt.Port == "" {
 		opt.Port = DefaultPort
@@ -55,6 +59,7 @@ func responseError(err error, w http.ResponseWriter) {
 	}
 }
 
+// Stub structure
 type Stub struct {
 	Service string `json:"service"`
 	Method  string `json:"method"`
@@ -62,12 +67,14 @@ type Stub struct {
 	Output  Output `json:"output"`
 }
 
+// Input structure
 type Input struct {
 	Equals   map[string]interface{} `json:"equals"`
 	Contains map[string]interface{} `json:"contains"`
 	Matches  map[string]interface{} `json:"matches"`
 }
 
+// Output structure
 type Output struct {
 	Data  map[string]interface{} `json:"data"`
 	Error string                 `json:"error"`

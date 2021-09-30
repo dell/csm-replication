@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package replication_controller
+package replicationcontroller
 
 import (
 	"context"
@@ -102,7 +102,7 @@ func (suite *PVControllerTestSuite) runFakeRemoteReplicationManager(fakeConfig c
 	pvcObj := utils.GetPVCObj("fake-pvc", suite.driver.Namespace, suite.driver.StorageClass)
 
 	pvcAnnotations := make(map[string]string)
-	pvcAnnotations[controllers.RemoteClusterId] = "remote-123"
+	pvcAnnotations[controllers.RemoteClusterID] = "remote-123"
 
 	pvcObj.Status.Phase = corev1.ClaimBound
 	pvcObj.Spec.VolumeName = "fake-pv"
@@ -177,7 +177,7 @@ func (suite *PVControllerTestSuite) runFakeRemoteReplicationManager(fakeConfig c
 	annotations[controllers.RemoteVolumeAnnotation] = `{"capacity_bytes":8591769600, "volume_id":"csi-UDI-pmax-e0cc37cd2e-000000000002-00766", "volume_context":{"CapacityGB":"8.00","RemoteSYMID":"000000000002","StorageGroup":"csi-no-srp-sg-test-2-ASYNC"}}`
 	annotations[controllers.RemoteStorageClassAnnotation] = "xyz"
 	annotations[controllers.ReplicationGroup] = "rg-abc"
-	annotations[controllers.RemoteClusterId] = "invalidId"
+	annotations[controllers.RemoteClusterID] = "invalidId"
 
 	pvc.Annotations = annotations
 	suite.client.Update(context.Background(), pvc)
@@ -187,7 +187,7 @@ func (suite *PVControllerTestSuite) runFakeRemoteReplicationManager(fakeConfig c
 
 	// scenario : Remote PV annotation is not nil
 	annotations = make(map[string]string)
-	annotations[controllers.RemoteClusterId] = "remote-123"
+	annotations[controllers.RemoteClusterID] = "remote-123"
 	annotations[controllers.RemotePV] = "xyz"
 
 	pvc.Annotations = annotations
@@ -261,7 +261,7 @@ func (suite *PVControllerTestSuite) TestRemoteReplication() {
 	annotations := make(map[string]string)
 	annotations[controllers.RGSyncComplete] = "yes"
 	annotations[controllers.RemoteReplicationGroup] = "fake-rg"
-	annotations[controllers.RemoteClusterId] = "remote-123"
+	annotations[controllers.RemoteClusterID] = "remote-123"
 	annotations[controllers.ContextPrefix] = "csi-fake"
 
 	//creating fake resource group

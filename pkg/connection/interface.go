@@ -44,10 +44,11 @@ type RemoteClusterClient interface {
 // ConnHandler - Interface
 type ConnHandler interface {
 	Verify(ctx context.Context) error
-	GetConnection(clusterId string) (RemoteClusterClient, error)
+	GetConnection(clusterID string) (RemoteClusterClient, error)
 }
 
+// MultiClusterClient interface of client that manages multiple clusters at once
 type MultiClusterClient interface {
-	GetConnection(clusterId string) (RemoteClusterClient, error)
-	GetClusterId() string
+	GetConnection(clusterID string) (RemoteClusterClient, error)
+	GetClusterID() string
 }

@@ -21,6 +21,7 @@ import (
 	"text/tabwriter"
 )
 
+// TableWriter is a structure that allows to print resources in table form
 type TableWriter struct {
 	writer  *tabwriter.Writer
 	objName string
@@ -77,6 +78,7 @@ func getFormatString(kind reflect.Kind) string {
 	return format
 }
 
+// NewTableWriter initializes and returns new instance of TableWriter
 func NewTableWriter(obj interface{}, out io.Writer) (*TableWriter, error) {
 	w := tabwriter.NewWriter(out, 0, 8, 1, '\t', 0)
 	header, format := getHeaderAndFormatStrings(obj)
@@ -101,6 +103,7 @@ func header(length int) string {
 	return header
 }
 
+// PrintHeader prints header of the table
 func (t *TableWriter) PrintHeader() {
 	length := len(t.objName)
 	paddingLength := 2 * length
@@ -112,6 +115,7 @@ func (t *TableWriter) PrintHeader() {
 	_, _ = fmt.Fprintln(t.writer, t.header)
 }
 
+// PrintRow prints rows of the tables
 func (t *TableWriter) PrintRow(obj interface{}) {
 	var values []interface{}
 	v := reflect.ValueOf(obj)
@@ -131,6 +135,7 @@ func (t *TableWriter) PrintRow(obj interface{}) {
 	_, _ = fmt.Fprintf(t.writer, t.format, values...)
 }
 
+// Done flushes table writer
 func (t *TableWriter) Done() {
 	_ = t.writer.Flush()
 }

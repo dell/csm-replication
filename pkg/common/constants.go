@@ -39,15 +39,23 @@ const (
 )
 
 const (
+	// PanicLevel represents logrus panic log level
 	PanicLevel = logrusr.PanicLevel
+	// FatalLevel represents logrus fatal log level
 	FatalLevel = logrusr.FatalLevel
+	// ErrorLevel represents logrus error log level
 	ErrorLevel = logrusr.ErrorLevel
+	// WarnLevel represents logrus warning log level
 	WarnLevel  = logrusr.WarnLevel
+	// InfoLevel represents logrus info log level
 	InfoLevel  = logrusr.InfoLevel
+	// DebugLevel represents logrus debug log level
 	DebugLevel = logrusr.DebugLevel
+	// TraceLevel represents logrus trace log level
 	TraceLevel = logrusr.TraceLevel
 )
 
+// ParseLevel returns correct logrus Level from given string name
 func ParseLevel(level string) (logrus.Level, error) {
 	switch strings.ToLower(level) {
 	case "panic":

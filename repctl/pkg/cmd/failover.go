@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// GetFailoverCommand returns 'failover' cobra command
 /* #nosec G104 */
 func GetFailoverCommand() *cobra.Command {
 	failoverCmd := &cobra.Command{

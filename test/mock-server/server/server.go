@@ -12,14 +12,17 @@ import (
 	"net/http"
 )
 
+// Replication mock controller that implements replication related calls
 type Replication struct{}
 
+// ProbeController calls stub for ProbeController
 func (s *Replication) ProbeController(ctx context.Context, in *replication.ProbeControllerRequest) (*replication.ProbeControllerResponse, error) {
 	out := &replication.ProbeControllerResponse{}
 	err := FindStub("Replication", "ProbeController", in, out)
 	return out, err
 }
 
+// GetReplicationCapabilities calls stub for GetReplicationCapabilities
 func (s *Replication) GetReplicationCapabilities(ctx context.Context, in *replication.GetReplicationCapabilityRequest) (*replication.GetReplicationCapabilityResponse, error) {
 	out := &replication.GetReplicationCapabilityResponse{}
 	outTemp := make(map[string][]int)
@@ -43,30 +46,35 @@ func (s *Replication) GetReplicationCapabilities(ctx context.Context, in *replic
 	return out, err
 }
 
+// CreateStorageProtectionGroup calls stub for CreateStorageProtectionGroup
 func (s *Replication) CreateStorageProtectionGroup(ctx context.Context, in *replication.CreateStorageProtectionGroupRequest) (*replication.CreateStorageProtectionGroupResponse, error) {
 	out := &replication.CreateStorageProtectionGroupResponse{}
 	err := FindStub("Replication", "CreateStorageProtectionGroup", in, out)
 	return out, err
 }
 
+// CreateRemoteVolume calls stub for CreateRemoteVolume
 func (s *Replication) CreateRemoteVolume(ctx context.Context, in *replication.CreateRemoteVolumeRequest) (*replication.CreateRemoteVolumeResponse, error) {
 	out := &replication.CreateRemoteVolumeResponse{}
 	err := FindStub("Replication", "CreateRemoteVolume", in, out)
 	return out, err
 }
 
+// DeleteStorageProtectionGroup calls stub for DeleteStorageProtectionGroup
 func (s *Replication) DeleteStorageProtectionGroup(ctx context.Context, in *replication.DeleteStorageProtectionGroupRequest) (*replication.DeleteStorageProtectionGroupResponse, error) {
 	out := &replication.DeleteStorageProtectionGroupResponse{}
 	err := FindStub("Replication", "DeleteStorageProtectionGroup", in, out)
 	return out, err
 }
 
+// GetStorageProtectionGroupStatus calls stub for GetStorageProtectionGroupStatus
 func (s *Replication) GetStorageProtectionGroupStatus(ctx context.Context, in *replication.GetStorageProtectionGroupStatusRequest) (*replication.GetStorageProtectionGroupStatusResponse, error) {
 	out := &replication.GetStorageProtectionGroupStatusResponse{}
 	err := FindStub("Replication", "GetStorageProtectionGroupStatus", in, out)
 	return out, err
 }
 
+// ExecuteAction calls stub for ExecuteAction
 func (s *Replication) ExecuteAction(ctx context.Context, in *replication.ExecuteActionRequest) (*replication.ExecuteActionResponse, error) {
 	out := &replication.ExecuteActionResponse{}
 	err := FindStub("Replication", "ExecuteAction", in, out)
@@ -84,6 +92,7 @@ type response struct {
 	Error string      `json:"error"`
 }
 
+// FindStub makes request to mock grpc server
 func FindStub(service, method string, in, out interface{}) error {
 	url := "http://localhost:4771/find"
 	pyl := payload{

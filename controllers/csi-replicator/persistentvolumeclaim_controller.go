@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package csi_replicator
+package csireplicator
 
 import (
 	"context"
@@ -63,6 +63,7 @@ type PersistentVolumeClaimReconciler struct {
 // +kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get
 // +kubebuilder:rbac:groups=core,resources=events,verbs=list;watch;create;update;patch
 
+// Reconcile contains reconciliation logic that updates PersistentVolumeClaim depending on it's current state
 func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("persistentvolumeclaim", req.NamespacedName)
 
@@ -160,8 +161,8 @@ func (r *PersistentVolumeClaimReconciler) processClaimForRemoteVolume(ctx contex
 	controller.AddAnnotation(claim, controller.RemoteStorageClassAnnotation, scParams[controller.StorageClassRemoteStorageClassParam])
 	// Add remote-cluster annotation and label
 	if remoteCluster, ok := scParams[controller.StorageClassRemoteClusterParam]; ok {
-		controller.AddAnnotation(claim, controller.RemoteClusterId, remoteCluster)
-		controller.AddLabel(claim, controller.RemoteClusterId, remoteCluster)
+		controller.AddAnnotation(claim, controller.RemoteClusterID, remoteCluster)
+		controller.AddLabel(claim, controller.RemoteClusterID, remoteCluster)
 		controller.AddLabel(claim, controller.DriverName, r.DriverName)
 	}
 	if r.ContextPrefix != "" {
@@ -202,6 +203,7 @@ func (r *PersistentVolumeClaimReconciler) processClaimForReplicationGroup(ctx co
 	return nil
 }
 
+// SetupWithManager start using reconciler by creating new controller managed by provided manager
 func (r *PersistentVolumeClaimReconciler) SetupWithManager(mgr ctrl.Manager, limiter ratelimiter.RateLimiter, maxReconcilers int) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.PersistentVolumeClaim{}).

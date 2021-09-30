@@ -24,9 +24,10 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// RgIDType represents replication group id
 type RgIDType string
 
-// pendingState type limits the number of pending requests by making sure there are no other requests for the same RG,
+// PendingState type limits the number of pending requests by making sure there are no other requests for the same RG,
 // otherwise a "pending" error is returned.
 // Additionally, no more than maxPending requests are processed at a time without returning an "overload" error.
 type PendingState struct {
@@ -37,6 +38,7 @@ type PendingState struct {
 	Log          logr.Logger
 }
 
+// CheckAndUpdatePendingState sets state of current RG as pending if allowed by current capacity
 func (rgID RgIDType) CheckAndUpdatePendingState(ps *PendingState) error {
 	ps.pendingMutex.Lock()
 	defer ps.pendingMutex.Unlock()
@@ -56,6 +58,7 @@ func (rgID RgIDType) CheckAndUpdatePendingState(ps *PendingState) error {
 	return nil
 }
 
+// ClearPending removes current replication group from pending list
 func (rgID RgIDType) ClearPending(ps *PendingState) {
 	ps.pendingMutex.Lock()
 	defer ps.pendingMutex.Unlock()

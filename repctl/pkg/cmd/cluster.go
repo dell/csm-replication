@@ -34,6 +34,7 @@ import (
 	"strings"
 )
 
+// GetClusterCommand returns 'cluster' cobra command
 func GetClusterCommand() *cobra.Command {
 	clusterCmd := &cobra.Command{
 		Use:     "cluster",
@@ -215,7 +216,7 @@ func addCluster(configs, clusterNames []string, folderPath string, force bool) e
 		clusterName := clusterNames[i]
 		err := updateClusters(cfg, clusterName, folderPath, force)
 		if err != nil {
-			return fmt.Errorf("error when adding config %s: %s\n", cfg, err.Error())
+			return fmt.Errorf("error when adding config %s: %s", cfg, err.Error())
 		}
 	}
 
@@ -225,12 +226,12 @@ func addCluster(configs, clusterNames []string, folderPath string, force bool) e
 func injectCluster(mc k8s.MultiClusterConfiguratorInterface, clusterIDs []string, path string, customConfigs ...string) error {
 	configFolder, err := getClustersFolderPath(path)
 	if err != nil {
-		return fmt.Errorf("error getting clusters folder path: %s\n", err.Error())
+		return fmt.Errorf("error getting clusters folder path: %s", err.Error())
 	}
 
 	clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
 	if err != nil {
-		return fmt.Errorf("error in initializing cluster info: %s\n", err.Error())
+		return fmt.Errorf("error in initializing cluster info: %s", err.Error())
 	}
 
 	configs := &k8s.Clusters{}
@@ -239,12 +240,12 @@ func injectCluster(mc k8s.MultiClusterConfiguratorInterface, clusterIDs []string
 		for _, cfg := range customConfigs {
 			info, err := os.Stat(cfg)
 			if err != nil {
-				return fmt.Errorf("error checking cfg %s: %s\n", cfg, err.Error())
+				return fmt.Errorf("error checking cfg %s: %s", cfg, err.Error())
 			}
 
 			cluster, err := k8s.CreateCluster(info.Name(), cfg)
 			if err != nil {
-				return fmt.Errorf("error creating cluster: %s\n", err.Error())
+				return fmt.Errorf("error creating cluster: %s", err.Error())
 			}
 
 			configs.Clusters = append(configs.Clusters, cluster)
@@ -285,13 +286,13 @@ func removeCluster(clusterName string, path string) error {
 
 func injectConfigIntoCluster(srcCluster k8s.ClusterInterface, clusters *k8s.Clusters) error {
 	type Target struct {
-		ClusterId string `yaml:"clusterId"`
+		ClusterID string `yaml:"clusterId"`
 		Address   string `yaml:"address"`
 		SecretRef string `yaml:"secretRef"`
 	}
 
 	type ConnectionConfig struct {
-		ClusterId string   `yaml:"clusterId"`
+		ClusterID string   `yaml:"clusterId"`
 		Targets   []Target `yaml:"targets"`
 		LogLevel  string   `yaml:"CSI_LOG_LEVEL"`
 	}
@@ -312,12 +313,12 @@ func injectConfigIntoCluster(srcCluster k8s.ClusterInterface, clusters *k8s.Clus
 		fmt.Printf("Creating %s namespace \n", namespace)
 		cErr := srcCluster.CreateNamespace(context.Background(), ns)
 		if cErr != nil {
-			return fmt.Errorf("error creating namespace: %s\n", err.Error())
+			return fmt.Errorf("error creating namespace: %s", err.Error())
 		}
 	}
 
 	connectionConfig := ConnectionConfig{
-		ClusterId: srcCluster.GetID(),
+		ClusterID: srcCluster.GetID(),
 		LogLevel:  "INFO",
 	}
 
@@ -341,12 +342,12 @@ func injectConfigIntoCluster(srcCluster k8s.ClusterInterface, clusters *k8s.Clus
 
 		data, err := ioutil.ReadFile(tgtCluster.GetKubeConfigFile())
 		if err != nil {
-			return fmt.Errorf("error while trying to read config file: %s\n", err.Error())
+			return fmt.Errorf("error while trying to read config file: %s", err.Error())
 		}
 
 		err = addKeyFromLiteralToSecret(secret, "data", data)
 		if err != nil {
-			return fmt.Errorf("error while adding file to secret: %s\n", err.Error())
+			return fmt.Errorf("error while adding file to secret: %s", err.Error())
 		}
 
 		fmt.Printf("Creating/Updating %s secret in %s cluster \n", secret.Name, srcCluster.GetID())
@@ -354,13 +355,13 @@ func injectConfigIntoCluster(srcCluster k8s.ClusterInterface, clusters *k8s.Clus
 		if err != nil {
 			uErr := srcCluster.GetClient().Update(context.Background(), secret)
 			if uErr != nil {
-				return fmt.Errorf("error while creating secret in cluster: %s\n", err.Error())
+				return fmt.Errorf("error while creating secret in cluster: %s", err.Error())
 			}
 		}
 		fmt.Printf("secret %s created \n", secret.Name)
 
 		connectionConfig.Targets = append(connectionConfig.Targets, Target{
-			ClusterId: tgtCluster.GetID(),
+			ClusterID: tgtCluster.GetID(),
 			Address:   tgtCluster.GetHost(),
 			SecretRef: tgtCluster.GetID(),
 		})
@@ -368,7 +369,7 @@ func injectConfigIntoCluster(srcCluster k8s.ClusterInterface, clusters *k8s.Clus
 
 	bytes, err := yaml.Marshal(connectionConfig)
 	if err != nil {
-		return fmt.Errorf("error while marshaling connection config: %s\n", err.Error())
+		return fmt.Errorf("error while marshaling connection config: %s", err.Error())
 	}
 
 	configMap := &corev1.ConfigMap{
@@ -390,23 +391,23 @@ func injectConfigIntoCluster(srcCluster k8s.ClusterInterface, clusters *k8s.Clus
 		cmap := &corev1.ConfigMap{}
 		err := srcCluster.GetClient().Get(context.Background(), types.NamespacedName{Name: "dell-replication-controller-config", Namespace: namespace}, cmap)
 		if err != nil {
-			return fmt.Errorf("error while trying to get existing config: %s\n", err.Error())
+			return fmt.Errorf("error while trying to get existing config: %s", err.Error())
 		}
 		gotData := &ConnectionConfig{}
 		err = yaml.Unmarshal([]byte(cmap.Data["config.yaml"]), gotData)
 		if err != nil {
-			return fmt.Errorf("error while unmarshaling connection config: %s\n", err.Error())
+			return fmt.Errorf("error while unmarshaling connection config: %s", err.Error())
 		}
 		connectionConfig.LogLevel = gotData.LogLevel
 		bytes, err := yaml.Marshal(connectionConfig)
 		if err != nil {
-			return fmt.Errorf("error while marshaling connection config: %s\n", err.Error())
+			return fmt.Errorf("error while marshaling connection config: %s", err.Error())
 		}
 		configMap.Data["config.yaml"] = string(bytes)
 
 		uErr := srcCluster.GetClient().Update(context.Background(), configMap)
 		if uErr != nil {
-			return fmt.Errorf("error while creating config map in cluster: %s\n", err.Error())
+			return fmt.Errorf("error while creating config map in cluster: %s", uErr.Error())
 		}
 	}
 	fmt.Printf("config map %s created \n", configMap.Name)
@@ -525,7 +526,7 @@ func generateConfigsFromSA(mc *k8s.MultiClusterConfigurator, clusterIDs []string
 
 	clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
 	if err != nil {
-		return nil, fmt.Errorf("error in initializing cluster info: %s\n", err.Error())
+		return nil, fmt.Errorf("error in initializing cluster info: %s", err.Error())
 	}
 
 	for _, cluster := range clusters.Clusters {

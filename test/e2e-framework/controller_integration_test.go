@@ -127,7 +127,7 @@ func (suite *ReplicationControllerTestSuite) createLocalPVC() error {
 		// Adding annotations
 		annotations := make(map[string]string)
 		annotations[controllers.PVCProtectionComplete] = "yes"
-		annotations[controllers.RemoteClusterId] = "lglap066"
+		annotations[controllers.RemoteClusterID] = "lglap066"
 		annotations[controllers.RemoteStorageClassAnnotation] = suite.driver.StorageClass
 		annotations[controllers.RemoteVolumeAnnotation] = `{
 			"capacity_bytes": 30023,
@@ -152,7 +152,7 @@ func (suite *ReplicationControllerTestSuite) createLocalPVC() error {
 
 		//Adding labels
 		labels := make(map[string]string)
-		labels[controllers.RemoteClusterId] = "lglap066"
+		labels[controllers.RemoteClusterID] = "lglap066"
 		labels[controllers.DriverName] = suite.driver.DriverName
 		labels[controllers.ReplicationGroup] = LocalRg
 		pvcObj.SetLabels(labels)
@@ -167,7 +167,7 @@ func (suite *ReplicationControllerTestSuite) createLocalPVC() error {
 func (suite *ReplicationControllerTestSuite) createLocalRG() error {
 	ctx := context.Background()
 	annotations := make(map[string]string)
-	annotations[controllers.RemoteClusterId] = "lglap066"
+	annotations[controllers.RemoteClusterID] = "lglap066"
 	attributes := map[string]string{
 		"RdfGroup":                               "2",
 		"RdfMode":                                "ASYNC",
@@ -178,7 +178,7 @@ func (suite *ReplicationControllerTestSuite) createLocalRG() error {
 		"SYMID":                                  "000000000001",
 		"ServiceLevel":                           "Bronze",
 		controllers.StorageClassReplicationParam: controllers.StorageClassReplicationParamEnabledValue,
-		controllers.RemoteClusterId:              "lglap066",
+		controllers.RemoteClusterID:              "lglap066",
 		controllers.RemotePVRetentionPolicy:      controllers.RemoteRetentionValueDelete,
 		controllers.RemoteStorageClassAnnotation: suite.driver.StorageClass,
 	}
@@ -189,7 +189,7 @@ func (suite *ReplicationControllerTestSuite) createLocalRG() error {
 			Name: LocalRg,
 			Labels: map[string]string{
 				controllers.DriverName:      suite.driver.DriverName,
-				controllers.RemoteClusterId: "lglap066",
+				controllers.RemoteClusterID: "lglap066",
 			},
 			Annotations: annotations,
 		},
@@ -241,7 +241,7 @@ func (suite *ReplicationControllerTestSuite) updateLocalPV(name string) error {
 	annotations := make(map[string]string)
 	annotations[controllers.PVProtectionComplete] = "yes"
 	annotations[controllers.RemotePVRetentionPolicy] = controllers.RemoteRetentionValueDelete
-	annotations[controllers.RemoteClusterId] = "xyz066"
+	annotations[controllers.RemoteClusterID] = "xyz066"
 	annotations[controllers.RemoteStorageClassAnnotation] = suite.driver.StorageClass
 	annotations[controllers.RemoteVolumeAnnotation] = `{
 	"capacity_bytes": 30023,
@@ -266,7 +266,7 @@ func (suite *ReplicationControllerTestSuite) updateLocalPV(name string) error {
 
 	//Adding labels
 	labels := make(map[string]string)
-	labels[controllers.RemoteClusterId] = "lglap066"
+	labels[controllers.RemoteClusterID] = "lglap066"
 	labels[controllers.DriverName] = suite.driver.DriverName
 	labels[controllers.ReplicationGroup] = LocalRg
 	pv.SetLabels(labels)

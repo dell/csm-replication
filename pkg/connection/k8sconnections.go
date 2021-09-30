@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
+// RemoteK8sConnHandler handler of remote Kubernetes cluster connection
 type RemoteK8sConnHandler struct {
 	configs       map[string]*rest.Config
 	lock          sync.Mutex
@@ -50,55 +51,57 @@ func (k8sConnHandler *RemoteK8sConnHandler) init() {
 	}
 }
 
-func (k8sConnHandler *RemoteK8sConnHandler) AddOrUpdateConfig(clusterId string, config *rest.Config, log logr.Logger) {
+// AddOrUpdateConfig adds (or updates) config to the list of managed clusters
+func (k8sConnHandler *RemoteK8sConnHandler) AddOrUpdateConfig(clusterID string, config *rest.Config, log logr.Logger) {
 	k8sConnHandler.lock.Lock()
 	defer k8sConnHandler.lock.Unlock()
 	k8sConnHandler.init()
-	if _, ok := k8sConnHandler.configs[clusterId]; ok {
-		log.V(common.DebugLevel).Info(fmt.Sprintf("Updating REST config for ClusterId: %s", clusterId))
-		delete(k8sConnHandler.configs, clusterId)
+	if _, ok := k8sConnHandler.configs[clusterID]; ok {
+		log.V(common.DebugLevel).Info(fmt.Sprintf("Updating REST config for ClusterId: %s", clusterID))
+		delete(k8sConnHandler.configs, clusterID)
 		// Also delete any cached clients
-		if _, ok := k8sConnHandler.cachedClients[clusterId]; ok {
-			log.V(common.DebugLevel).Info(fmt.Sprintf("Deleting cached client for ClusterId: %s", clusterId))
-			delete(k8sConnHandler.cachedClients, clusterId)
+		if _, ok := k8sConnHandler.cachedClients[clusterID]; ok {
+			log.V(common.DebugLevel).Info(fmt.Sprintf("Deleting cached client for ClusterId: %s", clusterID))
+			delete(k8sConnHandler.cachedClients, clusterID)
 		}
 	} else {
-		log.V(common.InfoLevel).Info(fmt.Sprintf("Adding REST config for ClusterId: %s\n", clusterId))
+		log.V(common.InfoLevel).Info(fmt.Sprintf("Adding REST config for ClusterId: %s\n", clusterID))
 	}
-	k8sConnHandler.configs[clusterId] = config
+	k8sConnHandler.configs[clusterID] = config
 }
 
-func (k8sConnHandler *RemoteK8sConnHandler) GetConnection(clusterId string) (RemoteClusterClient, error) {
+// GetConnection returns client from the map of managed clusters
+func (k8sConnHandler *RemoteK8sConnHandler) GetConnection(clusterID string) (RemoteClusterClient, error) {
 	k8sConnHandler.lock.Lock()
 	defer k8sConnHandler.lock.Unlock()
 	k8sConnHandler.init()
-	return k8sConnHandler.getControllerClient(clusterId)
+	return k8sConnHandler.getControllerClient(clusterID)
 }
 
-func (k8sConnHandler *RemoteK8sConnHandler) getControllerClient(clusterId string) (*RemoteK8sControllerClient, error) {
+func (k8sConnHandler *RemoteK8sConnHandler) getControllerClient(clusterID string) (*RemoteK8sControllerClient, error) {
 	// First check if we have cached the client already
-	if client, ok := k8sConnHandler.cachedClients[clusterId]; ok {
-		log.Printf("Using cached client for ClusterId: %s\n", clusterId)
+	if client, ok := k8sConnHandler.cachedClients[clusterID]; ok {
+		log.Printf("Using cached client for ClusterId: %s\n", clusterID)
 		return client, nil
 	}
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(repV1Alpha1.AddToScheme(scheme))
 	utilruntime.Must(apiExtensionsv1.AddToScheme(scheme))
-	if clientConfig, ok := k8sConnHandler.configs[clusterId]; ok {
+	if clientConfig, ok := k8sConnHandler.configs[clusterID]; ok {
 		client, err := GetControllerClient(clientConfig, scheme)
 		//client, err := ctrlClient.New(clientConfig, ctrlClient.Options{Scheme: scheme})
 		if err != nil {
 			return nil, err
 		}
 		remoteK8sClient := RemoteK8sControllerClient{
-			ClusterID: clusterId,
+			ClusterID: clusterID,
 			Client:    client,
 		}
-		k8sConnHandler.cachedClients[clusterId] = &remoteK8sClient
+		k8sConnHandler.cachedClients[clusterID] = &remoteK8sClient
 		return &remoteK8sClient, nil
 	}
-	return nil, fmt.Errorf("clusterId - %s not found", clusterId)
+	return nil, fmt.Errorf("clusterID - %s not found", clusterID)
 }
 
 // Verify if the connections have been established properly and all the required APIs
@@ -111,24 +114,24 @@ func (k8sConnHandler *RemoteK8sConnHandler) Verify(ctx context.Context) error {
 }
 
 func (k8sConnHandler *RemoteK8sConnHandler) verifyControllerClients(ctx context.Context) error {
-	for clusterId := range k8sConnHandler.configs {
-		client, err := k8sConnHandler.getControllerClient(clusterId)
+	for clusterID := range k8sConnHandler.configs {
+		client, err := k8sConnHandler.getControllerClient(clusterID)
 		if err != nil {
-			return fmt.Errorf("failed to create client for clusterId: %s. error - %s", clusterId, err.Error())
+			return fmt.Errorf("failed to create client for clusterId: %s. error - %s", clusterID, err.Error())
 		}
 		crdList, err := client.ListCustomResourceDefinitions(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to list CustomResourceDefinitions for ClusterId: %s. error - %s", clusterId, err.Error())
+			return fmt.Errorf("failed to list CustomResourceDefinitions for ClusterId: %s. error - %s", clusterID, err.Error())
 		}
 		if len(crdList.Items) == 0 {
-			return fmt.Errorf("couldn't find any CRD definitions for ClusterId: %s", clusterId)
+			return fmt.Errorf("couldn't find any CRD definitions for ClusterId: %s", clusterID)
 		}
 		found := false
 		for _, crd := range crdList.Items {
 			if crd.Name == "dellcsireplicationgroups.replication.storage.dell.com" {
 				crd, err := client.GetCustomResourceDefinitions(ctx, crd.Name)
 				if err != nil {
-					return fmt.Errorf("failed to get CRD definition for DellCSIReplicationGroup for ClusterId: %s. error - %s", clusterId, err.Error())
+					return fmt.Errorf("failed to get CRD definition for DellCSIReplicationGroup for ClusterId: %s. error - %s", clusterID, err.Error())
 				}
 				if crd.Spec.Group == repV1Alpha1.GroupVersion.Group && crd.Spec.Names.Kind == "DellCSIReplicationGroup" {
 					found = true
@@ -137,7 +140,7 @@ func (k8sConnHandler *RemoteK8sConnHandler) verifyControllerClients(ctx context.
 			}
 		}
 		if !found {
-			return fmt.Errorf("failed to find DellCSIReplicationGroup in list of CRDs for ClusterId: %s", clusterId)
+			return fmt.Errorf("failed to find DellCSIReplicationGroup in list of CRDs for ClusterId: %s", clusterID)
 		}
 	}
 	return nil
@@ -149,7 +152,7 @@ type RemoteK8sControllerClient struct {
 	Client    ctrlClient.Client
 }
 
-// GetStorageClass
+// GetStorageClass returns storage class object by querying cluster using storage class name
 func (c *RemoteK8sControllerClient) GetStorageClass(ctx context.Context, storageClassName string) (*storageV1.StorageClass, error) {
 	found := &storageV1.StorageClass{}
 	err := c.Client.Get(ctx, types.NamespacedName{Name: storageClassName}, found)
@@ -159,7 +162,7 @@ func (c *RemoteK8sControllerClient) GetStorageClass(ctx context.Context, storage
 	return found, nil
 }
 
-// ListStorageClass
+// ListStorageClass returns list of all storage classes objects that are currently in cluster
 func (c *RemoteK8sControllerClient) ListStorageClass(ctx context.Context) (*storageV1.StorageClassList, error) {
 	scList := &storageV1.StorageClassList{}
 	err := c.Client.List(ctx, scList)
@@ -169,12 +172,12 @@ func (c *RemoteK8sControllerClient) ListStorageClass(ctx context.Context) (*stor
 	return scList, nil
 }
 
-// CreateStorageClass
+// CreateStorageClass creates storage class object in current cluster
 func (c *RemoteK8sControllerClient) CreateStorageClass(ctx context.Context, storageClass *storageV1.StorageClass) error {
 	return c.Client.Create(ctx, storageClass)
 }
 
-// GetPersistentVolume
+// GetPersistentVolume returns persistent volume object by querying cluster using persistent volume name
 func (c *RemoteK8sControllerClient) GetPersistentVolume(ctx context.Context, persistentVolumeName string) (*corev1.PersistentVolume, error) {
 	found := &corev1.PersistentVolume{}
 	err := c.Client.Get(ctx, types.NamespacedName{Name: persistentVolumeName}, found)
@@ -184,17 +187,17 @@ func (c *RemoteK8sControllerClient) GetPersistentVolume(ctx context.Context, per
 	return found, nil
 }
 
-// CreatePersistentVolume
+// CreatePersistentVolume creates persistent volume object in current cluster
 func (c *RemoteK8sControllerClient) CreatePersistentVolume(ctx context.Context, volume *corev1.PersistentVolume) error {
 	return c.Client.Create(ctx, volume)
 }
 
-// UpdatePersistentVolume
+// UpdatePersistentVolume updates persistent volume object in current cluster
 func (c *RemoteK8sControllerClient) UpdatePersistentVolume(ctx context.Context, volume *corev1.PersistentVolume) error {
 	return c.Client.Update(ctx, volume)
 }
 
-// GetReplicationGroup
+// GetReplicationGroup returns replication group object by querying cluster using replication group name
 func (c *RemoteK8sControllerClient) GetReplicationGroup(ctx context.Context, replicationGroupName string) (*repV1Alpha1.DellCSIReplicationGroup, error) {
 	found := &repV1Alpha1.DellCSIReplicationGroup{}
 	err := c.Client.Get(ctx, types.NamespacedName{Name: replicationGroupName}, found)
@@ -204,18 +207,18 @@ func (c *RemoteK8sControllerClient) GetReplicationGroup(ctx context.Context, rep
 	return found, nil
 }
 
-// UpdateReplicationGroup
+// UpdateReplicationGroup updates replication group object in current cluster
 func (c *RemoteK8sControllerClient) UpdateReplicationGroup(ctx context.Context, replicationGroup *repV1Alpha1.DellCSIReplicationGroup) error {
 	return c.Client.Update(ctx, replicationGroup)
 
 }
 
-// CreateReplicationGroup
+// CreateReplicationGroup creates replication group object in current cluster
 func (c *RemoteK8sControllerClient) CreateReplicationGroup(ctx context.Context, group *repV1Alpha1.DellCSIReplicationGroup) error {
 	return c.Client.Create(ctx, group)
 }
 
-// ListReplicationGroup
+// ListReplicationGroup returns list of all replication group objects that are currently in cluster
 func (c *RemoteK8sControllerClient) ListReplicationGroup(ctx context.Context) (*repV1Alpha1.DellCSIReplicationGroupList, error) {
 	rgList := &repV1Alpha1.DellCSIReplicationGroupList{}
 	err := c.Client.List(ctx, rgList)
@@ -225,6 +228,7 @@ func (c *RemoteK8sControllerClient) ListReplicationGroup(ctx context.Context) (*
 	return rgList, nil
 }
 
+// ListCustomResourceDefinitions returns list of custom resource definition objects that are currently in cluster
 func (c *RemoteK8sControllerClient) ListCustomResourceDefinitions(ctx context.Context) (*apiExtensionsv1.CustomResourceDefinitionList, error) {
 	crdList := &apiExtensionsv1.CustomResourceDefinitionList{}
 	err := c.Client.List(ctx, crdList)
@@ -234,7 +238,7 @@ func (c *RemoteK8sControllerClient) ListCustomResourceDefinitions(ctx context.Co
 	return crdList, nil
 }
 
-// GetCustomResourceDefinitions
+// GetCustomResourceDefinitions returns custom resource definition object by querying cluster using custom resource definition name
 func (c *RemoteK8sControllerClient) GetCustomResourceDefinitions(ctx context.Context, crdName string) (*apiExtensionsv1.CustomResourceDefinition, error) {
 	crd := &apiExtensionsv1.CustomResourceDefinition{}
 	err := c.Client.Get(ctx, types.NamespacedName{Name: crdName}, crd)
@@ -244,7 +248,7 @@ func (c *RemoteK8sControllerClient) GetCustomResourceDefinitions(ctx context.Con
 	return crd, nil
 }
 
-// GetPersistentVolumeClaim
+// GetPersistentVolumeClaim returns persistent volume claim object by querying cluster using persistent volume claim name
 func (c *RemoteK8sControllerClient) GetPersistentVolumeClaim(ctx context.Context, namespace, claimName string) (*corev1.PersistentVolumeClaim, error) {
 	claim := &corev1.PersistentVolumeClaim{}
 	err := c.Client.Get(ctx, types.NamespacedName{Name: claimName, Namespace: namespace}, claim)
@@ -254,7 +258,7 @@ func (c *RemoteK8sControllerClient) GetPersistentVolumeClaim(ctx context.Context
 	return claim, nil
 }
 
-// UpdatePersistentVolume
+// UpdatePersistentVolumeClaim updates persistent volume claim object in current cluster
 func (c *RemoteK8sControllerClient) UpdatePersistentVolumeClaim(ctx context.Context, claim *corev1.PersistentVolumeClaim) error {
 	return c.Client.Update(ctx, claim)
 }

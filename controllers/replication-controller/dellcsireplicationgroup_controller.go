@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package replication_controller
+package replicationcontroller
 
 import (
 	"context"
@@ -59,6 +59,7 @@ type ReplicationGroupReconciler struct {
 // +kubebuilder:rbac:groups=replication.storage.dell.com,resources=dellcsireplicationgroups/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=events,verbs=list;watch;create;update;patch
 
+// Reconcile contains reconciliation logic that updates ReplicationGroup depending on it's current state
 func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("dellcsireplicationgroup", req.Name)
 
@@ -85,11 +86,11 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		// Continue as we can re verify
 	}
 
-	localClusterId := r.Config.GetClusterId()
-	remoteClusterId := localRG.Spec.RemoteClusterID
+	localClusterID := r.Config.GetClusterID()
+	remoteClusterID := localRG.Spec.RemoteClusterID
 
-	if remoteClusterId == controller.Self {
-		localClusterId = controller.Self
+	if remoteClusterID == controller.Self {
+		localClusterID = controller.Self
 
 		if !strings.HasPrefix(localRGName, replicated) {
 			remoteRGName = replicated + "-" + localRGName
@@ -99,12 +100,12 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	annotations := make(map[string]string)
 	annotations[controller.RemoteReplicationGroup] = localRGName
 	annotations[controller.RemoteRGRetentionPolicy] = localRG.Annotations[controller.RemoteRGRetentionPolicy]
-	annotations[controller.RemoteClusterId] = localClusterId
+	annotations[controller.RemoteClusterID] = localClusterID
 
 	labels := make(map[string]string)
 
 	labels[controller.DriverName] = localRG.Labels[controller.DriverName]
-	labels[controller.RemoteClusterId] = localClusterId
+	labels[controller.RemoteClusterID] = localClusterID
 
 	// Apply driver specific labels
 	remoteRGAttributes := localRG.Spec.RemoteProtectionGroupAttributes
@@ -127,7 +128,7 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		Spec: storagev1alpha1.DellCSIReplicationGroupSpec{
 			DriverName:                      localRG.Spec.DriverName,
 			Action:                          "",
-			RemoteClusterID:                 localClusterId,
+			RemoteClusterID:                 localClusterID,
 			ProtectionGroupID:               localRG.Spec.RemoteProtectionGroupID,
 			ProtectionGroupAttributes:       localRG.Spec.RemoteProtectionGroupAttributes,
 			RemoteProtectionGroupID:         localRG.Spec.ProtectionGroupID,
@@ -136,7 +137,7 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	// Try to get the client
-	remoteClient, err := r.Config.GetConnection(remoteClusterId)
+	remoteClient, err := r.Config.GetConnection(remoteClusterID)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -175,10 +176,9 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 						}
 						// Resetting the rate-limiter to requeue for the deletion of remote RG
 						return ctrl.Result{RequeueAfter: 1 * time.Millisecond}, nil
-					} else {
-						// Requeueing because the remote PV still exists
-						return ctrl.Result{Requeue: true}, nil
 					}
+					// Requeueing because the remote PV still exists
+					return ctrl.Result{Requeue: true}, nil
 				}
 			}
 		}
@@ -206,7 +206,7 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	// If the RG already exists on the Remote Cluster,
 	// We treat this as idempotent.
 	log.V(common.InfoLevel).Info(fmt.Sprintf("Checking if remote RG with the name %s exists on ClusterId: %s",
-		remoteRGName, remoteClusterId))
+		remoteRGName, remoteClusterID))
 	rgObj, err := remoteClient.GetReplicationGroup(ctx, remoteRGName)
 	if err != nil && !errors.IsNotFound(err) {
 		log.Error(err, "failed to get RG details on the remote cluster")
@@ -234,14 +234,14 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		// We got the object
 		log.V(common.InfoLevel).Info(" The RG already exists on the remote cluster")
 		// First verify the source cluster for this RG
-		if rgObj.Spec.RemoteClusterID == localClusterId {
+		if rgObj.Spec.RemoteClusterID == localClusterID {
 			// Confirmed that this object was created by this controller
 			// Check other fields to see if this matches everything from our object
 			// If fields don't match, then it could mean that this is a leftover object or someone edited it
 			// Verify driver name
 			if rgObj.Spec.DriverName != remoteRG.Spec.DriverName {
 				// Lets create a new object
-				remoteRGName = fmt.Sprintf("SourceClusterId-%s-%s", localClusterId, localRGName)
+				remoteRGName = fmt.Sprintf("SourceClusterId-%s-%s", localClusterID, localRGName)
 				remoteRG.Name = remoteRGName
 				createRG = true
 				rgSyncComplete = false
@@ -251,15 +251,15 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 					// Don't know how to proceed here
 					// Lets raise an event and stop reconciling
 					r.EventRecorder.Eventf(localRG, eventTypeWarning, eventReasonUpdated,
-						"Found conflicting RG on remote ClusterId: %s", remoteClusterId)
+						"Found conflicting RG on remote ClusterId: %s", remoteClusterID)
 					log.Error(fmt.Errorf("conflicting RG with name: %s exists on ClusterId: %s",
-						localRGName, remoteClusterId), "stopping reconcile")
+						localRGName, remoteClusterID), "stopping reconcile")
 					return ctrl.Result{}, nil
 				}
 			}
 		} else {
 			// update the name of the RG and create it
-			remoteRGName = fmt.Sprintf("SourceClusterId-%s-%s", localClusterId, localRGName)
+			remoteRGName = fmt.Sprintf("SourceClusterId-%s-%s", localClusterID, localRGName)
 			remoteRG.Name = remoteRGName
 			createRG = true
 			rgSyncComplete = false
@@ -271,12 +271,12 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		if err != nil {
 			log.Error(err, "failed to create remote CR for DellCSIReplicationGroup")
 			r.EventRecorder.Eventf(localRG, eventTypeWarning, eventReasonUpdated,
-				"Failed to create remote CR for DellCSIReplicationGroup on ClusterId: %s", remoteClusterId)
+				"Failed to create remote CR for DellCSIReplicationGroup on ClusterId: %s", remoteClusterID)
 			return ctrl.Result{}, err
 		}
 		log.V(common.InfoLevel).Info("The remote RG has been successfully created!!")
 		r.EventRecorder.Eventf(localRG, eventTypeNormal, eventReasonUpdated,
-			"Created remote ReplicationGroup with name: %s on cluster: %s", remoteRGName, remoteClusterId)
+			"Created remote ReplicationGroup with name: %s on cluster: %s", remoteRGName, remoteClusterID)
 	}
 
 	// Update the RemoteReplicationGroup annotation on the local RG if required
@@ -288,12 +288,13 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		controller.AddAnnotation(localRG, controller.RGSyncComplete, "yes")
 		err = r.Update(ctx, localRG)
 		return ctrl.Result{}, err
-	} else {
-		log.V(common.InfoLevel).Info("RG has already been synced to the remote cluster")
 	}
+
+	log.V(common.InfoLevel).Info("RG has already been synced to the remote cluster")
 	return ctrl.Result{}, nil
 }
 
+// SetupWithManager start using reconciler by creating new controller managed by provided manager
 func (r *ReplicationGroupReconciler) SetupWithManager(mgr ctrl.Manager, limiter ratelimiter.RateLimiter, maxReconcilers int) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&storagev1alpha1.DellCSIReplicationGroup{}).
