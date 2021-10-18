@@ -147,12 +147,12 @@ run-controller-tests:
 
 #To generate coverage for the csi-replicator
 gen-coverage-csi-replicator:
-	go test ./controllers/csi-replicator/ ./pkg/connection/ -v -coverpkg=./controllers/csi-replicator/ -coverprofile cover.out
+	go test ./controllers/csi-replicator/ ./pkg/connection/ -v -race -coverpkg=./controllers/csi-replicator/ -coverprofile cover.out
 
 #To generate coverage for the replication-controller
 gen-coverage-replication-controller:
-	go test ./controllers/replication-controller/ -v -coverpkg=./controllers/replication-controller/ -coverprofile cover.out
+	go test ./controllers/replication-controller/ -v -race -coverpkg=./controllers/replication-controller/ -coverprofile cover.out
 
 #To generate coverage for all the controllers
 gen-coverage:
-	( cd controllers; go clean -cache; go test -v -cover ./... -coverprofile cover.out )
+	( cd controllers; go clean -cache; go test -race -v -cover ./... -coverprofile cover.out )

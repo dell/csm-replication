@@ -30,10 +30,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sync"
 	"time"
 )
 
 type ReplicationGroupMonitoring struct {
+	Lock sync.Mutex
 	client.Client
 	EventRecorder      record.EventRecorder
 	Log                logr.Logger
@@ -47,11 +49,12 @@ type ReplicationGroupMonitoring struct {
 // from the driver.
 func (r *ReplicationGroupMonitoring) Monitor(ctx context.Context) error {
 	ticker := time.NewTicker(r.MonitoringInterval).C
-	go func() {
+	go func(<-chan time.Time) {
 		for {
 			r.monitorReplicationGroups(ticker)
 		}
-	}()
+	}(ticker)
+
 	return nil
 }
 
@@ -101,7 +104,9 @@ func (r *ReplicationGroupMonitoring) monitorReplicationGroups(ticker <-chan time
 
 			updateRequired := r.isUpdateRequired(refreshedRG)
 			if updateRequired {
+				r.Lock.Lock()
 				res, err := r.ReplicationClient.GetStorageProtectionGroupStatus(ctx, refreshedRG.Spec.ProtectionGroupID, refreshedRG.Spec.ProtectionGroupAttributes)
+				r.Lock.Unlock()
 				if err != nil {
 					r.Log.Error(err, "Error encountered while getting protection group status")
 					err = updateRGLinkStatus(ctx, r.Client, &refreshedRG,
