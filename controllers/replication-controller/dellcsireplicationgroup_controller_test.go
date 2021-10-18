@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package replication_controller
+package replicationcontroller
 
 import (
 	"context"
@@ -114,18 +114,18 @@ func (suite *RGControllerTestSuite) getRGWithoutSyncComplete(name string, local 
 	rg := new(storagev1alpha1.DellCSIReplicationGroup)
 	if local {
 		if self {
-			annotations[controllers.RemoteClusterId] = utils.Self
+			annotations[controllers.RemoteClusterID] = utils.Self
 			rg = suite.getLocalRG(name, utils.Self)
 		} else {
-			annotations[controllers.RemoteClusterId] = suite.driver.RemoteClusterID
+			annotations[controllers.RemoteClusterID] = suite.driver.RemoteClusterID
 			rg = suite.getLocalRG(name, suite.driver.RemoteClusterID)
 		}
 	} else {
 		if self {
-			annotations[controllers.RemoteClusterId] = utils.Self
+			annotations[controllers.RemoteClusterID] = utils.Self
 			rg = suite.getRemoteRG(name, utils.Self)
 		} else {
-			annotations[controllers.RemoteClusterId] = suite.driver.SourceClusterID
+			annotations[controllers.RemoteClusterID] = suite.driver.SourceClusterID
 			rg = suite.getRemoteRG(name, suite.driver.SourceClusterID)
 		}
 	}
@@ -138,7 +138,7 @@ func (suite *RGControllerTestSuite) getRGWithSyncComplete(name string) *storagev
 	annotations := make(map[string]string)
 	annotations[controllers.RGSyncComplete] = "yes"
 	annotations[controllers.RemoteReplicationGroup] = suite.driver.RGName
-	annotations[controllers.RemoteClusterId] = suite.driver.RemoteClusterID
+	annotations[controllers.RemoteClusterID] = suite.driver.RemoteClusterID
 	annotations[controllers.ContextPrefix] = utils.ContextPrefix
 	rg := suite.getLocalRG(name, suite.driver.RemoteClusterID)
 	rg.Annotations = annotations
@@ -226,7 +226,7 @@ func (suite *RGControllerTestSuite) TestReconcileWithRemoteRGInvalidPGID() {
 func (suite *RGControllerTestSuite) TestReconcileWithInvalidClusterID() {
 	// scenario: RG without any annotations set by sidecar
 	rg := suite.getRGWithoutSyncComplete(suite.driver.RGName, true, false)
-	rg.Annotations[controllers.RemoteClusterId] = "invalidClusterID"
+	rg.Annotations[controllers.RemoteClusterID] = "invalidClusterID"
 	rg.Spec.RemoteClusterID = "invalidClusterID"
 	suite.createSCAndRG(suite.getTypicalSC(), rg)
 	req := suite.getTypicalRequest()

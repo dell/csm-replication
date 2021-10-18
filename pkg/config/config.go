@@ -46,7 +46,7 @@ type ControllerManagerOpts struct {
 	InCluster         bool
 }
 
-// GetControllerManagerOpts
+// GetControllerManagerOpts initializes and returns new ControllerManagerOpts object
 func GetControllerManagerOpts() ControllerManagerOpts {
 	defaultNameSpace := getEnv(common.EnvWatchNameSpace, common.DefaultNameSpace)
 	configFile := getEnv(common.EnvConfigFileName, common.DefaultConfigFileName)
@@ -72,32 +72,33 @@ func GetControllerManagerOpts() ControllerManagerOpts {
 
 // target - target cluster information
 type target struct {
-	ClusterId string `yaml:"clusterId"`
+	ClusterID string `yaml:"clusterId"`
 	SecretRef string `yaml:"secretRef"`
 	Address   string `yaml:"address"`
 }
 
 // replicationConfigMap - represents the configuration file
 type replicationConfigMap struct {
-	ClusterId string   `yaml:"clusterId"`
+	ClusterID string   `yaml:"clusterId"`
 	Targets   []target `yaml:"targets"`
 	LogLevel  string   `yaml:"CSI_LOG_LEVEL"`
 }
 
 // replicationConfig - represents the configuration of Replication (formed using replicationConfigMap)
 type replicationConfig struct {
-	ClusterId string   `yaml:"clusterId"`
+	ClusterID string   `yaml:"clusterId"`
 	Targets   []target `yaml:"targets"`
 	connection.ConnHandler
 }
 
-// Config
+// Config structure that combines replication configuration and current log level
 type Config struct {
 	repConfig *replicationConfig
 	LogLevel  string
 	Lock      sync.Mutex
 }
 
+// UpdateConfigOnSecretEvent updates config instance if update to currently used secret was made
 func (c *Config) UpdateConfigOnSecretEvent(ctx context.Context, client ctrlClient.Client, opts ControllerManagerOpts, secretName string, recorder record.EventRecorder, log logr.Logger) error {
 	c.Lock.Lock()
 	defer c.Lock.Unlock()
@@ -106,7 +107,7 @@ func (c *Config) UpdateConfigOnSecretEvent(ctx context.Context, client ctrlClien
 	for _, target := range c.repConfig.Targets {
 		if secretName == target.SecretRef {
 			found = true
-			log.V(common.DebugLevel).Info(fmt.Sprintf("Received event for secret: %s configured for ClusterId: %s\n", secretName, target.ClusterId))
+			log.V(common.DebugLevel).Info(fmt.Sprintf("Received event for secret: %s configured for ClusterId: %s\n", secretName, target.ClusterID))
 			break
 		}
 	}
@@ -120,6 +121,7 @@ func (c *Config) UpdateConfigOnSecretEvent(ctx context.Context, client ctrlClien
 	return nil
 }
 
+// UpdateConfigMap updates config instance by reading mounted config
 func (c *Config) UpdateConfigMap(ctx context.Context, client ctrlClient.Client, opts ControllerManagerOpts, recorder record.EventRecorder, log logr.Logger) error {
 	c.Lock.Lock()
 	defer c.Lock.Unlock()
@@ -140,24 +142,28 @@ func (c *Config) updateConfig(ctx context.Context, client ctrlClient.Client, opt
 	return nil
 }
 
-func (c *Config) GetConnection(clusterId string) (connection.RemoteClusterClient, error) {
+// GetConnection returns cluster client for given cluster ID
+func (c *Config) GetConnection(clusterID string) (connection.RemoteClusterClient, error) {
 	c.Lock.Lock()
 	defer c.Lock.Unlock()
-	return c.repConfig.GetConnection(clusterId)
+	return c.repConfig.GetConnection(clusterID)
 }
 
-func (c *Config) GetClusterId() string {
+// GetClusterID returns cluster ID for config instance
+func (c *Config) GetClusterID() string {
 	c.Lock.Lock()
 	defer c.Lock.Unlock()
-	return c.repConfig.ClusterId
+	return c.repConfig.ClusterID
 }
 
+// PrintConfig prints current config information using provided logger interface
 func (c *Config) PrintConfig(log logr.Logger) {
 	c.Lock.Lock()
 	defer c.Lock.Unlock()
 	c.repConfig.Print(log)
 }
 
+// GetConfig returns new instance of replication config
 func GetConfig(ctx context.Context, client ctrlClient.Client, opts ControllerManagerOpts, recorder record.EventRecorder, log logr.Logger) (*Config, error) {
 	cmap, repConfig, err := getReplicationConfig(ctx, client, opts, recorder, log)
 	if err != nil {
@@ -169,32 +175,34 @@ func GetConfig(ctx context.Context, client ctrlClient.Client, opts ControllerMan
 	}, nil
 }
 
+// Print prints current config information using provided logger interface
 func (config *replicationConfig) Print(log logr.Logger) {
-	log.Info(fmt.Sprintf("Source ClusterId: %s", config.ClusterId))
+	log.Info(fmt.Sprintf("Source ClusterId: %s", config.ClusterID))
 	for _, target := range config.Targets {
-		log.Info(fmt.Sprintf("ClusterId: %s, Secret Ref: %s", target.ClusterId, target.SecretRef))
+		log.Info(fmt.Sprintf("ClusterId: %s, Secret Ref: %s", target.ClusterID, target.SecretRef))
 	}
 }
 
+// VerifyConfig verifies correctness of replication config
 func (config *replicationConfig) VerifyConfig(ctx context.Context) error {
-	if config.ClusterId == "" {
+	if config.ClusterID == "" {
 		return fmt.Errorf("missing source cluster id")
 	}
 	targetMap := make(map[string]string)
 	for _, target := range config.Targets {
-		if target.ClusterId == "" {
+		if target.ClusterID == "" {
 			return fmt.Errorf("ClusterId missing for target: %v", target)
 		}
-		if _, ok := targetMap[target.ClusterId]; ok {
-			return fmt.Errorf("detected duplicate entries for ClusterId - %s", target.ClusterId)
-		} else {
-			targetMap[target.ClusterId] = ""
+		if _, ok := targetMap[target.ClusterID]; ok {
+			return fmt.Errorf("detected duplicate entries for ClusterId - %s", target.ClusterID)
 		}
+		targetMap[target.ClusterID] = ""
 	}
 	err := config.Verify(ctx)
 	return err
 }
 
+// SetConnectionHandler sets connection handler of replication config to provided handler
 func (config *replicationConfig) SetConnectionHandler(handler connection.ConnHandler) {
 	config.ConnHandler = handler
 }
@@ -265,7 +273,7 @@ func getConnHandler(ctx context.Context, targets []target, client ctrlClient.Cli
 				return nil, err
 			}
 		}
-		k8sConnHandler.AddOrUpdateConfig(target.ClusterId, restConfig, log)
+		k8sConnHandler.AddOrUpdateConfig(target.ClusterID, restConfig, log)
 	}
 	// Let's add a connection handler by default for self (single cluster scenario)
 	inCluster, _ := strconv.ParseBool(getEnv(common.EnvInClusterConfig, "false"))
@@ -304,7 +312,7 @@ func getKubeConfigPathFromEnv() string {
 // newReplicationConfig - returns a new replication config given a config map & a connection handler
 func newReplicationConfig(configMap *replicationConfigMap, handler connection.ConnHandler) *replicationConfig {
 	var replicationConfig replicationConfig
-	replicationConfig.ClusterId = configMap.ClusterId
+	replicationConfig.ClusterID = configMap.ClusterID
 	targets := make([]target, len(configMap.Targets))
 	copy(targets, configMap.Targets)
 	replicationConfig.Targets = targets

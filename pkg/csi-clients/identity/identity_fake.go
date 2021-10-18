@@ -19,20 +19,20 @@ import (
 	"github.com/dell/dell-csi-extensions/replication"
 )
 
-type InjectedError struct {
+type injectedError struct {
 	error        error
 	clearAfter   int
 	currentCount int
 }
 
-func (i InjectedError) SetError(err error, clearAfter int) {
+func (i injectedError) setError(err error, clearAfter int) {
 	// Just overwrite any error which exists already
 	i.currentCount = 0
 	i.clearAfter = clearAfter
 	i.error = err
 }
 
-func (i InjectedError) getAndClearError() error {
+func (i injectedError) getAndClearError() error {
 	if i.clearAfter == -1 {
 		// Error which never clears
 		return i.error
@@ -47,9 +47,9 @@ func (i InjectedError) getAndClearError() error {
 	return err
 }
 
-type MockIdentity struct {
+type mockIdentity struct {
 	name             string
-	injectedError    InjectedError
+	injectedError    injectedError
 	capabilitySet    ReplicationCapabilitySet
 	supportedActions []*replication.SupportedActions
 }
@@ -87,31 +87,32 @@ func getSupportedActions() (ReplicationCapabilitySet, []*replication.SupportedAc
 	return capabilitySet, capResponse.Actions
 }
 
+// NewFakeIdentityClient returns fake identity client
 func NewFakeIdentityClient(name string) Identity {
 	capabilitySet, actions := getSupportedActions()
-	return &MockIdentity{
+	return &mockIdentity{
 		name:             name,
-		injectedError:    InjectedError{},
+		injectedError:    injectedError{},
 		capabilitySet:    capabilitySet,
 		supportedActions: actions,
 	}
 }
 
-func (m *MockIdentity) ProbeController(ctx context.Context) (string, bool, error) {
+func (m *mockIdentity) ProbeController(ctx context.Context) (string, bool, error) {
 	if err := m.injectedError.getAndClearError(); err != nil {
 		return "", false, err
 	}
 	return m.name, true, nil
 }
 
-func (m *MockIdentity) ProbeForever(ctx context.Context) (string, error) {
+func (m *mockIdentity) ProbeForever(ctx context.Context) (string, error) {
 	if err := m.injectedError.getAndClearError(); err != nil {
 		return "", err
 	}
 	return m.name, nil
 }
 
-func (m *MockIdentity) GetReplicationCapabilities(ctx context.Context) (ReplicationCapabilitySet,
+func (m *mockIdentity) GetReplicationCapabilities(ctx context.Context) (ReplicationCapabilitySet,
 	[]*replication.SupportedActions, error) {
 	if err := m.injectedError.getAndClearError(); err != nil {
 		return ReplicationCapabilitySet{}, []*replication.SupportedActions{}, err
@@ -119,22 +120,22 @@ func (m *MockIdentity) GetReplicationCapabilities(ctx context.Context) (Replicat
 	return m.capabilitySet, m.supportedActions, nil
 }
 
-func (m *MockIdentity) InjectError(err error) {
-	m.injectedError.SetError(err, -1)
+func (m *mockIdentity) InjectError(err error) {
+	m.injectedError.setError(err, -1)
 }
 
-func (m *MockIdentity) InjectErrorAutoClear(err error) {
-	m.injectedError.SetError(err, 1)
+func (m *mockIdentity) InjectErrorAutoClear(err error) {
+	m.injectedError.setError(err, 1)
 }
 
-func (m *MockIdentity) InjectErrorClearAfterN(err error, clearAfter int) {
-	m.injectedError.SetError(err, clearAfter)
+func (m *mockIdentity) InjectErrorClearAfterN(err error, clearAfter int) {
+	m.injectedError.setError(err, clearAfter)
 }
 
-func (m *MockIdentity) SetSupportedActions(supportedActions []*replication.SupportedActions) {
+func (m *mockIdentity) SetSupportedActions(supportedActions []*replication.SupportedActions) {
 	m.supportedActions = supportedActions
 }
 
-func (m *MockIdentity) SetCapabilitySet(capabilitySet ReplicationCapabilitySet) {
+func (m *mockIdentity) SetCapabilitySet(capabilitySet ReplicationCapabilitySet) {
 	m.capabilitySet = capabilitySet
 }

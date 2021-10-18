@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package replication_controller
+package replicationcontroller
 
 import (
 	"context"
@@ -61,6 +61,7 @@ type PersistentVolumeReconciler struct {
 
 // +kubebuilder:rbac:groups=core,resources=persistentvolumes,verbs=get;update;patch;list;watch;delete
 
+// Reconcile contains reconciliation logic that updates PersistentVolume depending on it's current state
 func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("persistentvolume", req.Name)
 
@@ -81,10 +82,10 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	// Parse the local annotations
 	localAnnotations := volume.Annotations
 
-	// RemoteClusterId annotation
-	remoteClusterId, err := getValueFromAnnotations(controller.RemoteClusterId, localAnnotations)
+	// RemoteClusterID annotation
+	remoteClusterID, err := getValueFromAnnotations(controller.RemoteClusterID, localAnnotations)
 	if err != nil {
-		log.Error(err, "remoteClusterId not set")
+		log.Error(err, "remoteClusterID not set")
 		r.EventRecorder.Eventf(volume, eventTypeWarning, eventReasonUpdated,
 			"failed to fetch remote cluster id from annotations. error: %s", err.Error())
 		return ctrl.Result{}, err
@@ -94,12 +95,12 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	// For this special case, we prefix the PV with 'replicated' keyword
 	// in order to allow a replicated PV to exist on the source
 	// cluster itself
-	if remoteClusterId == controller.Self {
+	if remoteClusterID == controller.Self {
 		remotePVName = replicated + "-" + localPVName
 	}
 
 	// Get the remote client
-	rClient, err := r.Config.GetConnection(remoteClusterId)
+	rClient, err := r.Config.GetConnection(remoteClusterID)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -137,10 +138,9 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 						}
 						// Resetting the rate-limiter to requeue for the deletion of remote PV
 						return ctrl.Result{RequeueAfter: 1 * time.Millisecond}, nil
-					} else {
-						// Requeueing because the remote PV still exists
-						return ctrl.Result{Requeue: true}, nil
 					}
+					// Requeueing because the remote PV still exists
+					return ctrl.Result{Requeue: true}, nil
 				}
 			}
 		}
@@ -220,7 +220,7 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			log.Error(err, "remote storage class doesn't exist")
 			r.EventRecorder.Eventf(volume, eventTypeWarning, eventReasonUpdated,
 				"remote storage class: %s doesn't exist on cluster: %s. error: %s",
-				remoteSCName, remoteClusterId, err.Error())
+				remoteSCName, remoteClusterID, err.Error())
 			return ctrl.Result{}, err
 		} else if err != nil {
 			// This could be transient. So, throw an error
@@ -228,11 +228,11 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			return ctrl.Result{}, err
 		}
 
-		var localClusterId string
-		if remoteClusterId == controller.Self {
-			localClusterId = controller.Self
+		var localClusterID string
+		if remoteClusterID == controller.Self {
+			localClusterID = controller.Self
 		} else {
-			localClusterId = r.Config.GetClusterId()
+			localClusterID = r.Config.GetClusterID()
 		}
 
 		pv := &v1.PersistentVolume{
@@ -255,7 +255,7 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 
 		// Update Labels for remote PV
-		updatePVLabels(pv, volume, localClusterId)
+		updatePVLabels(pv, volume, localClusterID)
 
 		// Add driver specific labels
 		contextPrefix := volume.Annotations[controller.ContextPrefix]
@@ -287,7 +287,7 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 		}
 
-		updatePVAnnotations(pv, volume, localClusterId, localAnnotations[controller.RemotePVRetentionPolicy], string(resourceRequests))
+		updatePVAnnotations(pv, volume, localClusterID, localAnnotations[controller.RemotePVRetentionPolicy], string(resourceRequests))
 
 		// Query local RG object to verify if RemoteReplicationGroup annotation is available
 		localRG := new(storagev1alpha1.DellCSIReplicationGroup)
@@ -330,9 +330,9 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				return ctrl.Result{}, err
 			}
 			log.V(common.InfoLevel).Info(fmt.Sprintf("Successfully created the remote PV with name: %s on cluster: %s",
-				remotePVName, remoteClusterId))
+				remotePVName, remoteClusterID))
 			r.EventRecorder.Eventf(volume, eventTypeNormal, eventReasonUpdated,
-				"Created Remote PV with name: %s on cluster: %s", remotePVName, remoteClusterId)
+				"Created Remote PV with name: %s on cluster: %s", remotePVName, remoteClusterID)
 			// fetch the newly created PV object
 			remotePV, err = rClient.GetPersistentVolume(ctx, remotePVName)
 			if err != nil {
@@ -343,13 +343,13 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			// TODO: Verify if the Remote PV matches with the one we are expecting
 
 			// For now just verify if the cluster id matches
-			if remotePV.Annotations[controller.RemoteClusterId] != localClusterId {
+			if remotePV.Annotations[controller.RemoteClusterID] != localClusterID {
 				// This PV was created by someone else
 				// For now, lets just raise an event and stop the reconcile
 				log.Error(fmt.Errorf("conflicting PV with name: %s exists on ClusterId: %s",
-					remotePVName, remoteClusterId), "stopping reconcile")
+					remotePVName, remoteClusterID), "stopping reconcile")
 				r.EventRecorder.Eventf(volume, eventTypeWarning, eventReasonUpdated,
-					"Found conflicting PV %s on remote ClusterId: %s", remotePVName, remoteClusterId)
+					"Found conflicting PV %s on remote ClusterId: %s", remotePVName, remoteClusterID)
 				return ctrl.Result{}, nil
 			}
 		}
@@ -370,7 +370,7 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			return ctrl.Result{RequeueAfter: controller.DefaultRetryInterval}, nil
 		}
 
-		err = r.processLocalPV(ctx, log, localPV.DeepCopy(), remotePVName, remoteClusterId)
+		err = r.processLocalPV(ctx, log, localPV.DeepCopy(), remotePVName, remoteClusterID)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -404,7 +404,7 @@ func (r *PersistentVolumeReconciler) processRemotePV(ctx context.Context, log lo
 	return true, nil
 }
 
-func (r *PersistentVolumeReconciler) processLocalPV(ctx context.Context, log logr.Logger, localPV *v1.PersistentVolume, remotePVName, remoteClusterId string) error {
+func (r *PersistentVolumeReconciler) processLocalPV(ctx context.Context, log logr.Logger, localPV *v1.PersistentVolume, remotePVName, remoteClusterID string) error {
 	// Update the local PV with the remote details
 	// First check if the PV sync has been completed
 	if localPV.Annotations[controller.PVSyncComplete] == "yes" {
@@ -413,7 +413,7 @@ func (r *PersistentVolumeReconciler) processLocalPV(ctx context.Context, log log
 	}
 	updatePV := false
 	remotePVNameFromLocalPVAnnotation := localPV.Annotations[controller.RemotePV]
-	remoteClusterIdFromLocalPVAnnotation := localPV.Annotations[controller.RemoteClusterId]
+	remoteClusterIDFromLocalPVAnnotation := localPV.Annotations[controller.RemoteClusterID]
 
 	if remotePVNameFromLocalPVAnnotation == "" {
 		controller.AddAnnotation(localPV, controller.RemotePV, remotePVName)
@@ -425,14 +425,14 @@ func (r *PersistentVolumeReconciler) processLocalPV(ctx context.Context, log log
 			controller.RemotePV, remotePVNameFromLocalPVAnnotation, localPV.Name))
 	}
 
-	if remoteClusterIdFromLocalPVAnnotation == "" {
-		controller.AddAnnotation(localPV, controller.RemoteClusterId, remoteClusterId)
+	if remoteClusterIDFromLocalPVAnnotation == "" {
+		controller.AddAnnotation(localPV, controller.RemoteClusterID, remoteClusterID)
 		updatePV = true
-	} else if remoteClusterIdFromLocalPVAnnotation != remoteClusterId {
+	} else if remoteClusterIDFromLocalPVAnnotation != remoteClusterID {
 		// Conflict - ??
 	} else {
 		log.V(common.InfoLevel).Info(fmt.Sprintf("%s already set to %s for local PV: %s",
-			controller.RemoteClusterId, remoteClusterIdFromLocalPVAnnotation, localPV.Name))
+			controller.RemoteClusterID, remoteClusterIDFromLocalPVAnnotation, localPV.Name))
 	}
 
 	if updatePV {
@@ -444,11 +444,12 @@ func (r *PersistentVolumeReconciler) processLocalPV(ctx context.Context, log log
 		}
 		log.V(common.InfoLevel).Info("Successfully updated local PV with remote annotations")
 		r.EventRecorder.Eventf(localPV, eventTypeNormal, eventReasonUpdated,
-			"PV sync complete for ClusterId: %s", remoteClusterId)
+			"PV sync complete for ClusterId: %s", remoteClusterID)
 	}
 	return nil
 }
 
+// SetupWithManager start using reconciler by creating new controller managed by provided manager
 func (r *PersistentVolumeReconciler) SetupWithManager(mgr ctrl.Manager, limiter ratelimiter.RateLimiter, maxReconcilers int) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.PersistentVolume{}, builder.WithPredicates(
@@ -494,7 +495,7 @@ func getValueFromAnnotations(key string, annotations map[string]string) (string,
 	return "", fmt.Errorf("not set")
 }
 
-func updatePVAnnotations(pv, volume *v1.PersistentVolume, remoteClusterId, remotePVRetentionPolicy, resourceRequest string) {
+func updatePVAnnotations(pv, volume *v1.PersistentVolume, remoteClusterID, remotePVRetentionPolicy, resourceRequest string) {
 	if volume.Spec.CSI != nil {
 		controller.AddAnnotation(pv, "pv.kubernetes.io/provisioned-by", volume.Spec.CSI.Driver)
 	}
@@ -510,7 +511,7 @@ func updatePVAnnotations(pv, volume *v1.PersistentVolume, remoteClusterId, remot
 		controller.AddAnnotation(pv, controller.RemotePVCNamespace, volume.Spec.ClaimRef.Namespace)
 	}
 	// Remote ClusterID
-	controller.AddAnnotation(pv, controller.RemoteClusterId, remoteClusterId)
+	controller.AddAnnotation(pv, controller.RemoteClusterID, remoteClusterID)
 	// Remote Storage Class
 	controller.AddAnnotation(pv, controller.RemoteStorageClassAnnotation, volume.Spec.StorageClassName)
 	// Resource Requests
@@ -521,11 +522,11 @@ func updatePVAnnotations(pv, volume *v1.PersistentVolume, remoteClusterId, remot
 	controller.AddAnnotation(pv, controller.RemotePVRetentionPolicy, remotePVRetentionPolicy)
 }
 
-func updatePVLabels(pv, volume *v1.PersistentVolume, remoteClusterId string) {
+func updatePVLabels(pv, volume *v1.PersistentVolume, remoteClusterID string) {
 	// Driver Name
 	controller.AddLabel(pv, controller.DriverName, volume.Labels[controller.DriverName])
 	// Remote ClusterID
-	controller.AddLabel(pv, controller.RemoteClusterId, remoteClusterId)
+	controller.AddLabel(pv, controller.RemoteClusterID, remoteClusterID)
 	// Remote PVC Namespace
 	if volume.Spec.ClaimRef != nil {
 		controller.AddLabel(pv, controller.RemotePVCNamespace, volume.Spec.ClaimRef.Namespace)

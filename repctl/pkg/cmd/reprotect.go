@@ -25,6 +25,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+// GetReprotectCommand returns 'reprotect' cobra command
 /* #nosec G104 */
 func GetReprotectCommand() *cobra.Command {
 	reprotectCmd := &cobra.Command{

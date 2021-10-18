@@ -25,6 +25,7 @@ import (
 	"os"
 )
 
+// GetListCommand returns 'list' cobra command
 /* #nosec G104 */
 func GetListCommand() *cobra.Command {
 	listCmd := &cobra.Command{

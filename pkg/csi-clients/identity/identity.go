@@ -27,14 +27,17 @@ import (
 	"google.golang.org/grpc"
 )
 
+// ReplicationCapabilitySet represents map of supported replication capabilities
 type ReplicationCapabilitySet map[replication.ReplicationCapability_RPC_Type]bool
 
+// Identity is an interface that defines calls used for querying identity and state of the driver
 type Identity interface {
 	ProbeController(ctx context.Context) (string, bool, error)
 	ProbeForever(ctx context.Context) (string, error)
 	GetReplicationCapabilities(ctx context.Context) (ReplicationCapabilitySet, []*replication.SupportedActions, error)
 }
 
+// New return new Identity interface implementation
 func New(conn *grpc.ClientConn, log logr.Logger, timeout time.Duration, frequency time.Duration) Identity {
 	return &identity{
 		conn:      conn,
@@ -51,6 +54,7 @@ type identity struct {
 	frequency time.Duration
 }
 
+// ProbeController queries driver controller
 func (r *identity) ProbeController(ctx context.Context) (string, bool, error) {
 	r.log.V(common.InfoLevel).Info("Probing controller")
 	tctx, cancel := context.WithTimeout(ctx, r.timeout)
@@ -72,6 +76,7 @@ func (r *identity) ProbeController(ctx context.Context) (string, bool, error) {
 	return driverName, ready.GetValue(), nil
 }
 
+// ProbeForever launches loop that continuously queries controller state
 func (r *identity) ProbeForever(ctx context.Context) (string, error) {
 	for {
 		r.log.V(common.DebugLevel).Info("Probing driver for readiness")
@@ -96,6 +101,7 @@ func (r *identity) ProbeForever(ctx context.Context) (string, error) {
 	}
 }
 
+// GetReplicationCapabilities queries driver for supported replication capabilities
 func (r *identity) GetReplicationCapabilities(ctx context.Context) (ReplicationCapabilitySet,
 	[]*replication.SupportedActions, error) {
 	r.log.V(common.InfoLevel).Info("Requesting replication capabilities")

@@ -200,14 +200,14 @@ func main() {
 		}
 	}
 
-	leaderElectionId := common.DellCSIReplicator + strings.ReplaceAll(driverName, ".", "-")
+	leaderElectionID := common.DellCSIReplicator + strings.ReplaceAll(driverName, ".", "-")
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                     scheme,
 		MetricsBindAddress:         metricsAddr,
 		Port:                       9443,
 		LeaderElection:             enableLeaderElection,
 		LeaderElectionResourceLock: "leases",
-		LeaderElectionID:           leaderElectionId,
+		LeaderElectionID:           leaderElectionID,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package csi_replicator
+package csireplicator
 
 import (
 	"fmt"
@@ -34,6 +34,7 @@ import (
 	"time"
 )
 
+// ReplicationGroupMonitoring structure for monitoring current status of replication groups
 type ReplicationGroupMonitoring struct {
 	Lock sync.Mutex
 	client.Client

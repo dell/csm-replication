@@ -257,8 +257,8 @@ func (suite *FakeReplicationTestSuite) testCreatePVC() {
 	// PVC Protection
 	suite.Equal("yes", annotations[controllers.PVCProtectionComplete], "PVC Protection annotation set")
 	// Remote Cluster ID
-	suite.Equal(annotations[controllers.RemoteClusterId],
-		sc.Parameters[controllers.RemoteClusterId], "Remote cluster ID matches")
+	suite.Equal(annotations[controllers.RemoteClusterID],
+		sc.Parameters[controllers.RemoteClusterID], "Remote cluster ID matches")
 	// Remote SC Name
 	suite.Equal(annotations[controllers.RemoteStorageClassAnnotation],
 		sc.Parameters[controllers.RemoteStorageClassAnnotation], "Remote SC annotation matches")

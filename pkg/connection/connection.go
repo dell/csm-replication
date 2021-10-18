@@ -25,6 +25,7 @@ import (
 
 const connectionLoggingInterval = 10 * time.Second
 
+// Connect establishes connection to socket
 func Connect(address string, log logr.Logger) (*grpc.ClientConn, error) {
 	dialOptions := []grpc.DialOption{
 		grpc.WithInsecure(),

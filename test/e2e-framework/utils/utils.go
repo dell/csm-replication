@@ -36,21 +36,35 @@ import (
 )
 
 const (
-	FakePVName        = "fake-pv"
-	FakePVCName       = "fake-pvc"
-	FakeSCName        = "fake-sc"
-	FakeDriverName    = "fake-csi-driver"
-	FakeRemoteSCName  = "fake-remote-sc"
-	FakeRGName        = "fake-rg"
+	// FakePVName name of PV
+	FakePVName = "fake-pv"
+	// FakePVCName name of PVC
+	FakePVCName = "fake-pvc"
+	// FakeSCName name of SC
+	FakeSCName = "fake-sc"
+	// FakeDriverName name of driver
+	FakeDriverName = "fake-csi-driver"
+	// FakeRemoteSCName name of remote SC
+	FakeRemoteSCName = "fake-remote-sc"
+	// FakeRGName name of remote RG
+	FakeRGName = "fake-rg"
+	// FakeNamespaceName name of namespace
 	FakeNamespaceName = "fake-namespace"
-	Self              = "self"
-	RemoteClusterID   = "remoteCluster"
-	SourceClusterID   = "sourceCluster"
-	LocalPGID         = "l-group-id"
-	RemotePGID        = "r-group-id"
-	ContextPrefix     = "csi-fake"
+	// Self this cluster
+	Self = "self"
+	// RemoteClusterID id remote cluster
+	RemoteClusterID = "remoteCluster"
+	// SourceClusterID id source cluster
+	SourceClusterID = "sourceCluster"
+	// LocalPGID id of local protection group
+	LocalPGID = "l-group-id"
+	// RemotePGID id of remote protection group
+	RemotePGID = "r-group-id"
+	// ContextPrefix fake csi replication prefix
+	ContextPrefix = "csi-fake"
 )
 
+// Driver mock implementation of the driver
 type Driver struct {
 	DriverName      string
 	StorageClass    string
@@ -62,6 +76,7 @@ type Driver struct {
 	PVName          string
 }
 
+// GetDefaultDriver returns default mock implementation of the driver
 func GetDefaultDriver() Driver {
 	return Driver{
 		DriverName:      FakeDriverName,
@@ -75,17 +90,23 @@ func GetDefaultDriver() Driver {
 	}
 }
 
+// Common contains common resources
 type Common struct {
 	Namespace string
 }
 
 var log logr.Logger
 
+// MockServer mock grpc server
 var MockServer *grpc.Server
+
+// Scheme runtime Scheme
 var Scheme = runtime.NewScheme()
 
+// PVCName name of testing PVC
 const PVCName = "test-pvc"
 
+// InitializeSchemes inits client-go and replication v1alpha1 schemes
 func InitializeSchemes() {
 
 	utilruntime.Must(clientgoscheme.AddToScheme(Scheme))
@@ -93,6 +114,7 @@ func InitializeSchemes() {
 	// +kubebuilder:scaffold:scheme
 }
 
+// RunServer launches mock grpc server
 func RunServer(stubsPath string) {
 	log.Info("RUNNING MOCK SERVER")
 	const (
@@ -136,6 +158,7 @@ func RunServer(stubsPath string) {
 	}()
 }
 
+// ValidateAnnotations validates that given annotations are correct
 func ValidateAnnotations(annotations map[string]string, t *testing.T) {
 	t.Log("Annotations:", annotations)
 	// To validate whether annotations are added or not properly
@@ -150,8 +173,8 @@ func ValidateAnnotations(annotations map[string]string, t *testing.T) {
 		assert.Equal(t, found, true, "Annotation %s not found", controllers.RemoteVolumeAnnotation)
 		assert.NotNil(t, value, "Annotation value:%s", value)
 
-		value, found = annotations[controllers.RemoteClusterId]
-		assert.Equal(t, found, true, "Annotation %s not found", controllers.RemoteClusterId)
+		value, found = annotations[controllers.RemoteClusterID]
+		assert.Equal(t, found, true, "Annotation %s not found", controllers.RemoteClusterID)
 		assert.NotNil(t, value, "Annotation value:%s", value)
 
 		value, found = annotations[controllers.ReplicationGroup]
@@ -160,6 +183,7 @@ func ValidateAnnotations(annotations map[string]string, t *testing.T) {
 	}
 }
 
+// ValidateRemotePVAnnotations validates that given PV annotations are correct
 func ValidateRemotePVAnnotations(annotations map[string]string, t *testing.T) {
 	t.Log("Annotations:", annotations)
 	// To validate whether annotations are added or not properly
@@ -171,6 +195,7 @@ func ValidateRemotePVAnnotations(annotations map[string]string, t *testing.T) {
 	}
 }
 
+// ValidateRemoteRGAnnotations validates that given RG annotations are correct
 func ValidateRemoteRGAnnotations(annotations map[string]string, t *testing.T) {
 	t.Log("Annotations:", annotations)
 	// To validate whether annotations are added or not properly
@@ -199,18 +224,21 @@ func GetConfigFromFile(kubeconfig string) (*rest.Config, error) {
 	return config, nil
 }
 
+// GetFakeClient returns fake k8s client
 func GetFakeClient() client.Client {
 	InitializeSchemes()
 	fakeClient := fake.NewClientBuilder().WithScheme(Scheme).Build()
 	return fakeClient
 }
 
+// GetFakeClientWithObjects returns fake k8s client and populates it with given objects
 func GetFakeClientWithObjects(initObjs ...client.Object) client.Client {
 	InitializeSchemes()
 	fakeClient := fake.NewClientBuilder().WithScheme(Scheme).WithObjects(initObjs...).Build()
 	return fakeClient
 }
 
+// GetPVObj returns PersistentVolume testing object
 func GetPVObj(name, volHandle, provisionerName, scName string, volAttributes map[string]string) *v1.PersistentVolume {
 	pvObj := v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
@@ -232,6 +260,7 @@ func GetPVObj(name, volHandle, provisionerName, scName string, volAttributes map
 	return &pvObj
 }
 
+// GetPVCObj returns PersistentVolumeClaim testing object
 func GetPVCObj(pvcName string, namespace string, sc string) *v1.PersistentVolumeClaim {
 	return &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
@@ -250,6 +279,7 @@ func GetPVCObj(pvcName string, namespace string, sc string) *v1.PersistentVolume
 	}
 }
 
+// GetParams returns correct map of replication parameters
 func GetParams(remoteClusterID, remoteSCName string) map[string]string {
 	params := map[string]string{
 		"param": "val",
@@ -260,6 +290,7 @@ func GetParams(remoteClusterID, remoteSCName string) map[string]string {
 	return params
 }
 
+// GetReplicationEnabledSC returns replication enabled StorageClass testing object
 func GetReplicationEnabledSC(provisionerName, scName, remoteSCName, remoteClusterID string) *storagev1.StorageClass {
 	scObj := storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: scName},
@@ -269,6 +300,7 @@ func GetReplicationEnabledSC(provisionerName, scName, remoteSCName, remoteCluste
 	return &scObj
 }
 
+// GetNonReplicationEnabledSC returns usual StorageClass testing object
 func GetNonReplicationEnabledSC(provisionerName, scName string) *storagev1.StorageClass {
 	scObj := storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: scName},
@@ -278,6 +310,7 @@ func GetNonReplicationEnabledSC(provisionerName, scName string) *storagev1.Stora
 	return &scObj
 }
 
+// GetRGObj returns DellCSIReplicationGroup testing object
 func GetRGObj(name, driverName, remoteClusterID, pgID, remotePGID string, params,
 	remoteParams map[string]string) *storagev1alpha1.DellCSIReplicationGroup {
 	replicationGroup := storagev1alpha1.DellCSIReplicationGroup{
@@ -351,18 +384,21 @@ func WaitForAllToBeBound(ctx context.Context, k8sClient client.Client, t *testin
 	return nil
 }
 
+// StopMockServer terminates mock grpc server
 func StopMockServer() {
 	// terminate gracefully
 	MockServer.GracefulStop()
 	log.Info("Server stopped gracefully")
 }
 
+// MockUtils contains utils for mocking calls
 type MockUtils struct {
-	FakeClient           *fake_client.Client
+	FakeClient           *fakeclient.Client
 	Specs                Common
 	FakeControllerClient client.Client
 }
 
+// GetLogger returns currently used logger
 func GetLogger() logr.Logger {
 	return log
 }

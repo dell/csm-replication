@@ -1,4 +1,4 @@
-package fake_client
+package fakeclient
 
 import (
 	"context"
@@ -28,6 +28,7 @@ type storageKey struct {
 	Kind      string
 }
 
+// Client is a fake k8s client
 type Client struct {
 	Objects       map[storageKey]runtime.Object
 	errorInjector errorInjector
@@ -49,6 +50,7 @@ func getKey(obj runtime.Object) (storageKey, error) {
 	}, nil
 }
 
+// NewFakeClient initializes and returns new fake k8s client
 func NewFakeClient(initialObjects []runtime.Object, errorInjector errorInjector) (*Client, error) {
 	client := &Client{
 		Objects:       map[storageKey]runtime.Object{},
@@ -65,6 +67,7 @@ func NewFakeClient(initialObjects []runtime.Object, errorInjector errorInjector)
 	return client, nil
 }
 
+// Get finds object and puts it in client.Object obj argument
 func (f Client) Get(ctx context.Context, key client.ObjectKey, obj client.Object) error {
 	if f.errorInjector != nil {
 		if err := f.errorInjector.shouldFail("Get", obj); err != nil {
@@ -99,6 +102,7 @@ func (f Client) Get(ctx context.Context, key client.ObjectKey, obj client.Object
 	return err
 }
 
+// List list all requested items in fake cluster
 func (f Client) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
 	if f.errorInjector != nil {
 		if err := f.errorInjector.shouldFail("List", list); err != nil {
@@ -182,6 +186,7 @@ func (f *Client) listReplicationGroup(list *storagev1alpha1.DellCSIReplicationGr
 	return nil
 }
 
+// Create creates new object in fake cluster by putting it in map
 func (f Client) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
 	if f.errorInjector != nil {
 		if err := f.errorInjector.shouldFail("Create", obj); err != nil {
@@ -208,6 +213,7 @@ func (f Client) Create(ctx context.Context, obj client.Object, opts ...client.Cr
 	return nil
 }
 
+// Delete deletes existing object in fake cluster by removing it from map
 func (f Client) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
 	if len(opts) > 0 {
 		return fmt.Errorf("delete options are not supported")
@@ -238,6 +244,7 @@ func (f Client) Delete(ctx context.Context, obj client.Object, opts ...client.De
 	return nil
 }
 
+// Update updates object in fake k8s cluster
 func (f Client) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
 	if f.errorInjector != nil {
 		if err := f.errorInjector.shouldFail("Update", obj); err != nil {
@@ -264,22 +271,28 @@ func (f Client) Update(ctx context.Context, obj client.Object, opts ...client.Up
 	return nil
 }
 
+// Patch patches the given obj in the Kubernetes cluster
 func (f Client) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
 	panic("implement me")
 }
 
+// DeleteAllOf deletes all objects of the given type matching the given options
 func (f Client) DeleteAllOf(ctx context.Context, obj client.Object, opts ...client.DeleteAllOfOption) error {
 	panic("implement me")
 }
 
+// Status knows how to create a client which can update status subresource
+// for kubernetes objects
 func (f Client) Status() client.StatusWriter {
 	return f
 }
 
+// Scheme returns the scheme this client is using
 func (f Client) Scheme() *runtime.Scheme {
 	panic("implement me")
 }
 
+// RESTMapper returns the rest this client is using
 func (f Client) RESTMapper() meta.RESTMapper {
 	panic("implement me")
 }

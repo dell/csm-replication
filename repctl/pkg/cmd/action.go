@@ -28,6 +28,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+// GetExecCommand returns 'exec' cobra command
 func GetExecCommand() *cobra.Command {
 	execCmd := &cobra.Command{
 		Use:   "exec",

@@ -21,20 +21,20 @@ import (
 	"path"
 )
 
-type InjectedError struct {
+type injectedError struct {
 	error        error
 	clearAfter   int
 	currentCount int
 }
 
-func (i *InjectedError) SetError(err error, clearAfter int) {
+func (i *injectedError) setError(err error, clearAfter int) {
 	// Just overwrite any error which exists already
 	i.currentCount = 0
 	i.clearAfter = clearAfter
 	i.error = err
 }
 
-func (i *InjectedError) clearError(force bool) {
+func (i *injectedError) clearError(force bool) {
 	if force {
 		i.clearAfter = 0
 	}
@@ -47,40 +47,50 @@ func (i *InjectedError) clearError(force bool) {
 	}
 }
 
-func (i *InjectedError) getError() error {
+func (i *injectedError) getError() error {
 	if i.clearAfter != -1 {
 		i.currentCount++
 	}
 	return i.error
 }
 
-type ConditionType string
+type conditionType string
 
 const (
-	ExecuteActionWithoutStatus  = ConditionType("ExecuteActionWithoutStatus")
-	ExecuteActionWithoutSuccess = ConditionType("ExecuteActionWithoutSuccess")
-	ExecuteActionWithSwap       = ConditionType("ExecuteActionWithSwap")
-	CreatePGWithMissingPGID     = ConditionType("CreatePGWithMissingPGID")
-	CreatePGWithOutStatus       = ConditionType("CreatePGWithOutStatus")
-	GetPGStatusForTarget        = ConditionType("GetPGStatusForTarget")
-	GetPGStatusInProgress       = ConditionType("GetPGStatusInProgress")
+	// ExecuteActionWithoutStatus condition
+	ExecuteActionWithoutStatus = conditionType("ExecuteActionWithoutStatus")
+	// ExecuteActionWithoutSuccess condition
+	ExecuteActionWithoutSuccess = conditionType("ExecuteActionWithoutSuccess")
+	// ExecuteActionWithSwap condition
+	ExecuteActionWithSwap = conditionType("ExecuteActionWithSwap")
+	// CreatePGWithMissingPGID condition
+	CreatePGWithMissingPGID = conditionType("CreatePGWithMissingPGID")
+	// CreatePGWithOutStatus condition
+	CreatePGWithOutStatus = conditionType("CreatePGWithOutStatus")
+	// GetPGStatusForTarget condition
+	GetPGStatusForTarget = conditionType("GetPGStatusForTarget")
+	// GetPGStatusInProgress condition
+	GetPGStatusInProgress = conditionType("GetPGStatusInProgress")
 )
 
+// MockReplication is dummy implementation of Replication interface
 type MockReplication struct {
 	contextPrefix string
-	injectedError *InjectedError
-	conditionType ConditionType
+	injectedError *injectedError
+	conditionType conditionType
 }
 
+// NewFakeReplicationClient returns mock implementation of Replication interface
 func NewFakeReplicationClient(contextPrefix string) MockReplication {
 	return MockReplication{
-		injectedError: &InjectedError{},
+		injectedError: &injectedError{},
 		contextPrefix: contextPrefix,
 	}
 }
 
+// GetStorageProtectionGroupStatus mocks call
 func (m *MockReplication) GetStorageProtectionGroupStatus(ctx context.Context,
-	protectionGroupId string, attributes map[string]string) (*csiext.GetStorageProtectionGroupStatusResponse, error) {
+	protectionGroupID string, attributes map[string]string) (*csiext.GetStorageProtectionGroupStatusResponse, error) {
 	defer m.ClearErrorAndCondition(false)
 	if err := m.injectedError.getError(); err != nil {
 		return nil, err
@@ -100,7 +110,8 @@ func (m *MockReplication) GetStorageProtectionGroupStatus(ctx context.Context,
 	return &response, nil
 }
 
-func (m *MockReplication) ExecuteAction(ctx context.Context, protectionGroupId string,
+// ExecuteAction mocks call
+func (m *MockReplication) ExecuteAction(ctx context.Context, protectionGroupID string,
 	actionType *csiext.ExecuteActionRequest_Action, attributes map[string]string,
 	remoteProtectionGroupID string, remoteAttributes map[string]string) (*csiext.ExecuteActionResponse, error) {
 	defer m.ClearErrorAndCondition(false)
@@ -129,6 +140,7 @@ func (m *MockReplication) ExecuteAction(ctx context.Context, protectionGroupId s
 	return &response, nil
 }
 
+// CreateRemoteVolume mocks call
 func (m *MockReplication) CreateRemoteVolume(ctx context.Context, volumeHandle string,
 	params map[string]string) (*csiext.CreateRemoteVolumeResponse, error) {
 	defer m.ClearErrorAndCondition(false)
@@ -148,6 +160,7 @@ func (m *MockReplication) CreateRemoteVolume(ctx context.Context, volumeHandle s
 	return &response, nil
 }
 
+// CreateStorageProtectionGroup mocks call
 func (m *MockReplication) CreateStorageProtectionGroup(ctx context.Context, volumeHandle string,
 	params map[string]string) (*csiext.CreateStorageProtectionGroupResponse, error) {
 	defer m.ClearErrorAndCondition(false)
@@ -184,7 +197,8 @@ func (m *MockReplication) CreateStorageProtectionGroup(ctx context.Context, volu
 	return &response, nil
 }
 
-func (m *MockReplication) DeleteStorageProtectionGroup(ctx context.Context, groupId string,
+// DeleteStorageProtectionGroup mocks call
+func (m *MockReplication) DeleteStorageProtectionGroup(ctx context.Context, groupID string,
 	groupAttributes map[string]string) error {
 	defer m.ClearErrorAndCondition(false)
 	if err := m.injectedError.getError(); err != nil {
@@ -193,22 +207,27 @@ func (m *MockReplication) DeleteStorageProtectionGroup(ctx context.Context, grou
 	return nil
 }
 
+// InjectError injects error
 func (m *MockReplication) InjectError(err error) {
-	m.injectedError.SetError(err, -1)
+	m.injectedError.setError(err, -1)
 }
 
+// InjectErrorAutoClear injects error and clears after 1 try
 func (m *MockReplication) InjectErrorAutoClear(err error) {
-	m.injectedError.SetError(err, 1)
+	m.injectedError.setError(err, 1)
 }
 
+// InjectErrorClearAfterN injects error and clears after N tries
 func (m *MockReplication) InjectErrorClearAfterN(err error, clearAfter int) {
-	m.injectedError.SetError(err, clearAfter)
+	m.injectedError.setError(err, clearAfter)
 }
 
-func (m *MockReplication) SetCondition(conditionType ConditionType) {
+// SetCondition sets condition to provided condition type
+func (m *MockReplication) SetCondition(conditionType conditionType) {
 	m.conditionType = conditionType
 }
 
+// ClearErrorAndCondition clears injected error and resets condition
 func (m *MockReplication) ClearErrorAndCondition(force bool) {
 	m.conditionType = ""
 	m.injectedError.clearError(force)

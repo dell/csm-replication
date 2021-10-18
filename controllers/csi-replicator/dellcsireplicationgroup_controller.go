@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package csi_replicator
+package csireplicator
 
 import (
 	"context"
@@ -46,23 +46,34 @@ import (
 )
 
 const (
-	ReadyState                 = "Ready"
-	InvalidState               = "Invalid"
-	ErrorState                 = "Error"
-	NoState                    = ""
-	InProgress                 = "IN_PROGRESS"
-	DeletingState              = "Deleting"
-	Action                     = "Action"
+	// ReadyState name of correct state of ReplicationGroup
+	ReadyState = "Ready"
+	// InvalidState name of invalid state of ReplicationGroup
+	InvalidState = "Invalid"
+	// ErrorState name of error state of ReplicationGroup
+	ErrorState = "Error"
+	// NoState empty state of ReplicationGroup
+	NoState = ""
+	// InProgress name of in progress state of ReplicationGroup
+	InProgress = "IN_PROGRESS"
+	// DeletingState name deletion state of ReplicationGroup
+	DeletingState = "Deleting"
+	// Action name of action field
+	Action = "Action"
+	// MaxRetryDurationForActions maximum amount of time between retries of failed action
 	MaxRetryDurationForActions = 1 * time.Hour
-	MaxNumberOfConditions      = 20
+	// MaxNumberOfConditions maximum length of conditions list
+	MaxNumberOfConditions = 20
 )
 
+// ActionType represent replication action (FAILOVER, REPROTECT and etc.)
 type ActionType string
 
 func (a ActionType) String() string {
 	return strings.ToUpper(string(a))
 }
 
+// Equals allows to check if provided string is equal to current action type
 func (a ActionType) Equals(val string) bool {
 	if strings.ToUpper(string(a)) == strings.ToUpper(val) {
 		return true
@@ -82,6 +93,7 @@ func (a ActionType) getErrorString(errorMsg string) string {
 	return fmt.Sprintf("Action %s failed with error %s", a.String(), errorMsg)
 }
 
+// ActionResult represents end result of replication action
 type ActionResult struct {
 	ActionType   ActionType
 	Time         time.Time
@@ -90,6 +102,7 @@ type ActionResult struct {
 	PGStatus     *csiext.StorageProtectionGroupStatus
 }
 
+// ActionAnnotation represents annotation that contains information about replication action
 type ActionAnnotation struct {
 	ActionName            string `json:"name"`
 	Completed             bool   `json:"completed"`
@@ -213,6 +226,7 @@ func updateLastAction(rg *storagev1alpha1.DellCSIReplicationGroup, result *Actio
 	}
 }
 
+// ReplicationGroupReconciler is a structure that watches and reconciles events on ReplicationGroup resources
 type ReplicationGroupReconciler struct {
 	client.Client
 	Log                        logr.Logger
@@ -228,6 +242,7 @@ type ReplicationGroupReconciler struct {
 // +kubebuilder:rbac:groups=replication.storage.dell.com,resources=dellcsireplicationgroups/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=events,verbs=list;watch;create;update;patch
 
+// Reconcile contains reconciliation logic that updates ReplicationGroup depending on it's current state
 func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("dellcsireplicationgroup", req.NamespacedName)
 
@@ -269,9 +284,8 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	default:
 		if strings.Contains(rg.Status.State, InProgress) {
 			return r.processRGInActionInProgressState(ctx, rg.DeepCopy(), log)
-		} else {
-			return ctrl.Result{}, fmt.Errorf("unknown state")
 		}
+		return ctrl.Result{}, fmt.Errorf("unknown state")
 	}
 }
 
@@ -339,6 +353,7 @@ func (r *ReplicationGroupReconciler) updateState(ctx context.Context, rg *storag
 	return nil
 }
 
+// SetupWithManager start using reconciler by creating new controller managed by provided manager
 func (r *ReplicationGroupReconciler) SetupWithManager(mgr ctrl.Manager, limiter ratelimiter.RateLimiter, maxReconcilers int) error {
 	if r.MaxRetryDurationForActions == 0 {
 		r.MaxRetryDurationForActions = MaxRetryDurationForActions

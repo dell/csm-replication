@@ -71,7 +71,7 @@ type ControllerManager struct {
 	config           *config.Config
 }
 
-func (mgr *ControllerManager) ReconcileSecretUpdates(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+func (mgr *ControllerManager) reconcileSecretUpdates(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	secretLog := mgr.SecretController.GetLogger().WithName(request.Name)
 	er := mgr.Manager.GetEventRecorderFor(common.DellReplicationController)
 	err := mgr.config.UpdateConfigOnSecretEvent(ctx, mgr.Manager.GetClient(), mgr.Opts, request.Name, er, secretLog)
@@ -83,7 +83,7 @@ func (mgr *ControllerManager) ReconcileSecretUpdates(ctx context.Context, reques
 
 func (mgr *ControllerManager) startSecretController() error {
 	secretController, err := controller.New("secret-controller", mgr.Manager, controller.Options{
-		Reconciler: reconcile.Func(mgr.ReconcileSecretUpdates),
+		Reconciler: reconcile.Func(mgr.reconcileSecretUpdates),
 	})
 	mgr.SecretController = secretController
 	if err != nil {

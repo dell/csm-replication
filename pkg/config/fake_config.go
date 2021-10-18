@@ -31,6 +31,7 @@ import (
 
 var _ connection.MultiClusterClient = &FakeConfig{}
 
+// New creates new fake config with prepopulated parameters
 func New(source string, targets ...string) connection.MultiClusterClient {
 	config := &FakeConfig{
 		sourceCluster: source,
@@ -71,26 +72,30 @@ func New(source string, targets ...string) connection.MultiClusterClient {
 	return config
 }
 
+// FakeConfig is a structure that implements MultiClusterClient interface providing dummy functionality
 type FakeConfig struct {
 	sourceCluster string
 	clusterClient map[string]*connection.RemoteK8sControllerClient
 }
 
-func (c *FakeConfig) GetClusterId() string {
+// GetClusterID returns ID of fake cluster
+func (c *FakeConfig) GetClusterID() string {
 	return c.sourceCluster
 }
 
-func (c *FakeConfig) GetConnection(clusterId string) (connection.RemoteClusterClient, error) {
+// GetConnection returns fake connection remote client
+func (c *FakeConfig) GetConnection(clusterID string) (connection.RemoteClusterClient, error) {
 	var (
 		client *connection.RemoteK8sControllerClient
 		ok     bool
 	)
-	if client, ok = c.clusterClient[clusterId]; !ok {
-		return nil, fmt.Errorf("clusterId - %s not found", clusterId)
+	if client, ok = c.clusterClient[clusterID]; !ok {
+		return nil, fmt.Errorf("clusterID - %s not found", clusterID)
 	}
 	return client, nil
 }
 
+// NewFakeConfig returns new FakeClient with initialized fake remote clients
 func NewFakeConfig(source string, targets ...string) connection.MultiClusterClient {
 	config := &FakeConfig{
 		sourceCluster: source,
@@ -109,6 +114,7 @@ func NewFakeConfig(source string, targets ...string) connection.MultiClusterClie
 	return config
 }
 
+// NewFakeConfigForSingleCluster returns new FakeClient configured to be used in single-cluster scenario
 func NewFakeConfigForSingleCluster(selfClient client.Client, source string, targets ...string) connection.MultiClusterClient {
 	config := &FakeConfig{
 		sourceCluster: source,

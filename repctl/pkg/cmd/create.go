@@ -36,11 +36,13 @@ import (
 //go:embed scripts/gen_kubeconfig.sh scripts/config-placeholder
 var f embed.FS
 
+// Mirrored is a struct that contains parameters for both src and dst systems
 type Mirrored struct {
 	Source string
 	Target string
 }
 
+// GlobalParameters is a struct that contains different replication configuration parameters for all supported drivers
 type GlobalParameters struct {
 	// PowerStore
 	ArrayID           Mirrored
@@ -52,11 +54,12 @@ type GlobalParameters struct {
 	// PowerMax
 	Srp          Mirrored
 	RdfMode      string
-	SymId        Mirrored
+	SymID        Mirrored
 	ServiceLevel Mirrored
 	RdfGroup     Mirrored
 }
 
+// ScConfig is a struct that represents config used for storage class creation
 type ScConfig struct {
 	Name              string
 	Driver            string
@@ -67,6 +70,7 @@ type ScConfig struct {
 	Parameters        GlobalParameters
 }
 
+// GetCreateCommand returns 'create' cobra command
 /* #nosec G104 */
 func GetCreateCommand() *cobra.Command {
 	createCmd := &cobra.Command{
@@ -283,7 +287,7 @@ func createPVCs(providedPVList []string, cluster k8s.ClusterInterface, rgName, t
 		// Get all volumes from cluster
 		list, err := cluster.FilterPersistentVolumes(context.Background(), "", "", "", "")
 		if err != nil {
-			return fmt.Errorf("error while filtering Persistent Volumes: %s\n", err.Error())
+			return fmt.Errorf("error while filtering Persistent Volumes: %s", err.Error())
 		}
 		for _, vol := range list {
 			for _, pv := range providedPVList {
@@ -295,7 +299,7 @@ func createPVCs(providedPVList []string, cluster k8s.ClusterInterface, rgName, t
 	} else {
 		pvList, err = cluster.FilterPersistentVolumes(context.Background(), "", "", "", rgName)
 		if err != nil {
-			return fmt.Errorf("error while filtering Persistent Volumes: %s\n", err.Error())
+			return fmt.Errorf("error while filtering Persistent Volumes: %s", err.Error())
 		}
 	}
 
@@ -309,7 +313,7 @@ func createPVCs(providedPVList []string, cluster k8s.ClusterInterface, rgName, t
 	if !dryRun {
 		create, err = askForConfirmation("Proceed with creation of PVCs", os.Stdin, 3)
 		if err != nil {
-			return fmt.Errorf("error encountered while processing user input: %s\n", err.Error())
+			return fmt.Errorf("error encountered while processing user input: %s", err.Error())
 		}
 	}
 
@@ -317,7 +321,7 @@ func createPVCs(providedPVList []string, cluster k8s.ClusterInterface, rgName, t
 		fmt.Println("Creating persistent volume claims")
 		err = cluster.CreatePersistentVolumeClaimsFromPVs(context.Background(), tgtNamespace, pvList, prefix, dryRun)
 		if err != nil {
-			return fmt.Errorf("error encountered while creating PVCs: %s\n", err.Error())
+			return fmt.Errorf("error encountered while creating PVCs: %s", err.Error())
 		}
 	}
 
@@ -334,12 +338,12 @@ func createSCs(scConfig ScConfig, clusters *k8s.Clusters, dryRun bool) error {
 
 	srcSC, err := getStorageClassObject(fmt.Sprintf("templates/%s_source.yaml", scConfig.Driver), scConfig)
 	if err != nil {
-		return fmt.Errorf("unable to generate storage class: %s\n", err.Error())
+		return fmt.Errorf("unable to generate storage class: %s", err.Error())
 	}
 
 	tgtSC, err := getStorageClassObject(fmt.Sprintf("templates/%s_target.yaml", scConfig.Driver), scConfig)
 	if err != nil {
-		return fmt.Errorf("unable to generate storage class: %s\n", err.Error())
+		return fmt.Errorf("unable to generate storage class: %s", err.Error())
 	}
 
 	fmt.Print(string(srcSC))

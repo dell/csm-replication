@@ -21,9 +21,9 @@ import "time"
 type actionType string
 
 const (
-	// StorageClassReplicationParamEnabledValue-value of the replication-enabled flag for which replication is considered to be enabled
+	// StorageClassReplicationParamEnabledValue value of the replication-enabled flag for which replication is considered to be enabled
 	StorageClassReplicationParamEnabledValue = "true"
-	// DefaultRetryInterval- default interval after which controllers reconcile objects
+	// DefaultRetryInterval default interval after which controllers reconcile objects
 	DefaultRetryInterval = 2 * time.Second
 
 	storageClassReplicationParam        = "/isReplicationEnabled"
@@ -53,17 +53,17 @@ const (
 	// DriverName
 	// useful for filtering out objects for a particular driver
 	driverName = "/driverName"
-	// RemoteClusterId
+	// RemoteClusterID
 	// Contains the identifier of the remote cluster
 	// Used in annotations to enable utils controller to connect to the remote cluster
 	// for syncing objects across clusters
 	// Used in labels to enable filtering out objects which are replicated to a particular cluster
-	remoteClusterId = "/remoteClusterID"
+	remoteClusterID = "/remoteClusterID"
 	// RemoteReplicationGroup
 	// Contains the name of the associated DellCSIReplicationGroup on the remote cluster
 	// Used in annotations as well as labels
 	remoteReplicationGroup = "/remoteReplicationGroupName"
-	//RGSyncComplete
+	// RGSyncComplete
 	rGSyncComplete = "/rg_sync_complete"
 	// RemotePV
 	// Contains the name of the remotePV object
@@ -82,11 +82,9 @@ const (
 	createdBy = "/createdBy"
 	// resource requirements
 	resourceRequest = "/resourceRequest"
-	//DeletionRequested
-	//Annotation to set for the deleted object
+	// DeletionRequested annotation to set for the deleted object
 	deletionRequested = "/deletionRequested"
-	//Self
-	//Typically for use when remote cluster is same as source
+	// Self typically used when remote cluster is same as source
 	Self = "self"
 	// RemotePVRetentionPolicy
 	// Indicates whether to retain or delete the target PV
@@ -99,11 +97,18 @@ const (
 	// Indicates whether to retain or delete the target RG
 	remoteRGRetentionPolicy = "/remoteRGRetentionPolicy"
 
-	FailOver         = "failover"
-	FailBack         = "failback"
-	Suspend          = "suspend"
-	Resume           = "resume"
-	Establish        = "establish"
-	TestFailOver     = "testfailover"
+	// FailOver failover replication action name
+	FailOver = "failover"
+	// FailBack failback replication action name
+	FailBack = "failback"
+	// Suspend suspend replication action name
+	Suspend = "suspend"
+	// Resume resume replication action name
+	Resume = "resume"
+	// Establish establish replication action name
+	Establish = "establish"
+	// TestFailOver test failover replication action name
+	TestFailOver = "testfailover"
+	// TestFailOverStop stop test failover replication action name
 	TestFailOverStop = "testfailoverstop"
 )

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package replication_controller
+package replicationcontroller
 
 import (
 	"context"
@@ -138,7 +138,7 @@ func (suite *PVReconcileSuite) runRemoteReplicationManager(fakeConfig connection
 	annotations := make(map[string]string)
 	annotations[controllers.PVProtectionComplete] = "yes"
 	annotations[controllers.RemotePV] = "fake-pv"
-	annotations[controllers.RemoteClusterId] = "remote-123"
+	annotations[controllers.RemoteClusterID] = "remote-123"
 	annotations[controllers.RemoteVolumeAnnotation] = `{"capacity_bytes":5369364480,"volume_id":"csi-KPC-pmax-a28d2d04ae-00000000000200A40","volume_context":{"CapacityGB":"5.00","RdfGroup":"4","RemoteRDFGroup":"4","ServiceLevel":"Bronze","StorageGroup":"csi-no-srp-sg-test-4-ASYNC","powermax/RdfMode":"ASYNC","powermax/RemoteSYMID":"000000000001","powermax/SYMID":"000000000002"}}`
 	annotations[controllers.RemoteStorageClassAnnotation] = "fake-sc"
 	annotations[controllers.ReplicationGroup] = "fake-rg"
@@ -263,7 +263,7 @@ func (suite *PVReconcileSuite) TestReconcilePV() {
 	annotations := make(map[string]string)
 	annotations[controllers.RGSyncComplete] = "yes"
 	annotations[controllers.RemoteReplicationGroup] = "fake-rg"
-	annotations[controllers.RemoteClusterId] = "remote-123"
+	annotations[controllers.RemoteClusterID] = "remote-123"
 	annotations[controllers.ContextPrefix] = "csi-fake"
 	annotations[controllers.RemotePV] = "fake-pv"
 	annotations[controllers.RemotePVRetentionPolicy] = "delete"
@@ -323,7 +323,7 @@ func (suite *PVReconcileSuite) TestReconcilePV() {
 	annotations = make(map[string]string)
 	annotations[controllers.RGSyncComplete] = "yes"
 	annotations[controllers.RemoteReplicationGroup] = "fake-rg"
-	annotations[controllers.RemoteClusterId] = "remote-123"
+	annotations[controllers.RemoteClusterID] = "remote-123"
 	annotations[controllers.ContextPrefix] = "csi-fake"
 
 	//creating fake resource group
@@ -386,7 +386,7 @@ func (suite *PVReconcileSuite) TestRemoteClusterIDSelfNotFound() {
 	pvObj := utils.GetPVObj("fake-pv02", "fakeHandle", suite.driver.DriverName, suite.driver.StorageClass, volAttributes)
 
 	annotations := make(map[string]string)
-	annotations[controllers.RemoteClusterId] = controllers.Self
+	annotations[controllers.RemoteClusterID] = controllers.Self
 	pvObj.Annotations = annotations
 
 	err := suite.client.Create(context.Background(), pvObj)
@@ -403,7 +403,7 @@ func (suite *PVReconcileSuite) TestRGAnnotationNotFound() {
 	pvObj := utils.GetPVObj("fake-pv03", "fakeHandle", suite.driver.DriverName, suite.driver.StorageClass, volAttributes)
 
 	annotations := make(map[string]string)
-	annotations[controllers.RemoteClusterId] = "remote-123"
+	annotations[controllers.RemoteClusterID] = "remote-123"
 	annotations[controllers.PVProtectionComplete] = "yes"
 	annotations[controllers.RemoteVolumeAnnotation] = `{"capacity_bytes":5369364480,"volume_id":"csi-KPC-pmax-a28d2d04ae-000000000001","volume_context":{"CapacityGB":"5.00","RdfGroup":"4","RemoteRDFGroup":"4","ServiceLevel":"Bronze","StorageGroup":"csi-no-srp-sg-test-4-ASYNC","powermax/RdfMode":"ASYNC","powermax/RemoteSYMID":"000000000001","powermax/SYMID":"000000000001"}}`
 	annotations[controllers.RemoteStorageClassAnnotation] = suite.driver.RemoteSCName
@@ -427,7 +427,7 @@ func (suite *PVReconcileSuite) TestRemoteSCDoesNotExist() {
 	pvObj := utils.GetPVObj("fake-pv04", "fakeHandle", suite.driver.DriverName, suite.driver.StorageClass, volAttributes)
 
 	annotations := make(map[string]string)
-	annotations[controllers.RemoteClusterId] = "remote-123"
+	annotations[controllers.RemoteClusterID] = "remote-123"
 	annotations[controllers.PVProtectionComplete] = "yes"
 	annotations[controllers.RemoteVolumeAnnotation] = `{"capacity_bytes":5369364480,"volume_id":"csi-KPC-pmax-a28d2d04ae-000000000001","volume_context":{"CapacityGB":"5.00","RdfGroup":"4","RemoteRDFGroup":"4","ServiceLevel":"Bronze","StorageGroup":"csi-no-srp-sg-test-4-ASYNC","powermax/RdfMode":"ASYNC","powermax/RemoteSYMID":"000000000001","powermax/SYMID":"000000000001"}}`
 	annotations[controllers.ReplicationGroup] = suite.driver.RGName

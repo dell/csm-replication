@@ -76,6 +76,7 @@ type ReplicationLinkState struct {
 // +kubebuilder:printcolumn:name="PG ID",type=string,JSONPath=`.spec.protectionGroupId`,description="Protection Group ID"
 // +kubebuilder:printcolumn:name="Link State",type=string,JSONPath=`.status.replicationLinkState.state`,description="Replication Link State"
 // +kubebuilder:printcolumn:name="Last LinkState Update",type=string,JSONPath=`.status.replicationLinkState.lastSuccessfulUpdate`,description="Replication Link State"
+
 // DellCSIReplicationGroup is the Schema for the dellcsireplicationgroups API
 type DellCSIReplicationGroup struct {
 	metav1.TypeMeta   `json:",inline"`

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package csi_replicator
+package csireplicator
 
 import (
 	"context"
@@ -41,6 +41,7 @@ import (
 	"strings"
 )
 
+// PersistentVolumeReconciler reconciles PersistentVolume resources
 type PersistentVolumeReconciler struct {
 	client.Client
 	Log               logr.Logger
@@ -55,6 +56,7 @@ type PersistentVolumeReconciler struct {
 
 const protectionIndexKey = "protection_id"
 
+// Reconcile contains reconciliation logic that updates PersistentVolume depending on it's current state
 func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("persistentvolume", req.NamespacedName)
 
@@ -175,9 +177,9 @@ func (r *PersistentVolumeReconciler) processVolumeForReplicationGroup(ctx contex
 
 	// Add replication-group and remote-cluster label to the PV
 	if scParams[controller.StorageClassRemoteClusterParam] != "" {
-		controller.AddAnnotation(volume, controller.RemoteClusterId, scParams[controller.StorageClassRemoteClusterParam])
+		controller.AddAnnotation(volume, controller.RemoteClusterID, scParams[controller.StorageClassRemoteClusterParam])
 		controller.AddLabel(volume, controller.DriverName, r.DriverName)
-		controller.AddLabel(volume, controller.RemoteClusterId, scParams[controller.StorageClassRemoteClusterParam])
+		controller.AddLabel(volume, controller.RemoteClusterID, scParams[controller.StorageClassRemoteClusterParam])
 	}
 
 	// Add driver specific labels
@@ -239,9 +241,9 @@ func (r *PersistentVolumeReconciler) createProtectionGroupAndRG(ctx context.Cont
 	return replicationGroup.Name, nil
 }
 
-func (r *PersistentVolumeReconciler) createReplicationGroupOnce(ctx context.Context, res *replication.CreateStorageProtectionGroupResponse, remoteClusterId string, remoteRGRetentionPolicy string, log logr.Logger) (*storagev1alpha1.DellCSIReplicationGroup, error) {
+func (r *PersistentVolumeReconciler) createReplicationGroupOnce(ctx context.Context, res *replication.CreateStorageProtectionGroupResponse, remoteClusterID string, remoteRGRetentionPolicy string, log logr.Logger) (*storagev1alpha1.DellCSIReplicationGroup, error) {
 	rgObj, err, _ := r.SingleFlightGroup.Do(res.GetLocalProtectionGroupId(), func() (interface{}, error) {
-		return r.createReplicationGroup(ctx, res, remoteClusterId, remoteRGRetentionPolicy, log)
+		return r.createReplicationGroup(ctx, res, remoteClusterID, remoteRGRetentionPolicy, log)
 	})
 	if err != nil {
 		return nil, err
@@ -249,11 +251,11 @@ func (r *PersistentVolumeReconciler) createReplicationGroupOnce(ctx context.Cont
 	return rgObj.(*storagev1alpha1.DellCSIReplicationGroup), nil
 }
 
-func (r *PersistentVolumeReconciler) createReplicationGroup(ctx context.Context, res *replication.CreateStorageProtectionGroupResponse, remoteClusterId string, remoteRGRetentionPolicy string, log logr.Logger) (*storagev1alpha1.DellCSIReplicationGroup, error) {
+func (r *PersistentVolumeReconciler) createReplicationGroup(ctx context.Context, res *replication.CreateStorageProtectionGroupResponse, remoteClusterID string, remoteRGRetentionPolicy string, log logr.Logger) (*storagev1alpha1.DellCSIReplicationGroup, error) {
 
 	annotations := make(map[string]string)
 	labels := make(map[string]string)
-	labels[controller.RemoteClusterId] = remoteClusterId
+	labels[controller.RemoteClusterID] = remoteClusterID
 	labels[controller.DriverName] = r.DriverName
 	// Add key-value pairs from protection-group-attributes, with
 	// certain prefix, as labels to the DellCSIReplicationGroup
@@ -265,7 +267,7 @@ func (r *PersistentVolumeReconciler) createReplicationGroup(ctx context.Context,
 		}
 		annotations[controller.ContextPrefix] = r.ContextPrefix
 	}
-	annotations[controller.RemoteClusterId] = remoteClusterId
+	annotations[controller.RemoteClusterID] = remoteClusterID
 
 	// Add retention policy annotation for syncing deletion across clusters.
 	// Adds `retain` as default retention policy for RG, in case no or incorrect value
@@ -289,7 +291,7 @@ func (r *PersistentVolumeReconciler) createReplicationGroup(ctx context.Context,
 			ProtectionGroupAttributes:       res.GetLocalProtectionGroupAttributes(),
 			RemoteProtectionGroupID:         res.GetRemoteProtectionGroupId(),
 			RemoteProtectionGroupAttributes: res.GetRemoteProtectionGroupAttributes(),
-			RemoteClusterID:                 remoteClusterId,
+			RemoteClusterID:                 remoteClusterID,
 		},
 	}
 
@@ -301,14 +303,14 @@ func (r *PersistentVolumeReconciler) createReplicationGroup(ctx context.Context,
 	return replicationGroup, nil
 }
 
+// SetupWithManager start using reconciler by creating new controller managed by provided manager
 func (r *PersistentVolumeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, limiter ratelimiter.RateLimiter, maxReconcilers int) error {
 	if err := mgr.GetFieldIndexer().IndexField(ctx, &storagev1alpha1.DellCSIReplicationGroup{}, protectionIndexKey, func(object client.Object) []string {
 		replicationGroup := object.(*storagev1alpha1.DellCSIReplicationGroup)
 		if replicationGroup.Spec.ProtectionGroupID != "" {
 			return []string{replicationGroup.Spec.ProtectionGroupID}
-		} else {
-			return nil
 		}
+		return nil
 	}); err != nil {
 		return err
 	}

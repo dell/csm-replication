@@ -458,7 +458,7 @@ func (suite *ClusterTestSuite) TestFilterReplicationGroups() {
 	suite.NotNil(rgList.RGList)
 	suite.Equal(1, len(rgList.RGList))
 	suite.Equal("test-rg-2", rgList.RGList[0].Name)
-	suite.Equal("cluster-B", rgList.RGList[0].RemoteClusterId)
+	suite.Equal("cluster-B", rgList.RGList[0].RemoteClusterID)
 }
 
 func (suite *ClusterTestSuite) TestGetAllClusters() {

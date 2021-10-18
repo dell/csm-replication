@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package replication_controller
+package replicationcontroller
 
 import (
 	"context"
@@ -53,6 +53,7 @@ type PersistentVolumeClaimReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=events,verbs=list;watch;create;update;patch
 // +kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
 
+// Reconcile contains reconciliation logic that updates PersistentVolumeClaim depending on it's current state
 func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// If we have received the reconcile request, it means that the sidecar has completed its protection
 	log := r.Log.WithValues("persistentvolumeclaim", req.NamespacedName)
@@ -75,10 +76,10 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 	// Parse the local annotations
 	localAnnotations := claim.Annotations
 
-	// RemoteClusterId annotation
-	remoteClusterId, err := getValueFromAnnotations(controller.RemoteClusterId, localAnnotations)
+	// RemoteClusterID annotation
+	remoteClusterID, err := getValueFromAnnotations(controller.RemoteClusterID, localAnnotations)
 	if err != nil {
-		log.Error(err, "remoteClusterId not set")
+		log.Error(err, "remoteClusterID not set")
 		r.EventRecorder.Eventf(claim, eventTypeWarning, eventReasonUpdated,
 			"failed to fetch remote cluster id from annotations. error: %s", err.Error())
 		return ctrl.Result{}, err
@@ -88,12 +89,12 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 	// For this special case, we prefix the PV with 'self' keyword
 	// in order to allow a replicated PV to exist on the source
 	// cluster itself
-	if remoteClusterId == controller.Self {
+	if remoteClusterID == controller.Self {
 		remotePVName = replicated + "-" + localPVName
 	}
 
 	// Get the remote client
-	rClient, err := r.Config.GetConnection(remoteClusterId)
+	rClient, err := r.Config.GetConnection(remoteClusterID)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -150,7 +151,7 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 		log.V(common.InfoLevel).Info("Remote PVC has not been created yet. Information can't be synced")
 	}
 
-	err = r.processLocalPVC(ctx, log, claim, remotePVName, remotePVCName, remotePVCNamespace, remoteClusterId, isRemotePVCUpdated)
+	err = r.processLocalPVC(ctx, log, claim, remotePVName, remotePVCName, remotePVCNamespace, remoteClusterID, isRemotePVCUpdated)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -184,15 +185,15 @@ func (r *PersistentVolumeClaimReconciler) processRemotePVC(ctx context.Context, 
 		}
 		log.V(common.InfoLevel).Info("Successfully updated remote PVC with annotation")
 		return true, nil
-	} else {
-		log.V(common.InfoLevel).Info("Remote PVC already has the annotations set")
 	}
+
+	log.V(common.InfoLevel).Info("Remote PVC already has the annotations set")
 	return true, nil
 }
 
 func (r *PersistentVolumeClaimReconciler) processLocalPVC(ctx context.Context, log logr.Logger,
 	claim *v1.PersistentVolumeClaim, remotePVName, remotePVCName, remotePVCNamespace,
-	remoteClusterId string, isRemotePVCUpdated bool) error {
+	remoteClusterID string, isRemotePVCUpdated bool) error {
 	if claim.Annotations[controller.PVCSyncComplete] == "yes" {
 		log.V(common.InfoLevel).Info("PVC Sync already completed")
 		return nil
@@ -219,11 +220,12 @@ func (r *PersistentVolumeClaimReconciler) processLocalPVC(ctx context.Context, l
 
 	if isRemotePVCUpdated {
 		r.EventRecorder.Eventf(claim, eventTypeNormal, eventReasonUpdated,
-			"PVC sync complete for ClusterId: %s", remoteClusterId)
+			"PVC sync complete for ClusterId: %s", remoteClusterID)
 	}
 	return nil
 }
 
+// SetupWithManager start using reconciler by creating new controller managed by provided manager
 func (r *PersistentVolumeClaimReconciler) SetupWithManager(mgr ctrl.Manager, limiter ratelimiter.RateLimiter, maxReconcilers int) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.PersistentVolumeClaim{}, builder.WithPredicates(

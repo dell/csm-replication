@@ -24,6 +24,7 @@ import (
 	"google.golang.org/grpc"
 )
 
+// Replication is an interface that defines calls used for querying replication management calls to the driver
 type Replication interface {
 	CreateRemoteVolume(context.Context, string, map[string]string) (*csiext.CreateRemoteVolumeResponse, error)
 	CreateStorageProtectionGroup(context.Context, string, map[string]string) (*csiext.CreateStorageProtectionGroupResponse, error)
@@ -32,6 +33,7 @@ type Replication interface {
 	GetStorageProtectionGroupStatus(context.Context, string, map[string]string) (*csiext.GetStorageProtectionGroupStatusResponse, error)
 }
 
+// New returns new implementation of Replication interface
 func New(conn *grpc.ClientConn, log logr.Logger, timeout time.Duration) Replication {
 	return &replication{
 		conn:           conn,
@@ -48,17 +50,18 @@ type replication struct {
 	rgPendingState connection.PendingState
 }
 
-func (r *replication) GetStorageProtectionGroupStatus(ctx context.Context, protectionGroupId string, attributes map[string]string) (*csiext.GetStorageProtectionGroupStatusResponse, error) {
+// GetStorageProtectionGroupStatus queries client for current status of protection group
+func (r *replication) GetStorageProtectionGroupStatus(ctx context.Context, protectionGroupID string, attributes map[string]string) (*csiext.GetStorageProtectionGroupStatusResponse, error) {
 	tctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 	client := csiext.NewReplicationClient(r.conn)
 
 	req := &csiext.GetStorageProtectionGroupStatusRequest{
-		ProtectionGroupId:         protectionGroupId,
+		ProtectionGroupId:         protectionGroupID,
 		ProtectionGroupAttributes: attributes,
 	}
 
-	var rgID = connection.RgIDType(protectionGroupId)
+	var rgID = connection.RgIDType(protectionGroupID)
 	err := r.updatePendingState(rgID)
 	if err != nil {
 		return nil, err
@@ -70,13 +73,14 @@ func (r *replication) GetStorageProtectionGroupStatus(ctx context.Context, prote
 	return res, err
 }
 
-func (r *replication) ExecuteAction(ctx context.Context, protectionGroupId string, actionType *csiext.ExecuteActionRequest_Action,
+// ExecuteAction queries client to execute on of supported replication actions
+func (r *replication) ExecuteAction(ctx context.Context, protectionGroupID string, actionType *csiext.ExecuteActionRequest_Action,
 	attributes map[string]string, remoteProtectionGroupID string, remoteAttributes map[string]string) (*csiext.ExecuteActionResponse, error) {
 	tctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 	client := csiext.NewReplicationClient(r.conn)
 
-	var rgID = connection.RgIDType(protectionGroupId)
+	var rgID = connection.RgIDType(protectionGroupID)
 	err := r.updatePendingState(rgID)
 	if err != nil {
 		return nil, err
@@ -84,7 +88,7 @@ func (r *replication) ExecuteAction(ctx context.Context, protectionGroupId strin
 	defer rgID.ClearPending(&r.rgPendingState)
 
 	req := &csiext.ExecuteActionRequest{
-		ProtectionGroupId:               protectionGroupId,
+		ProtectionGroupId:               protectionGroupID,
 		ActionTypes:                     actionType,
 		ProtectionGroupAttributes:       attributes,
 		RemoteProtectionGroupId:         remoteProtectionGroupID,
@@ -95,6 +99,7 @@ func (r *replication) ExecuteAction(ctx context.Context, protectionGroupId strin
 	return res, err
 }
 
+// CreateRemoteVolume queries client to make sure that remote volume was created
 func (r *replication) CreateRemoteVolume(ctx context.Context, volumeHandle string, params map[string]string) (*csiext.CreateRemoteVolumeResponse, error) {
 	tctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
@@ -109,6 +114,7 @@ func (r *replication) CreateRemoteVolume(ctx context.Context, volumeHandle strin
 	return res, err
 }
 
+// CreateStorageProtectionGroup queries client to make sure that protection group  was created
 func (r *replication) CreateStorageProtectionGroup(ctx context.Context, volumeHandle string, params map[string]string) (*csiext.CreateStorageProtectionGroupResponse, error) {
 	tctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
@@ -121,12 +127,13 @@ func (r *replication) CreateStorageProtectionGroup(ctx context.Context, volumeHa
 	return client.CreateStorageProtectionGroup(tctx, req)
 }
 
-func (r *replication) DeleteStorageProtectionGroup(ctx context.Context, groupId string, groupAttributes map[string]string) error {
+// DeleteStorageProtectionGroup sends deletion request of storage protection group
+func (r *replication) DeleteStorageProtectionGroup(ctx context.Context, groupID string, groupAttributes map[string]string) error {
 	tctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 	client := csiext.NewReplicationClient(r.conn)
 
-	var rgID = connection.RgIDType(groupId)
+	var rgID = connection.RgIDType(groupID)
 	err := r.updatePendingState(rgID)
 	if err != nil {
 		return err
@@ -134,7 +141,7 @@ func (r *replication) DeleteStorageProtectionGroup(ctx context.Context, groupId 
 	defer rgID.ClearPending(&r.rgPendingState)
 
 	req := &csiext.DeleteStorageProtectionGroupRequest{
-		ProtectionGroupId:         groupId,
+		ProtectionGroupId:         groupID,
 		ProtectionGroupAttributes: groupAttributes,
 	}
 	_, err = client.DeleteStorageProtectionGroup(tctx, req)

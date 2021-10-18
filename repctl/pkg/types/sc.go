@@ -21,20 +21,23 @@ import (
 	"os"
 )
 
+// StorageClass represents Storage Class k8s resource
 type StorageClass struct {
 	Name            string `display:"Name"`
 	Provisioner     string `display:"Driver"`
 	RemoteSCName    string `display:"RemoteSC Name"`
-	LocalClusterId  string `display:"Local Cluster"`
-	RemoteClusterId string `display:"Remote Cluster"`
+	LocalClusterID  string `display:"Local Cluster"`
+	RemoteClusterID string `display:"Remote Cluster"`
 	Parameters      map[string]string
 	Valid           string `display:"Valid"`
 }
 
+// SCList list of StorageClass objects
 type SCList struct {
 	SCList []StorageClass
 }
 
+// Print prints list of storage classes to stdout as a table
 func (s *SCList) Print() {
 	// Form an empty object and create a new table writer
 	t, err := display.NewTableWriter(StorageClass{}, os.Stdout)
@@ -48,20 +51,21 @@ func (s *SCList) Print() {
 	t.Done()
 }
 
-func GetSC(sc storagev1.StorageClass, clusterId string, repEnabled bool) StorageClass {
+// GetSC converts k8s StorageClass type to custom representation
+func GetSC(sc storagev1.StorageClass, clusterID string, repEnabled bool) StorageClass {
 	mysc := StorageClass{}
 	params := sc.Parameters
 	mysc.Name = sc.Name
 	mysc.Provisioner = sc.Provisioner
 	mysc.Parameters = params
 	if repEnabled {
-		mysc.LocalClusterId = clusterId
-		remoteClusterId := params[metadata.RemoteClusterID]
+		mysc.LocalClusterID = clusterID
+		remoteClusterID := params[metadata.RemoteClusterID]
 		mysc.Valid = "true"
-		if remoteClusterId == "" {
+		if remoteClusterID == "" {
 			mysc.Valid = "false"
 		} else {
-			mysc.RemoteClusterId = remoteClusterId
+			mysc.RemoteClusterID = remoteClusterID
 		}
 		remoteSCName := params[metadata.RemoteSCName]
 		if remoteSCName == "" {
@@ -71,8 +75,8 @@ func GetSC(sc storagev1.StorageClass, clusterId string, repEnabled bool) Storage
 		}
 	} else {
 		mysc.RemoteSCName = "N/A"
-		mysc.LocalClusterId = "N/A"
-		mysc.RemoteClusterId = "N/A"
+		mysc.LocalClusterID = "N/A"
+		mysc.RemoteClusterID = "N/A"
 		mysc.Valid = "N/A"
 	}
 	return mysc

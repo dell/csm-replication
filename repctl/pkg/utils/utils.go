@@ -14,6 +14,7 @@
 
 package utils
 
+// IsStringInSlice checks if provided string can be found in slice of strings
 func IsStringInSlice(str string, slice []string) bool {
 	for _, ele := range slice {
 		if ele == str {

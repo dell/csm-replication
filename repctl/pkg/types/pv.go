@@ -23,6 +23,7 @@ import (
 	"os"
 )
 
+// PersistentVolume represents Persistent Volume k8s resource
 type PersistentVolume struct {
 	Name               string `display:"Name"`
 	RGName             string `display:"RG"`
@@ -39,6 +40,7 @@ type PersistentVolume struct {
 	Annotations        map[string]string
 }
 
+// GetPV converts k8s PersistentVolume type to custom representation
 func GetPV(persistentVolume *v1.PersistentVolume) (PersistentVolume, error) {
 	// Get values from annotations
 	// Get namespace annotation
@@ -81,10 +83,12 @@ func GetPV(persistentVolume *v1.PersistentVolume) (PersistentVolume, error) {
 	return pv, nil
 }
 
+// PersistentVolumeList list of PersistentVolume objects
 type PersistentVolumeList struct {
 	PVList []PersistentVolume
 }
 
+// Print prints list of persistent volumes to stdout as a table
 func (p *PersistentVolumeList) Print() {
 	// Form an empty object and create a new table writer
 	t, err := display.NewTableWriter(PersistentVolume{}, os.Stdout)

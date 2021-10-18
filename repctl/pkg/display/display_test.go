@@ -32,8 +32,8 @@ func (suite *DisplayTestSuite) TestTableWriter() {
 		Name:            "test-replication",
 		Provisioner:     "test.dellemc.com",
 		RemoteSCName:    "test-replication",
-		LocalClusterId:  "cluster-A",
-		RemoteClusterId: "cluster-B",
+		LocalClusterID:  "cluster-A",
+		RemoteClusterID: "cluster-B",
 		Valid:           "true",
 	}
 

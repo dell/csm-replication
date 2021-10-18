@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// GetSwapCommand returns 'swap' cobra command
 /* #nosec G104 */
 func GetSwapCommand() *cobra.Command {
 	swapCmd := &cobra.Command{

@@ -9,7 +9,7 @@ parameters:
   srp:
     source: "SRP_1"
     target: "SRP_1"
-  symId:
+  symID:
     source: "000000000001"
     target: "000000000002"
   serviceLevel:
