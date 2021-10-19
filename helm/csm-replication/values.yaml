@@ -1,0 +1,14 @@
+# replicas: Defines number of controller replicas
+# Allowed values: int
+# Default value: 1
+replicas: 1
+
+# image: Defines controller image. This shouldn't be changed
+# Allowed values: string
+image: dellemc/dell-replication-controller:v1.0.0
+
+# logLevel: Defines initial log level for controller. This can be changed in runtime
+# Allowed values: "debug", "info", "warn", "error", "panic"
+# Default value: "info"
+logLevel: "info"
+
