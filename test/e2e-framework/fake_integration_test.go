@@ -146,7 +146,7 @@ func (suite *FakeReplicationTestSuite) runReplicationController() {
 }
 
 func TestFakeReplicationTestSuite(t *testing.T) {
-	if testing.Short(){
+	if testing.Short() {
 		t.Skip("Skipping as requested by short flag")
 	}
 	testSuite := new(FakeReplicationTestSuite)
