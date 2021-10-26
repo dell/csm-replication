@@ -222,12 +222,12 @@ spec:
     spec:
       containers:
       - args:
-        - --prefix=replication.storage.dell.com
+        - prefix=replication.storage.dell.com
         {{- if eq .Values.leaderElection "true" }}
-        - --enable-leader-election
+        - enable-leader-election
         {{ end }}
-        - --retry-interval-start {{ .Values.retryIntervalMin }}
-        - --retry-interval-max {{ .Values.retryIntervalMax }}
+        - retry-interval-start {{ .Values.retryIntervalMin }}
+        - retry-interval-max {{ .Values.retryIntervalMax }}
         command:
         - /dell-replication-controller
         env:

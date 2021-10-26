@@ -20,9 +20,9 @@ leaderElection: "true"
 
 # retryIntervalMin: Initial retry interval of failed reconcile request.
 # It doubles with each failure, upto retry-interval-max
-# Allowed values: int (seconds)
-retryIntervalMin: 1
+# Allowed values: time
+retryIntervalMin: 1s
 
 # retryIntervalMax: Maximum retry interval of failed reconcile request
-# Allowed values: int (seconds)
-retryIntervalMax: 5
+# Allowed values: time
+retryIntervalMax: 5m
