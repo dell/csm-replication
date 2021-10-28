@@ -15,10 +15,11 @@
 package types
 
 import (
+	"os"
+
 	"github.com/dell/repctl/pkg/display"
 	"github.com/dell/repctl/pkg/metadata"
 	v1 "k8s.io/api/core/v1"
-	"os"
 )
 
 // PersistentVolumeClaim represents Persistent Volume Claim k8s resource

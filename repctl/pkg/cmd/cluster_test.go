@@ -16,13 +16,14 @@ package cmd
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
+	"testing"
+
 	"github.com/dell/repctl/mocks"
 	"github.com/dell/repctl/pkg/k8s"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
-	"os"
-	"path/filepath"
-	"testing"
 )
 
 const folderPath = ".repctl/testdata/"

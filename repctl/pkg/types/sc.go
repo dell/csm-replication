@@ -15,10 +15,11 @@
 package types
 
 import (
+	"os"
+
 	"github.com/dell/repctl/pkg/display"
 	"github.com/dell/repctl/pkg/metadata"
 	storagev1 "k8s.io/api/storage/v1"
-	"os"
 )
 
 // StorageClass represents Storage Class k8s resource

@@ -16,11 +16,10 @@ package cmd
 
 import (
 	"context"
-	"fmt"
-	"os"
 
 	"github.com/dell/repctl/pkg/config"
 	"github.com/dell/repctl/pkg/k8s"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -48,8 +47,7 @@ repctl will patch CR at cluster1 with action REPROTECT_LOCAL.`,
 			verifyInputForAction(inputRG, inputCluster)
 			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "reprotect: error getting clusters folder path: %s\n", err.Error())
-				os.Exit(1)
+				log.Fatalf("reprotect: error getting clusters folder path: %s\n", err.Error())
 			}
 			if inputCluster != "" {
 				reprotectAtCluster(configFolder, inputCluster, rgName, verbose)
@@ -69,53 +67,48 @@ repctl will patch CR at cluster1 with action REPROTECT_LOCAL.`,
 
 func reprotectAtRG(configFolder, rgName string, verbose bool) {
 	if verbose {
-		fmt.Printf("fetching RG and cluster info...\n")
+		log.Printf("fetching RG and cluster info...\n")
 	}
 	// fetch the specified RG and the cluster info
 	cluster, rg, err := GetRGAndClusterFromRGID(configFolder, rgName, "")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "reprotect to RG: error fetching RG info: (%s)\n", err.Error())
-		os.Exit(1)
+		log.Fatalf("reprotect to RG: error fetching RG info: (%s)\n", err.Error())
 	}
 	if verbose {
-		fmt.Printf("found specified RG (%s) on cluster (%s)...\n", rg.Name, cluster.GetID())
-		fmt.Println("updating spec...", rg.Name)
+		log.Printf("found specified RG (%s) on cluster (%s)...\n", rg.Name, cluster.GetID())
+		log.Print("updating spec...", rg.Name)
 
 	}
 	rg.Spec.Action = config.ActionReprotect
 	if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
-		fmt.Fprintf(os.Stderr, "reprotect: error executing UpdateAction %s\n", err.Error())
-		os.Exit(1)
+		log.Fatalf("reprotect: error executing UpdateAction %s\n", err.Error())
 	}
-	fmt.Printf("RG (%s), successfully updated with action: reprotect\n", rg.Name)
+	log.Printf("RG (%s), successfully updated with action: reprotect\n", rg.Name)
 }
 
 func reprotectAtCluster(configFolder, inputCluster, rgName string, verbose bool) {
 	if verbose {
-		fmt.Println("reading cluster configs...")
+		log.Print("reading cluster configs...")
 	}
 	mc := &k8s.MultiClusterConfigurator{}
 	clusters, err := mc.GetAllClusters([]string{inputCluster}, configFolder)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "reprotect: error in initializing cluster info: %s\n", err.Error())
-		os.Exit(1)
+		log.Fatalf("reprotect: error in initializing cluster info: %s\n", err.Error())
 	}
 	cluster := clusters.Clusters[0]
 	if verbose {
-		fmt.Printf("found cluster (%s)\n", cluster.GetID())
+		log.Printf("found cluster (%s)\n", cluster.GetID())
 	}
 	rg, err := cluster.GetReplicationGroups(context.Background(), rgName)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "reprotect: error in fecthing RG info: %s\n", err.Error())
-		os.Exit(1)
+		log.Fatalf("reprotect: error in fecthing RG info: %s\n", err.Error())
 	}
 	if verbose {
-		fmt.Printf("found RG (%s) on cluster, updating spec...\n", rg.Name)
+		log.Printf("found RG (%s) on cluster, updating spec...\n", rg.Name)
 	}
 	rg.Spec.Action = config.ActionReprotect
 	if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
-		fmt.Fprintf(os.Stderr, "reprotect: error executing UpdateAction %s\n", err.Error())
-		os.Exit(1)
+		log.Fatalf("reprotect: error executing UpdateAction %s\n", err.Error())
 	}
-	fmt.Printf("RG (%s), successfully updated with action: reprotect\n", rg.Name)
+	log.Printf("RG (%s), successfully updated with action: reprotect\n", rg.Name)
 }

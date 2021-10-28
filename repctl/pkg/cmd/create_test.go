@@ -15,6 +15,8 @@
 package cmd
 
 import (
+	"testing"
+
 	"github.com/dell/repctl/mocks"
 	"github.com/dell/repctl/pkg/k8s"
 	"github.com/dell/repctl/pkg/types"
@@ -22,7 +24,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	v1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
 )
 
 type CreateTestSuite struct {

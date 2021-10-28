@@ -16,12 +16,11 @@ package cmd
 
 import (
 	"context"
-	"fmt"
-	"os"
 
 	"github.com/dell/repctl/pkg/k8s"
 
 	"github.com/dell/repctl/pkg/config"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
 	"github.com/spf13/cobra"
@@ -50,8 +49,7 @@ repctl will patch CR at cluster1 with action SWAP_LOCAL.`,
 			verifyInputForAction(inputRG, inputCluster)
 			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "swap: error getting clusters folder path: %s\n", err.Error())
-				os.Exit(1)
+				log.Fatalf("swap: error getting clusters folder path: %s", err.Error())
 			}
 			if inputCluster != "" {
 				swapAtCluster(configFolder, inputCluster, rgName, verbose)
@@ -72,53 +70,48 @@ repctl will patch CR at cluster1 with action SWAP_LOCAL.`,
 
 func swapAtRG(configFolder string, rgName string, verbose bool) {
 	if verbose {
-		fmt.Printf("fetching RG and cluster info...\n")
+		log.Printf("fetching RG and cluster info...")
 	}
 	// fetch the specified RG and the cluster info
 	cluster, rg, err := GetRGAndClusterFromRGID(configFolder, rgName, "")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failover to RG: error fetching RG info: (%s)\n", err.Error())
-		os.Exit(1)
+		log.Fatalf("failover to RG: error fetching RG info: (%s)", err.Error())
 	}
 	if verbose {
-		fmt.Printf("found specified RG (%s) on cluster (%s)...\n", rg.Name, cluster.GetID())
-		fmt.Println("updating spec...", rg.Name)
+		log.Printf("found specified RG (%s) on cluster (%s)...", rg.Name, cluster.GetID())
+		log.Print("updating spec...", rg.Name)
 
 	}
 	rg.Spec.Action = config.ActionSwap
 	if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
-		fmt.Fprintf(os.Stderr, "swap: error executing UpdateAction %s\n", err.Error())
-		os.Exit(1)
+		log.Fatalf("swap: error executing UpdateAction %s", err.Error())
 	}
-	fmt.Printf("RG (%s), successfully updated with action: swap\n", rg.Name)
+	log.Printf("RG (%s), successfully updated with action: swap", rg.Name)
 }
 
 func swapAtCluster(configFolder string, inputCluster string, rgName string, verbose bool) {
 	if verbose {
-		fmt.Println("reading cluster configs...")
+		log.Print("reading cluster configs...")
 	}
 	mc := &k8s.MultiClusterConfigurator{}
 	clusters, err := mc.GetAllClusters([]string{inputCluster}, configFolder)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "swap: error in initializing cluster info: %s\n", err.Error())
-		os.Exit(1)
+		log.Fatalf("swap: error in initializing cluster info: %s", err.Error())
 	}
 	cluster := clusters.Clusters[0]
 	if verbose {
-		fmt.Printf("found cluster (%s)\n", cluster.GetID())
+		log.Printf("found cluster (%s)", cluster.GetID())
 	}
 	rg, err := cluster.GetReplicationGroups(context.Background(), rgName)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "swap: error in fecthing RG info: %s\n", err.Error())
-		os.Exit(1)
+		log.Fatalf("swap: error in fecthing RG info: %s", err.Error())
 	}
 	if verbose {
-		fmt.Printf("found RG (%s) on cluster, updating spec...\n", rg.Name)
+		log.Printf("found RG (%s) on cluster, updating spec...", rg.Name)
 	}
 	rg.Spec.Action = config.ActionSwap
 	if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
-		fmt.Fprintf(os.Stderr, "swap: error executing UpdateAction %s\n", err.Error())
-		os.Exit(1)
+		log.Fatalf("swap: error executing UpdateAction %s", err.Error())
 	}
-	fmt.Printf("RG (%s), successfully updated with action: swap\n", rg.Name)
+	log.Printf("RG (%s), successfully updated with action: swap", rg.Name)
 }

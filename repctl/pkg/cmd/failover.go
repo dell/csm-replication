@@ -16,12 +16,11 @@ package cmd
 
 import (
 	"context"
-	"fmt"
-	"os"
 	"path"
 
 	"github.com/dell/repctl/pkg/config"
 	"github.com/dell/repctl/pkg/k8s"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
 	"github.com/spf13/cobra"
@@ -55,8 +54,7 @@ With --unplanned, this command will perform an unplanned failover to given clust
 
 			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "failover: error getting clusters folder path: %s\n", err.Error())
-				os.Exit(1)
+				log.Fatalf("failover: error getting clusters folder path: %s\n", err.Error())
 			}
 
 			if inputTargetCluster != "" {
@@ -82,134 +80,120 @@ With --unplanned, this command will perform an unplanned failover to given clust
 func verifyInputForAction(rg string, clusterID string) {
 	// Check if cluster or rg is given by the user
 	if len(rg) < 1 && len(clusterID) < 1 {
-		fmt.Fprintf(os.Stderr, "failover: wrong input, no input provided. Either clusterID or RGID is needed.\n")
-		os.Exit(1)
+		log.Fatalf("failover: wrong input, no input provided. Either clusterID or RGID is needed.\n")
 	}
 
 	// Check if both cluster and rg is given by the user
 	if len(rg) > 0 && len(clusterID) > 0 {
-		fmt.Fprintf(os.Stderr, "failover: wrong input, can not failover to both cluster and RG.\n")
-		os.Exit(1)
+		log.Fatalf("failover: wrong input, can not failover to both cluster and RG.\n")
 	}
 }
 
 func failoverToRG(configFolder, rgName string, unplanned, verbose bool) {
 	if verbose {
-		fmt.Printf("fetching RG and cluster info...\n")
+		log.Printf("fetching RG and cluster info...\n")
 	}
 	// fetch the target RG and the cluster info
 	cluster, rg, err := GetRGAndClusterFromRGID(configFolder, rgName, "tgt")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failover to RG: error fetching target RG info: (%s)\n", err.Error())
-		os.Exit(1)
+		log.Fatalf("failover to RG: error fetching target RG info: (%s)\n", err.Error())
 	}
 	if verbose {
-		fmt.Printf("found target RG (%s) on cluster (%s)...\n", rg.Name, cluster.GetID())
+		log.Printf("found target RG (%s) on cluster (%s)...\n", rg.Name, cluster.GetID())
 	}
 	// check if the action is unplanned failover
 	if unplanned {
 		// unplanned failover, update target RG
 		rg.Spec.Action = config.ActionFailoverLocalUnplanned
 		if verbose {
-			fmt.Println("found flag for unplanned failover, updating remote RG...")
+			log.Print("found flag for unplanned failover, updating remote RG...")
 		}
 		if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
-			fmt.Fprintf(os.Stderr, "failover: error executing UpdateAction %s\n", err.Error())
-			os.Exit(1)
+			log.Fatalf("failover: error executing UpdateAction %s\n", err.Error())
 		}
-		fmt.Printf("RG (%s), successfully updated with action: unplanned failover\n", rg.Name)
+		log.Printf("RG (%s), successfully updated with action: unplanned failover\n", rg.Name)
 	} else {
 		// proceed for planned failover
 		sourceRGID := rg.GetAnnotations()[path.Join(viper.GetString(config.ReplicationPrefix), "remoteReplicationGroupName")]
 		if sourceRGID == "" {
-			fmt.Fprintf(os.Stderr, "failover: error in fecthing source RG name: %s\n", err.Error())
-			os.Exit(1)
+			log.Fatalf("failover: error in fecthing source RG name: %s\n", err.Error())
 		}
 		if verbose {
-			fmt.Printf("source RG (%s) ...\n", sourceRGID)
+			log.Printf("source RG (%s) ...\n", sourceRGID)
 		}
 		sourceRG, err := cluster.GetReplicationGroups(context.Background(), sourceRGID)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "failover: error in fecthing RG info: %s\n", err.Error())
-			os.Exit(1)
+			log.Fatalf("failover: error in fecthing RG info: %s\n", err.Error())
 		}
 		if verbose {
-			fmt.Printf("found RG (%s) on source cluster, updating spec...\n", rg.Name)
+			log.Printf("found RG (%s) on source cluster, updating spec...\n", rg.Name)
 		}
 		sourceRG.Spec.Action = config.ActionFailoverRemote
 		if err := cluster.UpdateReplicationGroup(context.Background(), sourceRG); err != nil {
-			fmt.Fprintf(os.Stderr, "failover: error executing UpdateAction %s\n", err.Error())
-			os.Exit(1)
+			log.Fatalf("failover: error executing UpdateAction %s\n", err.Error())
 		}
-		fmt.Printf("RG (%s), successfully updated with action: failover\n", sourceRG.Name)
+		log.Printf("RG (%s), successfully updated with action: failover\n", sourceRG.Name)
 	}
 }
 
 func failoverToCluster(configFolder, inputTargetCluster, rgName string, unplanned, verbose bool) {
 	if verbose {
-		fmt.Println("reading cluster configs...")
+		log.Print("reading cluster configs...")
 	}
 	mc := &k8s.MultiClusterConfigurator{}
 	clusters, err := mc.GetAllClusters([]string{inputTargetCluster}, configFolder)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failover: error in initializing cluster info: %s\n", err.Error())
-		os.Exit(1)
+		log.Fatalf("failover: error in initializing cluster info: %s\n", err.Error())
 	}
 	targetCluster := clusters.Clusters[0]
 	if verbose {
-		fmt.Printf("found target cluster (%s)\n", targetCluster.GetID())
+		log.Printf("found target cluster (%s)\n", targetCluster.GetID())
 	}
 	rg, err := targetCluster.GetReplicationGroups(context.Background(), rgName)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failover: error in fecthing RG info: %s\n", err.Error())
-		os.Exit(1)
+		log.Fatalf("failover: error in fecthing RG info: %s\n", err.Error())
 	}
 	if verbose {
-		fmt.Printf("found RG (%s) on target cluster...\n", rg.Name)
+		log.Printf("found RG (%s) on target cluster...\n", rg.Name)
 	}
 	if rg.Status.ReplicationLinkState.IsSource {
-		fmt.Fprintln(os.Stderr, "failover: error executing failover to source site.")
-		os.Exit(1)
+		log.Fatalf("failover: error executing failover to source site.")
 	}
 	// check if this is an unplanned failover
 	if unplanned {
 		rg.Spec.Action = config.ActionFailoverLocalUnplanned
 		if verbose {
-			fmt.Println("found flag for unplanned failover, updating remote RG...")
+			log.Print("found flag for unplanned failover, updating remote RG...")
 		}
 		if err := targetCluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
-			fmt.Fprintf(os.Stderr, "failover: error executing UpdateAction %s\n", err.Error())
-			os.Exit(1)
+			log.Fatalf("failover: error executing UpdateAction %s\n", err.Error())
 		}
-		fmt.Printf("RG (%s), successfully updated with action: unplanned failover\n", rg.Name)
+		log.Printf("RG (%s), successfully updated with action: unplanned failover\n", rg.Name)
 	} else {
 		// proceed for planned failover
 		if verbose {
-			fmt.Println("fetching source cluster...")
+			log.Print("fetching source cluster...")
 		}
 		// fetch CR on source cluster (remote to this target  cluster)
 		clusters, err = mc.GetAllClusters([]string{rg.Spec.RemoteClusterID}, configFolder)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "failover: error in fetching source cluster info: %s\n", err.Error())
-			os.Exit(1)
+			log.Fatalf("failover: error in fetching source cluster info: %s\n", err.Error())
 		}
 		sourceCluster := clusters.Clusters[0]
 		if verbose {
-			fmt.Printf("found source cluster (%s)\n", sourceCluster.GetID())
+			log.Printf("found source cluster (%s)\n", sourceCluster.GetID())
 		}
 		rg, err = sourceCluster.GetReplicationGroups(context.Background(), rgName)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "failover: error in fecthing RG info: %s\n", err.Error())
-			os.Exit(1)
+			log.Fatalf("failover: error in fecthing RG info: %s\n", err.Error())
 		}
 		if verbose {
-			fmt.Printf("found RG (%s) on source cluster, updating spec...\n", rg.Name)
+			log.Printf("found RG (%s) on source cluster, updating spec...\n", rg.Name)
 		}
 		rg.Spec.Action = config.ActionFailoverRemote
 		if err := sourceCluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
-			fmt.Fprintf(os.Stderr, "failover: error executing UpdateAction %s\n", err.Error())
-			os.Exit(1)
+			log.Fatalf("failover: error executing UpdateAction %s\n", err.Error())
 		}
-		fmt.Printf("RG (%s), successfully updated with action: failover\n", rg.Name)
+		log.Printf("RG (%s), successfully updated with action: failover\n", rg.Name)
 	}
 }
