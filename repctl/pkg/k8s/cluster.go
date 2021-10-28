@@ -27,6 +27,7 @@ import (
 	"github.com/dell/repctl/pkg/metadata"
 	"github.com/dell/repctl/pkg/types"
 	"github.com/dell/repctl/pkg/utils"
+	log "github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -329,10 +330,10 @@ func (c *Cluster) CreatePersistentVolumeClaimsFromPVs(ctx context.Context, names
 			err = c.client.Create(ctx, &pvcObj)
 		}
 		if err != nil {
-			fmt.Printf("Dry-run: %v. Failed to create PVC for PV: %s. Error: %s\n", dryRun, pv.Name, err.Error())
+			log.Printf("Dry-run: %v. Failed to create PVC for PV: %s. Error: %s\n", dryRun, pv.Name, err.Error())
 			return err
 		}
-		fmt.Printf("Dry-Run: %v. Successfully created PVC with name: %s using PV: %s in the namespace: %s\n",
+		log.Printf("Dry-Run: %v. Successfully created PVC with name: %s using PV: %s in the namespace: %s\n",
 			dryRun, pv.RemotePVCName, pv.Name, namespace)
 	}
 	return nil
@@ -362,7 +363,7 @@ func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println("Successfully created storage class: ", scObj.Name)
+		log.Print("Successfully created storage class: ", scObj.Name)
 	case *v1.Namespace:
 		nsObj, ok := runtimeObj.(*v1.Namespace)
 		if !ok {
@@ -372,7 +373,6 @@ func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println("Successfully created namespace: ", nsObj.Name)
 	case *apiExtensionsv1.CustomResourceDefinition:
 		crdObj, ok := runtimeObj.(*apiExtensionsv1.CustomResourceDefinition)
 		if !ok {
@@ -380,9 +380,18 @@ func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object
 		}
 		err := c.client.Create(ctx, crdObj)
 		if err != nil {
-			return nil, err
+			if strings.Contains(err.Error(), "already exists") {
+				err := c.client.Update(ctx, crdObj)
+				if err != nil {
+					return nil, err
+				}
+				log.Print("Successfully updated existing crds: ", crdObj.Name)
+			} else {
+				return nil, err
+			}
+		} else {
+			log.Print("Successfully created crds: ", crdObj.Name)
 		}
-		fmt.Println("Successfully created crds: ", crdObj.Name)
 	case *rbacv1.ClusterRole:
 		crObj, ok := runtimeObj.(*rbacv1.ClusterRole)
 		if !ok {
@@ -390,9 +399,18 @@ func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object
 		}
 		err := c.client.Create(ctx, crObj)
 		if err != nil {
-			return nil, err
+			if strings.Contains(err.Error(), "already exists") {
+				err := c.client.Update(ctx, crObj)
+				if err != nil {
+					return nil, err
+				}
+				log.Print("Successfully updated existing cluster role: ", crObj.Name)
+			} else {
+				return nil, err
+			}
+		} else {
+			log.Print("Successfully created cluster role: ", crObj.Name)
 		}
-		fmt.Println("Successfully created cluster role: ", crObj.Name)
 	case *rbacv1.ClusterRoleBinding:
 		crbObj, ok := runtimeObj.(*rbacv1.ClusterRoleBinding)
 		if !ok {
@@ -400,9 +418,18 @@ func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object
 		}
 		err := c.client.Create(ctx, crbObj)
 		if err != nil {
-			return nil, err
+			if strings.Contains(err.Error(), "already exists") {
+				err := c.client.Update(ctx, crbObj)
+				if err != nil {
+					return nil, err
+				}
+				log.Print("Successfully updated existing cluster role binding: ", crbObj.Name)
+			} else {
+				return nil, err
+			}
+		} else {
+			log.Print("Successfully created cluster role binding: ", crbObj.Name)
 		}
-		fmt.Println("Successfully created cluster role binding: ", crbObj.Name)
 	case *v1.Service:
 		svcObj, ok := runtimeObj.(*v1.Service)
 		if !ok {
@@ -412,7 +439,6 @@ func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println("Successfully created service: ", svcObj.Name)
 	case *appsv1.Deployment:
 		dplObj, ok := runtimeObj.(*appsv1.Deployment)
 		if !ok {
@@ -420,9 +446,18 @@ func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object
 		}
 		err := c.client.Create(ctx, dplObj)
 		if err != nil {
-			return nil, err
+			if strings.Contains(err.Error(), "already exists") {
+				err := c.client.Update(ctx, dplObj)
+				if err != nil {
+					return nil, err
+				}
+				log.Print("Successfully updated existing deployment: ", dplObj.Name)
+			} else {
+				return nil, err
+			}
+		} else {
+			log.Print("Successfully created deployment: ", dplObj.Name)
 		}
-		fmt.Println("Successfully created deployment: ", dplObj.Name)
 	case *v1.ConfigMap:
 		cmObj, ok := runtimeObj.(*v1.ConfigMap)
 		if !ok {
@@ -432,7 +467,7 @@ func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println("Successfully created config map: ", cmObj.Name)
+		log.Print("Successfully created config map: ", cmObj.Name)
 	default:
 		return nil, fmt.Errorf("unsupported object type %+v", runtimeObj.GetObjectKind())
 	}
@@ -510,9 +545,9 @@ func (*MultiClusterConfigurator) GetAllClusters(clusterIDs []string, configDir s
 			}
 			c, err := CreateCluster(clusterID, kubeConfigFile)
 			if err != nil {
-				fmt.Printf("Error encountered in creating kube client for ClusterId: %s. Error: %s\n",
+				log.Printf("Error encountered in creating kube client for ClusterId: %s. Error: %s\n",
 					clusterID, err.Error())
-				fmt.Printf("Output will not include results from ClusterId: %s\n", clusterID)
+				log.Printf("Output will not include results from ClusterId: %s\n", clusterID)
 				continue
 			} else {
 				clusters = append(clusters, c)
