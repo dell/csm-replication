@@ -12,6 +12,8 @@ SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 MODULEDIR="${SCRIPTDIR}/../helm"
 PROG="${0}"
 MODE="install"
+NS="dell-replication-controller"
+RELEASE="replication"
 
 # export the name of the debug log, so child processes will see it
 export DEBUGLOG="${SCRIPTDIR}/install-debug.log"
@@ -31,11 +33,9 @@ function usage() {
   decho "Usage: $PROG options..."
   decho "Options:"
   decho "  Required"
-  decho "  --namespace[=]<namespace>                Kubernetes namespace for installation"
   decho "  --values[=]<values.yaml>                 Values file, which defines configuration values"
 
   decho "  Optional"
-  decho "  --release[=]<helm release>               Name to register with helm, default value will match the CSM-Replication name"
   decho "  --upgrade                                Perform an upgrade, default is false"
   decho "  -h                                       Help"
   decho
@@ -91,18 +91,6 @@ function check_for_module() {
 
 # validate_params will validate the parameters passed in
 function validate_params() {
-  # make sure the module was specified
-  if [ -z "${MODULE}" ]; then
-    decho "No module specified"
-    usage
-    exit 1
-  fi
-  # the namespace is required
-  if [ -z "${NS}" ]; then
-    decho "No namespace specified"
-    usage
-    exit 1
-  fi
   # values file
   if [ -z "${VALUES}" ]; then
     decho "No values file was specified"
@@ -148,7 +136,7 @@ function install_module() {
 
 # Print a nice summary at the end
 function summary() {
-  log section "Operation complete"
+  log section "Operation complete"  
 }
 
 function kubectl_safe() {
@@ -236,7 +224,6 @@ function verify_kubernetes() {
 # main
 #
 
-VERIFYOPTS=""
 ASSUMEYES="false"
 
 while getopts ":h-:" optchar; do
@@ -245,27 +232,6 @@ while getopts ":h-:" optchar; do
     case "${OPTARG}" in
     upgrade)
       MODE="upgrade"
-      ;;
-      # NAMESPACE
-    namespace)
-      NS="${!OPTIND}"
-      if [[ -z ${NS} || ${NS} == "--skip-verify" ]]; then
-        NS=${DEFAULT_NS}
-      else
-        OPTIND=$((OPTIND + 1))
-      fi
-      ;;
-    namespace=*)
-      NS=${OPTARG#*=}
-      if [[ -z ${NS} ]]; then NS=${DEFAULT_NS}; fi
-      ;;
-      # RELEASE
-    release)
-      RELEASE="${!OPTIND}"
-      OPTIND=$((OPTIND + 1))
-      ;;
-    release=*)
-      RELEASE=${OPTARG#*=}
       ;;
       # VALUES
     values)
@@ -292,11 +258,6 @@ while getopts ":h-:" optchar; do
     ;;
   esac
 done
-
-# by default the NAME of the helm release of the module is the same as the module name
-RELEASE="replication"
-# by default, NODEUSER is root
-NODEUSER="${NODEUSER:-root}"
 
 # make sure kubectl is available
 kubectl --help >&/dev/null || {
