@@ -8,7 +8,7 @@
 #
 #  http://www.apache.org/licenses/LICENSE-2.0
 
-DRIVERDIR="${SCRIPTDIR}/../helm"
+MODULEDIR="${SCRIPTDIR}/../helm"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -99,35 +99,6 @@ function check_error() {
   else
     log step_success
   fi
-}
-
-#
-# get_drivers will populate an array of drivers found by
-# enumerating the directories in drivers/ that contain a helm chart
-function get_drivers() {
-  D="${1}"
-  TTT=$(pwd)
-  while read -r line; do
-    DDD=$(decho $line | awk -F '/' '{print $(NF-1)}')
-    VALIDDRIVERS+=("$DDD")
-  done < <(find "${D}" -maxdepth 2 -type f -name Chart.yaml | sort)
-}
-
-#
-# get_release will determine the helm release name to use
-# If ${RELEASE} is set, use that
-# Otherwise, use the driver name minus any "csi-" prefix
-# argument 1: Driver name
-function get_release_name() {
-  local D="${1}"
-  if [ ! -z "${RELEASE}" ]; then
-    decho "${RELEASE}"
-    return
-  fi
-
-  local PREFIX="csm-"
-  R=${D#"$PREFIX"}
-  decho "${R}"
 }
 
 function run_command() {

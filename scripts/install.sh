@@ -9,14 +9,13 @@
 #  http://www.apache.org/licenses/LICENSE-2.0
 
 SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-DRIVERDIR="${SCRIPTDIR}/../helm"
+MODULEDIR="${SCRIPTDIR}/../helm"
 PROG="${0}"
 MODE="install"
-WATCHLIST=""
 
 # export the name of the debug log, so child processes will see it
 export DEBUGLOG="${SCRIPTDIR}/install-debug.log"
-declare -a VALIDDRIVERS
+MODULE="csm-replication"
 
 source "$SCRIPTDIR"/common.sh
 
@@ -24,7 +23,6 @@ if [ -f "${DEBUGLOG}" ]; then
   rm -f "${DEBUGLOG}"
 fi
 
-#
 # usage will print command execution help and then exit
 function usage() {
   decho
@@ -65,33 +63,37 @@ function warning() {
   fi
 }
 
-
 # print header information
 function header() {
-  log section "Installing CSM Replication ${DRIVER} on ${kMajorVersion}.${kMinorVersion}"
+  if [ "${MODE}" == "upgrade" ]; then
+    log section "Upgrading ${MODULE} module on ${kMajorVersion}.${kMinorVersion}"
+  else
+    log section "Installing ${MODULE} module on ${kMajorVersion}.${kMinorVersion}"
+  fi
 }
 
-#
-# check_for_driver will see if the driver is already installed within the namespace provided
-function check_for_driver() {
-  log section "Checking to see if Module is already installed"
+# check_for_module will see if the module is already installed within the namespace provided
+function check_for_module() {
+  log step "Checking to see if module is already installed"
   NUM=$(run_command helm list --namespace "${NS}" | grep "^${RELEASE}\b" | wc -l)
   if [ "${1}" == "install" -a "${NUM}" != "0" ]; then
     # grab the status of the existing chart release
-    debuglog_helm_status "${NS}"  "${RELEASE}"
-    log error "The Module is already installed"
+    debuglog_helm_status "${NS}" "${RELEASE}"
+    log step_failure
+    log error "The ${MODULE} module is already installed"
   fi
   if [ "${1}" == "upgrade" -a "${NUM}" == "0" ]; then
-    log error "The Module is not installed"
+    log step_failure
+    log error "The ${MODULE} module is not installed"
   fi
+  log step_success
 }
 
-#
 # validate_params will validate the parameters passed in
 function validate_params() {
-  # make sure the driver was specified
-  if [ -z "${DRIVER}" ]; then
-    decho "No driver specified"
+  # make sure the module was specified
+  if [ -z "${MODULE}" ]; then
+    decho "No module specified"
     usage
     exit 1
   fi
@@ -114,33 +116,28 @@ function validate_params() {
   fi
 }
 
-#
-# install_driver uses helm to install the driver with a given name
-function install_driver() {
+# install_module uses helm to install the module with a given name
+function install_module() {
   if [ "${1}" == "upgrade" ]; then
-    log step "Upgrading Driver"
+    log step "Upgrading ${MODULE} module"
   else
-    log step "Installing Driver"
+    log step "Installing ${MODULE} module"
   fi
 
-  # run driver specific install script
-  local SCRIPTNAME="install-${DRIVER}.sh"
-  if [ -f "${SCRIPTDIR}/${SCRIPTNAME}" ]; then
-    source "${SCRIPTDIR}/${SCRIPTNAME}"
-  fi
-
-  HELMOUTPUT="/tmp/csi-install.$$.out"
+  HELMOUTPUT="/tmp/csm-install.$$.out"
   run_command helm ${1} \
     --set openshift=${OPENSHIFT} \
     --values "${VALUES}" \
     --namespace ${NS} "${RELEASE}" \
-    "${DRIVERDIR}/${DRIVER}" >"${HELMOUTPUT}" 2>&1
+    "${MODULEDIR}/${MODULE}" >"${HELMOUTPUT}" 2>&1
 
   if [ $? -ne 0 ]; then
     cat "${HELMOUTPUT}"
-    log error "Helm operation failed, output can be found in ${HELMOUTPUT}. The failure should be examined, before proceeding. Additionally, running csi-uninstall.sh may be needed to clean up partial deployments."
+    log error "Helm operation failed, output can be found in ${HELMOUTPUT}. The failure should be examined, before proceeding."
   fi
   log step_success
+  # wait for the deployment to finish, use the default timeout
+  waitOnRunning "${NS}" "Deployment dell-replication-controller-manager"
   if [ $? -eq 1 ]; then
     warning "Timed out waiting for the operation to complete." \
       "This does not indicate a fatal error, pods may take a while to start." \
@@ -153,7 +150,6 @@ function install_driver() {
 function summary() {
   log section "Operation complete"
 }
-
 
 function kubectl_safe() {
   eval "kubectl $1"
@@ -180,6 +176,7 @@ function verify_namespace() {
     # Make sure the namespace exists
     run_command kubectl describe namespace "${N}" >/dev/null 2>&1
     if [ $? -ne 0 ]; then
+      log step_failure
       log error "Namespace does not exist: ${N}"
     fi
     log passed
@@ -187,25 +184,60 @@ function verify_namespace() {
 }
 
 
+# waitOnRunning
+# will wait, for a timeout period, for a number of pods to go into Running state within a namespace
+# arguments:
+#  $1: required: namespace to watch
+#  $2: required: comma seperated list of deployment type and name pairs
+#      for example: "statefulset mystatefulset,daemonset mydaemonset"
+#  $3: optional: timeout value, 300 seconds is the default.
+function waitOnRunning() {
+  if [ -z "${2}" ]; then
+    decho "No namespace and/or list of deployments was supplied. This field is required for waitOnRunning"
+    return 1
+  fi
+  # namespace
+  local NS="${1}"
+  # pods
+  IFS="," read -r -a PODS <<<"${2}"
+  # timeout value passed in, or 300 seconds as a default
+  local TIMEOUT="300"
+  if [ -n "${3}" ]; then
+    TIMEOUT="${3}"
+  fi
+
+  error=0
+  for D in "${PODS[@]}"; do
+    log arrow
+    log smart_step "Waiting for Deployment to be ready" "small"
+    run_command kubectl -n "${NS}" rollout status --timeout=${TIMEOUT}s ${D} >/dev/null 2>&1
+    if [ $? -ne 0 ]; then
+      error=1
+      log step_failure
+    else
+      log step_success
+    fi
+  done
+
+  if [ $error -ne 0 ]; then
+    return 1
+  fi
+  return 0
+}
+
 #
 # verify_kubernetes
-# will run a driver specific function to verify environmental requirements
+# will run a module specific function to verify environmental requirements
 function verify_kubernetes() {
- verify_namespace $NS
+  verify_namespace $NS
 }
 
 #
 # main
 #
+
 VERIFYOPTS=""
 ASSUMEYES="false"
-
-# get the list of valid CSI Drivers, this will be the list of directories in drivers/ that contain helm charts
-get_drivers "${DRIVERDIR}"
-# if only one driver was found, set the DRIVER to that one
-if [ ${#VALIDDRIVERS[@]} -eq 1 ]; then
-  DRIVER="${VALIDDRIVERS[0]}"
-fi
 
 while getopts ":h-:" optchar; do
   case "${optchar}" in
@@ -261,8 +293,8 @@ while getopts ":h-:" optchar; do
   esac
 done
 
-# by default the NAME of the helm release of the driver is the same as the driver name
-RELEASE=$(get_release_name "${DRIVER}")
+# by default the NAME of the helm release of the module is the same as the module name
+RELEASE="replication"
 # by default, NODEUSER is root
 NODEUSER="${NODEUSER:-root}"
 
@@ -287,10 +319,10 @@ kMinorVersion=$(run_command kubectl version | grep 'Server Version' | sed -e 's/
 validate_params "${MODE}"
 
 header
-check_for_driver "${MODE}"
+check_for_module "${MODE}"
 verify_kubernetes
 
 # all good, keep processing
-install_driver "${MODE}"
+install_module "${MODE}"
 
 summary
