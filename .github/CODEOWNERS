@@ -7,22 +7,14 @@
 # be requested for review when someone opens a pull request.
 # order is alphabetical for easier maintenance.
 #
-# Aaron Tye (atye)
+# Aron Suliman (AronAtDell)
 # Andrew Shipilo (walker2)
-# Alexander Hoppe(hoppea2)
-# Alik Saring (alikdell)
-# Ameer Jabbar (ameer-jabbar)
-# Florian Coulombel (coulof)
-# Logan Jones (lj-software)
 # Max Sklyarov (maxan98)
-# Michael Edegware (medegw01)
-# Prashant Rakheja (prashant-dell)
 # Sean Gallacher (gallacher)
-# Sharmila Ramamoorthy (sharmilarama)
-# Shayna Finocchiaro (shaynafinocchiaro)
-# Trevor Dawe (tdawe)
-# Vladislav Belogrudov(vlad-belogrudov)
+# Vladislav Belogrudov (vlad-belogrudov)
+# Ilya Rogozhkin (IliaRN)
+# Timofey Klimov (krezefal)
 
 
 # for all files:
-* @atye @walker2 @hoppea2 @alikdell @ameer-jabbar @coulof @lj-software @maxan98 @medegw01 @prashant-dell @gallacher @sharmilarama @shaynafinocchiaro @tdawe @vlad-belogrudov
+* @AronAtDell @walker2 @maxan98 @gallacher @vlad-belogrudov @IliaRN @krezefal
