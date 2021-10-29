@@ -17,10 +17,12 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+
 	"github.com/dell/repctl/pkg/display"
 	"github.com/dell/repctl/pkg/metadata"
+	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
-	"os"
 )
 
 // PersistentVolume represents Persistent Volume k8s resource
@@ -56,7 +58,7 @@ func GetPV(persistentVolume *v1.PersistentVolume) (PersistentVolume, error) {
 	if requests != "" {
 		err := json.Unmarshal([]byte(requests), &requestsResReq)
 		if err != nil {
-			fmt.Printf("Failed to unmarshal json for resource requirements. Error: %s\n", err.Error())
+			log.Printf("Failed to unmarshal json for resource requirements. Error: %s", err.Error())
 			return PersistentVolume{}, err
 		}
 	}

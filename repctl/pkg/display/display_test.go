@@ -17,10 +17,11 @@ package display_test
 import (
 	"bytes"
 	"fmt"
+	"testing"
+
 	"github.com/dell/repctl/pkg/display"
 	"github.com/dell/repctl/pkg/types"
 	"github.com/stretchr/testify/suite"
-	"testing"
 )
 
 type DisplayTestSuite struct {

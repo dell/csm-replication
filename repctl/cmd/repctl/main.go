@@ -15,8 +15,11 @@
 package main
 
 import (
-	"fmt"
 	"os"
+
+	"github.com/rifflock/lfshook"
+	log "github.com/sirupsen/logrus"
+	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 
 	"github.com/dell/repctl/pkg/cmd"
 	"github.com/dell/repctl/pkg/config"
@@ -24,6 +27,34 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+func init() {
+	terminal := &prefixed.TextFormatter{
+		DisableColors:   false,
+		TimestampFormat: "2006-01-02 15:04:05",
+		FullTimestamp:   true,
+		ForceFormatting: true,
+	}
+
+	file := &prefixed.TextFormatter{
+		DisableColors:   true,
+		TimestampFormat: "2006-01-02 15:04:05",
+		FullTimestamp:   true,
+		ForceFormatting: true,
+	}
+
+	log.SetFormatter(terminal)
+	log.SetOutput(os.Stdout)
+
+	pathMap := lfshook.PathMap{
+		log.DebugLevel: "./repctl.log",
+		log.InfoLevel:  "./repctl.log",
+		log.WarnLevel:  "./repctl.log",
+		log.ErrorLevel: "./repctl.log",
+		log.FatalLevel: "./repctl.log",
+	}
+	log.AddHook(lfshook.NewHook(pathMap, file))
+}
 
 func main() {
 	repctl := cobra.Command{
@@ -65,8 +96,7 @@ func main() {
 
 	err := repctl.Execute()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "repctl: error: %s\n", err.Error())
-		os.Exit(1)
+		log.Fatalf("repctl: error: %s\n", err.Error())
 	}
 	os.Exit(0)
 }

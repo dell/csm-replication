@@ -17,10 +17,10 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/dell/csm-replication/api/v1alpha1"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/dell/repctl/pkg/config"
 	"github.com/dell/repctl/pkg/k8s"
@@ -47,25 +47,22 @@ This command will perform a maintenance on current source site. repctl will patc
 			verbose := viper.GetBool(config.Verbose)
 			action, err := getSupportedMaintenanceAction(inputAction)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "exec: error in supported action: %s\n", err.Error())
-				os.Exit(1)
+				log.Fatalf("exec: error in supported action: %s", err.Error())
 			}
 			if verbose {
-				fmt.Printf("Proceeding for action (%s)...\n", action)
+				log.Printf("Proceeding for action (%s)...", action)
 			}
 			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "exec: error getting clusters folder path: %s\n", err.Error())
-				os.Exit(1)
+				log.Fatalf("exec: error getting clusters folder path: %s", err.Error())
 			}
 			if verbose {
-				fmt.Println("reading cluster configs...")
+				log.Printf("reading cluster configs...")
 			}
 			mc := &k8s.MultiClusterConfigurator{}
 			clusters, err := mc.GetAllClusters([]string{}, configFolder)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "exec: error in initializing cluster info: %s\n", err.Error())
-				os.Exit(1)
+				log.Fatalf("exec: error in initializing cluster info: %s", err.Error())
 			}
 			found := false
 			for _, cluster := range clusters.Clusters {
@@ -77,20 +74,18 @@ This command will perform a maintenance on current source site. repctl will patc
 				if rg.Status.ReplicationLinkState.IsSource {
 					found = true
 					if verbose {
-						fmt.Printf("found RG (%s) on cluster (%s), updating spec...\n", rg.Name, cluster.GetID())
+						log.Printf("found RG (%s) on cluster (%s), updating spec...", rg.Name, cluster.GetID())
 					}
 					rg.Spec.Action = action
 					if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
-						fmt.Fprintf(os.Stderr, "exec: error executing action %s\n", err.Error())
-						os.Exit(1)
+						log.Fatalf("exec: error executing action %s", err.Error())
 					}
-					fmt.Printf("RG (%s) on cluster (%s), successfully updated with action: (%s)\n", rg.Name, cluster.GetID(), action)
+					log.Printf("RG (%s) on cluster (%s), successfully updated with action: (%s)", rg.Name, cluster.GetID(), action)
 					break
 				}
 			}
 			if !found {
-				fmt.Fprintf(os.Stderr, "exec: no matching cluster found with RG as source (%s)\n", rgName)
-				os.Exit(1)
+				log.Fatalf("exec: no matching cluster found with RG as source (%s)", rgName)
 			}
 		},
 	}
@@ -109,7 +104,7 @@ func getSupportedMaintenanceAction(action string) (string, error) {
 	case "sync":
 		return config.ActionSync, nil
 	}
-	return "", fmt.Errorf("Not a supported action")
+	return "", fmt.Errorf("not a supported action")
 }
 
 // GetRGAndClusterFromRGID returns a ClusterInterface and DellCSIReplicationGroup given the rgID
@@ -118,8 +113,7 @@ func GetRGAndClusterFromRGID(configFolder, rgID, filter string) (k8s.ClusterInte
 	mc := &k8s.MultiClusterConfigurator{}
 	clusters, err := mc.GetAllClusters([]string{}, configFolder)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "exec: error in initializing cluster info: %s\n", err.Error())
-		os.Exit(1)
+		log.Fatalf("exec: error in initializing cluster info: %s", err.Error())
 	}
 	for _, cluster := range clusters.Clusters {
 		rg, err := cluster.GetReplicationGroups(context.Background(), rgID)

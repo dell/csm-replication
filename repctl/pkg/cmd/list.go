@@ -16,13 +16,14 @@ package cmd
 
 import (
 	"context"
-	"fmt"
+	"os"
+
 	"github.com/dell/repctl/pkg/config"
 	"github.com/dell/repctl/pkg/k8s"
 	"github.com/dell/repctl/pkg/types"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"os"
 )
 
 // GetListCommand returns 'list' cobra command
@@ -68,12 +69,11 @@ Filter out storage classes which have replication enabled.
 You can also list all storage classes by passing --all flag`,
 
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("listing storage classes")
+			log.Print("listing storage classes")
 
 			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "list sc: error getting clusters folder path: %s\n", err.Error())
-				os.Exit(1)
+				log.Fatalf("list sc: error getting clusters folder path: %s", err.Error())
 			}
 
 			clusterIDs := viper.GetStringSlice(config.Clusters)
@@ -81,24 +81,23 @@ You can also list all storage classes by passing --all flag`,
 			mc := &k8s.MultiClusterConfigurator{}
 			clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "list sc: error in initializing cluster info: %s\n", err.Error())
-				os.Exit(1)
+				log.Fatalf("list sc: error in initializing cluster info: %s", err.Error())
 			}
 
 			driverName := viper.GetString(config.Driver)
 			noFilter := viper.GetBool("all")
 
 			for _, cluster := range clusters.Clusters {
-				fmt.Printf("\nCluster: %s\n", cluster.GetID())
+				log.Printf("Cluster: %s", cluster.GetID())
 
 				scList, err := cluster.FilterStorageClass(context.Background(), driverName, noFilter)
 				if err != nil {
-					fmt.Printf("Encountered error during filtering storage classes. Error: %s\n",
+					log.Printf("Encountered error during filtering storage classes. Error: %s",
 						err.Error())
 					continue
 				}
 				scList.Print()
-				fmt.Println()
+				log.Print()
 			}
 		},
 	}
@@ -115,23 +114,21 @@ List Persistent Volumes in the specified clusters.
 You can also filter PersistentVolumes based on filters like
 Remote Namespace, Remote ClusterId`,
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("listing persistent volumes")
+			log.Print("listing persistent volumes")
 
 			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "list pv: error getting clusters folder path: %s\n", err.Error())
-				os.Exit(1)
+				log.Fatalf("list pv: error getting clusters folder path: %s", err.Error())
 			}
 
 			clusterIDs := viper.GetStringSlice(config.Clusters)
 
-			fmt.Println(clusterIDs)
+			log.Print(clusterIDs)
 
 			mc := &k8s.MultiClusterConfigurator{}
 			clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "list pv: error in initializing cluster info: %s\n", err.Error())
-				os.Exit(1)
+				log.Fatalf("list pv: error in initializing cluster info: %s", err.Error())
 			}
 
 			rNamespace := viper.GetString("rn")
@@ -141,7 +138,7 @@ Remote Namespace, Remote ClusterId`,
 			noFilter := viper.GetBool("all")
 
 			for _, cluster := range clusters.Clusters {
-				fmt.Printf("\nCluster: %s\n", cluster.GetID())
+				log.Printf("Cluster: %s", cluster.GetID())
 
 				var pvList []types.PersistentVolume
 				var err error
@@ -152,7 +149,7 @@ Remote Namespace, Remote ClusterId`,
 					pvList, err = cluster.FilterPersistentVolumes(context.Background(), driverName, remoteClusterID, rNamespace, rgName)
 				}
 				if err != nil {
-					fmt.Printf("Encountered error during filtering persistent volumes. Error: %s\n",
+					log.Printf("Encountered error during filtering persistent volumes. Error: %s",
 						err.Error())
 					continue
 				}
@@ -160,7 +157,7 @@ Remote Namespace, Remote ClusterId`,
 				printableList := &types.PersistentVolumeList{PVList: pvList}
 				printableList.Print()
 
-				fmt.Println()
+				log.Print()
 			}
 		},
 	}
@@ -177,12 +174,11 @@ func getListPersistentVolumeClaimsCommand() *cobra.Command {
 List PersistentVolumeClaim objects which are replicated.
 You can apply filters like remoteClusterId, remoteNamespace.`,
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("listing persistent volume claims")
+			log.Print("listing persistent volume claims")
 
 			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "list pvc: error getting clusters folder path: %s\n", err.Error())
-				os.Exit(1)
+				log.Fatalf("list pvc: error getting clusters folder path: %s", err.Error())
 			}
 
 			clusterIDs := viper.GetStringSlice(config.Clusters)
@@ -190,8 +186,7 @@ You can apply filters like remoteClusterId, remoteNamespace.`,
 			mc := &k8s.MultiClusterConfigurator{}
 			clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "list pvc: error in initializing cluster info: %s\n", err.Error())
-				os.Exit(1)
+				log.Fatalf("list pvc: error in initializing cluster info: %s", err.Error())
 			}
 
 			namespace := viper.GetString("namespace")
@@ -201,7 +196,7 @@ You can apply filters like remoteClusterId, remoteNamespace.`,
 			noFilter := viper.GetBool("all")
 
 			for _, cluster := range clusters.Clusters {
-				fmt.Printf("\nCluster: %s\n", cluster.GetID())
+				log.Printf("Cluster: %s", cluster.GetID())
 
 				var pvcList *types.PersistentVolumeClaimList
 				var err error
@@ -214,13 +209,13 @@ You can apply filters like remoteClusterId, remoteNamespace.`,
 						namespace, rclusterID, rNamespace, rgName)
 				}
 				if err != nil {
-					fmt.Printf("Encountered error during filtering persistent volume claims. Error: %s\n",
+					log.Printf("Encountered error during filtering persistent volume claims. Error: %s",
 						err.Error())
 					continue
 				}
 
 				pvcList.Print()
-				fmt.Println()
+				log.Print()
 			}
 		},
 	}
@@ -240,12 +235,11 @@ func getListReplicationGroupsCommand() *cobra.Command {
 instances on the set of provided cluster ids. You can also provide filters like
 remote cluster id (rc) & driver name`,
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("listing replication groups")
+			log.Print("listing replication groups")
 
 			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "list pvc: error getting clusters folder path: %s\n", err.Error())
-				os.Exit(1)
+				log.Fatalf("list pvc: error getting clusters folder path: %s", err.Error())
 			}
 
 			clusterIDs := viper.GetStringSlice(config.Clusters)
@@ -253,24 +247,23 @@ remote cluster id (rc) & driver name`,
 			mc := &k8s.MultiClusterConfigurator{}
 			clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "list pvc: error in initializing cluster info: %s\n", err.Error())
-				os.Exit(1)
+				log.Fatalf("list pvc: error in initializing cluster info: %s", err.Error())
 			}
 
 			remoteClusterID := viper.GetString("rc")
 			driverName := viper.GetString(config.Driver)
 
 			for _, cluster := range clusters.Clusters {
-				fmt.Printf("\nCluster: %s\n", cluster.GetID())
+				log.Printf("Cluster: %s", cluster.GetID())
 
 				rgList, err := cluster.FilterReplicationGroups(context.Background(), driverName, remoteClusterID)
 				if err != nil {
-					fmt.Printf("Encountered error during filtering persistent volume claims. Error: %s\n",
+					log.Printf("Encountered error during filtering persistent volume claims. Error: %s",
 						err.Error())
 					continue
 				}
 				rgList.Print()
-				fmt.Println()
+				log.Print()
 			}
 		},
 	}

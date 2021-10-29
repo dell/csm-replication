@@ -16,12 +16,11 @@ package cmd
 
 import (
 	"context"
-	"fmt"
-	"os"
 
 	"github.com/dell/repctl/pkg/k8s"
 
 	"github.com/dell/repctl/pkg/config"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -54,8 +53,7 @@ With --discard, this command will perform an failback but discard any writes at 
 
 			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "failback: error getting clusters folder path: %s\n", err.Error())
-				os.Exit(1)
+				log.Fatalf("failback: error getting clusters folder path: %s\n", err.Error())
 			}
 
 			if inputSourceCluster != "" {
@@ -80,74 +78,68 @@ With --discard, this command will perform an failback but discard any writes at 
 
 func failbackToRG(configFolder, rgName string, discard, verbose bool) {
 	if verbose {
-		fmt.Printf("fetching RG and cluster info...\n")
+		log.Printf("fetching RG and cluster info...\n")
 	}
 	// fetch the source RG and the cluster info
 	cluster, rg, err := GetRGAndClusterFromRGID(configFolder, rgName, "src")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failback to RG: error fetching source RG info: (%s)\n", err.Error())
-		os.Exit(1)
+		log.Fatalf("failback to RG: error fetching source RG info: (%s)\n", err.Error())
 	}
 	if verbose {
-		fmt.Printf("found RG (%s) on cluster (%s)...\n", rg.Name, cluster.GetID())
+		log.Printf("found RG (%s) on cluster (%s)...\n", rg.Name, cluster.GetID())
 	}
 
 	rg.Spec.Action = config.ActionFailbackLocal
 	if discard {
 		rg.Spec.Action = config.ActionFailbackLocalDiscard
 		if verbose {
-			fmt.Println("found flag for discarding local changes...")
+			log.Print("found flag for discarding local changes...")
 		}
 	}
 	if verbose {
-		fmt.Println("updating spec...")
+		log.Print("updating spec...")
 	}
 	if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
-		fmt.Fprintf(os.Stderr, "failback: error executing UpdateAction %s\n", err.Error())
-		os.Exit(1)
+		log.Fatalf("failback: error executing UpdateAction %s\n", err.Error())
 	}
-	fmt.Printf("RG (%s), successfully updated with action: faiback\n", rg.Name)
+	log.Printf("RG (%s), successfully updated with action: faiback\n", rg.Name)
 }
 
 func failbackToCluster(configFolder, inputSourceCluster, rgName string, discard, verbose bool) {
 	if verbose {
-		fmt.Println("reading cluster configs...")
+		log.Print("reading cluster configs...")
 	}
 	mc := &k8s.MultiClusterConfigurator{}
 	clusters, err := mc.GetAllClusters([]string{inputSourceCluster}, configFolder)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failback: error in initializing cluster info: %s\n", err.Error())
-		os.Exit(1)
+		log.Fatalf("failback: error in initializing cluster info: %s\n", err.Error())
 	}
 	sourceCluster := clusters.Clusters[0]
 	if verbose {
-		fmt.Printf("found source cluster (%s)\n", sourceCluster.GetID())
+		log.Printf("found source cluster (%s)\n", sourceCluster.GetID())
 	}
 	rg, err := sourceCluster.GetReplicationGroups(context.Background(), rgName)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failback: error in fecthing RG info: %s\n", err.Error())
-		os.Exit(1)
+		log.Fatalf("failback: error in fecthing RG info: %s\n", err.Error())
 	}
 	if verbose {
-		fmt.Printf("found RG (%s) on cluster (%s)...\n", rg.Name, sourceCluster.GetID())
+		log.Printf("found RG (%s) on cluster (%s)...\n", rg.Name, sourceCluster.GetID())
 	}
 	if !rg.Status.ReplicationLinkState.IsSource {
-		fmt.Fprintln(os.Stderr, "failback: error executing failback to target site.")
-		os.Exit(1)
+		log.Fatalf("failback: error executing failback to target site.")
 	}
 	rg.Spec.Action = config.ActionFailbackLocal
 	if discard {
 		rg.Spec.Action = config.ActionFailbackLocalDiscard
 		if verbose {
-			fmt.Println("found flag for discarding local changes...")
+			log.Print("found flag for discarding local changes...")
 		}
 	}
 	if verbose {
-		fmt.Printf("found RG (%s) on source cluster, updating spec...\n", rg.Name)
+		log.Printf("found RG (%s) on source cluster, updating spec...\n", rg.Name)
 	}
 	if err := sourceCluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
-		fmt.Fprintf(os.Stderr, "failback: error executing UpdateAction %s\n", err.Error())
-		os.Exit(1)
+		log.Fatalf("failback: error executing UpdateAction %s\n", err.Error())
 	}
-	fmt.Printf("RG (%s), successfully updated with action: faiback\n", rg.Name)
+	log.Printf("RG (%s), successfully updated with action: faiback\n", rg.Name)
 }

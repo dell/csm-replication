@@ -20,16 +20,18 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	"github.com/dell/repctl/pkg/config"
-	"github.com/dell/repctl/pkg/k8s"
-	"github.com/dell/repctl/pkg/types"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/dell/repctl/pkg/config"
+	"github.com/dell/repctl/pkg/k8s"
+	"github.com/dell/repctl/pkg/types"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 //go:embed templates/*
@@ -92,22 +94,19 @@ cat <path-to-file> | ./repctl create -f -
 				// input from an actual file
 				file, fileErr := os.Open(filepath.Clean(fileName))
 				if fileErr != nil {
-					fmt.Fprintf(os.Stderr, "create: error opening file: %s\n", fileErr.Error())
-					os.Exit(1)
+					log.Fatalf("create: error opening file: %s", fileErr.Error())
 				}
 
 				data, err = processCreateCmd(file)
 			}
 
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "create: error while parsing input file: %s\n", err.Error())
-				os.Exit(1)
+				log.Fatalf("create: error while parsing input file: %s", err.Error())
 			}
 
 			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "cluster list: error getting clusters folder path: %s\n", err.Error())
-				os.Exit(1)
+				log.Fatalf("cluster list: error getting clusters folder path: %s", err.Error())
 			}
 
 			clusterIDs := viper.GetStringSlice(config.Clusters)
@@ -115,17 +114,20 @@ cat <path-to-file> | ./repctl create -f -
 			mc := &k8s.MultiClusterConfigurator{}
 			clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "list pv: error in initializing cluster info: %s\n", err.Error())
-				os.Exit(1)
+				log.Fatalf("list pv: error in initializing cluster info: %s", err.Error())
 			}
 
 			for _, cluster := range clusters.Clusters {
-				fmt.Printf("Creating objects in %s\n", cluster.GetID())
+				log.Printf("Creating objects in %s", cluster.GetID())
 				for _, resource := range data {
 					_, err := cluster.CreateObject(context.Background(), resource)
 					if err != nil {
-						fmt.Printf("Encountered error during creating object. Error: %s\n",
-							err.Error())
+						if strings.Contains(err.Error(), "already exists") {
+							log.Warnf("Object already exists: %s", err.Error())
+						} else {
+							log.Errorf("Encountered error during creating object. Error: %s",
+								err.Error())
+						}
 						continue
 					}
 				}
@@ -173,21 +175,18 @@ re-run the command by removing the dry run flag.`,
 			providedPVList := viper.GetStringSlice("pvs")
 
 			if len(clusterIDs) > 1 || len(clusterIDs) == 0 {
-				fmt.Fprintf(os.Stderr, "create pvc: error please provide single cluster\n")
-				os.Exit(1)
+				log.Fatalf("create pvc: error please provide single cluster")
 			}
 
 			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "create pvc: error getting clusters folder path: %s\n", err.Error())
-				os.Exit(1)
+				log.Fatalf("create pvc: error getting clusters folder path: %s", err.Error())
 			}
 
 			mc := &k8s.MultiClusterConfigurator{}
 			clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "create pvc: error in initializing cluster info: %s\n", err.Error())
-				os.Exit(1)
+				log.Fatalf("create pvc: error in initializing cluster info: %s", err.Error())
 			}
 
 			// Get the first cluster object
@@ -195,8 +194,7 @@ re-run the command by removing the dry run flag.`,
 
 			err = createPVCs(providedPVList, cluster, rgName, tgtNamespace, prefix, dryRun)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "create pvc: %s\n", err.Error())
-				os.Exit(1)
+				log.Fatalf("create pvc: %s", err.Error())
 			}
 
 		},
@@ -224,7 +222,7 @@ func getCreateStorageClassCommand() *cobra.Command {
 		Example: `
 ./repctl create sc --from-config <config-file>`,
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("Started generating storage classes")
+			log.Print("Started generating storage classes")
 
 			clusterIDs := viper.GetStringSlice(config.Clusters)
 			dryRun := viper.GetBool("create-sc-dry-run")
@@ -236,33 +234,28 @@ func getCreateStorageClassCommand() *cobra.Command {
 
 			err := localViper.ReadInConfig() // Find and read the config file
 			if err != nil {                  // Handle errors reading the config file
-				fmt.Fprintf(os.Stderr, "create sc: can't find config file: %s\n", err.Error())
-				os.Exit(1)
+				log.Fatalf("create sc: can't find config file: %s", err.Error())
 			}
 
 			err = localViper.Unmarshal(&scConfig)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "create sc: unable to decode sc config: %s\n", err.Error())
-				os.Exit(1)
+				log.Fatalf("create sc: unable to decode sc config: %s", err.Error())
 			}
 
 			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "create sc: error getting clusters folder path: %s\n", err.Error())
-				os.Exit(1)
+				log.Fatalf("create sc: error getting clusters folder path: %s", err.Error())
 			}
 
 			mc := &k8s.MultiClusterConfigurator{}
 			clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "create sc: error in initializing cluster info: %s\n", err.Error())
-				os.Exit(1)
+				log.Fatalf("create sc: error in initializing cluster info: %s", err.Error())
 			}
 
 			err = createSCs(scConfig, clusters, dryRun)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "create sc: %s\n", err.Error())
-				os.Exit(1)
+				log.Fatalf("create sc: %s", err.Error())
 			}
 		},
 	}
@@ -303,12 +296,12 @@ func createPVCs(providedPVList []string, cluster k8s.ClusterInterface, rgName, t
 		}
 	}
 
-	fmt.Printf("\nCluster: %s\n", cluster.GetID())
+	log.Printf("\nCluster: %s\n", cluster.GetID())
 
 	printableList := &types.PersistentVolumeList{PVList: pvList}
 	printableList.Print()
 
-	fmt.Println()
+	log.Print()
 	create := true
 	if !dryRun {
 		create, err = askForConfirmation("Proceed with creation of PVCs", os.Stdin, 3)
@@ -318,7 +311,7 @@ func createPVCs(providedPVList []string, cluster k8s.ClusterInterface, rgName, t
 	}
 
 	if create {
-		fmt.Println("Creating persistent volume claims")
+		log.Print("Creating persistent volume claims")
 		err = cluster.CreatePersistentVolumeClaimsFromPVs(context.Background(), tgtNamespace, pvList, prefix, dryRun)
 		if err != nil {
 			return fmt.Errorf("error encountered while creating PVCs: %s", err.Error())
@@ -353,24 +346,24 @@ func createSCs(scConfig ScConfig, clusters *k8s.Clusters, dryRun bool) error {
 		return nil
 	}
 
-	fmt.Println("Creating generated storage classes in clusters")
+	log.Print("Creating generated storage classes in clusters")
 
 	for _, cluster := range clusters.Clusters {
 		if cluster.GetID() == scConfig.SourceClusterID {
-			fmt.Println("Creating storage class in source cluster")
+			log.Print("Creating storage class in source cluster")
 			_, err := cluster.CreateObject(context.Background(), srcSC)
 			if err != nil {
-				fmt.Printf("Encountered error during creating object. Error: %s\n",
+				log.Printf("Encountered error during creating object. Error: %s\n",
 					err.Error())
 				continue
 			}
 		}
 
 		if cluster.GetID() == scConfig.TargetClusterID {
-			fmt.Println("Creating storage class in target cluster")
+			log.Print("Creating storage class in target cluster")
 			_, err := cluster.CreateObject(context.Background(), tgtSC)
 			if err != nil {
-				fmt.Printf("Encountered error during creating object. Error: %s\n",
+				log.Printf("Encountered error during creating object. Error: %s\n",
 					err.Error())
 				continue
 			}
@@ -403,7 +396,7 @@ func processCreateCmd(r io.Reader) ([][]byte, error) {
 func askForConfirmation(s string, in io.Reader, tries int) (bool, error) {
 	r := bufio.NewReader(in)
 	for ; tries > 0; tries-- {
-		fmt.Printf("%s [y/n]: ", s)
+		log.Printf("%s [y/n]: ", s)
 		res, err := r.ReadString('\n')
 		if err != nil {
 			return false, err
