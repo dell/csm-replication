@@ -172,16 +172,24 @@ subjects:
   name: default
   namespace: dell-replication-controller
 ---
+{{- $secret := (lookup "v1" "ConfigMap" "dell-replication-controller" "dell-replication-controller-config").data -}}
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dell-replication-controller-config
+  namespace: dell-replication-controller
+{{ if $secret -}}
+data:
+ {{- range $key, $value := $secret }}
+ {{ $key }}: {{ toYaml $value }}
+ {{ end }}
+{{ else -}}
 data:
   config.yaml: |
     clusterId: ""
     targets: []
     CSI_LOG_LEVEL: {{ .Values.logLevel }}
-kind: ConfigMap
-metadata:
-  name: dell-replication-controller-config
-  namespace: dell-replication-controller
+{{ end }}
 ---
 apiVersion: v1
 kind: Service
