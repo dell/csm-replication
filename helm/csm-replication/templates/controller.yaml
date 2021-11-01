@@ -157,7 +157,7 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: default
-  namespace: {{ .Release.Namespace }}
+  namespace: dell-replication-controller
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -170,7 +170,7 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: default
-  namespace: {{ .Release.Namespace }}
+  namespace: dell-replication-controller
 ---
 apiVersion: v1
 data:
@@ -181,7 +181,7 @@ data:
 kind: ConfigMap
 metadata:
   name: dell-replication-controller-config
-  namespace: {{ .Release.Namespace }}
+  namespace: dell-replication-controller
 ---
 apiVersion: v1
 kind: Service
@@ -189,7 +189,7 @@ metadata:
   labels:
     control-plane: controller-manager
   name: dell-replication-controller-manager-metrics-service
-  namespace: {{ .Release.Namespace }}
+  namespace: dell-replication-controller
 spec:
   ports:
   - name: https
@@ -204,7 +204,7 @@ metadata:
   labels:
     control-plane: controller-manager
   name: dell-replication-controller-manager
-  namespace: {{ .Release.Namespace }}
+  namespace: dell-replication-controller
 spec:
   replicas: {{ .Values.replicas }}
   selector:
