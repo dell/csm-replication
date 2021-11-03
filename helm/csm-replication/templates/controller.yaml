@@ -1,8 +1,3 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: dell-replication-controller
----
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -177,16 +172,24 @@ subjects:
   name: default
   namespace: dell-replication-controller
 ---
+{{- $secret := (lookup "v1" "ConfigMap" "dell-replication-controller" "dell-replication-controller-config").data -}}
 apiVersion: v1
-data:
-  config.yaml: |
-    clusterId: ""
-    targets: []
-    CSI_LOG_LEVEL: "info"
 kind: ConfigMap
 metadata:
   name: dell-replication-controller-config
   namespace: dell-replication-controller
+{{ if $secret -}}
+data:
+ {{- range $key, $value := $secret }}
+ {{ $key }}: {{ toYaml $value }}
+ {{ end }}
+{{ else -}}
+data:
+  config.yaml: |
+    clusterId: ""
+    targets: []
+    CSI_LOG_LEVEL: {{ .Values.logLevel }}
+{{ end }}
 ---
 apiVersion: v1
 kind: Service
@@ -211,7 +214,7 @@ metadata:
   name: dell-replication-controller-manager
   namespace: dell-replication-controller
 spec:
-  replicas: 1
+  replicas: {{ .Values.replicas }}
   selector:
     matchLabels:
       control-plane: controller-manager
@@ -222,8 +225,12 @@ spec:
     spec:
       containers:
       - args:
-        - --enable-leader-election
-        - --prefix=replication.storage.dell.com
+        - prefix=replication.storage.dell.com
+        {{- if eq .Values.leaderElection "true" }}
+        - enable-leader-election
+        {{ end }}
+        - retry-interval-start {{ .Values.retryIntervalMin }}
+        - retry-interval-max {{ .Values.retryIntervalMax }}
         command:
         - /dell-replication-controller
         env:
@@ -245,7 +252,7 @@ spec:
           value: /app/certs
         - name: X_CSI_REPLICATION_CONFIG_FILE_NAME
           value: config
-        image: dellemc/dell-replication-controller:v1.0.0
+        image: {{ .Values.image }}
         imagePullPolicy: Always
         name: manager
         resources:
@@ -265,4 +272,3 @@ spec:
           name: dell-replication-controller-config
           optional: true
         name: configmap-volume
-        
