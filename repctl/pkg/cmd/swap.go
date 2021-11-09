@@ -86,7 +86,9 @@ func swapAtRG(configFolder string, rgName string, verbose bool, wait bool) {
 
 	}
 	rLinkState := rg.Status.ReplicationLinkState
-
+	if rLinkState.LastSuccessfulUpdate == nil{
+		log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
+	}
 	rg.Spec.Action = config.ActionSwap
 	if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
 		log.Fatalf("swap: error executing UpdateAction %s", err.Error())
@@ -125,7 +127,9 @@ func swapAtCluster(configFolder string, inputCluster string, rgName string, verb
 		log.Printf("found RG (%s) on cluster, updating spec...", rg.Name)
 	}
 	rLinkState := rg.Status.ReplicationLinkState
-
+	if rLinkState.LastSuccessfulUpdate == nil{
+		log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
+	}
 	rg.Spec.Action = config.ActionSwap
 	if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
 		log.Fatalf("swap: error executing UpdateAction %s", err.Error())

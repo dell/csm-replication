@@ -91,7 +91,9 @@ func failbackToRG(configFolder, rgName string, discard, verbose bool, wait bool)
 		log.Printf("found RG (%s) on cluster (%s)...\n", rg.Name, cluster.GetID())
 	}
 	rLinkState := rg.Status.ReplicationLinkState
-
+	if rLinkState.LastSuccessfulUpdate == nil{
+		log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
+	}
 	rg.Spec.Action = config.ActionFailbackLocal
 	if discard {
 		rg.Spec.Action = config.ActionFailbackLocalDiscard
@@ -142,6 +144,9 @@ func failbackToCluster(configFolder, inputSourceCluster, rgName string, discard,
 		log.Fatalf("failback: error executing failback to target site.")
 	}
 	rLinkState := rg.Status.ReplicationLinkState
+	if rLinkState.LastSuccessfulUpdate == nil{
+		log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
+	}
 	rg.Spec.Action = config.ActionFailbackLocal
 	if discard {
 		rg.Spec.Action = config.ActionFailbackLocalDiscard

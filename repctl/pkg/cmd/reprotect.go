@@ -122,6 +122,9 @@ func reprotectAtRG(configFolder, rgName string, verbose bool, wait bool) {
 
 	}
 	rLinkState := rg.Status.ReplicationLinkState
+	if rLinkState.LastSuccessfulUpdate == nil{
+		log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
+	}
 	rg.Spec.Action = config.ActionReprotect
 	if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
 		log.Fatalf("reprotect: error executing UpdateAction %s\n", err.Error())
@@ -160,6 +163,9 @@ func reprotectAtCluster(configFolder, inputCluster, rgName string, verbose bool,
 		log.Printf("found RG (%s) on cluster, updating spec...\n", rg.Name)
 	}
 	rLinkState := rg.Status.ReplicationLinkState
+	if rLinkState.LastSuccessfulUpdate == nil{
+		log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
+	}
 	rg.Spec.Action = config.ActionReprotect
 	if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
 		log.Fatalf("reprotect: error executing UpdateAction %s\n", err.Error())

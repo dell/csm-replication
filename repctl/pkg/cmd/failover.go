@@ -134,6 +134,9 @@ func failoverToRG(configFolder, rgName string, unplanned bool, verbose bool, wai
 	// check if the action is unplanned failover
 	if unplanned {
 		rLinkState := rg.Status.ReplicationLinkState
+		if rLinkState.LastSuccessfulUpdate == nil{
+			log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
+		}
 		// unplanned failover, update target RG
 		rg.Spec.Action = config.ActionFailoverLocalUnplanned
 		if verbose {
@@ -170,6 +173,9 @@ func failoverToRG(configFolder, rgName string, unplanned bool, verbose bool, wai
 			log.Printf("found RG (%s) on source cluster, updating spec...\n", rg.Name)
 		}
 		rLinkState := rg.Status.ReplicationLinkState
+		if rLinkState.LastSuccessfulUpdate == nil{
+			log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
+		}
 		sourceRG.Spec.Action = config.ActionFailoverRemote
 		if err := cluster.UpdateReplicationGroup(context.Background(), sourceRG); err != nil {
 			log.Fatalf("failover: error executing UpdateAction %s\n", err.Error())
@@ -214,6 +220,9 @@ func failoverToCluster(configFolder, inputTargetCluster, rgName string, unplanne
 	// check if this is an unplanned failover
 	if unplanned {
 		rLinkState := rg.Status.ReplicationLinkState
+		if rLinkState.LastSuccessfulUpdate == nil{
+			log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
+		}
 		rg.Spec.Action = config.ActionFailoverLocalUnplanned
 		if verbose {
 			log.Print("found flag for unplanned failover, updating remote RG...")
@@ -254,6 +263,9 @@ func failoverToCluster(configFolder, inputTargetCluster, rgName string, unplanne
 			log.Printf("found RG (%s) on source cluster, updating spec...\n", rg.Name)
 		}
 		rLinkState := rg.Status.ReplicationLinkState
+		if rLinkState.LastSuccessfulUpdate == nil{
+			log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
+		}
 		rg.Spec.Action = config.ActionFailoverRemote
 		if err := sourceCluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
 			log.Fatalf("failover: error executing UpdateAction %s\n", err.Error())
