@@ -34,9 +34,9 @@ func GetSwapCommand() *cobra.Command {
 		Short: "allows to execute swap action at the specified cluster or RG",
 		Example: `
 For multi-cluster config:
-./repctl --rg <rg-id> swap --to-cluster cluster1
+./repctl --rg <rg-id> swap --at <cluster-id> --wait
 For single cluster config:
-./repctl swap --to-rg <rg-id>`,
+./repctl --rg <rg-id> swap`,
 		Long: `
 This command will perform a swap at specified cluster or at the RG.
 To perform a swap at a cluster, use --to-cluster <clusterID> with <rg-id> and to do failover to RG, use --to-rg <rg-id>.
@@ -44,31 +44,34 @@ repctl will patch CR at cluster1 with action SWAP_LOCAL.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			rgName := viper.GetString(config.ReplicationGroup)
 			inputCluster := viper.GetString("toTgt")
-			inputRG := viper.GetString("toTgt-rg")
 			verbose := viper.GetBool(config.Verbose)
-			verifyInputForAction(inputRG, inputCluster)
+			wait := viper.GetBool("swap-wait")
+			input := verifyInputForAction(inputCluster, rgName)
 			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
 			if err != nil {
 				log.Fatalf("swap: error getting clusters folder path: %s", err.Error())
 			}
-			if inputCluster != "" {
-				swapAtCluster(configFolder, inputCluster, rgName, verbose)
-			} else {
-				swapAtRG(configFolder, inputRG, verbose)
+			if input == "cluster" {
+				swapAtCluster(configFolder, inputCluster, rgName, verbose, wait)
+			} else if input == "rg" {
+				swapAtRG(configFolder, inputCluster, verbose, wait)
+			}else {
+				log.Fatal("Unexpected input received")
 			}
 		},
 	}
 
-	swapCmd.Flags().String("to-cluster", "", "cluster on which swap to execute")
-	_ = viper.BindPFlag("toTgt", swapCmd.Flags().Lookup("to-cluster"))
+	swapCmd.Flags().String("at", "", "target on which swap to execute")
+	_ = viper.BindPFlag("toTgt", swapCmd.Flags().Lookup("at"))
 
-	swapCmd.Flags().String("to-rg", "", "RG on which swap to execute")
-	_ = viper.BindPFlag("toTgt-rg", swapCmd.Flags().Lookup("to-rg"))
+
+	swapCmd.Flags().Bool("wait", false, "wait for action to complete")
+	_ = viper.BindPFlag("swap-wait", swapCmd.Flags().Lookup("wait"))
 
 	return swapCmd
 }
 
-func swapAtRG(configFolder string, rgName string, verbose bool) {
+func swapAtRG(configFolder string, rgName string, verbose bool, wait bool) {
 	if verbose {
 		log.Printf("fetching RG and cluster info...")
 	}
@@ -82,14 +85,26 @@ func swapAtRG(configFolder string, rgName string, verbose bool) {
 		log.Print("updating spec...", rg.Name)
 
 	}
+	rLinkState := rg.Status.ReplicationLinkState
+
 	rg.Spec.Action = config.ActionSwap
 	if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
 		log.Fatalf("swap: error executing UpdateAction %s", err.Error())
 	}
+	if wait {
+		success := waitForStateToUpdate(rgName, cluster,rLinkState)
+		if success{
+			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
+			return
+		}else {
+			log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
+			return
+		}
+	}
 	log.Printf("RG (%s), successfully updated with action: swap", rg.Name)
 }
 
-func swapAtCluster(configFolder string, inputCluster string, rgName string, verbose bool) {
+func swapAtCluster(configFolder string, inputCluster string, rgName string, verbose bool, wait bool) {
 	if verbose {
 		log.Print("reading cluster configs...")
 	}
@@ -109,9 +124,21 @@ func swapAtCluster(configFolder string, inputCluster string, rgName string, verb
 	if verbose {
 		log.Printf("found RG (%s) on cluster, updating spec...", rg.Name)
 	}
+	rLinkState := rg.Status.ReplicationLinkState
+
 	rg.Spec.Action = config.ActionSwap
 	if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
 		log.Fatalf("swap: error executing UpdateAction %s", err.Error())
+	}
+	if wait {
+		success := waitForStateToUpdate(rgName, cluster,rLinkState)
+		if success{
+			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
+			return
+		}else {
+			log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
+			return
+		}
 	}
 	log.Printf("RG (%s), successfully updated with action: swap", rg.Name)
 }

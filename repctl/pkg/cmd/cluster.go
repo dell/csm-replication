@@ -64,7 +64,7 @@ func GetClusterCommand() *cobra.Command {
 func getAddClusterCommand() *cobra.Command {
 	addClusterCmd := &cobra.Command{
 		Use:   "add",
-		Short: "adds new a cluster to be managed by repctl",
+		Short: "adds a cluster to be managed by repctl",
 		Example: `
 			./repctl cluster add -f <file> -n <name>
 			./repctl cluster add -f <file1> -n <name1> -f <file2> -n <name2> ...
@@ -113,7 +113,7 @@ func getAddClusterCommand() *cobra.Command {
 /* #nosec G104 */
 func getRemoveClusterCommand() *cobra.Command {
 	removeClusterCmd := &cobra.Command{
-		Use:     "remove",
+		Use:     "delete",
 		Aliases: []string{"rm"},
 		Short:   "removes cluster by name from list of clusters being managed by repctl",
 		Run: func(cmd *cobra.Command, args []string) {
@@ -136,7 +136,7 @@ func getRemoveClusterCommand() *cobra.Command {
 
 func getListClusterCommand() *cobra.Command {
 	listClusterCmd := &cobra.Command{
-		Use:     "list",
+		Use:     "get",
 		Aliases: []string{"ls"},
 		Short:   "list all clusters currently being managed by repctl",
 		Run: func(cmd *cobra.Command, args []string) {
