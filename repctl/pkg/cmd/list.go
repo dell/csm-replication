@@ -54,8 +54,33 @@ func GetListCommand() *cobra.Command {
 	listCmd.AddCommand(getListPersistentVolumesCommand())
 	listCmd.AddCommand(getListPersistentVolumeClaimsCommand())
 	listCmd.AddCommand(getListReplicationGroupsCommand())
+	listCmd.AddCommand(getListClusterGlobalCommand())
 
 	return listCmd
+}
+
+func getListClusterGlobalCommand() *cobra.Command {
+	listClusterCmd := &cobra.Command{
+		Use:     "cluster",
+		Aliases: []string{"clusters"},
+		Short:   "list all clusters currently being managed by repctl",
+		Run: func(cmd *cobra.Command, args []string) {
+			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
+			if err != nil {
+				log.Fatalf("cluster list: error getting clusters folder path: %s", err.Error())
+			}
+
+			mc := &k8s.MultiClusterConfigurator{}
+
+			clusters, err := mc.GetAllClusters([]string{}, configFolder)
+			if err != nil {
+				log.Fatalf("cluster list: error in initializing cluster info: %s", err.Error())
+			}
+			clusters.Print()
+		},
+	}
+
+	return listClusterCmd
 }
 
 func getListStorageClassesCommand() *cobra.Command {

@@ -555,7 +555,7 @@ func (*MultiClusterConfigurator) GetAllClusters(clusterIDs []string, configDir s
 		}
 	}
 	if len(clusters) == 0 {
-		return nil, fmt.Errorf("failed to find any valid config files")
+		return nil, fmt.Errorf("failed to find any valid config files in %s", configDir)
 	}
 	return &Clusters{
 		Clusters: clusters,
