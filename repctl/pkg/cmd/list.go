@@ -30,8 +30,8 @@ import (
 /* #nosec G104 */
 func GetListCommand() *cobra.Command {
 	listCmd := &cobra.Command{
-		Use:     "get",
-		Short:   "lists different resources in clusters with configured replication",
+		Use:   "get",
+		Short: "lists different resources in clusters with configured replication",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) == 0 {
 				_ = cmd.Help()
@@ -40,7 +40,7 @@ func GetListCommand() *cobra.Command {
 		},
 	}
 
-	listCmd.PersistentFlags().BoolP("all", "A",false, "show all objects (overrides other filters)")
+	listCmd.PersistentFlags().BoolP("all", "A", false, "show all objects (overrides other filters)")
 	_ = viper.BindPFlag("all", listCmd.PersistentFlags().Lookup("all"))
 	_ = viper.BindPFlag("all", listCmd.PersistentFlags().ShorthandLookup("A"))
 

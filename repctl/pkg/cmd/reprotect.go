@@ -53,7 +53,7 @@ repctl will patch CR at cluster1 with action REPROTECT_LOCAL.`,
 				reprotectAtCluster(configFolder, res, rgName, verbose, wait)
 			} else if input == "rg" {
 				reprotectAtRG(configFolder, res, verbose, wait)
-			}else {
+			} else {
 				log.Fatal("Unexpected input received")
 			}
 		},
@@ -67,12 +67,12 @@ repctl will patch CR at cluster1 with action REPROTECT_LOCAL.`,
 	return reprotectCmd
 }
 
-func verifyInputForAction(input string, rg string) (res string, tgt string){
+func verifyInputForAction(input string, rg string) (res string, tgt string) {
 	// Check if cluster or rg is given by the user
 	if input == "" {
-		if rg != ""{
+		if rg != "" {
 			input = rg
-		}else {
+		} else {
 			log.Fatalf("failover: wrong input, no input provided. Either clusterID or RGID is needed.\n")
 		}
 	}
@@ -82,7 +82,6 @@ func verifyInputForAction(input string, rg string) (res string, tgt string){
 		log.Fatalf("list pvc: error getting clusters folder path: %s", err.Error())
 	}
 
-
 	mc := &k8s.MultiClusterConfigurator{}
 	clusters, err := mc.GetAllClusters([]string{}, configFolder)
 	if err != nil {
@@ -90,7 +89,7 @@ func verifyInputForAction(input string, rg string) (res string, tgt string){
 	}
 
 	for _, cluster := range clusters.Clusters {
-		if input == cluster.GetID(){
+		if input == cluster.GetID() {
 			return "cluster", input
 		}
 		rgList, err := cluster.ListReplicationGroups(context.Background())
@@ -99,8 +98,8 @@ func verifyInputForAction(input string, rg string) (res string, tgt string){
 				err.Error())
 			continue
 		}
-		for _,value := range rgList.Items{
-			if value.Name == input{
+		for _, value := range rgList.Items {
+			if value.Name == input {
 				return "rg", input
 			}
 		}
@@ -123,7 +122,7 @@ func reprotectAtRG(configFolder, rgName string, verbose bool, wait bool) {
 
 	}
 	rLinkState := rg.Status.ReplicationLinkState
-	if rLinkState.LastSuccessfulUpdate == nil{
+	if rLinkState.LastSuccessfulUpdate == nil {
 		log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
 	}
 	rg.Spec.Action = config.ActionReprotect
@@ -131,8 +130,8 @@ func reprotectAtRG(configFolder, rgName string, verbose bool, wait bool) {
 		log.Fatalf("reprotect: error executing UpdateAction %s\n", err.Error())
 	}
 	if wait {
-		success := waitForStateToUpdate(rgName, cluster,rLinkState)
-		if success{
+		success := waitForStateToUpdate(rgName, cluster, rLinkState)
+		if success {
 			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
 			return
 		}
@@ -163,7 +162,7 @@ func reprotectAtCluster(configFolder, inputCluster, rgName string, verbose bool,
 		log.Printf("found RG (%s) on cluster, updating spec...\n", rg.Name)
 	}
 	rLinkState := rg.Status.ReplicationLinkState
-	if rLinkState.LastSuccessfulUpdate == nil{
+	if rLinkState.LastSuccessfulUpdate == nil {
 		log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
 	}
 	rg.Spec.Action = config.ActionReprotect
@@ -171,8 +170,8 @@ func reprotectAtCluster(configFolder, inputCluster, rgName string, verbose bool,
 		log.Fatalf("reprotect: error executing UpdateAction %s\n", err.Error())
 	}
 	if wait {
-		success := waitForStateToUpdate(rgName, cluster,rLinkState)
-		if success{
+		success := waitForStateToUpdate(rgName, cluster, rLinkState)
+		if success {
 			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
 			return
 		}

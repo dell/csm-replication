@@ -63,7 +63,7 @@ With --unplanned, this command will perform an unplanned failover to given clust
 				failoverToCluster(configFolder, inputTargetCluster, rgName, unplanned, verbose, wait)
 			} else if target == "rg" {
 				failoverToRG(configFolder, inputTargetCluster, unplanned, verbose, wait)
-			}else {
+			} else {
 				log.Fatalf("Unexpected input")
 			}
 		},
@@ -71,7 +71,6 @@ With --unplanned, this command will perform an unplanned failover to given clust
 
 	failoverCmd.Flags().String("target", "", "target on which to execute failover")
 	_ = viper.BindPFlag("tgt", failoverCmd.Flags().Lookup("target"))
-
 
 	failoverCmd.Flags().Bool("unplanned", false, "flag marking failover to be unplanned")
 	_ = viper.BindPFlag("unplanned", failoverCmd.Flags().Lookup("unplanned"))
@@ -82,7 +81,7 @@ With --unplanned, this command will perform an unplanned failover to given clust
 	return failoverCmd
 }
 
-func verifyInputForFailoverAction(input string) string{
+func verifyInputForFailoverAction(input string) string {
 	// Check if cluster or rg is given by the user
 	if input == "" {
 		log.Fatalf("failover: wrong input, no input provided. Either clusterID or RGID is needed.\n")
@@ -93,7 +92,6 @@ func verifyInputForFailoverAction(input string) string{
 		log.Fatalf("list pvc: error getting clusters folder path: %s", err.Error())
 	}
 
-
 	mc := &k8s.MultiClusterConfigurator{}
 	clusters, err := mc.GetAllClusters([]string{}, configFolder)
 	if err != nil {
@@ -101,7 +99,7 @@ func verifyInputForFailoverAction(input string) string{
 	}
 
 	for _, cluster := range clusters.Clusters {
-		if input == cluster.GetID(){
+		if input == cluster.GetID() {
 			return "cluster"
 		}
 		rgList, err := cluster.ListReplicationGroups(context.Background())
@@ -110,8 +108,8 @@ func verifyInputForFailoverAction(input string) string{
 				err.Error())
 			continue
 		}
-		for _,value := range rgList.Items{
-			if value.Name == input{
+		for _, value := range rgList.Items {
+			if value.Name == input {
 				return "rg"
 			}
 		}
@@ -134,7 +132,7 @@ func failoverToRG(configFolder, rgName string, unplanned bool, verbose bool, wai
 	// check if the action is unplanned failover
 	if unplanned {
 		rLinkState := rg.Status.ReplicationLinkState
-		if rLinkState.LastSuccessfulUpdate == nil{
+		if rLinkState.LastSuccessfulUpdate == nil {
 			log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
 		}
 		// unplanned failover, update target RG
@@ -146,8 +144,8 @@ func failoverToRG(configFolder, rgName string, unplanned bool, verbose bool, wai
 			log.Fatalf("failover: error executing UpdateAction %s\n", err.Error())
 		}
 		if wait {
-			success := waitForStateToUpdate(rgName, cluster,rLinkState)
-			if success{
+			success := waitForStateToUpdate(rgName, cluster, rLinkState)
+			if success {
 				log.Printf("RG (%s), successfully updated with action: failover\n", rg.Name)
 				return
 			}
@@ -173,7 +171,7 @@ func failoverToRG(configFolder, rgName string, unplanned bool, verbose bool, wai
 			log.Printf("found RG (%s) on source cluster, updating spec...\n", rg.Name)
 		}
 		rLinkState := rg.Status.ReplicationLinkState
-		if rLinkState.LastSuccessfulUpdate == nil{
+		if rLinkState.LastSuccessfulUpdate == nil {
 			log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
 		}
 		sourceRG.Spec.Action = config.ActionFailoverRemote
@@ -181,8 +179,8 @@ func failoverToRG(configFolder, rgName string, unplanned bool, verbose bool, wai
 			log.Fatalf("failover: error executing UpdateAction %s\n", err.Error())
 		}
 		if wait {
-			success := waitForStateToUpdate(rgName, cluster,rLinkState)
-			if success{
+			success := waitForStateToUpdate(rgName, cluster, rLinkState)
+			if success {
 				log.Printf("RG (%s), successfully updated with action: failover\n", rg.Name)
 				return
 			}
@@ -220,7 +218,7 @@ func failoverToCluster(configFolder, inputTargetCluster, rgName string, unplanne
 	// check if this is an unplanned failover
 	if unplanned {
 		rLinkState := rg.Status.ReplicationLinkState
-		if rLinkState.LastSuccessfulUpdate == nil{
+		if rLinkState.LastSuccessfulUpdate == nil {
 			log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
 		}
 		rg.Spec.Action = config.ActionFailoverLocalUnplanned
@@ -231,8 +229,8 @@ func failoverToCluster(configFolder, inputTargetCluster, rgName string, unplanne
 			log.Fatalf("failover: error executing UpdateAction %s\n", err.Error())
 		}
 		if wait {
-			success := waitForStateToUpdate(rgName, targetCluster,rLinkState)
-			if success{
+			success := waitForStateToUpdate(rgName, targetCluster, rLinkState)
+			if success {
 				log.Printf("RG (%s), successfully updated with action: failover\n", rg.Name)
 				return
 			}
@@ -263,7 +261,7 @@ func failoverToCluster(configFolder, inputTargetCluster, rgName string, unplanne
 			log.Printf("found RG (%s) on source cluster, updating spec...\n", rg.Name)
 		}
 		rLinkState := rg.Status.ReplicationLinkState
-		if rLinkState.LastSuccessfulUpdate == nil{
+		if rLinkState.LastSuccessfulUpdate == nil {
 			log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
 		}
 		rg.Spec.Action = config.ActionFailoverRemote
@@ -271,8 +269,8 @@ func failoverToCluster(configFolder, inputTargetCluster, rgName string, unplanne
 			log.Fatalf("failover: error executing UpdateAction %s\n", err.Error())
 		}
 		if wait {
-			success := waitForStateToUpdate(rgName, sourceCluster,rLinkState)
-			if success{
+			success := waitForStateToUpdate(rgName, sourceCluster, rLinkState)
+			if success {
 				log.Printf("RG (%s), successfully updated with action: failover\n", rg.Name)
 				return
 			}
@@ -284,27 +282,28 @@ func failoverToCluster(configFolder, inputTargetCluster, rgName string, unplanne
 	}
 }
 
-func waitForStateToUpdate(rgName string, cluster k8s.ClusterInterface, repllinkstate v1alpha1.ReplicationLinkState) bool{
+func waitForStateToUpdate(rgName string, cluster k8s.ClusterInterface, repllinkstate v1alpha1.ReplicationLinkState) bool {
 
 	ret := make(chan bool)
 	go func() {
 		log.Print("Waiting for action to complete ...")
-		for{
-		select {
-		case <- time.After(5 * time.Minute):
-			ret <- false
-		default:
-			rg, err := cluster.GetReplicationGroups(context.Background(), rgName)
-			if err != nil {
-				log.Fatalf("failover: error in fecthing RG info: %s\n", err.Error())
+		for {
+			select {
+			case <-time.After(5 * time.Minute):
+				ret <- false
+			default:
+				rg, err := cluster.GetReplicationGroups(context.Background(), rgName)
+				if err != nil {
+					log.Fatalf("failover: error in fecthing RG info: %s\n", err.Error())
+				}
+				if rg.Status.ReplicationLinkState.LastSuccessfulUpdate.Time != repllinkstate.LastSuccessfulUpdate.Time {
+					ret <- true
+					return
+				}
+				time.Sleep(5 * time.Second)
 			}
-			if rg.Status.ReplicationLinkState.LastSuccessfulUpdate.Time != repllinkstate.LastSuccessfulUpdate.Time{
-				ret<-true
-				return
-			}
-			time.Sleep(5*time.Second)
-		}}
+		}
 	}()
-	res := <- ret
+	res := <-ret
 	return res
 }

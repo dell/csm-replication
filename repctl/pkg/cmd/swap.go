@@ -55,7 +55,7 @@ repctl will patch CR at cluster1 with action SWAP_LOCAL.`,
 				swapAtCluster(configFolder, res, rgName, verbose, wait)
 			} else if input == "rg" {
 				swapAtRG(configFolder, res, verbose, wait)
-			}else {
+			} else {
 				log.Fatal("Unexpected input received")
 			}
 		},
@@ -63,7 +63,6 @@ repctl will patch CR at cluster1 with action SWAP_LOCAL.`,
 
 	swapCmd.Flags().String("at", "", "target on which swap to execute")
 	_ = viper.BindPFlag("toTgt", swapCmd.Flags().Lookup("at"))
-
 
 	swapCmd.Flags().Bool("wait", false, "wait for action to complete")
 	_ = viper.BindPFlag("swap-wait", swapCmd.Flags().Lookup("wait"))
@@ -86,7 +85,7 @@ func swapAtRG(configFolder string, rgName string, verbose bool, wait bool) {
 
 	}
 	rLinkState := rg.Status.ReplicationLinkState
-	if rLinkState.LastSuccessfulUpdate == nil{
+	if rLinkState.LastSuccessfulUpdate == nil {
 		log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
 	}
 	rg.Spec.Action = config.ActionSwap
@@ -94,8 +93,8 @@ func swapAtRG(configFolder string, rgName string, verbose bool, wait bool) {
 		log.Fatalf("swap: error executing UpdateAction %s", err.Error())
 	}
 	if wait {
-		success := waitForStateToUpdate(rgName, cluster,rLinkState)
-		if success{
+		success := waitForStateToUpdate(rgName, cluster, rLinkState)
+		if success {
 			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
 			return
 		}
@@ -126,7 +125,7 @@ func swapAtCluster(configFolder string, inputCluster string, rgName string, verb
 		log.Printf("found RG (%s) on cluster, updating spec...", rg.Name)
 	}
 	rLinkState := rg.Status.ReplicationLinkState
-	if rLinkState.LastSuccessfulUpdate == nil{
+	if rLinkState.LastSuccessfulUpdate == nil {
 		log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
 	}
 	rg.Spec.Action = config.ActionSwap
@@ -134,8 +133,8 @@ func swapAtCluster(configFolder string, inputCluster string, rgName string, verb
 		log.Fatalf("swap: error executing UpdateAction %s", err.Error())
 	}
 	if wait {
-		success := waitForStateToUpdate(rgName, cluster,rLinkState)
-		if success{
+		success := waitForStateToUpdate(rgName, cluster, rLinkState)
+		if success {
 			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
 			return
 		}

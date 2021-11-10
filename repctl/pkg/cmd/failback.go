@@ -58,9 +58,9 @@ With --discard, this command will perform an failback but discard any writes at 
 
 			if input == "cluster" {
 				failbackToCluster(configFolder, inputSourceCluster, rgName, discard, verbose, wait)
-			} else if input == "rg"{
+			} else if input == "rg" {
 				failbackToRG(configFolder, inputSourceCluster, discard, verbose, wait)
-			}else {
+			} else {
 				log.Fatal("Unexpected input received")
 			}
 		},
@@ -91,7 +91,7 @@ func failbackToRG(configFolder, rgName string, discard, verbose bool, wait bool)
 		log.Printf("found RG (%s) on cluster (%s)...\n", rg.Name, cluster.GetID())
 	}
 	rLinkState := rg.Status.ReplicationLinkState
-	if rLinkState.LastSuccessfulUpdate == nil{
+	if rLinkState.LastSuccessfulUpdate == nil {
 		log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
 	}
 	rg.Spec.Action = config.ActionFailbackLocal
@@ -108,8 +108,8 @@ func failbackToRG(configFolder, rgName string, discard, verbose bool, wait bool)
 		log.Fatalf("failback: error executing UpdateAction %s\n", err.Error())
 	}
 	if wait {
-		success := waitForStateToUpdate(rgName, cluster,rLinkState)
-		if success{
+		success := waitForStateToUpdate(rgName, cluster, rLinkState)
+		if success {
 			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
 			return
 		}
@@ -144,7 +144,7 @@ func failbackToCluster(configFolder, inputSourceCluster, rgName string, discard,
 		log.Fatalf("failback: error executing failback to target site.")
 	}
 	rLinkState := rg.Status.ReplicationLinkState
-	if rLinkState.LastSuccessfulUpdate == nil{
+	if rLinkState.LastSuccessfulUpdate == nil {
 		log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
 	}
 	rg.Spec.Action = config.ActionFailbackLocal
@@ -161,8 +161,8 @@ func failbackToCluster(configFolder, inputSourceCluster, rgName string, discard,
 		log.Fatalf("failback: error executing UpdateAction %s\n", err.Error())
 	}
 	if wait {
-		success := waitForStateToUpdate(rgName, sourceCluster,rLinkState)
-		if success{
+		success := waitForStateToUpdate(rgName, sourceCluster, rLinkState)
+		if success {
 			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
 			return
 		}
