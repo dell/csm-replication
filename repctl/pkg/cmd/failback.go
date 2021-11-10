@@ -112,10 +112,10 @@ func failbackToRG(configFolder, rgName string, discard, verbose bool, wait bool)
 		if success{
 			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
 			return
-		}else {
-			log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
-			return
 		}
+		log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
+		return
+
 	}
 	log.Printf("RG (%s), successfully updated with action: faiback\n", rg.Name)
 }
@@ -165,10 +165,10 @@ func failbackToCluster(configFolder, inputSourceCluster, rgName string, discard,
 		if success{
 			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
 			return
-		}else {
-			log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
-			return
 		}
+		log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
+		return
+
 	}
 	log.Printf("RG (%s), successfully updated with action: faiback\n", rg.Name)
 }

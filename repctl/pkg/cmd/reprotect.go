@@ -135,10 +135,9 @@ func reprotectAtRG(configFolder, rgName string, verbose bool, wait bool) {
 		if success{
 			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
 			return
-		}else {
-			log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
-			return
 		}
+		log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
+		return
 	}
 	log.Printf("RG (%s), successfully updated with action: reprotect\n", rg.Name)
 }
@@ -176,10 +175,9 @@ func reprotectAtCluster(configFolder, inputCluster, rgName string, verbose bool,
 		if success{
 			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
 			return
-		}else {
-			log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
-			return
 		}
+		log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
+		return
 	}
 	log.Printf("RG (%s), successfully updated with action: reprotect\n", rg.Name)
 }

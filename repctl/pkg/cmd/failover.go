@@ -150,10 +150,10 @@ func failoverToRG(configFolder, rgName string, unplanned bool, verbose bool, wai
 			if success{
 				log.Printf("RG (%s), successfully updated with action: failover\n", rg.Name)
 				return
-			}else {
-				log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
-				return
 			}
+			log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
+			return
+
 		}
 		log.Printf("RG (%s), successfully updated with action: unplanned failover\n", rg.Name)
 	} else {
@@ -185,10 +185,10 @@ func failoverToRG(configFolder, rgName string, unplanned bool, verbose bool, wai
 			if success{
 				log.Printf("RG (%s), successfully updated with action: failover\n", rg.Name)
 				return
-			}else {
-				log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
-				return
 			}
+			log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
+			return
+
 		}
 		log.Printf("RG (%s), successfully updated with action: failover\n", sourceRG.Name)
 	}
@@ -235,10 +235,10 @@ func failoverToCluster(configFolder, inputTargetCluster, rgName string, unplanne
 			if success{
 				log.Printf("RG (%s), successfully updated with action: failover\n", rg.Name)
 				return
-			}else {
-				log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
-				return
 			}
+			log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
+			return
+
 		}
 		log.Printf("RG (%s), successfully updated with action: unplanned failover\n", rg.Name)
 	} else {
@@ -275,10 +275,10 @@ func failoverToCluster(configFolder, inputTargetCluster, rgName string, unplanne
 			if success{
 				log.Printf("RG (%s), successfully updated with action: failover\n", rg.Name)
 				return
-			}else {
-				log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
-				return
 			}
+			log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
+			return
+
 		}
 		log.Printf("RG (%s), successfully updatedd with action: failover\n", rg.Name)
 	}

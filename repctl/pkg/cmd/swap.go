@@ -98,10 +98,9 @@ func swapAtRG(configFolder string, rgName string, verbose bool, wait bool) {
 		if success{
 			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
 			return
-		}else {
-			log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
-			return
 		}
+		log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
+		return
 	}
 	log.Printf("RG (%s), successfully updated with action: swap", rg.Name)
 }
@@ -139,10 +138,9 @@ func swapAtCluster(configFolder string, inputCluster string, rgName string, verb
 		if success{
 			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
 			return
-		}else {
-			log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
-			return
 		}
+		log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
+		return
 	}
 	log.Printf("RG (%s), successfully updated with action: swap", rg.Name)
 }
