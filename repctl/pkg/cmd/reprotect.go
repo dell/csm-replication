@@ -72,8 +72,9 @@ func verifyInputForAction(input string, rg string) string{
 	if input == "" {
 		if rg != ""{
 			input = rg
+		}else {
+			log.Fatalf("failover: wrong input, no input provided. Either clusterID or RGID is needed.\n")
 		}
-		log.Fatalf("failover: wrong input, no input provided. Either clusterID or RGID is needed.\n")
 	}
 
 	configFolder, err := getClustersFolderPath("/.repctl/clusters/")
