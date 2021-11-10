@@ -44,15 +44,15 @@ repctl will patch CR at cluster1 with action REPROTECT_LOCAL.`,
 			inputCluster := viper.GetString("atTgt")
 			verbose := viper.GetBool(config.Verbose)
 			wait := viper.GetBool("reprotect-wait")
-			input := verifyInputForAction(inputCluster, rgName)
+			input, res := verifyInputForAction(inputCluster, rgName)
 			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
 			if err != nil {
 				log.Fatalf("reprotect: error getting clusters folder path: %s\n", err.Error())
 			}
 			if input == "cluster" {
-				reprotectAtCluster(configFolder, inputCluster, rgName, verbose, wait)
+				reprotectAtCluster(configFolder, res, rgName, verbose, wait)
 			} else if input == "rg" {
-				reprotectAtRG(configFolder, inputCluster, verbose, wait)
+				reprotectAtRG(configFolder, res, verbose, wait)
 			}else {
 				log.Fatal("Unexpected input received")
 			}
@@ -67,7 +67,7 @@ repctl will patch CR at cluster1 with action REPROTECT_LOCAL.`,
 	return reprotectCmd
 }
 
-func verifyInputForAction(input string, rg string) string{
+func verifyInputForAction(input string, rg string) (res string, tgt string){
 	// Check if cluster or rg is given by the user
 	if input == "" {
 		if rg != ""{
@@ -91,7 +91,7 @@ func verifyInputForAction(input string, rg string) string{
 
 	for _, cluster := range clusters.Clusters {
 		if input == cluster.GetID(){
-			return "cluster"
+			return "cluster", input
 		}
 		rgList, err := cluster.ListReplicationGroups(context.Background())
 		if err != nil {
@@ -101,11 +101,11 @@ func verifyInputForAction(input string, rg string) string{
 		}
 		for _,value := range rgList.Items{
 			if value.Name == input{
-				return "rg"
+				return "rg", input
 			}
 		}
 	}
-	return ""
+	return "", ""
 }
 
 func reprotectAtRG(configFolder, rgName string, verbose bool, wait bool) {

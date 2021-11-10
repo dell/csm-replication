@@ -46,15 +46,15 @@ repctl will patch CR at cluster1 with action SWAP_LOCAL.`,
 			inputCluster := viper.GetString("toTgt")
 			verbose := viper.GetBool(config.Verbose)
 			wait := viper.GetBool("swap-wait")
-			input := verifyInputForAction(inputCluster, rgName)
+			input, res := verifyInputForAction(inputCluster, rgName)
 			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
 			if err != nil {
 				log.Fatalf("swap: error getting clusters folder path: %s", err.Error())
 			}
 			if input == "cluster" {
-				swapAtCluster(configFolder, inputCluster, rgName, verbose, wait)
+				swapAtCluster(configFolder, res, rgName, verbose, wait)
 			} else if input == "rg" {
-				swapAtRG(configFolder, inputCluster, verbose, wait)
+				swapAtRG(configFolder, res, verbose, wait)
 			}else {
 				log.Fatal("Unexpected input received")
 			}
