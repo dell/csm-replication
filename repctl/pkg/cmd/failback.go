@@ -41,7 +41,7 @@ For single cluster config:
 `,
 		Long: `
 This command will perform a planned failback to a cluster or to an RG.
-To perform failback to a cluster, use --to-cluster <clusterID> with <rg-id> and to do failback to RG, use --to-rg <rg-id>. repctl will patch the CR at source site with action FAILBACK_LOCAL.
+To perform failback to a cluster, use --target <clusterID> with --rg <rg-id1> and to do failback to RG, use --target <rg-id2> with --rg <rg-id1>. repctl will patch the CR at source site with action FAILBACK_LOCAL.
 With --discard, this command will perform an failback but discard any writes at target. repctl will patch the CR at source site with action ACTION_FAILBACK_DISCARD_CHANGES_LOCAL`,
 		Run: func(cmd *cobra.Command, args []string) {
 			rgName := viper.GetString(config.ReplicationGroup)

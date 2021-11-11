@@ -43,7 +43,7 @@ For single cluster config:
 ./repctl --rg <rg-id> failover --target <rg-id> --unplanned`,
 		Long: `
 This command will perform a planned failover to a cluster or to an RG.
-To perform failover to a cluster, use --to-cluster <clusterID> with <rg-id> and to do failover to RG, use --to-rg <rg-id>. repctl will patch the CR at source site with action FAILOVER_REMOTE.
+To perform failover to a cluster, use --target <clusterID> with --rg <rg-id1> and to do failover to RG, use --target <rg-id2> with --rg <rg-id1>. repctl will patch the CR at source site with action FAILOVER_REMOTE.
 With --unplanned, this command will perform an unplanned failover to given cluster or an rg. repctl will patch CR at cluster2 with action UNPLANNED_FAILOVER_LOCAL`,
 
 		Run: func(cmd *cobra.Command, args []string) {

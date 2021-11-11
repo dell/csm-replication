@@ -39,7 +39,7 @@ For single cluster config:
 ./repctl --rg <rg-id> swap`,
 		Long: `
 This command will perform a swap at specified cluster or at the RG.
-To perform a swap at a cluster, use --to-cluster <clusterID> with <rg-id> and to do failover to RG, use --to-rg <rg-id>.
+To perform a swap at a cluster, use --at <clusterID> with --rg <rg-id> and to do failover to RG, use --rg <rg-id>.
 repctl will patch CR at cluster1 with action SWAP_LOCAL.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			rgName := viper.GetString(config.ReplicationGroup)
