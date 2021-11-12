@@ -77,7 +77,7 @@ func (suite *ReplicationTestSuite) runReplicationManager() {
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             utils.Scheme,
-		MetricsBindAddress: ":8080",
+		MetricsBindAddress: ":8000",
 		Port:               9443,
 		LeaderElection:     false,
 		LeaderElectionID:   "bec0e175.replication.storage.dell.com",
