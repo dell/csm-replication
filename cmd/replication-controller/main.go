@@ -76,7 +76,7 @@ func (mgr *ControllerManager) reconcileSecretUpdates(ctx context.Context, reques
 	er := mgr.Manager.GetEventRecorderFor(common.DellReplicationController)
 	err := mgr.config.UpdateConfigOnSecretEvent(ctx, mgr.Manager.GetClient(), mgr.Opts, request.Name, er, secretLog)
 	if err != nil {
-		secretLog.Error(err, "failed to update the configuration")
+		secretLog.Error(err, "Failed to update the configuration")
 	}
 	return reconcile.Result{}, nil
 }
@@ -111,7 +111,7 @@ func (mgr *ControllerManager) processConfigMapChanges(loggerConfig *logrus.Logge
 	if err != nil {
 		log.Println("Unable to parse ", err)
 	}
-	log.Println("set level to", level)
+	log.Println("Set level to", level)
 	loggerConfig.SetLevel(level)
 }
 
@@ -193,13 +193,13 @@ func main() {
 		LeaderElectionID:           fmt.Sprintf("%s-manager", common.DellReplicationController),
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
+		setupLog.Error(err, "Unable to start manager")
 		os.Exit(1)
 	}
 
 	controllerMgr, err := createControllerManager(ctx, mgr)
 	if err != nil {
-		setupLog.Error(err, "failed to configure the controller manager")
+		setupLog.Error(err, "Filed to configure the controller manager")
 		os.Exit(1)
 	}
 
@@ -211,13 +211,13 @@ func main() {
 	if err != nil {
 		log.Println("Unable to parse ", err)
 	}
-	log.Println("set level to", level)
+	log.Println("Set level to", level)
 	logrusLog.SetLevel(level)
 
 	// Start the secret controller
 	err = controllerMgr.startSecretController()
 	if err != nil {
-		setupLog.Error(err, "failed to setup secret controller. Continuing")
+		setupLog.Error(err, "Failed to setup secret controller. Continuing")
 	}
 
 	expRateLimiter := workqueue.NewItemExponentialFailureRateLimiter(retryIntervalStart, retryIntervalMax)
@@ -229,7 +229,7 @@ func main() {
 		Config:        controllerMgr.config,
 		Domain:        domain,
 	}).SetupWithManager(mgr, expRateLimiter, workerThreads); err != nil {
-		setupLog.Error(err, "unable to create controller", common.DellReplicationController, "PersistentVolumeClaim")
+		setupLog.Error(err, "Unable to create controller", common.DellReplicationController, "PersistentVolumeClaim")
 		os.Exit(1)
 	}
 
@@ -241,7 +241,7 @@ func main() {
 		Config:        controllerMgr.config,
 		Domain:        domain,
 	}).SetupWithManager(mgr, expRateLimiter, workerThreads); err != nil {
-		setupLog.Error(err, "unable to create controller", common.DellReplicationController, "DellCSIReplicationGroup")
+		setupLog.Error(err, "Unable to create controller", common.DellReplicationController, "DellCSIReplicationGroup")
 		os.Exit(1)
 	}
 
@@ -254,16 +254,16 @@ func main() {
 		Config:        controllerMgr.config,
 		Domain:        domain,
 	}).SetupWithManager(mgr, expRateLimiter, workerThreads); err != nil {
-		setupLog.Error(err, "unable to create controller", common.DellReplicationController, "PersistentVolume")
+		setupLog.Error(err, "Unable to create controller", common.DellReplicationController, "PersistentVolume")
 		os.Exit(1)
 	}
 
 	// +kubebuilder:scaffold:builder
 
-	setupLog.Info("starting manager")
+	setupLog.Info("Starting manager")
 
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
+		setupLog.Error(err, "Problem running manager")
 		os.Exit(1)
 	}
 }
