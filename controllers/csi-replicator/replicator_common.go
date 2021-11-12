@@ -17,15 +17,16 @@ limitations under the License.
 package csireplicator
 
 import (
+	"context"
 	"fmt"
 	controller "github.com/dell/csm-replication/controllers"
 	"github.com/dell/csm-replication/pkg/common"
-	"github.com/go-logr/logr"
 	storageV1 "k8s.io/api/storage/v1"
 	"strings"
 )
 
-func shouldContinue(class *storageV1.StorageClass, log logr.Logger, driverName string) bool {
+func shouldContinue(ctx context.Context, class *storageV1.StorageClass, driverName string) bool {
+	log := common.GetLoggerFromContext(ctx)
 	// Check for the driver match
 	if class.Provisioner != driverName {
 		log.V(common.InfoLevel).Info("PVC created using the driver name, not matching one on this replicator", "driverName", class.Provisioner)
@@ -35,7 +36,7 @@ func shouldContinue(class *storageV1.StorageClass, log logr.Logger, driverName s
 	// Check for the replication params to make sure, this PVC
 	// has a replica created for it
 	if value, ok := class.Parameters[controller.StorageClassReplicationParam]; !ok || value != controller.StorageClassReplicationParamEnabledValue {
-		log.V(common.InfoLevel).Info("StorageClass used to provision the PVC is not replication-enabled")
+		log.V(common.InfoLevel).Info("StorageClass used to provision the PVC is not replication-enabled", "StorageClass", class)
 		return false
 	}
 
@@ -52,7 +53,7 @@ func shouldContinue(class *storageV1.StorageClass, log logr.Logger, driverName s
 	_, ok := class.Parameters[controller.StorageClassRemoteStorageClassParam]
 	if !ok {
 		log.Error(fmt.Errorf("no remote storage class param specified in the storageclass"),
-			"remote storage class parameter missing")
+			"Remote storage class parameter missing")
 		return false
 	}
 	return true

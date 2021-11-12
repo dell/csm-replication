@@ -57,6 +57,7 @@ type PersistentVolumeClaimReconciler struct {
 func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// If we have received the reconcile request, it means that the sidecar has completed its protection
 	log := r.Log.WithValues("persistentvolumeclaim", req.NamespacedName)
+	ctx = context.WithValue(ctx, common.LoggerContextKey, log)
 
 	claim := new(v1.PersistentVolumeClaim)
 	err := r.Get(ctx, req.NamespacedName, claim)
@@ -143,7 +144,7 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 	isRemotePVCUpdated := false
 	if remoteClaim != nil {
 		// Update the remote PVC if it exists
-		isRemotePVCUpdated, err = r.processRemotePVC(ctx, log, rClient, remoteClaim, req.Name, req.Namespace, localPVName)
+		isRemotePVCUpdated, err = r.processRemotePVC(ctx, rClient, remoteClaim, req.Name, req.Namespace, localPVName)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -151,7 +152,7 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 		log.V(common.InfoLevel).Info("Remote PVC has not been created yet. Information can't be synced")
 	}
 
-	err = r.processLocalPVC(ctx, log, claim, remotePVName, remotePVCName, remotePVCNamespace, remoteClusterID, isRemotePVCUpdated)
+	err = r.processLocalPVC(ctx, claim, remotePVName, remotePVCName, remotePVCNamespace, remoteClusterID, isRemotePVCUpdated)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -160,10 +161,11 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 	return ctrl.Result{}, nil
 }
 
-func (r *PersistentVolumeClaimReconciler) processRemotePVC(ctx context.Context, log logr.Logger,
+func (r *PersistentVolumeClaimReconciler) processRemotePVC(ctx context.Context,
 	rClient connection.RemoteClusterClient,
 	claim *v1.PersistentVolumeClaim,
 	remotePVCName, remotePVCNamespace, remotePVName string) (bool, error) {
+	log := common.GetLoggerFromContext(ctx)
 	isUpdated := false
 	// Just apply the missing annotation
 	if claim.Annotations[controller.RemotePVC] == "" {
@@ -191,9 +193,10 @@ func (r *PersistentVolumeClaimReconciler) processRemotePVC(ctx context.Context, 
 	return true, nil
 }
 
-func (r *PersistentVolumeClaimReconciler) processLocalPVC(ctx context.Context, log logr.Logger,
+func (r *PersistentVolumeClaimReconciler) processLocalPVC(ctx context.Context,
 	claim *v1.PersistentVolumeClaim, remotePVName, remotePVCName, remotePVCNamespace,
 	remoteClusterID string, isRemotePVCUpdated bool) error {
+	log := common.GetLoggerFromContext(ctx)
 	if claim.Annotations[controller.PVCSyncComplete] == "yes" {
 		log.V(common.InfoLevel).Info("PVC Sync already completed")
 		return nil

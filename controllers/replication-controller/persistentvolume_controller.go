@@ -64,6 +64,7 @@ type PersistentVolumeReconciler struct {
 // Reconcile contains reconciliation logic that updates PersistentVolume depending on it's current state
 func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("persistentvolume", req.Name)
+	ctx = context.WithValue(ctx, common.LoggerContextKey, log)
 
 	r.Log.V(common.InfoLevel).Info("Reconciling PV event")
 
@@ -362,7 +363,7 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 
 		// Now update the remote PV with RemoteReplicationGroup annotation if required
-		requeue, err := r.processRemotePV(ctx, log, rClient, remotePV, remoteRGName)
+		requeue, err := r.processRemotePV(ctx, rClient, remotePV, remoteRGName)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -370,7 +371,7 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			return ctrl.Result{RequeueAfter: controller.DefaultRetryInterval}, nil
 		}
 
-		err = r.processLocalPV(ctx, log, localPV.DeepCopy(), remotePVName, remoteClusterID)
+		err = r.processLocalPV(ctx, localPV.DeepCopy(), remotePVName, remoteClusterID)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -382,8 +383,9 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	return ctrl.Result{}, nil
 }
 
-func (r *PersistentVolumeReconciler) processRemotePV(ctx context.Context, log logr.Logger,
+func (r *PersistentVolumeReconciler) processRemotePV(ctx context.Context,
 	rClient connection.RemoteClusterClient, remotePV *v1.PersistentVolume, remoteRGName string) (bool, error) {
+	log := common.GetLoggerFromContext(ctx)
 	if remoteRGName != "" {
 		// Update the annotation for the remote PV object
 		//controller.AddAnnotation(remotePV, controller.ReplicationGroup, remoteRGName)
@@ -404,7 +406,8 @@ func (r *PersistentVolumeReconciler) processRemotePV(ctx context.Context, log lo
 	return true, nil
 }
 
-func (r *PersistentVolumeReconciler) processLocalPV(ctx context.Context, log logr.Logger, localPV *v1.PersistentVolume, remotePVName, remoteClusterID string) error {
+func (r *PersistentVolumeReconciler) processLocalPV(ctx context.Context, localPV *v1.PersistentVolume, remotePVName, remoteClusterID string) error {
+	log := common.GetLoggerFromContext(ctx)
 	// Update the local PV with the remote details
 	// First check if the PV sync has been completed
 	if localPV.Annotations[controller.PVSyncComplete] == "yes" {

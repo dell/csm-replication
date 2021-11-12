@@ -60,6 +60,9 @@ func (r *ReplicationGroupMonitoring) Monitor(ctx context.Context) error {
 }
 
 func (r *ReplicationGroupMonitoring) monitorReplicationGroups(ticker <-chan time.Time) {
+
+	r.Log.V(common.InfoLevel).Info("Start monitoring replication-group")
+
 	dellCSIReplicationGroupsList := new(storagev1alpha1.DellCSIReplicationGroupList)
 	select {
 	case <-ticker:
@@ -112,7 +115,7 @@ func (r *ReplicationGroupMonitoring) monitorReplicationGroups(ticker <-chan time
 					r.Log.Error(err, "Error encountered while getting protection group status")
 					err = updateRGLinkStatus(ctx, r.Client, &refreshedRG,
 						replication.StorageProtectionGroupStatus_UNKNOWN.String(), refreshedRG.Status.ReplicationLinkState.IsSource,
-						err.Error(), r.Log)
+						err.Error())
 					if err != nil {
 						r.Log.Error(err, "Failed to update the RG Status")
 						continue
@@ -121,7 +124,7 @@ func (r *ReplicationGroupMonitoring) monitorReplicationGroups(ticker <-chan time
 				}
 				newStatus := res.GetStatus().State.String()
 				// Update the LinkStatus only if it is required
-				err = updateRGLinkStatus(ctx, r.Client, &refreshedRG, newStatus, res.GetStatus().IsSource, "", r.Log)
+				err = updateRGLinkStatus(ctx, r.Client, &refreshedRG, newStatus, res.GetStatus().IsSource, "")
 				if err != nil {
 					r.Log.Error(err, "Failed to update the RG status")
 					continue
@@ -158,7 +161,8 @@ func updateRGLinkState(rg *storagev1alpha1.DellCSIReplicationGroup, status strin
 }
 
 func updateRGLinkStatus(ctx context.Context, client client.Client, rg *storagev1alpha1.DellCSIReplicationGroup, status string,
-	isSource bool, errMsg string, log logr.Logger) error {
+	isSource bool, errMsg string) error {
+	log := common.GetLoggerFromContext(ctx)
 	updateRGLinkState(rg, status, isSource, errMsg)
 	if err := client.Status().Update(ctx, rg); err != nil {
 		log.Error(err, "Failed to update the state")
