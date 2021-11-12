@@ -88,10 +88,11 @@ func (mgr *ReplicatorManager) processConfigMapChanges(loggerConfig *logrus.Logge
 	defer mgr.config.Lock.Unlock()
 	level, err := common.ParseLevel(mgr.config.LogLevel)
 	if err != nil {
-		log.Println("Unable to parse log level", err)
+		log.Println("Unable to parse ", err)
 	}
-	log.Println("Set level to", level)
+	log.Println("set level to", level)
 	loggerConfig.SetLevel(level)
+
 }
 
 func (mgr *ReplicatorManager) setupConfigMapWatcher(loggerConfig *logrus.Logger) {
@@ -136,7 +137,7 @@ func main() {
 		probeFrequency             time.Duration
 		maxRetryDurationForActions time.Duration
 	)
-	flag.StringVar(&metricsAddr, "metrics-addr", ":8000", "The address the metric endpoint binds to.")
+	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-election", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
@@ -161,15 +162,15 @@ func main() {
 	logger := logrusr.NewLogger(logrusLog)
 	ctrl.SetLogger(logger)
 
-	setupLog.Info("Prefix", "Domain", domain)
-	setupLog.Info(common.DellCSIReplicator, "Version", core.SemVer, "Commit ID", core.CommitSha32, "Commit SHA", core.CommitTime.Format(time.RFC1123))
+	setupLog.V(1).Info("Prefix", "Domain", domain)
+	setupLog.V(1).Info(common.DellCSIReplicator, "Version", core.SemVer, "Commit ID", core.CommitSha32, "Commit SHA", core.CommitTime.Format(time.RFC1123))
 
 	ctx := context.Background()
 
 	// Connect to csi
 	csiConn, err := connection.Connect(csiAddress, setupLog)
 	if err != nil {
-		setupLog.Error(err, "Failed to connect to CSI driver")
+		setupLog.Error(err, "failed to connect to CSI driver")
 		os.Exit(1)
 	}
 
@@ -177,24 +178,24 @@ func main() {
 
 	driverName, err := identityClient.ProbeForever(ctx)
 	if err != nil {
-		setupLog.Error(err, "Error waiting for the CSI driver to be ready")
+		setupLog.Error(err, "error waiting for the CSI driver to be ready")
 		os.Exit(1)
 	}
-	setupLog.Info("CSI driver name", "driverName", driverName)
+	setupLog.V(1).Info("CSI driver name", "driverName", driverName)
 
 	capabilitySet, supportedActions, err := identityClient.GetReplicationCapabilities(ctx)
 	if err != nil {
-		setupLog.Error(err, "Error fetching replication capabilities")
+		setupLog.Error(err, "error fetching replication capabilities")
 		os.Exit(1)
 	}
 	if len(capabilitySet) == 0 {
-		setupLog.Error(fmt.Errorf("driver doesn't support replication"), "Replication not supported")
+		setupLog.Error(fmt.Errorf("driver doesn't support replication"), "replication not supported")
 		os.Exit(1)
 	}
 	for _, capability := range currentSupportedCapabilities {
 		if _, ok := capabilitySet[capability]; !ok {
 			setupLog.Error(fmt.Errorf("driver doesn't support %s capability, which is required", capability),
-				"One of the capabilities not supported")
+				"one of the capabilities not supported")
 			os.Exit(1)
 		}
 	}
@@ -209,13 +210,13 @@ func main() {
 		LeaderElectionID:           leaderElectionID,
 	})
 	if err != nil {
-		setupLog.Error(err, "Unable to start manager")
+		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
 
 	controllerMgr, err := createReplicatorManager(ctx, mgr)
 	if err != nil {
-		setupLog.Error(err, "Failed to configure the controller manager")
+		setupLog.Error(err, "failed to configure the controller manager")
 		os.Exit(1)
 	}
 	// Start the watch on configmap
@@ -226,7 +227,7 @@ func main() {
 	if err != nil {
 		log.Println("Unable to parse ", err)
 	}
-	log.Println("Set level to", level)
+	log.Println("set level to", level)
 	logrusLog.SetLevel(level)
 
 	expRateLimiter := workqueue.NewItemExponentialFailureRateLimiter(retryIntervalStart, retryIntervalMax)
@@ -241,7 +242,7 @@ func main() {
 		SingleFlightGroup: singleflight.Group{},
 		Domain:            domain,
 	}).SetupWithManager(mgr, expRateLimiter, workerThreads); err != nil {
-		setupLog.Error(err, "Unable to create controller", "controller", "PersistentVolumeClaim")
+		setupLog.Error(err, "unable to create controller", "controller", "PersistentVolumeClaim")
 		os.Exit(1)
 	}
 
@@ -256,7 +257,7 @@ func main() {
 		SingleFlightGroup: singleflight.Group{},
 		Domain:            domain,
 	}).SetupWithManager(ctx, mgr, expRateLimiter, workerThreads); err != nil {
-		setupLog.Error(err, "Unable to create controller", "controller", "PersistentVolume")
+		setupLog.Error(err, "unable to create controller", "controller", "PersistentVolume")
 		os.Exit(1)
 	}
 
@@ -270,12 +271,12 @@ func main() {
 		SupportedActions:           supportedActions,
 		MaxRetryDurationForActions: maxRetryDurationForActions,
 	}).SetupWithManager(mgr, expRateLimiter, workerThreads); err != nil {
-		setupLog.Error(err, "Unable to create controller", "controller", "DellCSIReplicationGroup")
+		setupLog.Error(err, "unable to create controller", "controller", "DellCSIReplicationGroup")
 		os.Exit(1)
 	}
 
 	if _, ok := capabilitySet[monitoringCapability]; ok {
-		setupLog.Info("Driver supports monitoring capability. We will monitor the RGs")
+		setupLog.Info("driver supports monitoring capability. we will monitor the RGs")
 		rgMonitor := controller.ReplicationGroupMonitoring{
 			Client:             mgr.GetClient(),
 			Log:                ctrl.Log.WithName("controllers").WithName(common.Monitoring),
@@ -290,12 +291,12 @@ func main() {
 			os.Exit(1)
 		}
 	} else {
-		setupLog.Info("Driver does not support monitoring capability")
+		setupLog.Info("driver does not support monitoring capability")
 	}
 
-	setupLog.Info("Starting manager")
+	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "Problem running manager")
+		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
 
