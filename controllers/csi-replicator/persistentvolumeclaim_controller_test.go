@@ -17,7 +17,6 @@ limitations under the License.
 package csireplicator
 
 import (
-
 	"context"
 	"github.com/dell/csm-replication/controllers"
 	constants "github.com/dell/csm-replication/pkg/common"
