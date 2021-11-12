@@ -136,7 +136,7 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			}
 		}
 		if err := r.processVolumeForReplicationGroup(ctx, pv, replicationGroupName,
-			log, storageClass.Parameters); err != nil {
+			storageClass.Parameters); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
@@ -154,9 +154,9 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 }
 
 func (r *PersistentVolumeReconciler) processVolumeForReplicationGroup(ctx context.Context, volume *v1.PersistentVolume,
-	replicationGroupName string, log logr.Logger,
+	replicationGroupName string,
 	scParams map[string]string) error {
-
+	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Begin process volume for replication-group")
 
 	log.V(common.DebugLevel).Info("Adding replication-group and remote-cluster annotation to the PV")

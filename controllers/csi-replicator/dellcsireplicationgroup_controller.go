@@ -153,6 +153,7 @@ func getActionResultFromActionAnnotation(ctx context.Context, actionAnnotation A
 	finalError := false
 	if actionAnnotation.FinalError != "" {
 		log.V(common.InfoLevel).Info("There is final error", "actionAnnotation.FinalError", actionAnnotation.FinalError)
+		finalErr = fmt.Errorf(actionAnnotation.FinalError)
 		finalError = true
 	}
 

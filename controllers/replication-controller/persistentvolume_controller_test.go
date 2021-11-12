@@ -128,11 +128,11 @@ func (suite *PVReconcileSuite) runRemoteReplicationManager(fakeConfig connection
 
 	//scenario: processLocalPV should fail with an error
 	logger := PVReconciler.Log.WithValues("persistentvolumeclaim")
-	e := PVReconciler.processLocalPV(context.TODO(), logger, &corev1.PersistentVolume{}, "", "")
+	e := PVReconciler.processLocalPV(context.WithValue(context.TODO(), constants.LoggerContextKey, logger), &corev1.PersistentVolume{}, "", "")
 	assert.Error(suite.T(), e, "Process local PV failed with an error")
 
 	// scenario: process remotePV should fail with an error
-	_, e = PVReconciler.processRemotePV(context.TODO(), logger, remoteClient, &corev1.PersistentVolume{}, "xyz")
+	_, e = PVReconciler.processRemotePV(context.WithValue(context.TODO(), constants.LoggerContextKey, logger), remoteClient, &corev1.PersistentVolume{}, "xyz")
 	assert.Error(suite.T(), e, "Process remote PV failed with an error")
 
 	annotations := make(map[string]string)
