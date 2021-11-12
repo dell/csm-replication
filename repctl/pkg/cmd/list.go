@@ -30,9 +30,8 @@ import (
 /* #nosec G104 */
 func GetListCommand() *cobra.Command {
 	listCmd := &cobra.Command{
-		Use:     "list",
-		Aliases: []string{"ls"},
-		Short:   "lists different resources in clusters with configured replication",
+		Use:   "get",
+		Short: "lists different resources in clusters with configured replication",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) == 0 {
 				_ = cmd.Help()
@@ -41,8 +40,9 @@ func GetListCommand() *cobra.Command {
 		},
 	}
 
-	listCmd.PersistentFlags().Bool("all", false, "show all objects (overrides other filters)")
+	listCmd.PersistentFlags().BoolP("all", "A", false, "show all objects (overrides other filters)")
 	_ = viper.BindPFlag("all", listCmd.PersistentFlags().Lookup("all"))
+	_ = viper.BindPFlag("all", listCmd.PersistentFlags().ShorthandLookup("A"))
 
 	listCmd.PersistentFlags().String("rn", "", "remote namespace")
 	_ = viper.BindPFlag("rn", listCmd.PersistentFlags().Lookup("rn"))
@@ -54,8 +54,33 @@ func GetListCommand() *cobra.Command {
 	listCmd.AddCommand(getListPersistentVolumesCommand())
 	listCmd.AddCommand(getListPersistentVolumeClaimsCommand())
 	listCmd.AddCommand(getListReplicationGroupsCommand())
+	listCmd.AddCommand(getListClusterGlobalCommand())
 
 	return listCmd
+}
+
+func getListClusterGlobalCommand() *cobra.Command {
+	listClusterCmd := &cobra.Command{
+		Use:     "cluster",
+		Aliases: []string{"clusters"},
+		Short:   "list all clusters currently being managed by repctl",
+		Run: func(cmd *cobra.Command, args []string) {
+			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
+			if err != nil {
+				log.Fatalf("cluster list: error getting clusters folder path: %s", err.Error())
+			}
+
+			mc := &k8s.MultiClusterConfigurator{}
+
+			clusters, err := mc.GetAllClusters([]string{}, configFolder)
+			if err != nil {
+				log.Fatalf("cluster list: error in initializing cluster info: %s", err.Error())
+			}
+			clusters.Print()
+		},
+	}
+
+	return listClusterCmd
 }
 
 func getListStorageClassesCommand() *cobra.Command {
@@ -63,10 +88,10 @@ func getListStorageClassesCommand() *cobra.Command {
 		Use:     "sc",
 		Aliases: []string{"storageclass", "storageclasses"},
 		Short:   "list storage classes",
-		Example: `./repctl list sc --all`,
+		Example: `./repctl get sc`,
 		Long: `
 Filter out storage classes which have replication enabled.
-You can also list all storage classes by passing --all flag`,
+You can also list all storage classes by passing --all (-A) flag`,
 
 		Run: func(cmd *cobra.Command, args []string) {
 			log.Print("listing storage classes")
@@ -108,7 +133,7 @@ func getListPersistentVolumesCommand() *cobra.Command {
 		Use:     "pv",
 		Aliases: []string{"persistentvolumes", "persistentvolume"},
 		Short:   "list Persistent Volumes",
-		Example: `./repctl list pv --all`,
+		Example: `./repctl get pv --all (-A)`,
 		Long: `
 List Persistent Volumes in the specified clusters.
 You can also filter PersistentVolumes based on filters like
@@ -169,7 +194,7 @@ func getListPersistentVolumeClaimsCommand() *cobra.Command {
 		Use:     "pvc",
 		Aliases: []string{"persistentvolumeclaims", "persistentvolumeclaim"},
 		Short:   "list PersistentVolumeClaims",
-		Example: `./repctl list pvc --all`,
+		Example: `./repctl get pvc --all (-A)`,
 		Long: `
 List PersistentVolumeClaim objects which are replicated.
 You can apply filters like remoteClusterId, remoteNamespace.`,
@@ -230,7 +255,7 @@ func getListReplicationGroupsCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:     "rg",
 		Aliases: []string{"replicationgroups", "replicationgroup"},
-		Short:   "list ReplicationGroup",
+		Short:   "get ReplicationGroup",
 		Long: `List DellCSIReplicationGroup Custom Resource (CR)
 instances on the set of provided cluster ids. You can also provide filters like
 remote cluster id (rc) & driver name`,

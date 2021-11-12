@@ -33,50 +33,52 @@ func GetFailbackCommand() *cobra.Command {
 		Short: "allows to execute failback action from target cluster/rg to source cluster/rg",
 		Example: `
 For multi-cluster config:
-./repctl --rg <rg-id> failback --to-cluster cluster1
-./repctl --rg <rg-id> failback --to-cluster cluster1 --discard
+./repctl --rg <rg-id> failback --target cluster1
+./repctl --rg <rg-id> failback --target cluster1 --discard
 For single cluster config:
-./repctl failback --to-rg <rg-id>
-./repctl failback --to-rg <rg-id> --discard
+./repctl --rg <rg-id> failback --target <rg-id>
+./repctl --rg <rg-id> failback --target <rg-id> --discard
 `,
 		Long: `
 This command will perform a planned failback to a cluster or to an RG.
-To perform failback to a cluster, use --to-cluster <clusterID> with <rg-id> and to do failback to RG, use --to-rg <rg-id>. repctl will patch the CR at source site with action FAILBACK_LOCAL.
+To perform failback to a cluster, use --target <clusterID> with --rg <rg-id1> and to do failback to RG, use --target <rg-id2> with --rg <rg-id1>. repctl will patch the CR at source site with action FAILBACK_LOCAL.
 With --discard, this command will perform an failback but discard any writes at target. repctl will patch the CR at source site with action ACTION_FAILBACK_DISCARD_CHANGES_LOCAL`,
 		Run: func(cmd *cobra.Command, args []string) {
 			rgName := viper.GetString(config.ReplicationGroup)
 			inputSourceCluster := viper.GetString("src")
-			inputSourceRG := viper.GetString("src-rg")
 			discard := viper.GetBool("discard")
 			verbose := viper.GetBool(config.Verbose)
-			verifyInputForAction(inputSourceRG, inputSourceCluster)
+			wait := viper.GetBool("failback-wait")
+			input := verifyInputForFailoverAction(inputSourceCluster)
 
 			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
 			if err != nil {
 				log.Fatalf("failback: error getting clusters folder path: %s\n", err.Error())
 			}
 
-			if inputSourceCluster != "" {
-				failbackToCluster(configFolder, inputSourceCluster, rgName, discard, verbose)
+			if input == "cluster" {
+				failbackToCluster(configFolder, inputSourceCluster, rgName, discard, verbose, wait)
+			} else if input == "rg" {
+				failbackToRG(configFolder, inputSourceCluster, discard, verbose, wait)
 			} else {
-				failbackToRG(configFolder, inputSourceRG, discard, verbose)
+				log.Fatal("Unexpected input received")
 			}
 		},
 	}
 
-	failbackCmd.Flags().String("to-cluster", "", "cluster to which execute failback")
-	_ = viper.BindPFlag("src", failbackCmd.Flags().Lookup("to-cluster"))
-
-	failbackCmd.Flags().String("to-rg", "", "RG to which execute failover")
-	_ = viper.BindPFlag("src-rg", failbackCmd.Flags().Lookup("to-rg"))
+	failbackCmd.Flags().String("target", "", "target to which execute failback")
+	_ = viper.BindPFlag("src", failbackCmd.Flags().Lookup("target"))
 
 	failbackCmd.Flags().Bool("discard", false, "flag marking failback to discard any writes at target")
 	_ = viper.BindPFlag("discard", failbackCmd.Flags().Lookup("discard"))
 
+	failbackCmd.Flags().Bool("wait", false, "wait for action to complete")
+	_ = viper.BindPFlag("failback-wait", failbackCmd.Flags().Lookup("wait"))
+
 	return failbackCmd
 }
 
-func failbackToRG(configFolder, rgName string, discard, verbose bool) {
+func failbackToRG(configFolder, rgName string, discard, verbose bool, wait bool) {
 	if verbose {
 		log.Printf("fetching RG and cluster info...\n")
 	}
@@ -88,7 +90,10 @@ func failbackToRG(configFolder, rgName string, discard, verbose bool) {
 	if verbose {
 		log.Printf("found RG (%s) on cluster (%s)...\n", rg.Name, cluster.GetID())
 	}
-
+	rLinkState := rg.Status.ReplicationLinkState
+	if rLinkState.LastSuccessfulUpdate == nil {
+		log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
+	}
 	rg.Spec.Action = config.ActionFailbackLocal
 	if discard {
 		rg.Spec.Action = config.ActionFailbackLocalDiscard
@@ -102,10 +107,20 @@ func failbackToRG(configFolder, rgName string, discard, verbose bool) {
 	if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
 		log.Fatalf("failback: error executing UpdateAction %s\n", err.Error())
 	}
+	if wait {
+		success := waitForStateToUpdate(rgName, cluster, rLinkState)
+		if success {
+			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
+			return
+		}
+		log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
+		return
+
+	}
 	log.Printf("RG (%s), successfully updated with action: faiback\n", rg.Name)
 }
 
-func failbackToCluster(configFolder, inputSourceCluster, rgName string, discard, verbose bool) {
+func failbackToCluster(configFolder, inputSourceCluster, rgName string, discard, verbose bool, wait bool) {
 	if verbose {
 		log.Print("reading cluster configs...")
 	}
@@ -128,6 +143,10 @@ func failbackToCluster(configFolder, inputSourceCluster, rgName string, discard,
 	if !rg.Status.ReplicationLinkState.IsSource {
 		log.Fatalf("failback: error executing failback to target site.")
 	}
+	rLinkState := rg.Status.ReplicationLinkState
+	if rLinkState.LastSuccessfulUpdate == nil {
+		log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
+	}
 	rg.Spec.Action = config.ActionFailbackLocal
 	if discard {
 		rg.Spec.Action = config.ActionFailbackLocalDiscard
@@ -140,6 +159,16 @@ func failbackToCluster(configFolder, inputSourceCluster, rgName string, discard,
 	}
 	if err := sourceCluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
 		log.Fatalf("failback: error executing UpdateAction %s\n", err.Error())
+	}
+	if wait {
+		success := waitForStateToUpdate(rgName, sourceCluster, rLinkState)
+		if success {
+			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
+			return
+		}
+		log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
+		return
+
 	}
 	log.Printf("RG (%s), successfully updated with action: faiback\n", rg.Name)
 }
