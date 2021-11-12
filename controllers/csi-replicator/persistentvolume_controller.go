@@ -91,7 +91,7 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		if _, ok = pv.Annotations[controller.RemoteVolumeAnnotation]; !ok {
 			res, err := r.ReplicationClient.CreateRemoteVolume(ctx, pv.Spec.CSI.VolumeHandle, storageClass.Parameters)
 			if err != nil {
-				log.Error(err, "Failed to create the remote volume", "RemoteVolume", res.RemoteVolume)
+				log.Error(err, "Failed to create the remote volume", "VolumeHandle", pv.Spec.CSI.VolumeHandle)
 				return ctrl.Result{}, err
 			}
 			buffer, err = json.Marshal(res.RemoteVolume)
