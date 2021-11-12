@@ -71,7 +71,8 @@ func (a ActionType) String() string {
 }
 
 // Equals allows to check if provided string is equal to current action type
-func (a ActionType) Equals(val string, log logr.Logger) bool {
+func (a ActionType) Equals(ctx context.Context, val string) bool {
+	log := common.GetLoggerFromContext(ctx)
 	if strings.ToUpper(string(a)) == strings.ToUpper(val) {
 		log.V(common.DebugLevel).Info("Current action type is equal", "val", val, "a", string(a))
 		return true
@@ -110,8 +111,8 @@ type ActionAnnotation struct {
 	ProtectionGroupStatus string `json:"protectionGroupStatus"`
 }
 
-func updateRGSpecWithActionResult(rg *storagev1alpha1.DellCSIReplicationGroup, result *ActionResult, log logr.Logger) bool {
-
+func updateRGSpecWithActionResult(ctx context.Context, rg *storagev1alpha1.DellCSIReplicationGroup, result *ActionResult) bool {
+	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Begin updating RG spec with", "Action Result", result)
 
 	isUpdated := false
@@ -144,8 +145,8 @@ func updateRGSpecWithActionResult(rg *storagev1alpha1.DellCSIReplicationGroup, r
 	return isUpdated
 }
 
-func getActionResultFromActionAnnotation(actionAnnotation ActionAnnotation, log logr.Logger) (*ActionResult, error) {
-
+func getActionResultFromActionAnnotation(ctx context.Context, actionAnnotation ActionAnnotation) (*ActionResult, error) {
+	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Getting result from action annotation..")
 
 	var finalErr error
@@ -181,17 +182,17 @@ func getActionResultFromActionAnnotation(actionAnnotation ActionAnnotation, log 
 	return &actionResult, nil
 }
 
-func updateRGStatusWithActionResult(rg *storagev1alpha1.DellCSIReplicationGroup, actionResult *ActionResult, log logr.Logger) error {
-
+func updateRGStatusWithActionResult(ctx context.Context, rg *storagev1alpha1.DellCSIReplicationGroup, actionResult *ActionResult) error {
+	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Begin updating RG status with action result")
 
 	var result *ActionResult
 	if actionResult == nil {
-		actionAnnotation, err := getActionInProgress(rg.Annotations, log)
+		actionAnnotation, err := getActionInProgress(ctx, rg.Annotations)
 		if err != nil {
 			return err
 		}
-		result, err = getActionResultFromActionAnnotation(*actionAnnotation, log)
+		result, err = getActionResultFromActionAnnotation(ctx, *actionAnnotation)
 		if err != nil {
 			return err
 		}
@@ -208,8 +209,8 @@ func updateRGStatusWithActionResult(rg *storagev1alpha1.DellCSIReplicationGroup,
 			rg.Status.State = ErrorState
 		}
 	}
-	updateConditionsWithActionResult(rg, result, log)
-	updateLastAction(rg, result, log)
+	updateConditionsWithActionResult(ctx, rg, result)
+	updateLastAction(ctx, rg, result)
 	// Update the RG link state if we got a status
 	if result.PGStatus != nil {
 		log.V(common.InfoLevel).Info("RG link state was updated")
@@ -223,8 +224,8 @@ func updateRGStatusWithActionResult(rg *storagev1alpha1.DellCSIReplicationGroup,
 	return nil
 }
 
-func updateConditionsWithActionResult(rg *storagev1alpha1.DellCSIReplicationGroup, result *ActionResult, log logr.Logger) {
-
+func updateConditionsWithActionResult(ctx context.Context, rg *storagev1alpha1.DellCSIReplicationGroup, result *ActionResult) {
+	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Begin updating condition with action result")
 
 	condition := storagev1alpha1.LastAction{
@@ -241,8 +242,8 @@ func updateConditionsWithActionResult(rg *storagev1alpha1.DellCSIReplicationGrou
 	log.V(common.InfoLevel).Info("Condition was updated")
 }
 
-func updateLastAction(rg *storagev1alpha1.DellCSIReplicationGroup, result *ActionResult, log logr.Logger) {
-
+func updateLastAction(ctx context.Context, rg *storagev1alpha1.DellCSIReplicationGroup, result *ActionResult) {
+	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Updating last action..")
 
 	rg.Status.LastAction.Time = &metav1.Time{Time: result.Time}
@@ -418,8 +419,8 @@ func (r *ReplicationGroupReconciler) SetupWithManager(mgr ctrl.Manager, limiter 
 		Complete(r)
 }
 
-func getActionInProgress(annotations map[string]string, log logr.Logger) (*ActionAnnotation, error) {
-
+func getActionInProgress(ctx context.Context, annotations map[string]string) (*ActionAnnotation, error) {
+	log := common.GetLoggerFromContext(ctx)
 	log.V(common.DebugLevel).Info("Getting the action in progress from annotation")
 
 	val, ok := annotations[Action]
@@ -446,7 +447,7 @@ func (r *ReplicationGroupReconciler) processRGInActionInProgressState(ctx contex
 	rg *storagev1alpha1.DellCSIReplicationGroup) (ctrl.Result, error) {
 	log := common.GetLoggerFromContext(ctx)
 	// Get action in progress from annotation
-	inProgress, err := getActionInProgress(rg.Annotations, log)
+	inProgress, err := getActionInProgress(ctx, rg.Annotations)
 	if err != nil || inProgress == nil {
 		// Either the annotation is not set or not set properly
 		// Mostly points to User error
@@ -508,14 +509,14 @@ func (r *ReplicationGroupReconciler) processRGInActionInProgressState(ctx contex
 			}
 		}
 		// Update status
-		if err := updateRGStatusWithActionResult(rg, nil, log); err == nil {
+		if err := updateRGStatusWithActionResult(ctx, rg, nil); err == nil {
 			log.Error(err, "Failed to update status", "rg", rg)
 			err1 := r.Status().Update(ctx, rg.DeepCopy())
 			return ctrl.Result{}, err1
 		}
 	}
 	actionType := ActionType(inProgress.ActionName)
-	if !actionType.Equals(rg.Spec.Action, log) {
+	if !actionType.Equals(ctx, rg.Spec.Action) {
 		r.EventRecorder.Eventf(rg, v1.EventTypeWarning, "InProgress",
 			"Action [%s] on DellCSIReplicationGroup [%s] is in Progress, cannot execute [%s] ", actionType.String(), rg.Name, rg.Spec.Action)
 	}
@@ -537,7 +538,7 @@ func (r *ReplicationGroupReconciler) processRGInActionInProgressState(ctx contex
 			actionType.String(), rg.Name, actionResult.Error.Error())
 	}
 	// Update spec
-	isSpecUpdated := updateRGSpecWithActionResult(rg, actionResult, log)
+	isSpecUpdated := updateRGSpecWithActionResult(ctx, rg, actionResult)
 	if isSpecUpdated {
 		if err := r.Update(ctx, rg); err != nil {
 			log.Error(err, "Failed to update spec", "rg", rg, "Action Result", actionResult)
@@ -546,7 +547,7 @@ func (r *ReplicationGroupReconciler) processRGInActionInProgressState(ctx contex
 		log.V(common.InfoLevel).Info("Successfully updated spec", "Action Result", actionResult)
 	}
 	// Update status
-	err = updateRGStatusWithActionResult(rg, actionResult, log)
+	err = updateRGStatusWithActionResult(ctx, rg, actionResult)
 	if err != nil {
 		r.Log.Error(err, "Failed to update status with action result", "Action Result", actionResult)
 		return ctrl.Result{}, err
@@ -615,7 +616,7 @@ func (r *ReplicationGroupReconciler) processRG(ctx context.Context, dellCSIRepli
 	if dellCSIReplicationGroup.Spec.ProtectionGroupID != "" &&
 		dellCSIReplicationGroup.Spec.Action != "" {
 		// Get action in progress from annotation
-		inProgress, err := getActionInProgress(dellCSIReplicationGroup.Annotations, log)
+		inProgress, err := getActionInProgress(ctx, dellCSIReplicationGroup.Annotations)
 		if err != nil {
 			// We need to decide what to do here
 			// Maybe best effort for what is set in the action field

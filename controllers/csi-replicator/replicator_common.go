@@ -17,15 +17,16 @@ limitations under the License.
 package csireplicator
 
 import (
+	"context"
 	"fmt"
 	controller "github.com/dell/csm-replication/controllers"
 	"github.com/dell/csm-replication/pkg/common"
-	"github.com/go-logr/logr"
 	storageV1 "k8s.io/api/storage/v1"
 	"strings"
 )
 
-func shouldContinue(class *storageV1.StorageClass, log logr.Logger, driverName string) bool {
+func shouldContinue(ctx context.Context, class *storageV1.StorageClass, driverName string) bool {
+	log := common.GetLoggerFromContext(ctx)
 	// Check for the driver match
 	if class.Provisioner != driverName {
 		log.V(common.InfoLevel).Info("PVC created using the driver name, not matching one on this replicator", "driverName", class.Provisioner)

@@ -81,8 +81,10 @@ func ParseLevel(level string) (logrus.Level, error) {
 	return InfoLevel + 4, fmt.Errorf("not a valid logrus level, falling back to InfoLevel %s", level)
 }
 
+// LoggerContextKey defines key which we use to store log in the context
 const LoggerContextKey = "logger"
 
+// GetLoggerFromContext serves to pass the logger instance to the context
 func GetLoggerFromContext(ctx context.Context) logr.Logger {
 	log, ok := ctx.Value(LoggerContextKey).(logr.Logger)
 	if !ok {

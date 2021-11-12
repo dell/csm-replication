@@ -81,7 +81,7 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	if !shouldContinue(storageClass, log, r.DriverName) {
+	if !shouldContinue(ctx, storageClass, r.DriverName) {
 		return ctrl.Result{}, nil
 	}
 
