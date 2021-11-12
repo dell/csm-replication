@@ -35,12 +35,12 @@ func shouldContinue(class *storageV1.StorageClass, log logr.Logger, driverName s
 	// Check for the replication params to make sure, this PVC
 	// has a replica created for it
 	if value, ok := class.Parameters[controller.StorageClassReplicationParam]; !ok || value != controller.StorageClassReplicationParamEnabledValue {
-		log.V(common.InfoLevel).Info("StorageClass used to provision the PVC is not replication-enabled")
+		log.V(common.InfoLevel).Info("StorageClass used to provision the PVC is not replication-enabled", "StorageClass", class)
 		return false
 	}
 
 	// TODO: This should be removed when we start supporting RGs for SRDF Metro too
-	// Check for PowerMax SRDF Metro
+	// Check for PowerMax SRDF Metrot
 	if value, ok := class.Parameters["replication.storage.dell.com/RdfMode"]; ok {
 		if strings.ToUpper(value) == "METRO" {
 			log.V(common.InfoLevel).Info("Metro replication is not supported by Dell CSI Replication Controllers")
@@ -52,7 +52,7 @@ func shouldContinue(class *storageV1.StorageClass, log logr.Logger, driverName s
 	_, ok := class.Parameters[controller.StorageClassRemoteStorageClassParam]
 	if !ok {
 		log.Error(fmt.Errorf("no remote storage class param specified in the storageclass"),
-			"remote storage class parameter missing")
+			"Remote storage class parameter missing")
 		return false
 	}
 	return true

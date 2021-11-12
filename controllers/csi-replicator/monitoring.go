@@ -60,6 +60,9 @@ func (r *ReplicationGroupMonitoring) Monitor(ctx context.Context) error {
 }
 
 func (r *ReplicationGroupMonitoring) monitorReplicationGroups(ticker <-chan time.Time) {
+
+	r.Log.V(common.InfoLevel).Info("Start monitoring replication-group")
+
 	dellCSIReplicationGroupsList := new(storagev1alpha1.DellCSIReplicationGroupList)
 	select {
 	case <-ticker:
