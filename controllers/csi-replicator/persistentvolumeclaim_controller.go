@@ -66,7 +66,7 @@ type PersistentVolumeClaimReconciler struct {
 // Reconcile contains reconciliation logic that updates PersistentVolumeClaim depending on it's current state
 func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("persistentvolumeclaim", req.NamespacedName)
-
+	ctx = context.WithValue(ctx, common.LoggerContextKey, log)
 	log.V(common.InfoLevel).Info("Begin reconcile - PVC controller")
 
 	claim := new(v1.PersistentVolumeClaim)
@@ -117,7 +117,7 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 			log.V(common.InfoLevel).Info("Waiting for RemoteVolume to be created by PV controller and set the corresponding annotation")
 			return ctrl.Result{Requeue: true, RequeueAfter: controller.DefaultRetryInterval}, nil
 		}
-		if err := r.processClaimForRemoteVolume(ctx, claim.DeepCopy(), pv, storageClass.Parameters, log, pv.Annotations[controller.RemoteVolumeAnnotation]); err != nil {
+		if err := r.processClaimForRemoteVolume(ctx, claim.DeepCopy(), pv, storageClass.Parameters, pv.Annotations[controller.RemoteVolumeAnnotation]); err != nil {
 			log.Error(err, "Failed to fetch PV details of the PVC", "pv", pv, "claim", claim)
 			return ctrl.Result{}, err
 		}
@@ -147,7 +147,7 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 			log.V(common.InfoLevel).Info("RG annotation is missing on PV, retry..")
 			return ctrl.Result{Requeue: true, RequeueAfter: controller.DefaultRetryInterval}, nil
 		}
-		err = r.processClaimForReplicationGroup(ctx, claim.DeepCopy(), pv, log)
+		err = r.processClaimForReplicationGroup(ctx, claim.DeepCopy(), pv)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -157,8 +157,8 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 }
 
 func (r *PersistentVolumeClaimReconciler) processClaimForRemoteVolume(ctx context.Context, claim *v1.PersistentVolumeClaim,
-	pv *v1.PersistentVolume, scParams map[string]string, log logr.Logger, buffer string) error {
-
+	pv *v1.PersistentVolume, scParams map[string]string, buffer string) error {
+	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Begin process claim for remote-volume")
 
 	log.V(common.DebugLevel).Info("Adding remote-volume annotation to the PVC")
@@ -191,8 +191,8 @@ func (r *PersistentVolumeClaimReconciler) processClaimForRemoteVolume(ctx contex
 	return nil
 }
 
-func (r *PersistentVolumeClaimReconciler) processClaimForReplicationGroup(ctx context.Context, claim *v1.PersistentVolumeClaim, pv *v1.PersistentVolume, log logr.Logger) error {
-
+func (r *PersistentVolumeClaimReconciler) processClaimForReplicationGroup(ctx context.Context, claim *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) error {
+	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Begin process claim for replication-group")
 
 	log.V(common.DebugLevel).Info("Adding replication-group annotation to the PVC")

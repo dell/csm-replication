@@ -57,6 +57,7 @@ type PersistentVolumeClaimReconciler struct {
 func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// If we have received the reconcile request, it means that the sidecar has completed its protection
 	log := r.Log.WithValues("persistentvolumeclaim", req.NamespacedName)
+	ctx = context.WithValue(ctx, common.LoggerContextKey, log)
 
 	claim := new(v1.PersistentVolumeClaim)
 	err := r.Get(ctx, req.NamespacedName, claim)

@@ -62,6 +62,7 @@ type ReplicationGroupReconciler struct {
 // Reconcile contains reconciliation logic that updates ReplicationGroup depending on it's current state
 func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("dellcsireplicationgroup", req.Name)
+	ctx = context.WithValue(ctx, common.LoggerContextKey, log)
 
 	localRG := new(storagev1alpha1.DellCSIReplicationGroup)
 	err := r.Get(ctx, req.NamespacedName, localRG)

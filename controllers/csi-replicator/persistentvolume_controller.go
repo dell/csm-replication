@@ -59,6 +59,7 @@ const protectionIndexKey = "protection_id"
 // Reconcile contains reconciliation logic that updates PersistentVolume depending on it's current state
 func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("persistentvolume", req.NamespacedName)
+	ctx = context.WithValue(ctx, common.LoggerContextKey, log)
 
 	log.V(common.InfoLevel).Info("Begin reconcile - PV Controller")
 
@@ -120,7 +121,7 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			log.V(common.DebugLevel).Info("This PV was created by sync controller. It is expected to have RG annotation. Re-queuing..")
 			return ctrl.Result{Requeue: true, RequeueAfter: controller.DefaultRetryInterval}, nil
 		}
-		if replicationGroupName, err = r.createProtectionGroupAndRG(ctx, pv.Spec.CSI.VolumeHandle, storageClass.Parameters, log); err != nil {
+		if replicationGroupName, err = r.createProtectionGroupAndRG(ctx, pv.Spec.CSI.VolumeHandle, storageClass.Parameters); err != nil {
 			return ctrl.Result{}, err
 		}
 
@@ -218,8 +219,8 @@ func (r *PersistentVolumeReconciler) processVolumeForReplicationGroup(ctx contex
 	return nil
 }
 
-func (r *PersistentVolumeReconciler) createProtectionGroupAndRG(ctx context.Context, volumeHandle string, scParams map[string]string, log logr.Logger) (string, error) {
-
+func (r *PersistentVolumeReconciler) createProtectionGroupAndRG(ctx context.Context, volumeHandle string, scParams map[string]string) (string, error) {
+	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Creating protection-group anf RG")
 
 	res, err := r.ReplicationClient.CreateStorageProtectionGroup(ctx, volumeHandle, scParams)
@@ -243,7 +244,7 @@ func (r *PersistentVolumeReconciler) createProtectionGroupAndRG(ctx context.Cont
 		// DellCSIReplicationGroup instance doesn't exists for the ProtectionGroup;
 		// creating a new one
 		var err error
-		replicationGroup, err = r.createReplicationGroupOnce(ctx, res, scParams[controller.StorageClassRemoteClusterParam], scParams[controller.RemoteRGRetentionPolicy], log)
+		replicationGroup, err = r.createReplicationGroupOnce(ctx, res, scParams[controller.StorageClassRemoteClusterParam], scParams[controller.RemoteRGRetentionPolicy])
 		if err != nil {
 			return "", err
 		}
@@ -256,9 +257,9 @@ func (r *PersistentVolumeReconciler) createProtectionGroupAndRG(ctx context.Cont
 	return replicationGroup.Name, nil
 }
 
-func (r *PersistentVolumeReconciler) createReplicationGroupOnce(ctx context.Context, res *replication.CreateStorageProtectionGroupResponse, remoteClusterID string, remoteRGRetentionPolicy string, log logr.Logger) (*storagev1alpha1.DellCSIReplicationGroup, error) {
+func (r *PersistentVolumeReconciler) createReplicationGroupOnce(ctx context.Context, res *replication.CreateStorageProtectionGroupResponse, remoteClusterID string, remoteRGRetentionPolicy string) (*storagev1alpha1.DellCSIReplicationGroup, error) {
 	rgObj, err, _ := r.SingleFlightGroup.Do(res.GetLocalProtectionGroupId(), func() (interface{}, error) {
-		return r.createReplicationGroup(ctx, res, remoteClusterID, remoteRGRetentionPolicy, log)
+		return r.createReplicationGroup(ctx, res, remoteClusterID, remoteRGRetentionPolicy)
 	})
 	if err != nil {
 		return nil, err
@@ -266,8 +267,8 @@ func (r *PersistentVolumeReconciler) createReplicationGroupOnce(ctx context.Cont
 	return rgObj.(*storagev1alpha1.DellCSIReplicationGroup), nil
 }
 
-func (r *PersistentVolumeReconciler) createReplicationGroup(ctx context.Context, res *replication.CreateStorageProtectionGroupResponse, remoteClusterID string, remoteRGRetentionPolicy string, log logr.Logger) (*storagev1alpha1.DellCSIReplicationGroup, error) {
-
+func (r *PersistentVolumeReconciler) createReplicationGroup(ctx context.Context, res *replication.CreateStorageProtectionGroupResponse, remoteClusterID string, remoteRGRetentionPolicy string) (*storagev1alpha1.DellCSIReplicationGroup, error) {
+	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Creating replication-group")
 
 	annotations := make(map[string]string)

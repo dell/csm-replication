@@ -21,9 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/dell/csm-replication/pkg/common"
-
 	v1 "k8s.io/api/core/v1"
-
 	"strings"
 	"time"
 
@@ -280,7 +278,8 @@ type ReplicationGroupReconciler struct {
 
 // Reconcile contains reconciliation logic that updates ReplicationGroup depending on it's current state
 func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("dellcsireplicationgroup", req.NamespacedName)
+	log := r.Log.WithValues("persistentvolumeclaim", req.NamespacedName)
+	ctx = context.WithValue(ctx, common.LoggerContextKey, log)
 
 	rg := new(storagev1alpha1.DellCSIReplicationGroup)
 	err := r.Get(ctx, req.NamespacedName, rg)
@@ -292,7 +291,7 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	// Handle deletion by checking for deletion timestamp
 	if !rg.DeletionTimestamp.IsZero() && !strings.Contains(currentState, InProgress) {
-		return r.processRGForDeletion(ctx, rg.DeepCopy(), log)
+		return r.processRGForDeletion(ctx, rg.DeepCopy())
 	}
 
 	// If no protection group ID set(the only mandatory field), we set it to Invalid state and return
@@ -300,7 +299,7 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		r.EventRecorder.Event(rg, v1.EventTypeWarning, "Invalid", "Missing mandatory value - protectionGroupID")
 		log.V(common.InfoLevel).Info("Missing mandatory value - protectionGroupID", "rg", rg, "v1.EventTypeWarning", v1.EventTypeWarning)
 		if rg.Status.State != InvalidState {
-			if err := r.updateState(ctx, rg.DeepCopy(), InvalidState, log); err != nil {
+			if err := r.updateState(ctx, rg.DeepCopy(), InvalidState); err != nil {
 				return ctrl.Result{}, err
 			}
 			return ctrl.Result{}, fmt.Errorf("missing protection group id")
@@ -310,19 +309,19 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	switch rg.Status.State {
 	case NoState:
-		return r.processRGInNoState(ctx, rg.DeepCopy(), log)
+		return r.processRGInNoState(ctx, rg.DeepCopy())
 	case InvalidState:
 		// Update the state to no state
-		err := r.updateState(ctx, rg.DeepCopy(), "", log)
+		err := r.updateState(ctx, rg.DeepCopy(), "")
 		log.Error(err, "Empty state")
 		return ctrl.Result{}, err
 	case ErrorState:
 		fallthrough
 	case ReadyState:
-		return r.processRG(ctx, rg.DeepCopy(), log)
+		return r.processRG(ctx, rg.DeepCopy())
 	default:
 		if strings.Contains(rg.Status.State, InProgress) {
-			return r.processRGInActionInProgressState(ctx, rg.DeepCopy(), log)
+			return r.processRGInActionInProgressState(ctx, rg.DeepCopy())
 		}
 		return ctrl.Result{}, fmt.Errorf("unknown state")
 	}
@@ -345,8 +344,8 @@ func (r *ReplicationGroupReconciler) getAction(actionType ActionType) (*csiext.E
 	return nil, fmt.Errorf("unsupported action")
 }
 
-func (r *ReplicationGroupReconciler) deleteProtectionGroup(ctx context.Context, rg *storagev1alpha1.DellCSIReplicationGroup, log logr.Logger) error {
-
+func (r *ReplicationGroupReconciler) deleteProtectionGroup(ctx context.Context, rg *storagev1alpha1.DellCSIReplicationGroup) error {
+	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Deleting protection-group")
 
 	log.V(common.DebugLevel).Info("Making CSI call to delete replication group")
@@ -360,8 +359,8 @@ func (r *ReplicationGroupReconciler) deleteProtectionGroup(ctx context.Context, 
 	return nil
 }
 
-func (r *ReplicationGroupReconciler) removeFinalizer(ctx context.Context, rg *storagev1alpha1.DellCSIReplicationGroup, log logr.Logger) error {
-
+func (r *ReplicationGroupReconciler) removeFinalizer(ctx context.Context, rg *storagev1alpha1.DellCSIReplicationGroup) error {
+	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Removing finalizer")
 
 	// Remove replication-protection finalizer
@@ -377,8 +376,8 @@ func (r *ReplicationGroupReconciler) removeFinalizer(ctx context.Context, rg *st
 	return nil
 }
 
-func (r *ReplicationGroupReconciler) addFinalizer(ctx context.Context, rg *storagev1alpha1.DellCSIReplicationGroup, log logr.Logger) (bool, error) {
-
+func (r *ReplicationGroupReconciler) addFinalizer(ctx context.Context, rg *storagev1alpha1.DellCSIReplicationGroup) (bool, error) {
+	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Adding finalizer")
 
 	ok := controllers.AddFinalizerIfNotExist(rg, controllers.ReplicationFinalizer)
@@ -392,8 +391,8 @@ func (r *ReplicationGroupReconciler) addFinalizer(ctx context.Context, rg *stora
 	return ok, nil
 }
 
-func (r *ReplicationGroupReconciler) updateState(ctx context.Context, rg *storagev1alpha1.DellCSIReplicationGroup, state string, log logr.Logger) error {
-
+func (r *ReplicationGroupReconciler) updateState(ctx context.Context, rg *storagev1alpha1.DellCSIReplicationGroup, state string) error {
+	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Updating to", "state", state)
 
 	rg.Status.State = state
@@ -444,7 +443,8 @@ func resetRGSpecForInvalidAction(rg *storagev1alpha1.DellCSIReplicationGroup) {
 }
 
 func (r *ReplicationGroupReconciler) processRGInActionInProgressState(ctx context.Context,
-	rg *storagev1alpha1.DellCSIReplicationGroup, log logr.Logger) (ctrl.Result, error) {
+	rg *storagev1alpha1.DellCSIReplicationGroup) (ctrl.Result, error) {
+	log := common.GetLoggerFromContext(ctx)
 	// Get action in progress from annotation
 	inProgress, err := getActionInProgress(rg.Annotations, log)
 	if err != nil || inProgress == nil {
@@ -494,7 +494,7 @@ func (r *ReplicationGroupReconciler) processRGInActionInProgressState(ctx contex
 			if err := r.Update(ctx, rg); err != nil {
 				return ctrl.Result{}, err
 			}
-			err = r.updateState(ctx, rg, ReadyState, log)
+			err = r.updateState(ctx, rg, ReadyState)
 			return ctrl.Result{}, err
 		}
 	}
@@ -525,11 +525,11 @@ func (r *ReplicationGroupReconciler) processRGInActionInProgressState(ctx contex
 			"Action changed to an invalid value %s while another action execution was in progress. [%s]",
 			actionType.String(), err.Error())
 		log.Error(err, "Can not proceed!", "actionType", actionType)
-		err = r.updateState(ctx, rg.DeepCopy(), ErrorState, log)
+		err = r.updateState(ctx, rg.DeepCopy(), ErrorState)
 		return ctrl.Result{}, err
 	}
 	// Make API call to Execute Action
-	actionResult := r.executeAction(ctx, rg.DeepCopy(), actionType, action, log)
+	actionResult := r.executeAction(ctx, rg.DeepCopy(), actionType, action)
 	if actionResult.Error != nil {
 		// Raise event in case of an error
 		r.EventRecorder.Eventf(rg, v1.EventTypeWarning, "Error",
@@ -567,8 +567,8 @@ func (r *ReplicationGroupReconciler) processRGInActionInProgressState(ctx contex
 }
 
 func (r *ReplicationGroupReconciler) executeAction(ctx context.Context, rg *storagev1alpha1.DellCSIReplicationGroup,
-	actionType ActionType, action *csiext.ExecuteActionRequest_Action, log logr.Logger) *ActionResult {
-
+	actionType ActionType, action *csiext.ExecuteActionRequest_Action) *ActionResult {
+	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Executing action", "actionType", actionType)
 
 	actionResult := ActionResult{
@@ -608,8 +608,8 @@ func (r *ReplicationGroupReconciler) executeAction(ctx context.Context, rg *stor
 //                        - Add an ActionInProgress annotation
 //                        - Update the spec
 //                        - Update status.State to <ACTION>_IN_PROGRESS
-func (r *ReplicationGroupReconciler) processRG(ctx context.Context, dellCSIReplicationGroup *storagev1alpha1.DellCSIReplicationGroup, log logr.Logger) (ctrl.Result, error) {
-
+func (r *ReplicationGroupReconciler) processRG(ctx context.Context, dellCSIReplicationGroup *storagev1alpha1.DellCSIReplicationGroup) (ctrl.Result, error) {
+	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Start process RG")
 
 	if dellCSIReplicationGroup.Spec.ProtectionGroupID != "" &&
@@ -677,26 +677,28 @@ func (r *ReplicationGroupReconciler) processRG(ctx context.Context, dellCSIRepli
 	return ctrl.Result{}, nil
 }
 
-func (r *ReplicationGroupReconciler) processRGInNoState(ctx context.Context, dellCSIReplicationGroup *storagev1alpha1.DellCSIReplicationGroup, log logr.Logger) (ctrl.Result, error) {
-	ok, err := r.addFinalizer(ctx, dellCSIReplicationGroup.DeepCopy(), log)
+func (r *ReplicationGroupReconciler) processRGInNoState(ctx context.Context, dellCSIReplicationGroup *storagev1alpha1.DellCSIReplicationGroup) (ctrl.Result, error) {
+	ok, err := r.addFinalizer(ctx, dellCSIReplicationGroup.DeepCopy())
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 	if ok {
 		return ctrl.Result{Requeue: true}, nil
 	}
-	if err := r.updateState(ctx, dellCSIReplicationGroup.DeepCopy(), ReadyState, log); err != nil {
+	if err := r.updateState(ctx, dellCSIReplicationGroup.DeepCopy(), ReadyState); err != nil {
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, nil
 }
 
-func (r *ReplicationGroupReconciler) processRGForDeletion(ctx context.Context, dellCSIReplicationGroup *storagev1alpha1.DellCSIReplicationGroup, log logr.Logger) (ctrl.Result, error) {
+func (r *ReplicationGroupReconciler) processRGForDeletion(ctx context.Context, dellCSIReplicationGroup *storagev1alpha1.DellCSIReplicationGroup) (ctrl.Result, error) {
+	log := common.GetLoggerFromContext(ctx)
+
 	if dellCSIReplicationGroup.Spec.ProtectionGroupID != "" {
 		log.V(common.DebugLevel).Info("Deleting the protection-group associated with this replication-group")
-		if err := r.deleteProtectionGroup(ctx, dellCSIReplicationGroup.DeepCopy(), log); err != nil {
+		if err := r.deleteProtectionGroup(ctx, dellCSIReplicationGroup.DeepCopy()); err != nil {
 			if !controllers.IsCSIFinalError(err) && dellCSIReplicationGroup.Status.State != DeletingState {
-				if err := r.updateState(ctx, dellCSIReplicationGroup.DeepCopy(), DeletingState, log); err != nil {
+				if err := r.updateState(ctx, dellCSIReplicationGroup.DeepCopy(), DeletingState); err != nil {
 					return ctrl.Result{}, err
 				}
 			}
@@ -704,11 +706,11 @@ func (r *ReplicationGroupReconciler) processRGForDeletion(ctx context.Context, d
 		}
 	} else {
 		if dellCSIReplicationGroup.Status.State != DeletingState {
-			err := r.updateState(ctx, dellCSIReplicationGroup.DeepCopy(), DeletingState, log)
+			err := r.updateState(ctx, dellCSIReplicationGroup.DeepCopy(), DeletingState)
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil
 	}
-	err := r.removeFinalizer(ctx, dellCSIReplicationGroup.DeepCopy(), log)
+	err := r.removeFinalizer(ctx, dellCSIReplicationGroup.DeepCopy())
 	return ctrl.Result{}, err
 }

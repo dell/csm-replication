@@ -17,6 +17,7 @@ limitations under the License.
 package csireplicator
 
 import (
+
 	"context"
 	"github.com/dell/csm-replication/controllers"
 	constants "github.com/dell/csm-replication/pkg/common"
@@ -113,9 +114,8 @@ func (suite *PVControllerTestSuite) TestVolumeCreationFail() {
 		},
 	}
 	logger := PVCReconciler.Log.WithValues("persistentvolumeclaim", req.NamespacedName)
-
-	e := PVCReconciler.processClaimForRemoteVolume(context.TODO(), &corev1.PersistentVolumeClaim{},
-		&corev1.PersistentVolume{}, map[string]string{}, logger, dummyBuffer)
+	e := PVCReconciler.processClaimForRemoteVolume(context.WithValue(ctx, constants.LoggerContextKey, logger), &corev1.PersistentVolumeClaim{},
+		&corev1.PersistentVolume{}, map[string]string{}, dummyBuffer)
 	suite.Error(e, "CreateRemoteVolume failed with an error")
 }
 
@@ -139,12 +139,13 @@ func (suite *PVControllerTestSuite) TestPVProcessingFailure() {
 	req := reconcile.Request{
 		NamespacedName: types.NamespacedName{
 			Namespace: suite.mockUtils.Specs.Namespace,
-			Name:      "fake-pvc2",
+			Name:      "fake-pvc3",
 		},
 	}
+
 	logger := PVCReconciler.Log.WithValues("persistentvolumeclaim", req.NamespacedName)
-	e := PVCReconciler.processClaimForReplicationGroup(context.TODO(), &corev1.PersistentVolumeClaim{},
-		pvObj, logger)
+	e := PVCReconciler.processClaimForReplicationGroup(context.WithValue(ctx, constants.LoggerContextKey, logger), &corev1.PersistentVolumeClaim{},
+		pvObj)
 	suite.Error(e, "CreateRemoteVolume failed with an error")
 }
 
@@ -173,8 +174,8 @@ func (suite *PVControllerTestSuite) TestRGCreationFailure() {
 	}
 
 	logger := PVCReconciler.Log.WithValues("persistentvolumeclaim", req.NamespacedName)
-	e := PVCReconciler.processClaimForReplicationGroup(context.TODO(), &corev1.PersistentVolumeClaim{},
-		pvObj, logger)
+	e := PVCReconciler.processClaimForReplicationGroup(context.WithValue(ctx, constants.LoggerContextKey, logger), &corev1.PersistentVolumeClaim{},
+		pvObj)
 	suite.Error(e, "CreateRemoteVolume failed with an error")
 }
 

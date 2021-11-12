@@ -64,6 +64,7 @@ type PersistentVolumeReconciler struct {
 // Reconcile contains reconciliation logic that updates PersistentVolume depending on it's current state
 func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("persistentvolume", req.Name)
+	ctx = context.WithValue(ctx, common.LoggerContextKey, log)
 
 	r.Log.V(common.InfoLevel).Info("Reconciling PV event")
 

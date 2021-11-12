@@ -15,10 +15,13 @@
 package common
 
 import (
+	"context"
 	"fmt"
+	"github.com/go-logr/logr"
 	"github.com/maxan98/logrusr"
 	"github.com/sirupsen/logrus"
 	"strings"
+	"time"
 )
 
 // Constants
@@ -76,4 +79,20 @@ func ParseLevel(level string) (logrus.Level, error) {
 	}
 
 	return InfoLevel + 4, fmt.Errorf("not a valid logrus level, falling back to InfoLevel %s", level)
+}
+
+const LoggerContextKey = "logger"
+
+func GetLoggerFromContext(ctx context.Context) logr.Logger {
+	log, ok := ctx.Value(LoggerContextKey).(logr.Logger)
+	if !ok {
+		logrusLog := logrus.New()
+		logrusLog.SetFormatter(&logrus.JSONFormatter{
+			TimestampFormat: time.RFC3339Nano,
+		})
+
+		logger := logrusr.NewLogger(logrusLog)
+		return logger
+	}
+	return log
 }
