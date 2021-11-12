@@ -40,7 +40,7 @@ func shouldContinue(class *storageV1.StorageClass, log logr.Logger, driverName s
 	}
 
 	// TODO: This should be removed when we start supporting RGs for SRDF Metro too
-	// Check for PowerMax SRDF Metrot
+	// Check for PowerMax SRDF Metro
 	if value, ok := class.Parameters["replication.storage.dell.com/RdfMode"]; ok {
 		if strings.ToUpper(value) == "METRO" {
 			log.V(common.InfoLevel).Info("Metro replication is not supported by Dell CSI Replication Controllers")
