@@ -381,9 +381,8 @@ func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object
 		err := c.client.Create(ctx, crdObj)
 		if err != nil {
 			return nil, err
-		} else {
-			log.Print("Successfully created crds: ", crdObj.Name)
 		}
+		log.Print("Successfully created crds: ", crdObj.Name)
 	case *rbacv1.ClusterRole:
 		crObj, ok := runtimeObj.(*rbacv1.ClusterRole)
 		if !ok {
