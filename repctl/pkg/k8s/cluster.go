@@ -380,15 +380,7 @@ func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object
 		}
 		err := c.client.Create(ctx, crdObj)
 		if err != nil {
-			if strings.Contains(err.Error(), "already exists") {
-				err := c.client.Update(ctx, crdObj)
-				if err != nil {
-					return nil, err
-				}
-				log.Print("Successfully updated existing crds: ", crdObj.Name)
-			} else {
-				return nil, err
-			}
+			return nil, err
 		} else {
 			log.Print("Successfully created crds: ", crdObj.Name)
 		}
