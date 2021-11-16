@@ -137,7 +137,7 @@ func main() {
 		probeFrequency             time.Duration
 		maxRetryDurationForActions time.Duration
 	)
-	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
+	flag.StringVar(&metricsAddr, "metrics-addr", ":8000", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-election", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
