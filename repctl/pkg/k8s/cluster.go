@@ -380,18 +380,9 @@ func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object
 		}
 		err := c.client.Create(ctx, crdObj)
 		if err != nil {
-			if strings.Contains(err.Error(), "already exists") {
-				err := c.client.Update(ctx, crdObj)
-				if err != nil {
-					return nil, err
-				}
-				log.Print("Successfully updated existing crds: ", crdObj.Name)
-			} else {
-				return nil, err
-			}
-		} else {
-			log.Print("Successfully created crds: ", crdObj.Name)
+			return nil, err
 		}
+		log.Print("Successfully created crds: ", crdObj.Name)
 	case *rbacv1.ClusterRole:
 		crObj, ok := runtimeObj.(*rbacv1.ClusterRole)
 		if !ok {
