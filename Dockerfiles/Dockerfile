@@ -24,7 +24,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o dell-rep
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o dell-csi-replicator sidecar.go
 
 # Base image for controller and sidecar
-FROM registry.access.redhat.com/ubi8/ubi-minimal:latest AS container-base
+FROM registry.access.redhat.com/ubi8/ubi-minimal@sha256:e0814339ffc6c933652bed0c5f8b6416b9a3d40be2f49f95e6e4128387d2a24a AS container-base
 RUN microdnf update -y \
 && \
 microdnf clean all
