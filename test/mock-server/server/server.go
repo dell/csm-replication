@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 
 	"fmt"
+	commonext "github.com/dell/dell-csi-extensions/common"
 	"github.com/dell/dell-csi-extensions/replication"
-
 	"golang.org/x/net/context"
 	"io/ioutil"
 	"net/http"
@@ -16,8 +16,8 @@ import (
 type Replication struct{}
 
 // ProbeController calls stub for ProbeController
-func (s *Replication) ProbeController(ctx context.Context, in *replication.ProbeControllerRequest) (*replication.ProbeControllerResponse, error) {
-	out := &replication.ProbeControllerResponse{}
+func (s *Replication) ProbeController(ctx context.Context, in *commonext.ProbeControllerRequest) (*commonext.ProbeControllerResponse, error) {
+	out := &commonext.ProbeControllerResponse{}
 	err := FindStub("Replication", "ProbeController", in, out)
 	return out, err
 }

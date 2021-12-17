@@ -22,6 +22,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	commonext "github.com/dell/dell-csi-extensions/common"
 	"github.com/dell/dell-csi-extensions/replication"
 	"github.com/go-logr/logr"
 	"google.golang.org/grpc"
@@ -62,7 +63,7 @@ func (r *identity) ProbeController(ctx context.Context) (string, bool, error) {
 
 	client := replication.NewReplicationClient(r.conn)
 
-	response, err := client.ProbeController(tctx, &replication.ProbeControllerRequest{})
+	response, err := client.ProbeController(tctx, &commonext.ProbeControllerRequest{})
 	if err != nil {
 		return "", false, err
 	}
