@@ -154,10 +154,16 @@ spec:
                     type: string
                 required:
                 - isSource
+Ы                - lastSuccessfulUpdate
                 type: object
               state:
                 type: string
+            required:
+            - lastAction
+            - replicationLinkState
             type: object
+        required:
+        - status
         type: object
     served: true
     storage: true

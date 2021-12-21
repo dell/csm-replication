@@ -1,0 +1,17 @@
+sourceClusterID: "cluster-1"
+targetClusterID: "cluster-2"
+name: "isilon-replication"
+driver: "isilon"
+reclaimPolicy: "Delete"
+replicationPrefix: "replication.storage.dell.com"
+parameters:
+  rpo: "Five_Minutes"
+  ignoreNamespaces: "false"
+  volumeGroupPrefix: "csi"
+  accessZone: "System"
+  isiPath: "/ifs/data/csi"
+  rootClientEnabled: "false"
+  clusterName:
+    source: "cluster-1"
+    target: "cluster-2"
+
