@@ -44,6 +44,7 @@ type ControllerManagerOpts struct {
 	ConfigDir         string
 	ConfigFileName    string
 	InCluster         bool
+	IsInInvalidState  bool
 }
 
 // GetControllerManagerOpts initializes and returns new ControllerManagerOpts object
@@ -242,10 +243,19 @@ func getReplicationConfig(ctx context.Context, client ctrlClient.Client, opts Co
 		err = repConfig.VerifyConfig(ctx)
 		if err != nil {
 			err := controllers.PublishControllerEvent(ctx, client, recorder, "Warning", "Invalid", "Config update won't be applied because of invalid configmap/secrets. Please fix the invalid configuration.")
+			opts.IsInInvalidState = true
 			if err != nil {
 				return nil, nil, err
 			}
 
+		} else {
+			if opts.IsInInvalidState == true {
+				err := controllers.PublishControllerEvent(ctx, client, recorder, "Normal", "Correct config applied", "Correct configuration has been applied to cluster.")
+				opts.IsInInvalidState = false
+				if err != nil {
+					return nil, nil, err
+				}
+			}
 		}
 		return configMap, repConfig, nil
 	}
