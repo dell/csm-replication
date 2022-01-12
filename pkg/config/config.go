@@ -47,7 +47,7 @@ type ControllerManagerOpts struct {
 	Mode              string
 }
 
-var IsInInvalidState bool
+var isInInvalidState bool
 
 // GetControllerManagerOpts initializes and returns new ControllerManagerOpts object
 func GetControllerManagerOpts() ControllerManagerOpts {
@@ -244,18 +244,18 @@ func getReplicationConfig(ctx context.Context, client ctrlClient.Client, opts Co
 		repConfig := newReplicationConfig(configMap, connHandler)
 		err = repConfig.VerifyConfig(ctx)
 		if err != nil && opts.Mode == "controller" {
-			log.V(common.InfoLevel).Info("Wrong config, publishing event. ", err.Error(), IsInInvalidState)
+			log.V(common.InfoLevel).Info("Wrong config, publishing event. ", err.Error(), isInInvalidState)
 			err := controllers.PublishControllerEvent(ctx, client, recorder, "Warning", "Invalid", "Config update won't be applied because of invalid configmap/secrets. Please fix the invalid configuration.")
-			IsInInvalidState = true
+			isInInvalidState = true
 			if err != nil {
 				return nil, nil, err
 			}
 
 		} else {
-			if IsInInvalidState == true && opts.Mode == "controller" {
+			if isInInvalidState == true && opts.Mode == "controller" {
 				log.V(common.InfoLevel).Info("Correct config, publishing event. ")
 				err := controllers.PublishControllerEvent(ctx, client, recorder, "Normal", "Correct config applied", "Correct configuration has been applied to cluster.")
-				IsInInvalidState = false
+				isInInvalidState = false
 				if err != nil {
 					log.V(common.InfoLevel).Info(err.Error())
 					return nil, nil, err
