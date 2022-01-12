@@ -44,8 +44,10 @@ type ControllerManagerOpts struct {
 	ConfigDir         string
 	ConfigFileName    string
 	InCluster         bool
-	IsInInvalidState  bool
+	Mode              string
 }
+
+var IsInInvalidState bool
 
 // GetControllerManagerOpts initializes and returns new ControllerManagerOpts object
 func GetControllerManagerOpts() ControllerManagerOpts {
@@ -228,8 +230,8 @@ func readConfigFile(configFile, configPath string) (*replicationConfigMap, error
 }
 
 func getReplicationConfig(ctx context.Context, client ctrlClient.Client, opts ControllerManagerOpts, recorder record.EventRecorder, log logr.Logger) (*replicationConfigMap, *replicationConfig, error) {
-	configMap, err := readConfigFile(opts.ConfigFileName, opts.ConfigDir)
 
+	configMap, err := readConfigFile(opts.ConfigFileName, opts.ConfigDir)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -241,18 +243,21 @@ func getReplicationConfig(ctx context.Context, client ctrlClient.Client, opts Co
 
 		repConfig := newReplicationConfig(configMap, connHandler)
 		err = repConfig.VerifyConfig(ctx)
-		if err != nil {
+		if err != nil && opts.Mode == "controller" {
+			log.V(common.InfoLevel).Info("Wrong config, publishing event. ", err.Error(), IsInInvalidState)
 			err := controllers.PublishControllerEvent(ctx, client, recorder, "Warning", "Invalid", "Config update won't be applied because of invalid configmap/secrets. Please fix the invalid configuration.")
-			opts.IsInInvalidState = true
+			IsInInvalidState = true
 			if err != nil {
 				return nil, nil, err
 			}
 
 		} else {
-			if opts.IsInInvalidState == true {
+			if IsInInvalidState == true && opts.Mode == "controller" {
+				log.V(common.InfoLevel).Info("Correct config, publishing event. ")
 				err := controllers.PublishControllerEvent(ctx, client, recorder, "Normal", "Correct config applied", "Correct configuration has been applied to cluster.")
-				opts.IsInInvalidState = false
+				IsInInvalidState = false
 				if err != nil {
+					log.V(common.InfoLevel).Info(err.Error())
 					return nil, nil, err
 				}
 			}
@@ -260,6 +265,7 @@ func getReplicationConfig(ctx context.Context, client ctrlClient.Client, opts Co
 		return configMap, repConfig, nil
 	}
 	return configMap, nil, nil
+
 }
 
 // Returns a connection handler for the remote clusters
