@@ -125,6 +125,7 @@ func (mgr *ControllerManager) setupConfigMapWatcher(loggerConfig *logrus.Logger)
 
 func createControllerManager(ctx context.Context, mgr ctrl.Manager) (*ControllerManager, error) {
 	opts := config.GetControllerManagerOpts()
+	opts.Mode = "controller"
 	// We need to create a new client as the informer caches have not started yet
 	client, err := connection.GetControllerClient(nil, scheme)
 	if err != nil {
