@@ -105,6 +105,7 @@ func (mgr *ReplicatorManager) setupConfigMapWatcher(loggerConfig *logrus.Logger)
 
 func createReplicatorManager(ctx context.Context, mgr ctrl.Manager) (*ReplicatorManager, error) {
 	opts := config.GetControllerManagerOpts()
+	opts.Mode = "sidecar"
 	mgrLogger := mgr.GetLogger()
 	repConfig, err := config.GetConfig(ctx, nil, opts, nil, mgrLogger)
 	if err != nil {
