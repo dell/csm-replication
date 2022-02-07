@@ -34,7 +34,7 @@ jobs:
       - uses: actions/setup-go@v2
         with:
           go-version: ^1.16
-      - run: cd repctl && go test ./...
+      - run: cd repctl && make test
       - name: Run unit tests and check package coverage
         continue-on-error: true #! TODO(Michael: delete this line after all unit tests errors have been fixed)
         uses: dell/common-github-actions/go-code-tester@main
