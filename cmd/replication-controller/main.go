@@ -178,7 +178,7 @@ func main() {
 		TimestampFormat: time.RFC3339Nano,
 	})
 
-	logger := logrusr.NewLogger(logrusLog)
+	logger := logrusr.New(logrusLog)
 	ctrl.SetLogger(logger)
 	setupLog.V(common.InfoLevel).Info(common.DellReplicationController, "Version", core.SemVer, "Commit ID", core.CommitSha32, "Commit SHA", core.CommitTime.Format(time.RFC1123))
 

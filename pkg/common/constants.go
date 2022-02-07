@@ -93,7 +93,7 @@ func GetLoggerFromContext(ctx context.Context) logr.Logger {
 			TimestampFormat: time.RFC3339Nano,
 		})
 
-		logger := logrusr.NewLogger(logrusLog)
+		logger := logrusr.New(logrusLog)
 		return logger
 	}
 	return log

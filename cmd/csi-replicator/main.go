@@ -160,7 +160,7 @@ func main() {
 		TimestampFormat: time.RFC3339Nano,
 	})
 
-	logger := logrusr.NewLogger(logrusLog)
+	logger := logrusr.New(logrusLog)
 	ctrl.SetLogger(logger)
 
 	setupLog.V(1).Info("Prefix", "Domain", domain)
