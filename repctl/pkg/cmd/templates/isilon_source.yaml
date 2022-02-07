@@ -17,9 +17,9 @@ parameters:
   {{ .ReplicationPrefix }}/rpo: {{ .Parameters.Rpo }}
   {{ .ReplicationPrefix }}/ignoreNamespaces: "{{ .Parameters.IgnoreNamespaces }}"
   {{ .ReplicationPrefix }}/volumeGroupPrefix: {{ .Parameters.VolumeGroupPrefix }}
-  accessZone: {{ .Parameters.AccessZone}}
-  isiPath: {{ .Parameters.IsiPath}}
-  rootClientEnabled: "{{ .Parameters.RootClientEnabled }}"
-  clusterName: {{ .Parameters.ClusterName.Source }}
-
+  AccessZone: {{ .Parameters.AccessZone}}
+  IsiPath: {{ .Parameters.IsiPath}}
+  RootClientEnabled: "{{ .Parameters.RootClientEnabled }}"
+  ClusterName: {{ .Parameters.ClusterName.Source }}
+  {{ .ReplicationPrefix }}/remoteSystem: {{ .TargetClusterID }}
 

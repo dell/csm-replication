@@ -245,7 +245,7 @@ spec:
           value: /app/certs
         - name: X_CSI_REPLICATION_CONFIG_FILE_NAME
           value: config
-        image: dellemc/dell-replication-controller:v1.0.0
+        image: amaas-eos-mw1.cec.lab.emc.com:5017/dell-replication-controller:sch
         imagePullPolicy: Always
         name: manager
         resources:
