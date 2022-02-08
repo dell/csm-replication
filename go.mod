@@ -3,18 +3,19 @@ module github.com/dell/csm-replication
 go 1.17
 
 require (
+	github.com/dell/dell-csi-extensions/common v1.0.0
 	github.com/dell/dell-csi-extensions/replication v1.0.0
 	github.com/fatih/color v1.13.0
 	github.com/fsnotify/fsnotify v1.5.1
 	github.com/go-chi/chi v1.5.4
 	github.com/go-logr/logr v1.2.2
-	github.com/google/uuid v1.3.0
-	github.com/lithammer/fuzzysearch v1.1.3
+	github.com/google/uuid v1.1.2
+	github.com/lithammer/fuzzysearch v1.1.1
 	github.com/maxan98/logrusr v1.2.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/viper v1.10.1
 	github.com/stretchr/testify v1.7.0
-	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
+	golang.org/x/net v0.0.0-20211209124913-491a49abca63
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	google.golang.org/grpc v1.44.0
 	k8s.io/api v0.23.3
@@ -67,6 +68,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/kr/pretty v0.2.1 // indirect
 	github.com/magiconair/properties v1.8.5 // indirect
 	github.com/mailru/easyjson v0.7.6 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
@@ -105,7 +107,7 @@ require (
 	golang.org/x/mod v0.5.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8 // indirect
 	golang.org/x/sys v0.0.0-20220128215802-99c3d69c2c27 // indirect
-	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
+	golang.org/x/term v0.0.0-20210615171337-6886f2dfbf5b // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac // indirect
 	golang.org/x/tools v0.1.6-0.20210820212750-d4cc65f0b2ff // indirect
@@ -128,4 +130,9 @@ require (
 	sigs.k8s.io/kustomize/kyaml v0.10.9 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
+)
+
+replace (
+	github.com/dell/dell-csi-extensions/common v1.0.0 => github.com/dell/dell-csi-extensions/common v0.0.0-20211217121714-58de430139aa
+	github.com/dell/dell-csi-extensions/replication v1.0.0 => github.com/dell/dell-csi-extensions/replication v0.0.0-20211217121714-58de430139aa
 )
