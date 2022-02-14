@@ -1,5 +1,5 @@
-sourceClusterID: "cluster-1"
-targetClusterID: "cluster-2"
+sourceClusterID: "source"
+targetClusterID: "target"
 name: "isilon-replication"
 driver: "isilon"
 reclaimPolicy: "Delete"
