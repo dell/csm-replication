@@ -223,6 +223,14 @@ spec:
       labels:
         control-plane: controller-manager
     spec:
+      {{- if hasKey .Values "hostAliases" }}
+      {{ if .Values.hostAliases.enableHostAliases }}
+      hostAliases:
+      - ip: {{.Values.hostAliases.ip}}
+        hostnames:
+        - {{.Values.hostAliases.hostName}}
+      {{ end }}
+      {{- end }}
       containers:
       - args:
         - prefix=replication.storage.dell.com
