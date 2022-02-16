@@ -34,8 +34,8 @@ type DellCSIReplicationGroupSpec struct {
 type DellCSIReplicationGroupStatus struct {
 	State                string               `json:"state,omitempty"`
 	RemoteState          string               `json:"remoteState,omitempty"`
-	ReplicationLinkState ReplicationLinkState `json:"replicationLinkState"`
-	LastAction           LastAction           `json:"lastAction"`
+	ReplicationLinkState ReplicationLinkState `json:"replicationLinkState,omitempty"`
+	LastAction           LastAction           `json:"lastAction,omitempty"`
 	Conditions           []LastAction         `json:"conditions,omitempty"`
 }
 
@@ -62,7 +62,7 @@ type ReplicationLinkState struct {
 	IsSource bool `json:"isSource"`
 
 	// LastSuccessfulUpdate is the time stamp for the last state update
-	LastSuccessfulUpdate *metav1.Time `json:"lastSuccessfulUpdate"`
+	LastSuccessfulUpdate *metav1.Time `json:"lastSuccessfulUpdate,omitempty"`
 
 	// ErrorMessage is the last error message associated with the link state
 	ErrorMessage string `json:"errorMessage,omitempty"`
@@ -83,7 +83,7 @@ type DellCSIReplicationGroup struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec   DellCSIReplicationGroupSpec   `json:"spec,omitempty"`
-	Status DellCSIReplicationGroupStatus `json:"status"`
+	Status DellCSIReplicationGroupStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
