@@ -67,6 +67,7 @@ type GlobalParameters struct {
 	RootClientEnabled bool
 }
 
+// RemoteRetentionPolicy structure that contains values for remoteRetentionPolicy for both PV and RGs
 type RemoteRetentionPolicy struct {
 	RG string
 	PV string
