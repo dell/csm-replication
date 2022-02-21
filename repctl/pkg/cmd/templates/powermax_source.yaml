@@ -23,4 +23,6 @@ parameters:
   {{ .ReplicationPrefix }}/RemoteServiceLevel: "{{ .Parameters.ServiceLevel.Target }}"
   {{ .ReplicationPrefix }}/RdfGroup: "{{ .Parameters.RdfGroup.Source }}"
   {{ .ReplicationPrefix }}/RemoteRDFGroup: "{{ .Parameters.RdfGroup.Target }}"
+  {{ .ReplicationPrefix }}/remoteRGRetentionPolicy: {{ .RemoteRetentionPolicy.RG }}
+  {{ .ReplicationPrefix }}/remotePVRetentionPolicy: {{ .RemoteRetentionPolicy.PV }}
 

@@ -67,15 +67,21 @@ type GlobalParameters struct {
 	RootClientEnabled bool
 }
 
+type RemoteRetentionPolicy struct {
+	RG string
+	PV string
+}
+
 // ScConfig is a struct that represents config used for storage class creation
 type ScConfig struct {
-	Name              string
-	Driver            string
-	ReclaimPolicy     string
-	TargetClusterID   string
-	SourceClusterID   string
-	ReplicationPrefix string
-	Parameters        GlobalParameters
+	Name                  string
+	Driver                string
+	ReclaimPolicy         string
+	TargetClusterID       string
+	SourceClusterID       string
+	ReplicationPrefix     string
+	RemoteRetentionPolicy RemoteRetentionPolicy
+	Parameters            GlobalParameters
 }
 
 // GetCreateCommand returns 'create' cobra command
