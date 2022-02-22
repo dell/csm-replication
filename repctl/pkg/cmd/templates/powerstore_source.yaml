@@ -18,5 +18,7 @@ parameters:
   {{ .ReplicationPrefix }}/rpo: {{ .Parameters.Rpo }}
   {{ .ReplicationPrefix }}/ignoreNamespaces: "{{ .Parameters.IgnoreNamespaces }}"
   {{ .ReplicationPrefix }}/volumeGroupPrefix: {{ .Parameters.VolumeGroupPrefix }}
+  {{ .ReplicationPrefix }}/remoteRGRetentionPolicy: {{ .RemoteRetentionPolicy.RG }}
+  {{ .ReplicationPrefix }}/remotePVRetentionPolicy: {{ .RemoteRetentionPolicy.PV }}
   arrayID: {{ .Parameters.ArrayID.Source }}
 

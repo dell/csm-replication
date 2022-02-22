@@ -21,6 +21,8 @@ parameters:
   {{ .ReplicationPrefix }}/ignoreNamespaces: "{{ .Parameters.IgnoreNamespaces }}"
   {{ .ReplicationPrefix }}/volumeGroupPrefix: {{ .Parameters.VolumeGroupPrefix }}
   {{ .ReplicationPrefix }}/remoteSystem: {{ .Parameters.ClusterName.Source }}
+  {{ .ReplicationPrefix }}/remoteRGRetentionPolicy: {{ .RemoteRetentionPolicy.RG }}
+  {{ .ReplicationPrefix }}/remotePVRetentionPolicy: {{ .RemoteRetentionPolicy.PV }}
   AccessZone: {{ .Parameters.AccessZone}}
   IsiPath: {{ .Parameters.IsiPath}}
   RootClientEnabled: "{{ .Parameters.RootClientEnabled }}"
