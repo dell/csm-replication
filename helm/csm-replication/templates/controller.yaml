@@ -224,12 +224,8 @@ spec:
         control-plane: controller-manager
     spec:
       {{- if hasKey .Values "hostAliases" }}
-      {{ if .Values.hostAliases.enableHostAliases }}
       hostAliases:
-      - ip: {{.Values.hostAliases.ip}}
-        hostnames:
-        - {{.Values.hostAliases.hostName}}
-      {{ end }}
+      {{- toYaml .Values.hostAliases | nindent 6 }}
       {{- end }}
       containers:
       - args:
