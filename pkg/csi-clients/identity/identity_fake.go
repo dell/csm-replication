@@ -54,6 +54,11 @@ type mockIdentity struct {
 	supportedActions []*replication.SupportedActions
 }
 
+func (m *mockIdentity) GetMigrationCapabilities(ctx context.Context) (MigrationCapabilitySet, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func getSupportedActions() (ReplicationCapabilitySet, []*replication.SupportedActions) {
 	capResponse := &replication.GetReplicationCapabilityResponse{}
 	for i := 0; i < 3; i++ {

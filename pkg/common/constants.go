@@ -35,10 +35,13 @@ const (
 	EnvUseConfFileFormat      = "X_CSI_USE_CONF_FILE_FORMAT"
 	DefaultNameSpace          = "dell-replication-controller"
 	DefaultDomain             = "replication.storage.dell.com"
+	DefaultMigrationDomain    = "migration.storage.dell.com"
 	DellReplicationController = "dell-replication-controller"
 	// DellCSIReplicator - Name of the sidecar controller manager
 	DellCSIReplicator = "dell-csi-replicator"
-	Monitoring        = "rg-monitoring"
+	// DellCSIMigrator - Name of the sidecar controller manager
+	DellCSIMigrator = "dell-csi-migrator"
+	Monitoring      = "rg-monitoring"
 )
 
 const (

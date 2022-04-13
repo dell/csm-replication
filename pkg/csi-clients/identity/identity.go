@@ -17,6 +17,7 @@ package identity
 import (
 	"context"
 	"github.com/dell/csm-replication/pkg/common"
+	"github.com/dell/dell-csi-extensions/migration"
 	"time"
 
 	"google.golang.org/grpc/codes"
@@ -31,11 +32,15 @@ import (
 // ReplicationCapabilitySet represents map of supported replication capabilities
 type ReplicationCapabilitySet map[replication.ReplicationCapability_RPC_Type]bool
 
+// MigrationCapabilitySet represents map of supported migration capabilities
+type MigrationCapabilitySet map[migration.MigrateTypes]bool
+
 // Identity is an interface that defines calls used for querying identity and state of the driver
 type Identity interface {
 	ProbeController(ctx context.Context) (string, bool, error)
 	ProbeForever(ctx context.Context) (string, error)
 	GetReplicationCapabilities(ctx context.Context) (ReplicationCapabilitySet, []*replication.SupportedActions, error)
+	GetMigrationCapabilities(ctx context.Context) (MigrationCapabilitySet, error)
 }
 
 // New return new Identity interface implementation
@@ -128,4 +133,30 @@ func (r *identity) GetReplicationCapabilities(ctx context.Context) (ReplicationC
 		capabilitySet[t] = true
 	}
 	return capabilitySet, response.Actions, nil
+}
+
+func (r *identity) GetMigrationCapabilities(ctx context.Context) (MigrationCapabilitySet, error) {
+	r.log.V(common.InfoLevel).Info("Requesting migration capabilities")
+	tctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+
+	client := migration.NewMigrationClient(r.conn)
+
+	response, err := client.GetMigrationCapabilities(tctx, &migration.GetMigrationCapabilityRequest{})
+	if err != nil {
+		return nil, err
+	}
+	capabilitySet := MigrationCapabilitySet{}
+	for _, capability := range response.Capabilities {
+		if capability == nil {
+			continue
+		}
+		rpc := capability.GetRpc()
+		if rpc == nil {
+			continue
+		}
+		t := rpc.GetType()
+		capabilitySet[t] = true
+	}
+	return capabilitySet, nil
 }
