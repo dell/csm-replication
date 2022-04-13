@@ -97,7 +97,7 @@ const (
 	// Indicates whether to retain or delete the target RG
 	remoteRGRetentionPolicy = "/remoteRGRetentionPolicy"
 	// Indicates if migration is requested for given volume
-	migrationRequested = "migrationRequested"
+	migrationRequested = "/migrationRequested"
 
 	// FailOver failover replication action name
 	FailOver = "failover"

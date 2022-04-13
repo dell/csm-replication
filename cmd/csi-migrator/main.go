@@ -182,7 +182,7 @@ func main() {
 
 	capabilitySet, err := identityClient.GetMigrationCapabilities(ctx)
 	if err != nil {
-		setupLog.Error(err, "error fetching replication capabilities")
+		setupLog.Error(err, "error fetching migration capabilities")
 		os.Exit(1)
 	}
 	if len(capabilitySet) == 0 {

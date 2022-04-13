@@ -58,6 +58,7 @@ func Connect(address string, log logr.Logger) (*grpc.ClientConn, error) {
 		case <-ticker.C:
 			log.Info("Still connecting to", "address", address)
 		case <-ready:
+			log.Info("Connected to socket")
 			return conn, err
 		}
 	}
