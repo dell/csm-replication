@@ -18,6 +18,10 @@ package csi_migrator
 
 import (
 	"context"
+	"github.com/dell/dell-csi-extensions/migration"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	controller "github.com/dell/csm-replication/controllers"
 	"github.com/dell/csm-replication/pkg/common"
@@ -76,14 +80,73 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		log.Error(err, "Failed to fetch storage class of the PV", "StorageClassName", pv.Spec.StorageClassName)
 		return ctrl.Result{}, err
 	}
+	targetStorageClassName := pv.Annotations[controller.MigrationRequested]
+	targetStorageClassNameSpaced := types.NamespacedName{Name: targetStorageClassName}
+	targetStorageClass := new(storageV1.StorageClass)
+	if err := r.Get(ctx, targetStorageClassNameSpaced, targetStorageClass); err != nil {
+		if errors.IsNotFound(err) {
+			log.Error(err, "The storage class specified for migration doesn't exist", "StorageClassName", targetStorageClassName)
+			return ctrl.Result{}, nil
+		}
+		log.Error(err, "Failed to fetch target storage class", "StorageClassName", targetStorageClassName)
+		return ctrl.Result{}, err
+	}
 
-	//if !shouldContinue(ctx, storageClass, r.DriverName) {
-	//	return ctrl.Result{}, nil
-	//	}
+	// TODO:  check both SC's parameters, detect behavior
+	if storageClass.Name == targetStorageClassName {
+		log.Error(errors.NewBadRequest("Source SC == Target SC"), "Unable to migrate withing single SC")
+		return ctrl.Result{}, nil
+	}
+	//for now lets assume we just want to move from isilons one storage class serving
+	//e.g. /ifs/data/csi to a new isilon's sc serving /ifs/data/csi/new
+	migrateReq := &migration.VolumeMigrateRequest_Type{
+		Type: migration.MigrateTypes_VERSION_UPGRADE,
+	}
 
-	// TODO: create target namespace annotation; check it, detect behavior
+	migrate, err := r.MigrationClient.VolumeMigrate(ctx, pv.Spec.CSI.VolumeHandle, targetStorageClassName, migrateReq, targetStorageClass.Parameters, false)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	pvT := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: pv.Name + "-to-" + targetStorageClassName,
+		},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				CSI: &v1.CSIPersistentVolumeSource{
+					Driver:           targetStorageClass.Provisioner,
+					VolumeHandle:     migrate.GetMigratedVolume().GetVolumeId(),
+					ReadOnly:         migrate.GetMigratedVolume().GetReadOnly(),
+					FSType:           migrate.GetMigratedVolume().GetFsType(),
+					VolumeAttributes: migrate.GetMigratedVolume().GetVolumeContext(),
+				},
+			},
+			StorageClassName: targetStorageClassName,
+			AccessModes:      pv.Spec.AccessModes,
+			MountOptions:     migrate.GetMigratedVolume().GetMountOptions(),
+			Capacity:         v1.ResourceList{v1.ResourceStorage: bytesToQuantity(migrate.GetMigratedVolume().CapacityBytes)}},
+	}
+	err = r.Create(ctx, pvT, &client.CreateOptions{})
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	pv.Spec.PersistentVolumeReclaimPolicy = v1.PersistentVolumeReclaimRetain
+	_, ok := pv.Annotations[controller.MigrationRequested];
+	if ok {
+		delete(pv.Annotations, controller.MigrationRequested);
+	}
+	err = r.Update(ctx, pv, &client.UpdateOptions{})
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
+	r.EventRecorder.Eventf(pv, "Normal", "Migrated", "This PV has been successfully migrated to SC %s,"+
+		" consider using new PV %s.", targetStorageClassName, pv.Name+"-to-"+targetStorageClassName)
+	// TODO: DONE: Remove annotation and switch reclaim policy and publish event on previous PV and check POD attachment
+	// TODO: Check that newly created PV is being processed by replicator sidecar
+	// what to do next? create dummy pv? Why do we have volume in response from VolumeMigrate?
 	return ctrl.Result{}, nil
+
 }
 
 func isMigrationRequested() predicate.Predicate {
@@ -92,6 +155,10 @@ func isMigrationRequested() predicate.Predicate {
 		_, ok := a[controller.MigrationRequested]
 		return a != nil && ok
 	})
+}
+func bytesToQuantity(bytes int64) resource.Quantity {
+	quantity := resource.NewQuantity(bytes, resource.BinarySI)
+	return *quantity
 }
 
 // SetupWithManager start using reconciler by creating new controller managed by provided manager

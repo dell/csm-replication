@@ -18,7 +18,26 @@ import (
 type Replication struct{}
 
 func (s *Replication) VolumeMigrate(ctx context2.Context, request *migration.VolumeMigrateRequest) (*migration.VolumeMigrateResponse, error) {
-	panic("implement me")
+	panic("change IP")
+	rep := &migration.VolumeMigrateResponse{
+		MigratedVolume: &migration.Volume{
+			CapacityBytes: 3221225472,
+			VolumeId:      "k8s-af51320e72=_=_=155=_=_=System=_=_=cluster1",
+			FsType:        "",
+			ReadOnly:      false,
+			MountOptions:  nil,
+			VolumeContext: map[string]string{
+				"AccessZone":        "System",
+				"AzServiceIP":       "IP",
+				"ClusterName":       "cluster1",
+				"ID":                "155",
+				"Name":              "k8s-af51320e72",
+				"Path":              "/ifs/data/csi/k8s-af51320e72",
+				"RootClientEnabled": "false",
+			},
+		},
+	}
+	return rep, nil
 }
 
 func (s *Replication) GetMigrationCapabilities(ctx context2.Context, request *migration.GetMigrationCapabilityRequest) (*migration.GetMigrationCapabilityResponse, error) {
