@@ -97,8 +97,7 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		log.Error(errors.NewBadRequest("Source SC == Target SC"), "Unable to migrate withing single SC")
 		return ctrl.Result{}, nil
 	}
-	//for now lets assume we just want to move from isilons one storage class serving
-	//e.g. /ifs/data/csi to a new isilon's sc serving /ifs/data/csi/new
+
 	migrateReq := &migration.VolumeMigrateRequest_Type{
 		Type: migration.MigrateTypes_VERSION_UPGRADE,
 	}
@@ -107,34 +106,48 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	pvT := &v1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: pv.Name + "-to-" + targetStorageClassName,
-		},
-		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeSource: v1.PersistentVolumeSource{
-				CSI: &v1.CSIPersistentVolumeSource{
-					Driver:           targetStorageClass.Provisioner,
-					VolumeHandle:     migrate.GetMigratedVolume().GetVolumeId(),
-					ReadOnly:         migrate.GetMigratedVolume().GetReadOnly(),
-					FSType:           migrate.GetMigratedVolume().GetFsType(),
-					VolumeAttributes: migrate.GetMigratedVolume().GetVolumeContext(),
-				},
-			},
-			StorageClassName: targetStorageClassName,
-			AccessModes:      pv.Spec.AccessModes,
-			MountOptions:     migrate.GetMigratedVolume().GetMountOptions(),
-			Capacity:         v1.ResourceList{v1.ResourceStorage: bytesToQuantity(migrate.GetMigratedVolume().CapacityBytes)}},
-	}
-	err = r.Create(ctx, pvT, &client.CreateOptions{})
-	if err != nil {
+
+	log.V(common.DebugLevel).Info("Checking if a Migrated PV instance already exists")
+
+	gotPv := new(v1.PersistentVolume)
+	if err = r.Get(ctx, client.ObjectKey{
+		Name: pv.Name + "-to-" + targetStorageClassName,
+	}, gotPv); err != nil {
+		log.Error(err, "Failed to check for a pre-existing PV")
 		return ctrl.Result{}, err
 	}
-	pv.Spec.PersistentVolumeReclaimPolicy = v1.PersistentVolumeReclaimRetain
-	_, ok := pv.Annotations[controller.MigrationRequested]
-	if ok {
-		delete(pv.Annotations, controller.MigrationRequested)
+	if _, ok := gotPv.Annotations[controller.CreatedByMigrator]; !ok {
+		pvT := &v1.PersistentVolume{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: pv.Name + "-to-" + targetStorageClassName,
+				Annotations: map[string]string{
+					controller.CreatedByMigrator: "true",
+				},
+			},
+			Spec: v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					CSI: &v1.CSIPersistentVolumeSource{
+						Driver:           targetStorageClass.Provisioner,
+						VolumeHandle:     migrate.GetMigratedVolume().GetVolumeId(),
+						ReadOnly:         migrate.GetMigratedVolume().GetReadOnly(),
+						FSType:           migrate.GetMigratedVolume().GetFsType(),
+						VolumeAttributes: migrate.GetMigratedVolume().GetVolumeContext(),
+					},
+				},
+				StorageClassName: targetStorageClassName,
+				AccessModes:      pv.Spec.AccessModes,
+				MountOptions:     migrate.GetMigratedVolume().GetMountOptions(),
+				Capacity:         v1.ResourceList{v1.ResourceStorage: bytesToQuantity(migrate.GetMigratedVolume().CapacityBytes)}},
+		}
+		err = r.Create(ctx, pvT, &client.CreateOptions{})
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 	}
+
+	pv.Spec.PersistentVolumeReclaimPolicy = v1.PersistentVolumeReclaimRetain
+
+	delete(pv.Annotations, controller.MigrationRequested)
 	err = r.Update(ctx, pv, &client.UpdateOptions{})
 	if err != nil {
 		return ctrl.Result{}, err
@@ -142,9 +155,7 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	r.EventRecorder.Eventf(pv, "Normal", "Migrated", "This PV has been successfully migrated to SC %s,"+
 		" consider using new PV %s.", targetStorageClassName, pv.Name+"-to-"+targetStorageClassName)
-	// TODO: DONE: Remove annotation and switch reclaim policy and publish event on previous PV and check POD attachment
 	// TODO: Check that newly created PV is being processed by replicator sidecar
-	// what to do next? create dummy pv? Why do we have volume in response from VolumeMigrate?
 	return ctrl.Result{}, nil
 
 }

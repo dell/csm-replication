@@ -1,5 +1,5 @@
 /*
-Copyright © 2021 Dell Inc. or its subsidiaries. All Rights Reserved.
+Copyright © 2022 Dell Inc. or its subsidiaries. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,8 @@ import (
 	"flag"
 	"fmt"
 	"github.com/dell/dell-csi-extensions/migration"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"log"
 
 	"github.com/dell/csm-replication/pkg/config"
@@ -40,14 +42,11 @@ import (
 
 	controller "github.com/dell/csm-replication/controllers/csi-migrator"
 
-	storagev1alpha1 "github.com/dell/csm-replication/api/v1alpha1"
 	"github.com/dell/csm-replication/core"
 	"github.com/dell/csm-replication/pkg/connection"
 	csiidentity "github.com/dell/csm-replication/pkg/csi-clients/identity"
 	csimigration "github.com/dell/csm-replication/pkg/csi-clients/migration"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -56,16 +55,15 @@ import (
 var (
 	scheme                       = runtime.NewScheme()
 	setupLog                     = ctrl.Log.WithName("setup")
-	currentSupportedCapabilities = []migration.MigrateTypes{
-		migration.MigrateTypes_NON_REPL_TO_REPL,
-		migration.MigrateTypes_REPL_TO_NON_REPL,
-		migration.MigrateTypes_VERSION_UPGRADE,
+	currentSupportedCapabilities = map[migration.MigrateTypes]bool{
+		migration.MigrateTypes_NON_REPL_TO_REPL: true,
+		migration.MigrateTypes_REPL_TO_NON_REPL: true,
+		migration.MigrateTypes_VERSION_UPGRADE:  true,
 	}
 )
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(storagev1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -133,7 +131,6 @@ func main() {
 		operationTimeout     time.Duration
 		pgContextKeyPrefix   string
 		domain               string
-		monitoringInterval   time.Duration
 		probeFrequency       time.Duration
 	)
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8000", "The address the metric endpoint binds to.")
@@ -146,8 +143,6 @@ func main() {
 	flag.DurationVar(&retryIntervalStart, "retry-interval-start", time.Second, "Initial retry interval of failed reconcile request. It doubles with each failure, upto retry-interval-max")
 	flag.DurationVar(&retryIntervalMax, "retry-interval-max", 5*time.Minute, "Maximum retry interval of failed reconcile request")
 	flag.DurationVar(&operationTimeout, "timeout", 10*time.Second, "Timeout of waiting for response for CSI Driver")
-	flag.StringVar(&pgContextKeyPrefix, "context-prefix", "", "All the protection-group-attribute-keys with this prefix are added as annotation to the DellCSIReplicationGroup")
-	flag.DurationVar(&monitoringInterval, "monitoring-interval", 60*time.Second, "Time after which monitoring cycle runs")
 	flag.DurationVar(&probeFrequency, "probe-frequency", 5*time.Second, "Time between identity ProbeController calls")
 	flag.Parse()
 	controllers.InitLabelsAndAnnotations(domain)
@@ -189,19 +184,17 @@ func main() {
 		setupLog.Error(fmt.Errorf("driver doesn't support migration"), "migration not supported")
 		os.Exit(1)
 	}
-	for _, capability := range currentSupportedCapabilities {
-		if _, ok := capabilitySet[capability]; !ok {
-			setupLog.Error(fmt.Errorf("driver doesn't support %s capability, which is required", capability),
-				"one of the capabilities not supported")
+	for types, _ := range capabilitySet {
+		if _, ok := currentSupportedCapabilities[types]; !ok {
+			setupLog.Error(err, "unknown capability advertised")
 			os.Exit(1)
 		}
 	}
-
 	leaderElectionID := common.DellCSIMigrator + strings.ReplaceAll(driverName, ".", "-")
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                     scheme,
 		MetricsBindAddress:         metricsAddr,
-		Port:                       9443,
+		Port:                       8443,
 		LeaderElection:             enableLeaderElection,
 		LeaderElectionResourceLock: "leases",
 		LeaderElectionID:           leaderElectionID,
