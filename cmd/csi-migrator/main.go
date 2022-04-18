@@ -184,7 +184,7 @@ func main() {
 		setupLog.Error(fmt.Errorf("driver doesn't support migration"), "migration not supported")
 		os.Exit(1)
 	}
-	for types, _ := range capabilitySet {
+	for types := range capabilitySet {
 		if _, ok := currentSupportedCapabilities[types]; !ok {
 			setupLog.Error(err, "unknown capability advertised")
 			os.Exit(1)
