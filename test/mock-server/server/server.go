@@ -17,6 +17,7 @@ import (
 // Replication mock controller that implements replication related calls
 type Replication struct{}
 
+// VolumeMigrate - mocks Migrate function
 func (s *Replication) VolumeMigrate(ctx context2.Context, request *migration.VolumeMigrateRequest) (*migration.VolumeMigrateResponse, error) {
 	panic("change IP")
 	rep := &migration.VolumeMigrateResponse{
@@ -40,6 +41,7 @@ func (s *Replication) VolumeMigrate(ctx context2.Context, request *migration.Vol
 	return rep, nil
 }
 
+// GetMigrationCapabilities - mocks GetMigrationCapabilities func
 func (s *Replication) GetMigrationCapabilities(ctx context2.Context, request *migration.GetMigrationCapabilityRequest) (*migration.GetMigrationCapabilityResponse, error) {
 	return &migration.GetMigrationCapabilityResponse{
 		Capabilities: []*migration.MigrationCapability{

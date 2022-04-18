@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package csi_migrator
+package csimigrator
 
 import (
 	"context"
@@ -131,9 +131,9 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 	pv.Spec.PersistentVolumeReclaimPolicy = v1.PersistentVolumeReclaimRetain
-	_, ok := pv.Annotations[controller.MigrationRequested];
+	_, ok := pv.Annotations[controller.MigrationRequested]
 	if ok {
-		delete(pv.Annotations, controller.MigrationRequested);
+		delete(pv.Annotations, controller.MigrationRequested)
 	}
 	err = r.Update(ctx, pv, &client.UpdateOptions{})
 	if err != nil {
