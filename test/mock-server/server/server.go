@@ -19,7 +19,6 @@ type Replication struct{}
 
 // VolumeMigrate - mocks Migrate function
 func (s *Replication) VolumeMigrate(ctx context2.Context, request *migration.VolumeMigrateRequest) (*migration.VolumeMigrateResponse, error) {
-	panic("change IP")
 	rep := &migration.VolumeMigrateResponse{
 		MigratedVolume: &migration.Volume{
 			CapacityBytes: 3221225472,
