@@ -96,7 +96,10 @@ const (
 	// RemoteRGRetentionPolicy
 	// Indicates whether to retain or delete the target RG
 	remoteRGRetentionPolicy = "/remoteRGRetentionPolicy"
-
+	// Indicates if migration is requested for given volume. Value is the target SC.
+	migrateTo = "/migrate-to"
+	// Indicates that this PV's been created by migrator sidecar
+	createdByMigrator = "/createdByMigrator"
 	// FailOver failover replication action name
 	FailOver = "failover"
 	// FailBack failback replication action name

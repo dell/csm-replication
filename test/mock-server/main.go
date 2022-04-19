@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/dell/dell-csi-extensions/migration"
 	"log"
 	"net"
 	"os"
@@ -51,6 +52,7 @@ func main() {
 	s := grpc.NewServer()
 
 	replication.RegisterReplicationServer(s, &server.Replication{})
+	migration.RegisterMigrationServer(s, &server.Replication{})
 
 	fmt.Printf("Serving gRPC on %s\n", csiAddress)
 	errChan := make(chan error)

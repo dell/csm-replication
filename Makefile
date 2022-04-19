@@ -23,7 +23,8 @@ test: generate fmt vet static-crd gen-semver
 # Build manager binary for csi-replicator
 sidecar-manager: pre
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/dell-csi-replicator cmd/csi-replicator/main.go
-
+sidecar-migrator: pre
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/dell-csi-migrator cmd/csi-migrator/main.go
 # Build manager binary for replication-controller
 controller-manager: pre
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/dell-replication-controller cmd/replication-controller/main.go
@@ -102,6 +103,12 @@ pre: gen-semver fmt vet tools generate
 # Build the container image
 image-sidecar: gen-semver
 	make -f image.mk sidecar
+
+image-migrator: gen-semver
+	make -f image.mk migrator-sidecar
+
+image-migrator-push: gen-semver
+	make -f image.mk sidecar-migrator-push
 
 # Build the container image
 image-controller: gen-semver

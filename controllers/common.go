@@ -213,6 +213,10 @@ var (
 	RemotePVRetentionPolicy string
 	// RemoteRGRetentionPolicy indicates whether to retain or delete the target RG
 	RemoteRGRetentionPolicy string
+	// MigrationRequested  annotation indicates if migration is requested for given volume
+	MigrationRequested string
+	// CreatedByMigrator indicates that this PV's been created by migrator sidecar
+	CreatedByMigrator string
 )
 
 // InitLabelsAndAnnotations initializes package visible constants by using customizable domain variable
@@ -243,4 +247,6 @@ func InitLabelsAndAnnotations(domain string) {
 	DeletionRequested = domain + deletionRequested
 	RemotePVRetentionPolicy = domain + remotePVRetentionPolicy
 	RemoteRGRetentionPolicy = domain + remoteRGRetentionPolicy
+	MigrationRequested = domain + migrateTo
+	CreatedByMigrator = domain + createdByMigrator
 }

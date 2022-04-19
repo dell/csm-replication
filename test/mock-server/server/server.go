@@ -2,7 +2,9 @@ package server
 
 import (
 	"bytes"
+	context2 "context"
 	"encoding/json"
+	"github.com/dell/dell-csi-extensions/migration"
 
 	"fmt"
 	commonext "github.com/dell/dell-csi-extensions/common"
@@ -14,6 +16,56 @@ import (
 
 // Replication mock controller that implements replication related calls
 type Replication struct{}
+
+// VolumeMigrate - mocks Migrate function
+func (s *Replication) VolumeMigrate(ctx context2.Context, request *migration.VolumeMigrateRequest) (*migration.VolumeMigrateResponse, error) {
+	rep := &migration.VolumeMigrateResponse{
+		MigratedVolume: &migration.Volume{
+			CapacityBytes: 3221225472,
+			VolumeId:      "k8s-af51320e72=_=_=155=_=_=System=_=_=cluster1",
+			FsType:        "",
+			VolumeContext: map[string]string{
+				"AccessZone":        "System",
+				"AzServiceIP":       "IP",
+				"ClusterName":       "cluster1",
+				"ID":                "155",
+				"Name":              "k8s-af51320e72",
+				"Path":              "/ifs/data/csi/k8s-af51320e72",
+				"RootClientEnabled": "false",
+			},
+		},
+	}
+	return rep, nil
+}
+
+// GetMigrationCapabilities - mocks GetMigrationCapabilities func
+func (s *Replication) GetMigrationCapabilities(ctx context2.Context, request *migration.GetMigrationCapabilityRequest) (*migration.GetMigrationCapabilityResponse, error) {
+	return &migration.GetMigrationCapabilityResponse{
+		Capabilities: []*migration.MigrationCapability{
+			{
+				Type: &migration.MigrationCapability_Rpc{
+					Rpc: &migration.MigrationCapability_RPC{
+						Type: migration.MigrateTypes_NON_REPL_TO_REPL,
+					},
+				},
+			},
+			{
+				Type: &migration.MigrationCapability_Rpc{
+					Rpc: &migration.MigrationCapability_RPC{
+						Type: migration.MigrateTypes_REPL_TO_NON_REPL,
+					},
+				},
+			},
+			{
+				Type: &migration.MigrationCapability_Rpc{
+					Rpc: &migration.MigrationCapability_RPC{
+						Type: migration.MigrateTypes_VERSION_UPGRADE,
+					},
+				},
+			},
+		},
+	}, nil
+}
 
 // ProbeController calls stub for ProbeController
 func (s *Replication) ProbeController(ctx context.Context, in *commonext.ProbeControllerRequest) (*commonext.ProbeControllerResponse, error) {

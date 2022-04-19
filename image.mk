@@ -22,14 +22,22 @@ REGISTRY ?= "localhost:5000"
 
 # Default Sidecar image name
 SIDECAR_IMAGE_NAME ?= dell-csi-replicator
+SIDECAR_M_IMAGE_NAME ?= dell-csi-migrator
 # Default Common controller image name
 CONTROLLER_IMAGE_NAME ?= dell-replication-controller
 
+SIDECAR_IMAGE_M_TAG ?= "$(REGISTRY)/$(SIDECAR_M_IMAGE_NAME):$(VERSION)"
 SIDECAR_IMAGE_TAG ?= "$(REGISTRY)/$(SIDECAR_IMAGE_NAME):$(VERSION)"
 CONTROLLER_IMAGE_TAG ?= "$(REGISTRY)/$(CONTROLLER_IMAGE_NAME):$(VERSION)"
 
 sidecar:
 	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_TAG} -f Dockerfiles/Dockerfile --target sidecar ${NOCACHE_ARG}
+
+sidecar-migrator:
+	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_TAG} -f Dockerfiles/Dockerfile --target migrator ${NOCACHE_ARG}
+
+sidecar-migrator-push:
+	$(CONTAINER_TOOL) push ${SIDECAR_IMAGE_M_TAG}
 
 sidecar-push:
 	$(CONTAINER_TOOL) push ${SIDECAR_IMAGE_TAG}
@@ -40,8 +48,8 @@ controller:
 controller-push:
 	$(CONTAINER_TOOL) push ${CONTROLLER_IMAGE_TAG}
 
-images: sidecar controller
-images-push: sidecar-push controller-push
+images: sidecar controller sidecar-migrator
+images-push: sidecar-push controller-push sidecar-migrator-push
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 deploy-controller:
