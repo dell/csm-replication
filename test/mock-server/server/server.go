@@ -24,8 +24,6 @@ func (s *Replication) VolumeMigrate(ctx context2.Context, request *migration.Vol
 			CapacityBytes: 3221225472,
 			VolumeId:      "k8s-af51320e72=_=_=155=_=_=System=_=_=cluster1",
 			FsType:        "",
-			ReadOnly:      false,
-			MountOptions:  nil,
 			VolumeContext: map[string]string{
 				"AccessZone":        "System",
 				"AzServiceIP":       "IP",

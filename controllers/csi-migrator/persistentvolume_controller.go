@@ -1,5 +1,5 @@
 /*
-Copyright © 2021 Dell Inc. or its subsidiaries. All Rights Reserved.
+Copyright © 2022 Dell Inc. or its subsidiaries. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -129,14 +129,14 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 					CSI: &v1.CSIPersistentVolumeSource{
 						Driver:           targetStorageClass.Provisioner,
 						VolumeHandle:     migrate.GetMigratedVolume().GetVolumeId(),
-						ReadOnly:         migrate.GetMigratedVolume().GetReadOnly(),
+						ReadOnly:         pv.Spec.CSI.ReadOnly,
 						FSType:           migrate.GetMigratedVolume().GetFsType(),
 						VolumeAttributes: migrate.GetMigratedVolume().GetVolumeContext(),
 					},
 				},
 				StorageClassName: targetStorageClassName,
 				AccessModes:      pv.Spec.AccessModes,
-				MountOptions:     migrate.GetMigratedVolume().GetMountOptions(),
+				MountOptions:     pv.Spec.MountOptions,
 				Capacity:         v1.ResourceList{v1.ResourceStorage: bytesToQuantity(migrate.GetMigratedVolume().CapacityBytes)}},
 		}
 		err = r.Create(ctx, pvT, &client.CreateOptions{})
