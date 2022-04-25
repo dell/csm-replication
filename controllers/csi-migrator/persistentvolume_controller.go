@@ -98,8 +98,22 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, nil
 	}
 
+	_, isSourceReplicated := storageClass.Parameters[controller.StorageClassReplicationParam]
+	_, isTargetReplicated := targetStorageClass.Parameters[controller.StorageClassReplicationParam]
+	var migrateType migration.MigrateTypes
+	switch true {
+	case (isSourceReplicated && isTargetReplicated) || (!isSourceReplicated && !isTargetReplicated):
+		migrateType = migration.MigrateTypes_VERSION_UPGRADE
+	case !isSourceReplicated && isTargetReplicated:
+		migrateType = migration.MigrateTypes_NON_REPL_TO_REPL
+	case isSourceReplicated && !isTargetReplicated:
+		migrateType = migration.MigrateTypes_REPL_TO_NON_REPL
+	default:
+		log.Info("Strange migration type..")
+
+	}
 	migrateReq := &migration.VolumeMigrateRequest_Type{
-		Type: migration.MigrateTypes_VERSION_UPGRADE,
+		Type: migrateType,
 	}
 
 	migrate, err := r.MigrationClient.VolumeMigrate(ctx, pv.Spec.CSI.VolumeHandle, targetStorageClassName, migrateReq, targetStorageClass.Parameters, false)
