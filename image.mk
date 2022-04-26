@@ -18,7 +18,7 @@ endif
 # Version of the sidecar & common controller. e.g. - v1.0.0.001
 VERSION ?="v$(MAJOR).$(MINOR).$(PATCH).$(BUILD)"
 
-REGISTRY ?= "amaas-eos-mw1.cec.lab.emc.com:5017"
+REGISTRY ?= "localhost:5000"
 
 # Default Sidecar image name
 SIDECAR_IMAGE_NAME ?= dell-csi-replicator
