@@ -18,7 +18,7 @@ endif
 # Version of the sidecar & common controller. e.g. - v1.0.0.001
 VERSION ?="v$(MAJOR).$(MINOR).$(PATCH).$(BUILD)"
 
-REGISTRY ?= "localhost:5000"
+REGISTRY ?= "amaas-eos-mw1.cec.lab.emc.com:5017"
 
 # Default Sidecar image name
 SIDECAR_IMAGE_NAME ?= dell-csi-replicator
@@ -33,7 +33,7 @@ CONTROLLER_IMAGE_TAG ?= "$(REGISTRY)/$(CONTROLLER_IMAGE_NAME):$(VERSION)"
 sidecar:
 	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_TAG} -f Dockerfiles/Dockerfile --target sidecar ${NOCACHE_ARG}
 
-migrator-sidecar:
+sidecar-migrator:
 	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_M_TAG} -f Dockerfiles/Dockerfile --target migrator ${NOCACHE_ARG}
 
 sidecar-migrator-push:
@@ -65,5 +65,5 @@ controller-dev:
 sidecar-dev:
 	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_TAG} -f Dockerfiles/Dockerfile.dev --target sidecar
 
-migrator-sidecar-dev:
+sidecar-migrator-dev:
 	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_M_TAG} -f Dockerfiles/Dockerfile.dev --target sidecar
