@@ -132,6 +132,9 @@ image-sidecar-dev: sidecar-manager
 image-controller-dev:	controller-manager
 	make -f image.mk controller-dev
 
+image-migrator-dev: gen-semver
+	make -f image.mk migrator-sidecar-dev
+
 #To start mock-grpc server
 start-server-win:
 	go run test/mock-server/main.go --csi-address localhost:4772 --stubs test/mock-server/stubs
