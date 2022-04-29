@@ -93,6 +93,7 @@ func main() {
 	repctl.AddCommand(cmd.GetReprotectCommand())
 	repctl.AddCommand(cmd.GetSwapCommand())
 	repctl.AddCommand(cmd.GetExecCommand())
+	repctl.AddCommand(cmd.GetEditCommand())
 
 	err := repctl.Execute()
 	if err != nil {
