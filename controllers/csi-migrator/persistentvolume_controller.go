@@ -126,10 +126,11 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	gotPv := new(v1.PersistentVolume)
 	if err = r.Get(ctx, client.ObjectKey{
 		Name: pv.Name + "-to-" + targetStorageClassName,
-	}, gotPv); err != nil {
+	}, gotPv); err != nil && !errors.IsNotFound(err) {
 		log.Error(err, "Failed to check for a pre-existing PV")
 		return ctrl.Result{}, err
 	}
+	log.V(common.InfoLevel).Info("checked for already created PV. Result: ", err)
 	if _, ok := gotPv.Annotations[controller.CreatedByMigrator]; !ok {
 		pvT := &v1.PersistentVolume{
 			ObjectMeta: metav1.ObjectMeta{
@@ -153,23 +154,25 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				MountOptions:     pv.Spec.MountOptions,
 				Capacity:         v1.ResourceList{v1.ResourceStorage: bytesToQuantity(migrate.GetMigratedVolume().CapacityBytes)}},
 		}
+		log.V(common.InfoLevel).Info("trying to create migrated PV")
 		err = r.Create(ctx, pvT, &client.CreateOptions{})
 		if err != nil {
+			log.V(common.ErrorLevel).Error(err, "migrated PV creation failed")
 			return ctrl.Result{}, err
 		}
 	}
 
 	pv.Spec.PersistentVolumeReclaimPolicy = v1.PersistentVolumeReclaimRetain
-
+	log.V(common.InfoLevel).Info("removing annotation..")
 	delete(pv.Annotations, controller.MigrationRequested)
 	err = r.Update(ctx, pv, &client.UpdateOptions{})
 	if err != nil {
+		log.V(common.ErrorLevel).Error(err, "failed to update the PV")
 		return ctrl.Result{}, err
 	}
-
+	log.V(common.InfoLevel).Info("Successfully created PV, publishing event..")
 	r.EventRecorder.Eventf(pv, "Normal", "Migrated", "This PV has been successfully migrated to SC %s,"+
 		" consider using new PV %s.", targetStorageClassName, pv.Name+"-to-"+targetStorageClassName)
-	// TODO: Check that newly created PV is being processed by replicator sidecar
 	return ctrl.Result{}, nil
 
 }
