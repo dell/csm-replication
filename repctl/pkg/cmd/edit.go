@@ -26,6 +26,7 @@ type DecodedSecret struct {
 	Type              v1.SecretType     `json:"type,omitempty" protobuf:"bytes,3,opt,name=type,casttype=SecretType"`
 }
 
+// ToSecret converts Decoded Secret to Secret
 func (s *DecodedSecret) ToSecret() *v1.Secret {
 	m := make(map[string][]byte)
 	for k, v := range s.Data {
@@ -42,10 +43,12 @@ func (s *DecodedSecret) ToSecret() *v1.Secret {
 	}
 }
 
+// Secret type exported for convenience and readability
 type Secret struct {
 	*v1.Secret
 }
 
+// ToDecodedSecret converts Secret to Decoded Secret
 func (s *Secret) ToDecodedSecret() *DecodedSecret {
 	m := make(map[string]string)
 	for k, v := range s.Data {
@@ -70,6 +73,7 @@ func (s *Secret) ToDecodedSecret() *DecodedSecret {
 	}
 }
 
+// GetEditCommand returns 'edit' cobra command
 func GetEditCommand() *cobra.Command {
 	editCmd := &cobra.Command{
 		Use:   "edit",
@@ -92,11 +96,13 @@ func editSecretCommand() *cobra.Command {
 		Use:     "secret",
 		Aliases: []string{"sercrets"},
 		Short:   "edit secret by repctl",
-		Example: `./repctl edit secret --name <name secret> --namespace <namespace>`,
+		Example: `
+./repctl edit secret <secret name> --namespace <namespace>
+./repctl edit secret <secret name> --namespace <namespace> --clusters <cluster name>`,
 		Run: func(cmd *cobra.Command, args []string) {
 			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
 			if err != nil {
-				log.Fatalf("ed:it secret: error getting clusters folder path: %s", err.Error())
+				log.Fatalf("edit secret: error getting clusters folder path: %s", err.Error())
 			}
 
 			clusterIDs := viper.GetStringSlice(config.Clusters)
@@ -134,7 +140,12 @@ func editSecretCommand() *cobra.Command {
 				log.Fatalf("edit secret: error in closing temp file with secret data: %s", err.Error())
 			}
 
-			command := exec.Command("vim", tmpFile.Name())
+			editor, existence := os.LookupEnv("EDITOR")
+			if !existence {
+				os.Setenv("EDITOR", "vim")
+				editor = os.Getenv("EDITOR")
+			}
+			command := exec.Command(editor, tmpFile.Name())
 			command.Stdout = os.Stdout
 			command.Stderr = os.Stderr
 			command.Stdin = os.Stdin

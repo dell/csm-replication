@@ -15,6 +15,8 @@ import (
 
 	storagev1 "k8s.io/api/storage/v1"
 
+	testing "testing"
+
 	types "github.com/dell/repctl/pkg/types"
 
 	v1 "k8s.io/api/core/v1"
@@ -311,6 +313,29 @@ func (_m *ClusterInterface) GetReplicationGroups(_a0 context.Context, _a1 string
 	return r0, r1
 }
 
+// GetSecret provides a mock function with given fields: _a0, _a1, _a2
+func (_m *ClusterInterface) GetSecret(_a0 context.Context, _a1 string, _a2 string) (*v1.Secret, error) {
+	ret := _m.Called(_a0, _a1, _a2)
+
+	var r0 *v1.Secret
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *v1.Secret); ok {
+		r0 = rf(_a0, _a1, _a2)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.Secret)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(_a0, _a1, _a2)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ListPersistentVolumeClaims provides a mock function with given fields: _a0, _a1
 func (_m *ClusterInterface) ListPersistentVolumeClaims(_a0 context.Context, _a1 ...client.ListOption) (*v1.PersistentVolumeClaimList, error) {
 	_va := make([]interface{}, len(_a1))
@@ -462,4 +487,28 @@ func (_m *ClusterInterface) UpdateReplicationGroup(_a0 context.Context, _a1 *v1a
 	}
 
 	return r0
+}
+
+// UpdateSecret provides a mock function with given fields: ctx, secret
+func (_m *ClusterInterface) UpdateSecret(ctx context.Context, secret *v1.Secret) error {
+	ret := _m.Called(ctx, secret)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Secret) error); ok {
+		r0 = rf(ctx, secret)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// NewClusterInterface creates a new instance of ClusterInterface. It also registers the testing.TB interface on the mock and a cleanup function to assert the mocks expectations.
+func NewClusterInterface(t testing.TB) *ClusterInterface {
+	mock := &ClusterInterface{}
+	mock.Mock.Test(t)
+
+	t.Cleanup(func() { mock.AssertExpectations(t) })
+
+	return mock
 }
