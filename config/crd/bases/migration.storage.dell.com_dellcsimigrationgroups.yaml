@@ -1,0 +1,78 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.4.1
+  creationTimestamp: null
+  name: dellcsimigrationgroups.migration.storage.dell.com
+spec:
+  group: migration.storage.dell.com
+  names:
+    kind: DellCSIMigrationGroup
+    listKind: DellCSIMigrationGroupList
+    plural: dellcsiMigrationgroups
+    shortNames:
+    - mg
+    singular: dellcsimigrationgroup
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    - description: State of the CR
+      jsonPath: .spec.state
+      name: State
+      type: string
+    - description: Migration Group ID
+      jsonPath: .spec.migrationGroupId
+      name: MG ID
+      type: string
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: DellCSIMigrationGroup is the Schema for the dellcsimigrationgroups
+          API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: DellCSIMigrationGroupSpec defines the desired state of
+              DellCSIMigrationGroup
+            properties:
+              driverName:
+                type: string
+              sourceArrayId:
+                type: string
+              targetArrayId:
+                type: string
+              action:
+                type: string
+              state:
+                type: string
+              migrationGroupID:
+                type: string
+            required:
+            - action
+            - driverName
+            - sourceArrayID
+            - targetArrayId
+            - state
+            - migrationGroupID
+            type: object
+        type: object
+    served: true
+    storage: true
+

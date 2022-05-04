@@ -217,6 +217,8 @@ var (
 	MigrationRequested string
 	// CreatedByMigrator indicates that this PV's been created by migrator sidecar
 	CreatedByMigrator string
+	// MigrationGroup contains the name of the local DellCSIMigrationGroup object
+	MigrationGroup string
 )
 
 // InitLabelsAndAnnotations initializes package visible constants by using customizable domain variable
@@ -249,4 +251,5 @@ func InitLabelsAndAnnotations(domain string) {
 	RemoteRGRetentionPolicy = domain + remoteRGRetentionPolicy
 	MigrationRequested = domain + migrateTo
 	CreatedByMigrator = domain + createdByMigrator
+	MigrationGroup = domain + migrationGroup
 }

@@ -122,16 +122,17 @@ func createMigratorManager(ctx context.Context, mgr ctrl.Manager) (*MigratorMana
 
 func main() {
 	var (
-		metricsAddr          string
-		enableLeaderElection bool
-		csiAddress           string
-		workerThreads        int
-		retryIntervalStart   time.Duration
-		retryIntervalMax     time.Duration
-		operationTimeout     time.Duration
-		pgContextKeyPrefix   string
-		domain               string
-		probeFrequency       time.Duration
+		metricsAddr                string
+		enableLeaderElection       bool
+		csiAddress                 string
+		workerThreads              int
+		retryIntervalStart         time.Duration
+		retryIntervalMax           time.Duration
+		operationTimeout           time.Duration
+		pgContextKeyPrefix         string
+		domain                     string
+		probeFrequency             time.Duration
+		maxRetryDurationForActions time.Duration
 	)
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8000", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-election", false,
@@ -175,7 +176,7 @@ func main() {
 	}
 	setupLog.V(1).Info("CSI driver name", "driverName", driverName)
 
-	capabilitySet, err := identityClient.GetMigrationCapabilities(ctx)
+	capabilitySet, supportedActions, err := identityClient.GetMigrationCapabilities(ctx)
 	if err != nil {
 		setupLog.Error(err, "error fetching migration capabilities")
 		os.Exit(1)
@@ -234,6 +235,31 @@ func main() {
 		Domain:            domain,
 	}).SetupWithManager(ctx, mgr, expRateLimiter, workerThreads); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PersistentVolume")
+		os.Exit(1)
+	}
+	/*
+	   type MigrationGroupReconciler struct {
+	   	client.Client
+	   	Log                        logr.Logger
+	   	Scheme                     *runtime.Scheme
+	   	EventRecorder              record.EventRecorder
+	   	DriverName                 string
+	   	MigrationClient            csimigration.Migration
+	   	SupportedActions           []*csiext.MGSupportedActions
+	   	MaxRetryDurationForActions time.Duration
+	   }
+	*/
+	if err = (&controller.MigrationGroupReconciler{
+		Client:                     mgr.GetClient(),
+		Log:                        ctrl.Log.WithName("controllers").WithName("DellCSIReplicationGroup"),
+		Scheme:                     mgr.GetScheme(),
+		EventRecorder:              mgr.GetEventRecorderFor(common.DellCSIReplicator),
+		DriverName:                 driverName,
+		MigrationClient:            csimirgation.New(csiConn, ctrl.Log.WithName("migration-client"), operationTimeout),
+		SupportedActions:           supportedActions,
+		MaxRetryDurationForActions: maxRetryDurationForActions,
+	}).SetupWithManager(mgr, expRateLimiter, workerThreads); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "DellCSIMigrationGroup")
 		os.Exit(1)
 	}
 
