@@ -142,8 +142,7 @@ func editSecretCommand() *cobra.Command {
 
 			editor, existence := os.LookupEnv("EDITOR")
 			if !existence {
-				os.Setenv("EDITOR", "vim")
-				editor = os.Getenv("EDITOR")
+				editor = "vi"
 			}
 			command := exec.Command(editor, tmpFile.Name())
 			command.Stdout = os.Stdout
