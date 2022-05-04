@@ -105,7 +105,7 @@ image-sidecar: gen-semver
 	make -f image.mk sidecar
 
 image-migrator: gen-semver
-	make -f image.mk migrator-sidecar
+	make -f image.mk sidecar-migrator
 
 image-migrator-push: gen-semver
 	make -f image.mk sidecar-migrator-push
@@ -131,6 +131,9 @@ image-sidecar-dev: sidecar-manager
 
 image-controller-dev:	controller-manager
 	make -f image.mk controller-dev
+
+image-migrator-dev: gen-semver
+	make -f image.mk sidecar-migrator-dev
 
 #To start mock-grpc server
 start-server-win:

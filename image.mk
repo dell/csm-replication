@@ -34,7 +34,7 @@ sidecar:
 	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_TAG} -f Dockerfiles/Dockerfile --target sidecar ${NOCACHE_ARG}
 
 sidecar-migrator:
-	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_TAG} -f Dockerfiles/Dockerfile --target migrator ${NOCACHE_ARG}
+	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_M_TAG} -f Dockerfiles/Dockerfile --target migrator ${NOCACHE_ARG}
 
 sidecar-migrator-push:
 	$(CONTAINER_TOOL) push ${SIDECAR_IMAGE_M_TAG}
@@ -64,3 +64,6 @@ controller-dev:
 # Build sidecar image in dev environment with Golang
 sidecar-dev:
 	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_TAG} -f Dockerfiles/Dockerfile.dev --target sidecar
+
+sidecar-migrator-dev:
+	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_M_TAG} -f Dockerfiles/Dockerfile.dev --target sidecar
