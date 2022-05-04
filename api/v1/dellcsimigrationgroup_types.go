@@ -12,7 +12,7 @@
  limitations under the License.
 */
 
-package v1alpha1
+package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,13 +34,12 @@ type DellCSIMigrationGroupStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Cluster,shortName=mg
-// +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`,description="State of the CR"
 // +kubebuilder:printcolumn:name="Source ID",type=string,JSONPath=`.spec.sourceID`,description="Source ID"
 // +kubebuilder:printcolumn:name="Target ID",type=string,JSONPath=`.spec.targetID`,description="Target ID"
 
-// DellCSIMigrationGroup is the Schema for the dellcsimigrationgroup API
+// DellCSIMigrationGroup defines the Schema for the dellcsimigrationgroups API
 type DellCSIMigrationGroup struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

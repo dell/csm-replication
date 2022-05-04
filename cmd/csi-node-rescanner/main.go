@@ -1,17 +1,18 @@
 /*
- Copyright © 2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+Copyright © 2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-      http://www.apache.org/licenses/LICENSE-2.0
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+	http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
-
 package main
 
 import (
@@ -19,37 +20,30 @@ import (
 	"flag"
 	"fmt"
 	"log"
-
-	"github.com/dell/dell-csi-extensions/migration"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-
-	"github.com/bombsimon/logrusr/v3"
-	"github.com/dell/csm-replication/pkg/config"
-	"github.com/fsnotify/fsnotify"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
-
 	"os"
 	"strings"
 	"time"
 
+	"github.com/bombsimon/logrusr/v3"
 	storagev1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
-	"github.com/dell/csm-replication/pkg/common"
-
-	"golang.org/x/sync/singleflight"
-
-	controller "github.com/dell/csm-replication/controllers/csi-migrator"
-
+	controller "github.com/dell/csm-replication/controllers/csi-node-rescanner"
 	"github.com/dell/csm-replication/core"
-	"github.com/dell/csm-replication/pkg/connection"
+	"github.com/dell/csm-replication/pkg/common"
+	"github.com/dell/csm-replication/pkg/config"
 	csiidentity "github.com/dell/csm-replication/pkg/csi-clients/identity"
-	csimigration "github.com/dell/csm-replication/pkg/csi-clients/migration"
+	"github.com/dell/dell-csi-extensions/migration"
+	"github.com/fsnotify/fsnotify"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/runtime"
-	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
+
+	"github.com/dell/csm-replication/pkg/connection"
+	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 )
 
 var (
@@ -68,14 +62,15 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
-// MigratorManager - Represents the controller manager and its configuration
-type MigratorManager struct {
-	Opts    config.ControllerManagerOpts
-	Manager ctrl.Manager
-	config  *config.Config
+// NodeRescanner - Represents the controller manager and its configuration
+type NodeRescanner struct {
+	Opts     config.ControllerManagerOpts
+	Manager  ctrl.Manager
+	config   *config.Config
+	NodeName string
 }
 
-func (mgr *MigratorManager) processConfigMapChanges(loggerConfig *logrus.Logger) {
+func (mgr *NodeRescanner) processConfigMapChanges(loggerConfig *logrus.Logger) {
 	log.Println("Received a config change event")
 	err := mgr.config.UpdateConfigMap(context.Background(), nil, mgr.Opts, nil, mgr.Manager.GetLogger())
 	if err != nil {
@@ -93,7 +88,7 @@ func (mgr *MigratorManager) processConfigMapChanges(loggerConfig *logrus.Logger)
 
 }
 
-func (mgr *MigratorManager) setupConfigMapWatcher(loggerConfig *logrus.Logger) {
+func (mgr *NodeRescanner) setupConfigMapWatcher(loggerConfig *logrus.Logger) {
 	log.Println("Started ConfigMap Watcher")
 	viper.WatchConfig()
 	viper.OnConfigChange(func(e fsnotify.Event) {
@@ -101,19 +96,23 @@ func (mgr *MigratorManager) setupConfigMapWatcher(loggerConfig *logrus.Logger) {
 	})
 }
 
-func createMigratorManager(ctx context.Context, mgr ctrl.Manager) (*MigratorManager, error) {
+func createNodeReScannerManager(ctx context.Context, mgr ctrl.Manager) (*NodeRescanner, error) {
 	opts := config.GetControllerManagerOpts()
 	opts.Mode = "sidecar"
-	mgrLogger := mgr.GetLogger()
-	repConfig, err := config.GetConfig(ctx, nil, opts, nil, mgrLogger)
-	if err != nil {
-		return nil, err
+	//mgrLogger := mgr.GetLogger()
+	//repConfig, err := config.GetConfig(ctx, nil, opts, nil, mgrLogger)
+	//if err != nil {
+	//	return nil, err
+	//}
+	nodeName, found := os.LookupEnv(common.EnvNodeName)
+	if !found {
+		logrus.Warning("Node name not found")
+		nodeName = ""
 	}
-
-	controllerManager := MigratorManager{
-		Opts:    opts,
-		Manager: mgr,
-		config:  repConfig,
+	controllerManager := NodeRescanner{
+		Opts:     opts,
+		Manager:  mgr,
+		NodeName: nodeName,
 	}
 	return &controllerManager, nil
 }
@@ -130,7 +129,6 @@ func main() {
 		retryIntervalStart         time.Duration
 		retryIntervalMax           time.Duration
 		operationTimeout           time.Duration
-		pgContextKeyPrefix         string
 		domain                     string
 		replicationDomain          string
 		probeFrequency             time.Duration
@@ -159,7 +157,7 @@ func main() {
 	ctrl.SetLogger(logger)
 
 	setupLog.V(1).Info("Prefix", "Domain", domain)
-	setupLog.V(1).Info(common.DellCSIMigrator, "Version", core.SemVer, "Commit ID", core.CommitSha32, "Commit SHA", core.CommitTime.Format(time.RFC1123))
+	setupLog.V(1).Info(common.DellCSINodeReScanner, "Version", core.SemVer, "Commit ID", core.CommitSha32, "Commit SHA", core.CommitTime.Format(time.RFC1123))
 
 	ctx := context.Background()
 
@@ -194,7 +192,7 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	leaderElectionID := common.DellCSIMigrator + strings.ReplaceAll(driverName, ".", "-")
+	leaderElectionID := common.DellCSINodeReScanner + strings.ReplaceAll(driverName, ".", "-")
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                     scheme,
 		MetricsBindAddress:         metricsAddr,
@@ -208,16 +206,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	MigratorMgr, err := createMigratorManager(ctx, mgr)
+	rescanMgr, err := createNodeReScannerManager(ctx, mgr)
 	if err != nil {
-		setupLog.Error(err, "failed to configure the migrator manager")
+		setupLog.Error(err, "failed to configure the node re-rescanner manager")
 		os.Exit(1)
 	}
+	log.Printf("Rescan manager configured: (+%v)", rescanMgr)
 	// Start the watch on configmap
-	MigratorMgr.setupConfigMapWatcher(logrusLog)
+	//rescanMgr.setupConfigMapWatcher(logrusLog)
 
 	// Process the config. Get initial log level
-	level, err := common.ParseLevel(MigratorMgr.config.LogLevel)
+	level, err := common.ParseLevel("debug")
 	if err != nil {
 		log.Println("Unable to parse ", err)
 	}
@@ -226,32 +225,16 @@ func main() {
 
 	expRateLimiter := workqueue.NewItemExponentialFailureRateLimiter(retryIntervalStart, retryIntervalMax)
 
-	if err = (&controller.PersistentVolumeReconciler{
-		Client:            mgr.GetClient(),
-		Log:               ctrl.Log.WithName("controllers").WithName("PersistentVolume"),
-		Scheme:            mgr.GetScheme(),
-		EventRecorder:     mgr.GetEventRecorderFor(common.DellCSIReplicator),
-		DriverName:        driverName,
-		MigrationClient:   csimigration.New(csiConn, ctrl.Log.WithName("migration-client"), operationTimeout),
-		ContextPrefix:     pgContextKeyPrefix,
-		SingleFlightGroup: singleflight.Group{},
-		Domain:            domain,
-		ReplDomain:        replicationDomain,
-	}).SetupWithManager(ctx, mgr, expRateLimiter, workerThreads); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "PersistentVolume")
-		os.Exit(1)
-	}
-
-	if err = (&controller.MigrationGroupReconciler{
+	if err = (&controller.NodeRescanReconciler{
 		Client:                     mgr.GetClient(),
-		Log:                        ctrl.Log.WithName("controllers").WithName("DellCSIMigrationGroup"),
+		Log:                        ctrl.Log.WithName("controllers").WithName("DellCSINodeReScanner"),
 		Scheme:                     mgr.GetScheme(),
-		EventRecorder:              mgr.GetEventRecorderFor(common.DellCSIMigrator),
+		EventRecorder:              mgr.GetEventRecorderFor(common.DellCSINodeReScanner),
 		DriverName:                 driverName,
-		MigrationClient:            csimigration.New(csiConn, ctrl.Log.WithName("migration-client"), operationTimeout),
+		NodeName:                   rescanMgr.NodeName,
 		MaxRetryDurationForActions: maxRetryDurationForActions,
 	}).SetupWithManager(mgr, expRateLimiter, workerThreads); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "DellCSIMigrationGroup")
+		setupLog.Error(err, "unable to create controller", "controller", "DellCSINodeReScanner")
 		os.Exit(1)
 	}
 

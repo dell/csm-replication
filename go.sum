@@ -154,6 +154,12 @@ github.com/dell/dell-csi-extensions/migration v1.0.2-0.20230112204455-8f3445ef54
 github.com/dell/dell-csi-extensions/migration v1.0.2-0.20230112204455-8f3445ef5483/go.mod h1:fJ96sw0lLILdszZJungcxKAHedAjsdbluyLTXOsnGV8=
 github.com/dell/dell-csi-extensions/replication v1.2.2-0.20230112204455-8f3445ef5483 h1:sVMPxFaRBk80s+gwPAtzw1mtcjefDdvv1drkoyK1/kg=
 github.com/dell/dell-csi-extensions/replication v1.2.2-0.20230112204455-8f3445ef5483/go.mod h1:FU2kzS8/29GlK9iCdS+E70cyeWun63eNP44aHwg7jW8=
+github.com/dell/gobrick v1.4.0 h1:YABxiIsHLytMu92tuNqE9apPDBXD8v/RKu5go7gV5XA=
+github.com/dell/gobrick v1.4.0/go.mod h1:26AsAebGUd/FuMiQzNM6+8P0IBteipNrAaSYEMVazP8=
+github.com/dell/goiscsi v1.4.0 h1:TpMo0BLQpHsuUaePHBwZ0yjcq8gXhOOuYeUPzqmwjKk=
+github.com/dell/goiscsi v1.4.0/go.mod h1:oDkUXDPAYqSOc0t6PpU+BpOqF45mzv+9eLFRkAoQYKs=
+github.com/dell/gonvme v1.1.0 h1:5O554dUsrPEXNEy/mc+977eD1FE0geLYlk5HwuXnAaE=
+github.com/dell/gonvme v1.1.0/go.mod h1:qLlZNduxrt1hLR/JaU6OXe8+QkU6dtwa5wHM8EWQ58Y=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/dgryski/go-sip13 v0.0.0-20181026042036-e10d5fee7954/go.mod h1:vAd38F8PWV+bWy6jNmig1y/TA+kYO4g3RSRF0IAv0no=
 github.com/docker/go-units v0.3.3/go.mod h1:fgPhTUdO+D/Jk86RDLlptpiXQzgHJF7gydDDbaIK4Dk=
@@ -325,6 +331,7 @@ github.com/golang/mock v1.4.0/go.mod h1:UOMv5ysSaYNkG+OFQykRIcU/QvvxJf3p21QfJ2Bt
 github.com/golang/mock v1.4.1/go.mod h1:UOMv5ysSaYNkG+OFQykRIcU/QvvxJf3p21QfJ2Bt3cw=
 github.com/golang/mock v1.4.3/go.mod h1:UOMv5ysSaYNkG+OFQykRIcU/QvvxJf3p21QfJ2Bt3cw=
 github.com/golang/mock v1.4.4/go.mod h1:l3mdAwkq5BuhzHwde/uurv3sEJeZMXNpwsxVWU71h+4=
+github.com/golang/mock v1.5.0 h1:jlYHihg//f7RRwuPfptm04yp4s7O6Kw8EZiVYIGcH0g=
 github.com/golang/mock v1.5.0/go.mod h1:CWnOUgYIOo4TcNZ0wHX3YZCqsaM1I1Jvs6v3mP3KVu8=
 github.com/golang/protobuf v1.2.0/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
 github.com/golang/protobuf v1.3.1/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=

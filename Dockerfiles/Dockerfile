@@ -19,10 +19,13 @@ COPY test/e2e-framework test/e2e-framework/
 COPY cmd/replication-controller/main.go controller.go
 COPY cmd/csi-replicator/main.go sidecar.go
 COPY cmd/csi-migrator/main.go migrator.go
+COPY cmd/csi-node-rescanner/main.go node-rescanner.go
+
 # Build binaries
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o dell-replication-controller controller.go
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o dell-csi-replicator sidecar.go
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o dell-csi-migrator migrator.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o dell-csi-node-rescanner node-rescanner.go
 
 # Base image for controller and sidecar
 FROM scratch AS container-base
@@ -44,3 +47,9 @@ FROM container-base AS migrator
 WORKDIR /
 COPY --from=builder /workspace/dell-csi-replicator/dell-csi-migrator ./
 ENTRYPOINT ["/dell-csi-migrator"]
+
+# Sidecar node-rescanner
+FROM container-base AS node-rescanner
+WORKDIR /
+COPY --from=builder /workspace/dell-csi-replicator/dell-csi-node-rescanner ./
+ENTRYPOINT ["/dell-csi-node-rescanner"]

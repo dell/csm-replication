@@ -49,6 +49,17 @@ func AddLabel(obj metav1.Object, labelKey, labelValue string) {
 	obj.SetLabels(labels)
 }
 
+// DeleteLabel deletes labels from k8s resources
+func DeleteLabel(obj metav1.Object, labelKey string) bool {
+	labels := obj.GetLabels()
+	if _, ok := labels[labelKey]; !ok {
+		return true
+	}
+	delete(labels, labelKey)
+	obj.SetLabels(labels)
+	return true
+}
+
 // AddFinalizerIfNotExist adds a finalizer to k8s resource, if it doesn't already exist and
 // returns true else returns false
 func AddFinalizerIfNotExist(obj metav1.Object, name string) bool {
@@ -218,12 +229,18 @@ var (
 	MigrationNamespace string
 	// CreatedByMigrator indicates that this PV's been created by migrator sidecar
 	CreatedByMigrator string
+
 	// SnapshotClass name of the desired snapshot class.
 	SnapshotClass string
 	// SnapshotNamespace name of the target namespace to create snapshots in.
 	SnapshotNamespace string
 	// ActionProcessedTime indicates when the last action was proccessed by the controller (if needed).
 	ActionProcessedTime string
+
+	// MigrationGroup contains the name of the local DellCSIMigrationGroup object
+	MigrationGroup string
+	// MigrationFinalizer — finalizer used by the migration sidecar for pre delete hook
+	MigrationFinalizer string
 )
 
 // InitLabelsAndAnnotations initializes package visible constants by using customizable domain variable
@@ -260,4 +277,6 @@ func InitLabelsAndAnnotations(domain string) {
 	SnapshotClass = domain + snapshotClass
 	SnapshotNamespace = domain + snapshotNamespace
 	ActionProcessedTime = domain + actionProcessedTime
+	MigrationGroup = domain + migrationGroup
+	MigrationFinalizer = domain + migrationFinalizer
 }

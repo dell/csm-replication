@@ -43,6 +43,9 @@ const (
 	// DellCSIMigrator - Name of the sidecar controller manager
 	DellCSIMigrator = "dell-csi-migrator"
 	Monitoring      = "rg-monitoring"
+	// DellCSINodeReScanner - Name of the node sidecar manager
+	DellCSINodeReScanner = "dell-csi-node-rescanner"
+	EnvNodeName          = "X_CSI_NODE_NAME"
 )
 
 const (
