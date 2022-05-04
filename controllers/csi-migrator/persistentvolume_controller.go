@@ -19,7 +19,7 @@ package csimigrator
 import (
 	"context"
 
-	"github.com/dell/dell-csi-extensions/migration"
+	migration "github.com/dell/dell-csi-extensions/migration"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"

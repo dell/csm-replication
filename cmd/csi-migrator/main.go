@@ -20,10 +20,11 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log"
+
 	"github.com/dell/dell-csi-extensions/migration"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"log"
 
 	"github.com/bombsimon/logrusr/v3"
 	"github.com/dell/csm-replication/pkg/config"
@@ -35,6 +36,7 @@ import (
 	"strings"
 	"time"
 
+	storagev1alpha1 "github.com/dell/csm-replication/api/v1alpha1"
 	"github.com/dell/csm-replication/controllers"
 	"github.com/dell/csm-replication/pkg/common"
 
@@ -64,6 +66,7 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(storagev1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -122,17 +125,18 @@ func createMigratorManager(ctx context.Context, mgr ctrl.Manager) (*MigratorMana
 
 func main() {
 	var (
-		metricsAddr          string
-		enableLeaderElection bool
-		csiAddress           string
-		workerThreads        int
-		retryIntervalStart   time.Duration
-		retryIntervalMax     time.Duration
-		operationTimeout     time.Duration
-		pgContextKeyPrefix   string
-		domain               string
-		replicationDomain    string
-		probeFrequency       time.Duration
+		metricsAddr                string
+		enableLeaderElection       bool
+		csiAddress                 string
+		workerThreads              int
+		retryIntervalStart         time.Duration
+		retryIntervalMax           time.Duration
+		operationTimeout           time.Duration
+		pgContextKeyPrefix         string
+		domain                     string
+		replicationDomain          string
+		probeFrequency             time.Duration
+		maxRetryDurationForActions time.Duration
 	)
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8001", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-election", false,
@@ -237,6 +241,19 @@ func main() {
 		ReplDomain:        replicationDomain,
 	}).SetupWithManager(ctx, mgr, expRateLimiter, workerThreads); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PersistentVolume")
+		os.Exit(1)
+	}
+
+	if err = (&controller.MigrationGroupReconciler{
+		Client:                     mgr.GetClient(),
+		Log:                        ctrl.Log.WithName("controllers").WithName("DellCSIMigrationGroupTest"),
+		Scheme:                     mgr.GetScheme(),
+		EventRecorder:              mgr.GetEventRecorderFor(common.DellCSIMigrator),
+		DriverName:                 driverName,
+		MigrationClient:            csimigration.New(csiConn, ctrl.Log.WithName("migration-client"), operationTimeout),
+		MaxRetryDurationForActions: maxRetryDurationForActions,
+	}).SetupWithManager(mgr, expRateLimiter, workerThreads); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "DellCSIMigrationGroup")
 		os.Exit(1)
 	}
 

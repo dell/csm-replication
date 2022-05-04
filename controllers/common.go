@@ -219,6 +219,10 @@ var (
 	MigrationNamespace string
 	// CreatedByMigrator indicates that this PV's been created by migrator sidecar
 	CreatedByMigrator string
+	// MigrationGroup contains the name of the local DellCSIMigrationGroup object
+	MigrationGroup string
+	// MigrationFinalizer — finalizer used by the migration sidecar for pre delete hook
+	MigrationFinalizer string
 )
 
 // InitLabelsAndAnnotations initializes package visible constants by using customizable domain variable
@@ -252,4 +256,6 @@ func InitLabelsAndAnnotations(domain string) {
 	MigrationRequested = domain + migrateTo
 	MigrationNamespace = domain + migrateNS
 	CreatedByMigrator = domain + createdByMigrator
+	MigrationGroup = domain + migrationGroup
+	MigrationFinalizer = domain + migrationFinalizer
 }

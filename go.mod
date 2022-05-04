@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/bombsimon/logrusr/v3 v3.0.0
 	github.com/dell/dell-csi-extensions/common v1.0.1-0.20220526070836-43b4ac597bf3
-	github.com/dell/dell-csi-extensions/migration v1.0.1
+	github.com/dell/dell-csi-extensions/migration v1.0.2-0.20220705095823-4fee73a928d6
 	github.com/dell/dell-csi-extensions/replication v1.2.1
 	github.com/fatih/color v1.13.0
 	github.com/fsnotify/fsnotify v1.5.4

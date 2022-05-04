@@ -116,6 +116,9 @@ type ClusterInterface interface {
 
 	DeleteStsOrphan(ctx context.Context, sts *appsv1.StatefulSet) error
 	CreateStatefulSet(ctx context.Context, sts *appsv1.StatefulSet) error
+
+	GetMigrationGroups(context.Context, string) (*v1alpha1.DellCSIMigrationGroup, error)
+	UpdateMigrationGroup(context.Context, *v1alpha1.DellCSIMigrationGroup) error
 }
 
 // Cluster is implementation of ClusterInterface that represents some cluster
@@ -739,4 +742,19 @@ func (c *Cluster) DeletePersistentVolumeClaim(ctx context.Context, pvc *v1.Persi
 // CreateStatefulSet creates new sts object in cluster
 func (c *Cluster) CreateStatefulSet(ctx context.Context, sts *appsv1.StatefulSet) error {
 	return c.GetClient().Create(ctx, sts)
+}
+
+// GetMigrationGroups returns migration group object by querying cluster using migration group name
+func (c *Cluster) GetMigrationGroups(ctx context.Context, mgName string) (*v1alpha1.DellCSIMigrationGroup, error) {
+	found := &v1alpha1.DellCSIMigrationGroup{}
+	err := c.client.Get(ctx, apiTypes.NamespacedName{Name: mgName}, found)
+	if err != nil {
+		return nil, err
+	}
+	return found, err
+}
+
+// UpdateMigrationGroup updates migration group
+func (c *Cluster) UpdateMigrationGroup(ctx context.Context, mg *v1alpha1.DellCSIMigrationGroup) error {
+	return c.client.Update(ctx, mg)
 }

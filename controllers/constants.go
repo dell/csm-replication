@@ -77,6 +77,11 @@ const (
 	// ReplicationGroup
 	// Contains the name of the local DellCSIReplicationGroup object
 	replicationGroup = "/replicationGroupName"
+	// MigrationGroup
+	// Contains the name of the local DellCSIMigrationGroup object
+	migrationGroup = "/migrationGroupName"
+	// migrationFinalizer—finalizer used by the dell-csi-migrator sidecar and utils controller for pre delete hook
+	migrationFinalizer = "/migrationgroupobject"
 	// CreatedBy
 	// Annotation which indicates that this object was created by the replication-controller-manager
 	createdBy = "/createdBy"

@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Config
+users:
+- name: svcs-acct
+  user:
+    token: ${gntoken}
+clusters:
+- cluster:
+    certificate-authority-data: ${gncert}
+    server: ${gnserver}
+  name: self-hosted-cluster
+contexts:
+- context:
+    cluster: self-hosted-cluster
+    user: svcs-acct
+  name: svcs-acct-context
+current-context: svcs-acct-context

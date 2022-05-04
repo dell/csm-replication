@@ -83,6 +83,23 @@ func (m *MockMigration) VolumeMigrate(ctx context.Context, volumeHandle string, 
 	return &response, nil
 }
 
+// ArrayMigrate migrates volume
+func (m *MockMigration) ArrayMigrate(ctx context.Context, migrateAction *csiext.ArrayMigrateRequest_Action, Params map[string]string) (*csiext.ArrayMigrateResponse, error) {
+	defer m.ClearError(false)
+	if err := m.injectedError.getError(); err != nil {
+		return nil, err
+	}
+
+	response := csiext.ArrayMigrateResponse{
+		Success: true,
+		ActionTypes: &csiext.ArrayMigrateResponse_Action{
+			Action: migrateAction.Action,
+		},
+	}
+
+	return &response, nil
+}
+
 // ClearError clears injected error
 func (m *MockMigration) ClearError(force bool) {
 	m.injectedError.clearError(force)
