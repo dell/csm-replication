@@ -86,6 +86,9 @@ type ClusterInterface interface {
 	GetNamespace(context.Context, string) (*v1.Namespace, error)
 	CreateNamespace(context.Context, *v1.Namespace) error
 
+	GetSecret(context.Context, string, string) (*v1.Secret, error)
+	UpdateSecret(ctx context.Context, secret *v1.Secret) error
+
 	ListStorageClass(context.Context, ...client.ListOption) (*storagev1.StorageClassList, error)
 	FilterStorageClass(context.Context, string, bool) (*types.SCList, error)
 
@@ -208,6 +211,21 @@ func (c *Cluster) GetNamespace(ctx context.Context, nsName string) (*v1.Namespac
 // CreateNamespace creates new namespace object in cluster
 func (c *Cluster) CreateNamespace(ctx context.Context, ns *v1.Namespace) error {
 	return c.GetClient().Create(ctx, ns)
+}
+
+// GetSecret returns namespace object by querying cluster using namespace name
+func (c *Cluster) GetSecret(ctx context.Context, nsName string, sName string) (*v1.Secret, error) {
+	found := &v1.Secret{}
+	err := c.client.Get(ctx, apiTypes.NamespacedName{Namespace: nsName, Name: sName}, found)
+	if err != nil {
+		return nil, err
+	}
+	return found, nil
+}
+
+// UpdateSecret updates secret
+func (c *Cluster) UpdateSecret(ctx context.Context, secret *v1.Secret) error {
+	return c.client.Update(ctx, secret)
 }
 
 // ListStorageClass returns list of all storage class objects that are currently in cluster

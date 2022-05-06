@@ -13,6 +13,8 @@ import (
 
 	runtime "k8s.io/apimachinery/pkg/runtime"
 
+	testing "testing"
+
 	types "k8s.io/apimachinery/pkg/types"
 )
 
@@ -207,4 +209,14 @@ func (_m *ClientInterface) Update(ctx context.Context, obj client.Object, opts .
 	}
 
 	return r0
+}
+
+// NewClientInterface creates a new instance of ClientInterface. It also registers the testing.TB interface on the mock and a cleanup function to assert the mocks expectations.
+func NewClientInterface(t testing.TB) *ClientInterface {
+	mock := &ClientInterface{}
+	mock.Mock.Test(t)
+
+	t.Cleanup(func() { mock.AssertExpectations(t) })
+
+	return mock
 }
