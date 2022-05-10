@@ -176,7 +176,7 @@ func main() {
 	}
 	setupLog.V(1).Info("CSI driver name", "driverName", driverName)
 
-	capabilitySet, supportedActions, err := identityClient.GetMigrationCapabilities(ctx)
+	capabilitySet, err := identityClient.GetMigrationCapabilities(ctx)
 	if err != nil {
 		setupLog.Error(err, "error fetching migration capabilities")
 		os.Exit(1)
@@ -237,18 +237,7 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "PersistentVolume")
 		os.Exit(1)
 	}
-	/*
-	   type MigrationGroupReconciler struct {
-	   	client.Client
-	   	Log                        logr.Logger
-	   	Scheme                     *runtime.Scheme
-	   	EventRecorder              record.EventRecorder
-	   	DriverName                 string
-	   	MigrationClient            csimigration.Migration
-	   	SupportedActions           []*csiext.MGSupportedActions
-	   	MaxRetryDurationForActions time.Duration
-	   }
-	*/
+
 	if err = (&controller.MigrationGroupReconciler{
 		Client:                     mgr.GetClient(),
 		Log:                        ctrl.Log.WithName("controllers").WithName("DellCSIReplicationGroup"),

@@ -26,9 +26,13 @@ spec:
       jsonPath: .spec.state
       name: State
       type: string
-    - description: Migration Group ID
-      jsonPath: .spec.migrationGroupId
-      name: MG ID
+    - description: Source Array ID
+      jsonPath: .spec.sourceArrayId
+      name: Source Array
+      type: string
+    - description: Target Array ID
+      jsonPath: .spec.targetArrayId
+      name: Target Array
       type: string
     name: v1alpha1
     schema:
@@ -58,19 +62,15 @@ spec:
                 type: string
               targetArrayId:
                 type: string
-              action:
+              lastaction:
                 type: string
               state:
                 type: string
-              migrationGroupID:
-                type: string
             required:
-            - action
             - driverName
             - sourceArrayID
             - targetArrayId
             - state
-            - migrationGroupID
             type: object
         type: object
     served: true

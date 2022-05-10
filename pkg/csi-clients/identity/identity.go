@@ -40,7 +40,7 @@ type Identity interface {
 	ProbeController(ctx context.Context) (string, bool, error)
 	ProbeForever(ctx context.Context) (string, error)
 	GetReplicationCapabilities(ctx context.Context) (ReplicationCapabilitySet, []*replication.SupportedActions, error)
-	GetMigrationCapabilities(ctx context.Context) (MigrationCapabilitySet, []*migration.SupportedActions, error)
+	GetMigrationCapabilities(ctx context.Context) (MigrationCapabilitySet, error)
 }
 
 // New return new Identity interface implementation
@@ -135,7 +135,7 @@ func (r *identity) GetReplicationCapabilities(ctx context.Context) (ReplicationC
 	return capabilitySet, response.Actions, nil
 }
 
-func (r *identity) GetMigrationCapabilities(ctx context.Context) (MigrationCapabilitySet, []*migration.SupportedActions, error) {
+func (r *identity) GetMigrationCapabilities(ctx context.Context) (MigrationCapabilitySet, error) {
 	r.log.V(common.InfoLevel).Info("Requesting migration capabilities")
 	tctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()

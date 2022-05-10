@@ -219,6 +219,8 @@ var (
 	CreatedByMigrator string
 	// MigrationGroup contains the name of the local DellCSIMigrationGroup object
 	MigrationGroup string
+	// MigrationFinalizer — finalizer used by the migration sidecar for pre delete hook
+	MigrationFinalizer string
 )
 
 // InitLabelsAndAnnotations initializes package visible constants by using customizable domain variable

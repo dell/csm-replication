@@ -26,7 +26,7 @@ import (
 // Migration is an interface that defines calls used for querying migration management calls to the driver
 type Migration interface {
 	VolumeMigrate(context.Context, string, string, *csiext.VolumeMigrateRequest_Type, map[string]string, bool) (*csiext.VolumeMigrateResponse, error)
-	ArrayMigrate(ctx context.Context, string, string, *csiext.ArrayMigrateRequest_Type, map[string]string, bool) (*csiext.ArrayMigrateResponce, error)
+	ArrayMigrate(context.Context, *csiext.ArrayMigrateRequest_Action, map[string]string) (*csiext.ArrayMigrateResponce, error)
 }
 
 // New returns new implementation of Replication interface
@@ -62,20 +62,17 @@ func (m *migration) VolumeMigrate(ctx context.Context, volumeHandle string, stor
 	return res, err
 }
 
-// ArrayMigrate migrate volume
-func (m *migration) ArrayMigrate(ctx context.Context, volumeHandle string, storageClass string, migrateType *csiext.VolumeMigrateRequest_Type, scParams map[string]string, toClone bool) (*csiext.VolumeMigrateResponse, error) {
+// ArrayMigrate
+func (m *migration) ArrayMigrate(ctx context.Context, migrateAction *csiext.ArrayMigrateRequest_Action, Params map[string]string) (*csiext.ArrayMigrateResponce, error) {
 	tc, cancel := context.WithTimeout(ctx, m.timeout)
 	defer cancel()
 	client := csiext.NewMigrationClient(m.conn)
 
-	req := &csiext.VolumeMigrateRequest{
-		VolumeHandle: volumeHandle,
-		StorageClass: storageClass,
-		MigrateTypes: migrateType,
-		ScParameters: scParams,
-		ShouldClone:  toClone,
+	req := &csiext.ArrayMigrateRequest{
+		Action:     migrateAction,
+		Parameters: Params,
 	}
 
-	res, err := client.VolumeMigrate(tc, req)
+	res, err := client.ArrayMigrate(tc, req)
 	return res, err
 }

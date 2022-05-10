@@ -20,12 +20,11 @@ import (
 
 // DellCSIMigrationGroupSpec defines the desired state of DellCSIMigrationGroup
 type DellCSIMigrationGroupSpec struct {
-	DriverName       string `json:"driverName"`
-	SourceArrayID    string `json:"SourceArrayID"`
-	TargetArrayID    string `json:"targetArrayId"`
-	Action           string `json:"action"`
-	State            string `json:"state"`
-	MigrationGroupID string `json:"migrationGroupID"`
+	DriverName    string `json:"driverName"`
+	SourceArrayID string `json:"sourceArrayID"`
+	TargetArrayID string `json:"targetArrayId"`
+	LastAction    string `json:"lastAction"`
+	State         string `json:"state"`
 }
 
 type DellCSIMigrationGroup struct {
