@@ -67,6 +67,7 @@ func NewFakeMigrationClient(contextPrefix string) MockMigration {
 	}
 }
 
+// VolumeMigrate migrates volume
 func (m *MockMigration) VolumeMigrate(ctx context.Context, volumeHandle string, storageClass string, migrateType *csiext.VolumeMigrateRequest_Type,
 	scParams map[string]string, toClone bool) (*csiext.VolumeMigrateResponse, error) {
 
