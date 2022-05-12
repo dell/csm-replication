@@ -52,6 +52,7 @@ type PersistentVolumeReconciler struct {
 	ContextPrefix     string
 	SingleFlightGroup singleflight.Group
 	Domain            string
+	ReplDomain        string
 }
 
 const protectionIndexKey = "protection_id"
@@ -98,8 +99,9 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, nil
 	}
 
-	_, isSourceReplicated := storageClass.Parameters[controller.StorageClassReplicationParam]
-	_, isTargetReplicated := targetStorageClass.Parameters[controller.StorageClassReplicationParam]
+	replParam := r.ReplDomain + "/isReplicationEnabled"
+	_, isSourceReplicated := storageClass.Parameters[replParam]
+	_, isTargetReplicated := targetStorageClass.Parameters[replParam]
 	var migrateType migration.MigrateTypes
 	switch true {
 	case (isSourceReplicated && isTargetReplicated) || (!isSourceReplicated && !isTargetReplicated):
@@ -184,6 +186,7 @@ func isMigrationRequested() predicate.Predicate {
 		return a != nil && ok
 	})
 }
+
 func bytesToQuantity(bytes int64) resource.Quantity {
 	quantity := resource.NewQuantity(bytes, resource.BinarySI)
 	return *quantity
