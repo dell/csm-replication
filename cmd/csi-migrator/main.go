@@ -131,6 +131,7 @@ func main() {
 		operationTimeout     time.Duration
 		pgContextKeyPrefix   string
 		domain               string
+		replicationDomain    string
 		probeFrequency       time.Duration
 	)
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8000", "The address the metric endpoint binds to.")
@@ -139,6 +140,7 @@ func main() {
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.StringVar(&csiAddress, "csi-address", "/var/run/csi.sock", "Address for the csi driver socket")
 	flag.StringVar(&domain, "prefix", common.DefaultMigrationDomain, "Prefix used for creating labels/annotations")
+	flag.StringVar(&replicationDomain, "repl-prefix", common.DefaultDomain, "Replication prefix used for creating labels/annotations")
 	flag.IntVar(&workerThreads, "worker-threads", 2, "Number of concurrent reconcilers for each of the controllers")
 	flag.DurationVar(&retryIntervalStart, "retry-interval-start", time.Second, "Initial retry interval of failed reconcile request. It doubles with each failure, upto retry-interval-max")
 	flag.DurationVar(&retryIntervalMax, "retry-interval-max", 5*time.Minute, "Maximum retry interval of failed reconcile request")
@@ -232,6 +234,7 @@ func main() {
 		ContextPrefix:     pgContextKeyPrefix,
 		SingleFlightGroup: singleflight.Group{},
 		Domain:            domain,
+		ReplDomain:        replicationDomain,
 	}).SetupWithManager(ctx, mgr, expRateLimiter, workerThreads); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PersistentVolume")
 		os.Exit(1)
