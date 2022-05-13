@@ -32,6 +32,13 @@ func (i *injectedError) getError() error {
 	return i.error
 }
 
+func (i *injectedError) setError(err error, clearAfter int) {
+	// Just overwrite any error which exists already
+	i.currentCount = 0
+	i.clearAfter = clearAfter
+	i.error = err
+}
+
 func (i *injectedError) clearError(force bool) {
 	if force {
 		i.clearAfter = 0
@@ -45,18 +52,10 @@ func (i *injectedError) clearError(force bool) {
 	}
 }
 
-type conditionType string
-
-const (
-	// SeemsGood condition
-	SeemsGood = conditionType("SeemsGood")
-)
-
 // MockMigration is dummy implementation of Migration interface
 type MockMigration struct {
 	contextPrefix string
 	injectedError *injectedError
-	conditionType conditionType
 }
 
 // NewFakeMigrationClient returns mock implementation of Migration interface
@@ -71,27 +70,24 @@ func NewFakeMigrationClient(contextPrefix string) MockMigration {
 func (m *MockMigration) VolumeMigrate(ctx context.Context, volumeHandle string, storageClass string, migrateType *csiext.VolumeMigrateRequest_Type,
 	scParams map[string]string, toClone bool) (*csiext.VolumeMigrateResponse, error) {
 
-	defer m.ClearErrorAndCondition(false)
+	defer m.ClearError(false)
 	if err := m.injectedError.getError(); err != nil {
 		return nil, err
 	}
 
 	response := csiext.VolumeMigrateResponse{
-		MigratedVolume: &csiext.Volume{
-			//rewrite
-		},
+		MigratedVolume: &csiext.Volume{},
 	}
-
-	//switch m.conditionType {
-	//case SeemsGood:
-	//	response
-	//}
 
 	return &response, nil
 }
 
-// ClearErrorAndCondition clears injected error and resets condition
-func (m *MockMigration) ClearErrorAndCondition(force bool) {
-	m.conditionType = ""
+// ClearError clears injected error
+func (m *MockMigration) ClearError(force bool) {
 	m.injectedError.clearError(force)
+}
+
+// InjectError injects error
+func (m *MockMigration) InjectError(err error) {
+	m.injectedError.setError(err, -1)
 }
