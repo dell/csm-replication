@@ -19,6 +19,9 @@ package csimigrator
 import (
 	"context"
 	"fmt"
+	"path"
+	"testing"
+
 	"github.com/dell/csm-replication/controllers"
 	constants "github.com/dell/csm-replication/pkg/common"
 	csimigration "github.com/dell/csm-replication/pkg/csi-clients/migration"
@@ -29,12 +32,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	"path"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"testing"
 )
 
 type PersistentVolumeControllerTestSuite struct {
