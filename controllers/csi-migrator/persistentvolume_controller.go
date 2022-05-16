@@ -147,8 +147,8 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			ObjectMeta: metav1.ObjectMeta{
 				Name: pv.Name + "-to-" + targetStorageClassName,
 				Annotations: map[string]string{
-					controller.CreatedByMigrator:       "true",
-					"csi.storage.k8s.io/pvc/namespace": targetPVCNamespace,
+					controller.CreatedByMigrator:  "true",
+					controller.MigrationNamespace: targetPVCNamespace,
 				},
 			},
 			Spec: v1.PersistentVolumeSpec{
