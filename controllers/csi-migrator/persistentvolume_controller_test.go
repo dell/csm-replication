@@ -18,6 +18,10 @@ package csimigrator
 
 import (
 	"context"
+	"fmt"
+	"path"
+	"testing"
+
 	"github.com/dell/csm-replication/controllers"
 	constants "github.com/dell/csm-replication/pkg/common"
 	csimigration "github.com/dell/csm-replication/pkg/csi-clients/migration"
@@ -28,11 +32,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	"path"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"testing"
 )
 
 type PersistentVolumeControllerTestSuite struct {
@@ -50,14 +53,13 @@ func (suite *PersistentVolumeControllerTestSuite) SetupTest() {
 
 func (suite *PersistentVolumeControllerTestSuite) Init() {
 	suite.driver = utils.GetDefaultDriver()
-	suite.client = utils.GetFakeClient()
-	//suite.client = utils.GetFakeClientWithObjects(suite.getFakeStorageClass())
+	fakeClient := errorFakeCtrlRuntimeClient{
+		Client: utils.GetFakeClient(),
+	}
+	suite.client = fakeClient
 
 	mockMigrationClient := csimigration.NewFakeMigrationClient(utils.ContextPrefix)
 	suite.migrationClient = &mockMigrationClient
-	//var sc storagev1.StorageClass
-	//err := suite.client.Get(context.Background(), types.NamespacedName{Name: suite.driver.StorageClass}, &sc)
-	//suite.NoError(err)
 }
 
 func (suite *PersistentVolumeControllerTestSuite) initReconciler() {
@@ -192,43 +194,47 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileScNotFound() {
 }
 
 func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileScFailedFetch() {
-	//specified in pv sc doesn't fetch don't know how
-	//sc1 := &storagev1.StorageClass{
-	//	ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
-	//	Provisioner: "provisionerName",
-	//}
-	//
-	//pv := &corev1.PersistentVolume{
-	//	ObjectMeta: metav1.ObjectMeta{
-	//		Name: "pv",
-	//		Annotations: map[string]string{
-	//			"migration.storage.dell.com/migrate-to": "sc2",
-	//		},
-	//	},
-	//	Spec: corev1.PersistentVolumeSpec{
-	//		PersistentVolumeSource: corev1.PersistentVolumeSource{
-	//			CSI: &corev1.CSIPersistentVolumeSource{
-	//				Driver:           "provisionerName",
-	//				VolumeHandle:     "volHandle",
-	//				FSType:           "ext4",
-	//				VolumeAttributes: suite.getParams(),
-	//			},
-	//		},
-	//		StorageClassName: sc1.Name,
-	//	},
-	//	Status: corev1.PersistentVolumeStatus{Phase: corev1.VolumeBound},
-	//}
-	//
-	//suite.client = utils.GetFakeClientWithObjects(sc1)
-	//suite.reconciler.Client = suite.client
-	//
-	//ctx := context.Background()
-	//err := suite.client.Create(ctx, pv)
-	//suite.NoError(err)
-	//
-	//req := suite.getTypicalReconcileRequest(pv.Name)
-	//_, err = suite.reconciler.Reconcile(context.Background(), req)
-	//suite.NoError(err)
+	//specified in pv sc doesn't fetch
+	sc1 := &storagev1.StorageClass{
+		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
+		Provisioner: "provisionerName",
+	}
+
+	pv := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pv",
+			Annotations: map[string]string{
+				"migration.storage.dell.com/migrate-to": "sc2",
+			},
+		},
+		Spec: corev1.PersistentVolumeSpec{
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CSI: &corev1.CSIPersistentVolumeSource{
+					Driver:           "provisionerName",
+					VolumeHandle:     "volHandle",
+					FSType:           "ext4",
+					VolumeAttributes: suite.getParams(),
+				},
+			},
+			StorageClassName: sc1.Name,
+		},
+		Status: corev1.PersistentVolumeStatus{Phase: corev1.VolumeBound},
+	}
+	fakeClient := errorFakeCtrlRuntimeClient{
+		Client: utils.GetFakeClientWithObjects(sc1),
+		method: "get",
+		key:    "sc1",
+	}
+	suite.client = fakeClient
+	suite.reconciler.Client = suite.client
+
+	ctx := context.Background()
+	err := suite.client.Create(ctx, pv)
+	suite.NoError(err)
+
+	req := suite.getTypicalReconcileRequest(pv.Name)
+	_, err = suite.reconciler.Reconcile(context.Background(), req)
+	suite.Error(err)
 }
 
 func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileGetTargetSc() {
@@ -272,56 +278,96 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileGetTargetSc() {
 }
 
 func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileTargetScFailedFetch() {
-	//target sc doesn't fetch don't know how
+	//target sc doesn't fetch
+	sc1 := &storagev1.StorageClass{
+		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
+		Provisioner: "provisionerName",
+	}
+
+	sc2 := &storagev1.StorageClass{
+		ObjectMeta:  metav1.ObjectMeta{Name: "sc2"},
+		Provisioner: "provisionerName",
+	}
+
+	pv := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pv",
+			Annotations: map[string]string{
+				"migration.storage.dell.com/migrate-to": "sc2",
+			},
+		},
+		Spec: corev1.PersistentVolumeSpec{
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CSI: &corev1.CSIPersistentVolumeSource{
+					Driver:           "provisionerName",
+					VolumeHandle:     "volHandle",
+					FSType:           "ext4",
+					VolumeAttributes: suite.getParams(),
+				},
+			},
+			StorageClassName: sc1.Name,
+		},
+		Status: corev1.PersistentVolumeStatus{Phase: corev1.VolumeBound},
+	}
+	fakeClient := errorFakeCtrlRuntimeClient{
+		Client: utils.GetFakeClientWithObjects(sc1, sc2),
+		method: "get",
+		key:    "sc2",
+	}
+	suite.client = fakeClient
+	suite.reconciler.Client = suite.client
+
+	ctx := context.Background()
+	err := suite.client.Create(ctx, pv)
+	suite.NoError(err)
+
+	req := suite.getTypicalReconcileRequest(pv.Name)
+	_, err = suite.reconciler.Reconcile(context.Background(), req)
+	suite.Error(err)
 }
 
 func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileSameSc() {
-	//sc1 = sc1 doesn't pass second
-	//sc1 := &storagev1.StorageClass{
-	//	ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
-	//	Provisioner: "provisionerName",
-	//}
-	//
-	//sc2 := &storagev1.StorageClass{
-	//	ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
-	//	Provisioner: "provisionerName2",
-	//}
-	//
-	//pv := &corev1.PersistentVolume{
-	//	ObjectMeta: metav1.ObjectMeta{
-	//		Name: "pv",
-	//		Annotations: map[string]string{
-	//			"migration.storage.dell.com/migrate-to": "sc1",
-	//		},
-	//	},
-	//	Spec: corev1.PersistentVolumeSpec{
-	//		PersistentVolumeSource: corev1.PersistentVolumeSource{
-	//			CSI: &corev1.CSIPersistentVolumeSource{
-	//				Driver:           "provisionerName",
-	//				VolumeHandle:     "volHandle",
-	//				FSType:           "ext4",
-	//				VolumeAttributes: suite.getParams(),
-	//			},
-	//		},
-	//		StorageClassName: sc1.Name,
-	//	},
-	//	Status: corev1.PersistentVolumeStatus{Phase: corev1.VolumeBound},
-	//}
-	//
-	//suite.client = utils.GetFakeClientWithObjects(sc1, sc2)
-	//suite.reconciler.Client = suite.client
-	//
-	//ctx := context.Background()
-	//err := suite.client.Create(ctx, pv)
-	//suite.NoError(err)
-	//
-	//req := suite.getTypicalReconcileRequest(pv.Name)
-	//_, err = suite.reconciler.Reconcile(context.Background(), req)
-	//suite.NoError(err)
+	//source sc = target sc
+	sc1 := &storagev1.StorageClass{
+		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
+		Provisioner: "provisionerName",
+	}
+
+	pv := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pv",
+			Annotations: map[string]string{
+				"migration.storage.dell.com/migrate-to": "sc1",
+			},
+		},
+		Spec: corev1.PersistentVolumeSpec{
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CSI: &corev1.CSIPersistentVolumeSource{
+					Driver:           "provisionerName",
+					VolumeHandle:     "volHandle",
+					FSType:           "ext4",
+					VolumeAttributes: suite.getParams(),
+				},
+			},
+			StorageClassName: sc1.Name,
+		},
+		Status: corev1.PersistentVolumeStatus{Phase: corev1.VolumeBound},
+	}
+
+	suite.client = utils.GetFakeClientWithObjects(sc1)
+	suite.reconciler.Client = suite.client
+
+	ctx := context.Background()
+	err := suite.client.Create(ctx, pv)
+	suite.NoError(err)
+
+	req := suite.getTypicalReconcileRequest(pv.Name)
+	_, err = suite.reconciler.Reconcile(context.Background(), req)
+	suite.NoError(err)
 }
 
 func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileNonReplToRepl() {
-	//migration type non repl to repl doesn't work cause domain?
+	//migration type non repl to repl
 	sc1 := &storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
 		Provisioner: "provisionerName",
@@ -373,12 +419,256 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileNonReplToRepl()
 }
 
 func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileReplToNonRepl() {
+	//migration type repl to non repl
+	sc1 := &storagev1.StorageClass{
+		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
+		Provisioner: "provisionerName",
+		Parameters: map[string]string{
+			"replication.storage.dell.com/isReplicationEnabled": "true",
+		},
+	}
 
+	sc2 := &storagev1.StorageClass{
+		ObjectMeta:  metav1.ObjectMeta{Name: "sc2"},
+		Provisioner: "provisionerName",
+	}
+
+	pv := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pv",
+			Annotations: map[string]string{
+				"migration.storage.dell.com/migrate-to": "sc2",
+			},
+		},
+		Spec: corev1.PersistentVolumeSpec{
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CSI: &corev1.CSIPersistentVolumeSource{
+					Driver:           "provisionerName",
+					VolumeHandle:     "volHandle",
+					FSType:           "ext4",
+					VolumeAttributes: suite.getParams(),
+				},
+			},
+			StorageClassName: sc1.Name,
+		},
+		Status: corev1.PersistentVolumeStatus{Phase: corev1.VolumeBound},
+	}
+
+	suite.client = utils.GetFakeClientWithObjects(sc1, sc2)
+	suite.reconciler.Client = suite.client
+
+	ctx := context.Background()
+	err := suite.client.Create(ctx, pv)
+	suite.NoError(err)
+
+	req := suite.getTypicalReconcileRequest(pv.Name)
+	_, err = suite.reconciler.Reconcile(context.Background(), req)
+	suite.NoError(err, "No error on PV reconcile")
+
+	updatedPV := new(corev1.PersistentVolume)
+	err = suite.client.Get(ctx, types.NamespacedName{Namespace: "", Name: pv.Name + "-to-" + sc2.Name}, updatedPV)
+	suite.NoError(err)
 }
 
 func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileVolumeMigrate() {
-	//err = envoke how to check?
-	//injected error in migration client
+	//volume migrate error
+	sc1 := &storagev1.StorageClass{
+		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
+		Provisioner: "provisionerName",
+	}
+
+	sc2 := &storagev1.StorageClass{
+		ObjectMeta:  metav1.ObjectMeta{Name: "sc2"},
+		Provisioner: "provisionerName",
+	}
+
+	pv := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pv",
+			Annotations: map[string]string{
+				"migration.storage.dell.com/migrate-to": "sc2",
+			},
+		},
+		Spec: corev1.PersistentVolumeSpec{
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CSI: &corev1.CSIPersistentVolumeSource{
+					Driver:           "provisionerName",
+					VolumeHandle:     "volHandle",
+					FSType:           "ext4",
+					VolumeAttributes: suite.getParams(),
+				},
+			},
+			StorageClassName: sc1.Name,
+		},
+		Status: corev1.PersistentVolumeStatus{Phase: corev1.VolumeBound},
+	}
+
+	suite.client = utils.GetFakeClientWithObjects(sc1, sc2)
+	suite.reconciler.Client = suite.client
+
+	ctx := context.Background()
+	err := suite.client.Create(ctx, pv)
+	suite.NoError(err)
+
+	req := suite.getTypicalReconcileRequest(pv.Name)
+
+	suite.migrationClient.InjectError(fmt.Errorf("dgdsfgdf"))
+
+	_, err = suite.reconciler.Reconcile(context.Background(), req)
+}
+
+func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileNewPvFailedFetch() {
+	//new pv doesn't fetch
+
+	sc1 := &storagev1.StorageClass{
+		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
+		Provisioner: "provisionerName",
+	}
+
+	sc2 := &storagev1.StorageClass{
+		ObjectMeta:  metav1.ObjectMeta{Name: "sc2"},
+		Provisioner: "provisionerName",
+	}
+
+	pv := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pv",
+			Annotations: map[string]string{
+				"migration.storage.dell.com/migrate-to": "sc2",
+			},
+		},
+		Spec: corev1.PersistentVolumeSpec{
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CSI: &corev1.CSIPersistentVolumeSource{
+					Driver:           "provisionerName",
+					VolumeHandle:     "volHandle",
+					FSType:           "ext4",
+					VolumeAttributes: suite.getParams(),
+				},
+			},
+			StorageClassName: sc1.Name,
+		},
+		Status: corev1.PersistentVolumeStatus{Phase: corev1.VolumeBound},
+	}
+	fakeClient := errorFakeCtrlRuntimeClient{
+		Client: utils.GetFakeClientWithObjects(sc1, sc2),
+		method: "get",
+		key:    "pv-to-sc2",
+	}
+	suite.client = fakeClient
+	suite.reconciler.Client = suite.client
+
+	ctx := context.Background()
+	err := suite.client.Create(ctx, pv)
+	suite.NoError(err)
+
+	req := suite.getTypicalReconcileRequest(pv.Name)
+	_, err = suite.reconciler.Reconcile(context.Background(), req)
+	suite.Error(err)
+}
+
+func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileCreatePv() {
+	//new pv test
+	sc1 := &storagev1.StorageClass{
+		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
+		Provisioner: "provisionerName",
+	}
+
+	sc2 := &storagev1.StorageClass{
+		ObjectMeta:  metav1.ObjectMeta{Name: "sc2"},
+		Provisioner: "provisionerName",
+	}
+
+	pv := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pv",
+			Annotations: map[string]string{
+				"migration.storage.dell.com/migrate-to": "sc2",
+			},
+		},
+		Spec: corev1.PersistentVolumeSpec{
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CSI: &corev1.CSIPersistentVolumeSource{
+					Driver:           "provisionerName",
+					VolumeHandle:     "volHandle",
+					FSType:           "ext4",
+					VolumeAttributes: suite.getParams(),
+				},
+			},
+			StorageClassName: sc1.Name,
+		},
+		Status: corev1.PersistentVolumeStatus{Phase: corev1.VolumeBound},
+	}
+
+	fakeClient := errorFakeCtrlRuntimeClient{
+		Client: utils.GetFakeClientWithObjects(sc1, sc2),
+		method: "create",
+		key:    "pv-to-sc2",
+	}
+	suite.client = fakeClient
+	suite.reconciler.Client = suite.client
+
+	ctx := context.Background()
+	err := suite.client.Create(ctx, pv)
+	suite.NoError(err)
+
+	req := suite.getTypicalReconcileRequest(pv.Name)
+	_, err = suite.reconciler.Reconcile(context.Background(), req)
+	suite.Error(err)
+}
+
+func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileUpdate() {
+	//update test
+	sc1 := &storagev1.StorageClass{
+		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
+		Provisioner: "provisionerName",
+	}
+
+	sc2 := &storagev1.StorageClass{
+		ObjectMeta:  metav1.ObjectMeta{Name: "sc2"},
+		Provisioner: "provisionerName",
+	}
+
+	pv := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pv",
+			Annotations: map[string]string{
+				"migration.storage.dell.com/migrate-to": "sc2",
+			},
+		},
+		Spec: corev1.PersistentVolumeSpec{
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CSI: &corev1.CSIPersistentVolumeSource{
+					Driver:           "provisionerName",
+					VolumeHandle:     "volHandle",
+					FSType:           "ext4",
+					VolumeAttributes: suite.getParams(),
+				},
+			},
+			StorageClassName: sc1.Name,
+		},
+		Status: corev1.PersistentVolumeStatus{Phase: corev1.VolumeBound},
+	}
+
+	fakeClient := errorFakeCtrlRuntimeClient{
+		Client: utils.GetFakeClientWithObjects(sc1, sc2),
+		method: "update",
+		key:    "pv",
+	}
+	suite.client = fakeClient
+	suite.reconciler.Client = suite.client
+
+	ctx := context.Background()
+	err := suite.client.Create(ctx, pv)
+	suite.NoError(err)
+
+	req := suite.getTypicalReconcileRequest(pv.Name)
+	_, err = suite.reconciler.Reconcile(context.Background(), req)
+	suite.Error(err)
+
+	updatedPV := new(corev1.PersistentVolume)
+	err = suite.client.Get(ctx, types.NamespacedName{Namespace: "", Name: pv.Name + "-to-" + sc2.Name}, updatedPV)
+	suite.NoError(err)
 }
 
 func (suite *PersistentVolumeControllerTestSuite) getTypicalReconcileRequest(name string) reconcile.Request {
@@ -408,4 +698,31 @@ func TestPersistentVolumeControllerTestSuite(t *testing.T) {
 
 func (suite *PersistentVolumeControllerTestSuite) TearDownTest() {
 	suite.T().Log("Cleaning up resources...")
+}
+
+type errorFakeCtrlRuntimeClient struct {
+	ctrlruntimeclient.Client
+	method string
+	key    string
+}
+
+func (e errorFakeCtrlRuntimeClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+	if e.method == "get" && key.Name == e.key {
+		return fmt.Errorf("Get method error")
+	}
+	return e.Client.Get(ctx, key, obj)
+}
+
+func (e errorFakeCtrlRuntimeClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+	if e.method == "create" && obj.GetName() == e.key {
+		return fmt.Errorf("Create method error")
+	}
+	return e.Client.Create(ctx, obj, opts...)
+}
+
+func (e errorFakeCtrlRuntimeClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+	if e.method == "update" && obj.GetName() == e.key {
+		return fmt.Errorf("Update method error")
+	}
+	return e.Client.Update(ctx, obj, opts...)
 }
