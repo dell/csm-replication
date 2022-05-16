@@ -127,7 +127,7 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, nil
 	}
 	targetStorageClass.Parameters["csi.storage.k8s.io/pvc/namespace"] = targetPVCNamespace
-	migrate, err := r.MigrationClient.VolumeMigrate(ctx, pv.Spec.CSI.VolumeHandle, targetStorageClassName, migrateReq, targetStorageClass.Parameters, false)
+	migrate, err := r.MigrationClient.VolumeMigrate(ctx, pv.Spec.CSI.VolumeHandle, targetStorageClassName, migrateReq, targetStorageClass.Parameters, storageClass.Parameters, false)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
