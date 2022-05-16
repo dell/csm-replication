@@ -117,7 +117,16 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	migrateReq := &migration.VolumeMigrateRequest_Type{
 		Type: migrateType,
 	}
-
+	var targetPVCNamespace string
+	if ns, ok := pv.Annotations[controller.MigrationNamespace]; ok {
+		targetPVCNamespace = ns
+	} else if pv.Spec.ClaimRef != nil {
+		targetPVCNamespace = pv.Spec.ClaimRef.Namespace
+	} else {
+		log.Error(errors.NewBadRequest("Unable to detect target NS"), "No annotation for target NS specified and unable to retrieve information from PVC")
+		return ctrl.Result{}, nil
+	}
+	targetStorageClass.Parameters["csi.storage.k8s.io/pvc/namespace"] = targetPVCNamespace
 	migrate, err := r.MigrationClient.VolumeMigrate(ctx, pv.Spec.CSI.VolumeHandle, targetStorageClassName, migrateReq, targetStorageClass.Parameters, false)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -138,7 +147,8 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			ObjectMeta: metav1.ObjectMeta{
 				Name: pv.Name + "-to-" + targetStorageClassName,
 				Annotations: map[string]string{
-					controller.CreatedByMigrator: "true",
+					controller.CreatedByMigrator:       "true",
+					"csi.storage.k8s.io/pvc/namespace": targetPVCNamespace,
 				},
 			},
 			Spec: v1.PersistentVolumeSpec{
