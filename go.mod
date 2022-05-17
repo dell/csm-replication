@@ -4,7 +4,7 @@ go 1.17
 
 replace github.com/dell/dell-csi-extensions/migration v1.1.0 => github.com/dell/dell-csi-extensions/migration v0.0.0-20220419095831-beeaf83e4853
 
-replace github.com/dell/dell-csi-extensions/replication v1.1.0 => github.com/dell/dell-csi-extensions/replication v0.0.0-20220512125436-b34414a4a3ad
+replace github.com/dell/dell-csi-extensions/replication v1.1.0 => github.com/dell/dell-csi-extensions/replication v0.0.0-20220517124947-d6a2b1019d5a
 
 require (
 	github.com/dell/dell-csi-extensions/common v1.0.0
