@@ -93,6 +93,11 @@ func (r *ReplicationGroupMonitoring) monitorReplicationGroups(ticker <-chan time
 				if len(persistentVolumes.Items) == 0 {
 					r.Log.V(common.DebugLevel).Info(
 						"Skipping RG " + rg.Name + "as there are no associated PVs")
+					// Update status to EMPTY
+					err := updateRGLinkStatus(ctx, r.Client, &rg, replication.StorageProtectionGroupStatus_EMPTY.String(), rg.Status.ReplicationLinkState.IsSource, "")
+					if err != nil {
+						r.Log.Error(err, "Failed to update the RG status")
+					}
 					continue
 				}
 			}
