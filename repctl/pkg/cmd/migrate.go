@@ -20,8 +20,11 @@ import (
 	"github.com/dell/repctl/pkg/k8s"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -182,9 +185,10 @@ func migrate(configFolder, resource string, resName string, resNS string, toSC s
 		wg := &sync.WaitGroup{}
 		for _, i := range clusters.Clusters {
 			wg.Add(1)
-			migratePV(context.Background(), i, resName, toSC, targetNS, wg)
-			wg.Wait()
+			go migratePV(context.Background(), i, resName, toSC, targetNS, wg)
 		}
+		wg.Wait()
+
 	case "pvc":
 		wg := &sync.WaitGroup{}
 		for _, i := range clusters.Clusters {
@@ -193,11 +197,13 @@ func migrate(configFolder, resource string, resName string, resNS string, toSC s
 				log.Error(err)
 				os.Exit(1)
 			}
+			log.Info(pvc.OwnerReferences)
 			pvName := pvc.Spec.VolumeName
 			wg.Add(1)
 			go migratePV(context.Background(), i, pvName, toSC, targetNS, wg)
-			wg.Wait()
 		}
+		wg.Wait()
+
 	case "sts":
 		wg := &sync.WaitGroup{}
 		for _, i := range clusters.Clusters {
@@ -206,16 +212,26 @@ func migrate(configFolder, resource string, resName string, resNS string, toSC s
 				log.Error(err)
 				os.Exit(1)
 			}
-			pvcList := sts.Spec.VolumeClaimTemplates
-			for _, pvc := range pvcList {
-				log.Infof("Starting processing PVC %s", pvc.Name)
-				pvName := pvc.Spec.VolumeName
-				wg.Add(1)
-				migratePV(context.Background(), i, pvName, toSC, targetNS, wg)
-				wg.Wait()
+			list, err := i.FilterPods(context.Background(), resNS, sts.Name)
+			if err != nil {
+				log.Error(err)
+				os.Exit(1)
 			}
-
+			for _, pod := range list.Items {
+				for _, volume := range pod.Spec.Volumes {
+					if volume.PersistentVolumeClaim != nil {
+						pvc, err := i.GetPersistentVolumeClaim(context.Background(), resNS, volume.PersistentVolumeClaim.ClaimName)
+						if err != nil {
+							log.Error(err)
+							os.Exit(1)
+						}
+						wg.Add(1)
+						go migratePV(context.Background(), i, pvc.Spec.VolumeName, toSC, targetNS, wg)
+					}
+				}
+			}
 		}
+		wg.Wait()
 	default:
 		log.Error("Unknown resource")
 		os.Exit(1)
@@ -224,6 +240,7 @@ func migrate(configFolder, resource string, resName string, resNS string, toSC s
 
 func migratePV(ctx context.Context, cluster k8s.ClusterInterface, pvName string, toSC string, targetNS string, wg *sync.WaitGroup) {
 	defer wg.Done()
+	log.Info(pvName)
 	pv, err := cluster.GetPersistentVolume(context.Background(), pvName)
 	if err != nil {
 		log.Error(err, "Unable to find backing PV")
@@ -237,5 +254,35 @@ func migratePV(ctx context.Context, cluster k8s.ClusterInterface, pvName string,
 		log.Error(err, "unable to update persistent volume")
 		os.Exit(1)
 	}
-	log.Infof("Successfully updated pv %s in cluster %s", pv.Name, cluster.GetID())
+	done := waitForPVToBeBound(pvName+"-to-"+toSC, cluster)
+	if done {
+		log.Infof("Successfully updated pv %s in cluster %s. Consider using new PV: [%s]", pv.Name, cluster.GetID(), pvName+"-to-"+toSC)
+	} else {
+		log.Error("time out waiting for the PV to be bound")
+	}
+}
+
+func waitForPVToBeBound(pvName string, cluster k8s.ClusterInterface) bool {
+	t := time.NewTicker(5 * time.Second)
+	ret := make(chan bool)
+	go func() {
+		log.Print("Waiting for action to complete ...")
+		for {
+			select {
+			case <-time.After(5 * time.Minute):
+				ret <- false
+			case <-t.C:
+				pv, err := cluster.GetPersistentVolume(context.Background(), pvName)
+				if err != nil && !errors.IsNotFound(err) {
+					log.Fatalf("migrate: error in fecthing pv info: %s\n", err.Error())
+				}
+				if pv != nil && pv.Status.Phase == v1.VolumeBound {
+					ret <- true
+					return
+				}
+			}
+		}
+	}()
+	res := <-ret
+	return res
 }

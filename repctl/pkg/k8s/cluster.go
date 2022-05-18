@@ -107,6 +107,9 @@ type ClusterInterface interface {
 	CreateObject(context.Context, []byte) (runtime.Object, error)
 
 	GetStatefulSet(context.Context, string, string) (*appsv1.StatefulSet, error)
+
+	FilterPods(ctx context.Context, namespace string, stsName string) (*v1.PodList, error)
+	ListPods(ctx context.Context, opts ...client.ListOption) (*v1.PodList, error)
 }
 
 // Cluster is implementation of ClusterInterface that represents some cluster
@@ -650,6 +653,37 @@ func (c *Cluster) GetReplicationGroups(ctx context.Context, rgID string) (*v1alp
 func (c *Cluster) GetStatefulSet(ctx context.Context, nsName string, stsName string) (*appsv1.StatefulSet, error) {
 	found := &appsv1.StatefulSet{}
 	err := c.client.Get(ctx, apiTypes.NamespacedName{Namespace: nsName, Name: stsName}, found)
+	if err != nil {
+		return nil, err
+	}
+	return found, nil
+}
+
+// FilterPods returns filtered list of pod, managed by given sts
+func (c *Cluster) FilterPods(ctx context.Context, namespace string, stsName string) (*v1.PodList, error) {
+
+	podList, err := c.ListPods(ctx, client.InNamespace(namespace))
+	if err != nil {
+		return nil, err
+	}
+
+	myPodList := &v1.PodList{}
+
+	for _, item := range podList.Items {
+		for _, reference := range item.OwnerReferences {
+			if reference.Name == stsName && reference.Kind == "StatefulSet" {
+				myPodList.Items = append(myPodList.Items, item)
+			}
+		}
+	}
+
+	return myPodList, nil
+}
+
+// ListPods returns list of all pods in ns
+func (c *Cluster) ListPods(ctx context.Context, opts ...client.ListOption) (*v1.PodList, error) {
+	found := &v1.PodList{}
+	err := c.client.List(ctx, found, opts...)
 	if err != nil {
 		return nil, err
 	}
