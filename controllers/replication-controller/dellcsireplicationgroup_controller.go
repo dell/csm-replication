@@ -154,18 +154,24 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	// Handle RG deletion if timestamp is set
 	if !localRG.DeletionTimestamp.IsZero() {
 		// Process deletion of remote RG
+		log.V(common.InfoLevel).Info("Deletion timestamp is not zero")
+		log.V(common.InfoLevel).WithValues(localRG.Annotations).Info("Annotations")
+		_, ok := localRG.Annotations[controller.DeletionRequested]
+		log.V(common.InfoLevel).WithValues(ok).Info("Deletion requested?", ok)
+
 		if _, ok := localRG.Annotations[controller.DeletionRequested]; !ok {
-			log.Info("Deletion requested annotation not found")
+			log.V(common.InfoLevel).Info("Deletion requested annotation not found")
 			remoteRG, err := remoteClient.GetReplicationGroup(ctx, localRG.Annotations[controller.RemoteReplicationGroup])
 			if err != nil {
+				log.V(common.ErrorLevel).WithValues(err.Error()).Info("error getting replication group")
 				// If remote RG doesn't exist, proceed to removing finalizer
 				if !errors.IsNotFound(err) {
-					log.Error(err, "Failed to get remote volume")
+					log.Error(err, "Failed to get remote replication group")
 					return ctrl.Result{}, err
 				}
 			} else {
-				log.Info("Got remote RG")
-				if retentionPolicy == controller.RemoteRetentionValueDelete {
+				log.V(common.InfoLevel).Info("Got remote RG")
+				if strings.ToLower(retentionPolicy) == controller.RemoteRetentionValueDelete {
 					log.Info("Retention policy is set to Delete")
 					if _, ok := remoteRG.Annotations[controller.DeletionRequested]; !ok {
 						// Add annotation on the remote RG to request its deletion
@@ -183,22 +189,27 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				}
 			}
 		}
+
+		log.V(common.InfoLevel).Info("Removing finalizer RGFinalizer")
 		finalizerRemoved := controller.RemoveFinalizerIfExists(localRG, controller.RGFinalizer)
 		if finalizerRemoved {
+			log.V(common.InfoLevel).Info("Updating rg copy to remove finalizer")
 			return ctrl.Result{}, r.Update(ctx, localRG)
 		}
 	}
 
 	rgCopy := localRG.DeepCopy()
 
+	log.V(common.InfoLevel).Info("Adding finalizer RGFinalizer")
 	// Check for the finalizer; add, if doesn't exist
 	if finalizerAdded := controller.AddFinalizerIfNotExist(rgCopy, controller.RGFinalizer); finalizerAdded {
-		log.Info("Finalizer not found adding it")
+		log.V(common.InfoLevel).Info("Finalizer not found adding it")
 		return ctrl.Result{}, r.Update(ctx, rgCopy)
 	}
+	log.V(common.InfoLevel).Info("Trying to delete RG if deletion request annotation found")
 	// Check for deletion request annotation
 	if _, ok := rgCopy.Annotations[controller.DeletionRequested]; ok {
-		log.Info("Deletion Requested annotation found and deleting the remote RG")
+		log.V(common.InfoLevel).Info("Deletion Requested annotation found and deleting the remote RG")
 		return ctrl.Result{}, r.Delete(ctx, rgCopy)
 	}
 

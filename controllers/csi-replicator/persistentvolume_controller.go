@@ -179,7 +179,7 @@ func (r *PersistentVolumeReconciler) processVolumeForReplicationGroup(ctx contex
 
 	log.V(common.DebugLevel).Info("Adding retention policy annotation for syncing deletion across clusters")
 
-	if scParams[controller.RemotePVRetentionPolicy] == controller.RemoteRetentionValueDelete {
+	if strings.ToLower(scParams[controller.RemotePVRetentionPolicy]) == controller.RemoteRetentionValueDelete {
 		controller.AddAnnotation(volume, controller.RemotePVRetentionPolicy, controller.RemoteRetentionValueDelete)
 	} else {
 		controller.AddAnnotation(volume, controller.RemotePVRetentionPolicy, controller.RemoteRetentionValueRetain)
@@ -293,7 +293,7 @@ func (r *PersistentVolumeReconciler) createReplicationGroup(ctx context.Context,
 
 	log.V(common.DebugLevel).Info("Adding retention policy annotation")
 
-	if remoteRGRetentionPolicy == controller.RemoteRetentionValueDelete {
+	if strings.ToLower(remoteRGRetentionPolicy) == controller.RemoteRetentionValueDelete {
 		annotations[controller.RemoteRGRetentionPolicy] = controller.RemoteRetentionValueDelete
 	} else {
 		annotations[controller.RemoteRGRetentionPolicy] = controller.RemoteRetentionValueRetain
