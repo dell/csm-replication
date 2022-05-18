@@ -4,7 +4,7 @@ go 1.17
 
 replace github.com/dell/csm-replication => ../
 
-replace github.com/dell/dell-csi-extensions/migration v1.1.0 => github.com/dell/dell-csi-extensions/migration v0.0.0-20220419095831-beeaf83e4853
+replace github.com/dell/dell-csi-extensions/migration v1.1.0 => github.com/dell/dell-csi-extensions/migration v0.0.0-20220518094004-fd4b2bd2f440
 
 require (
 	github.com/dell/csm-replication v0.0.0
