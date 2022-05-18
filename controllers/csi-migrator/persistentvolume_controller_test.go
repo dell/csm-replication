@@ -85,11 +85,13 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcile() {
 	sc1 := &storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
 		Provisioner: "provisionerName",
+		Parameters:  map[string]string{"test": "test"},
 	}
 
 	sc2 := &storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: "sc2"},
 		Provisioner: "provisionerName",
+		Parameters:  map[string]string{"test": "test"},
 	}
 
 	pv := &corev1.PersistentVolume{
@@ -97,6 +99,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcile() {
 			Name: "pv",
 			Annotations: map[string]string{
 				"migration.storage.dell.com/migrate-to": "sc2",
+				"migration.storage.dell.com/namespace":  "namespace",
 			},
 		},
 		Spec: corev1.PersistentVolumeSpec{
@@ -136,6 +139,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileGetPV() {
 			Name: "pv",
 			Annotations: map[string]string{
 				"migration.storage.dell.com/migrate-to": "sc2",
+				"migration.storage.dell.com/namespace":  "namespace",
 			},
 		},
 		Spec: corev1.PersistentVolumeSpec{
@@ -166,6 +170,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileScNotFound() {
 			Name: "pv",
 			Annotations: map[string]string{
 				"migration.storage.dell.com/migrate-to": "sc2",
+				"migration.storage.dell.com/namespace":  "namespace",
 			},
 		},
 		Spec: corev1.PersistentVolumeSpec{
@@ -198,6 +203,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileScFailedFetch()
 	sc1 := &storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
 		Provisioner: "provisionerName",
+		Parameters:  map[string]string{"test": "test"},
 	}
 
 	pv := &corev1.PersistentVolume{
@@ -205,6 +211,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileScFailedFetch()
 			Name: "pv",
 			Annotations: map[string]string{
 				"migration.storage.dell.com/migrate-to": "sc2",
+				"migration.storage.dell.com/namespace":  "namespace",
 			},
 		},
 		Spec: corev1.PersistentVolumeSpec{
@@ -242,6 +249,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileGetTargetSc() {
 	sc1 := &storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
 		Provisioner: "provisionerName",
+		Parameters:  map[string]string{"test": "test"},
 	}
 
 	pv := &corev1.PersistentVolume{
@@ -249,6 +257,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileGetTargetSc() {
 			Name: "pv",
 			Annotations: map[string]string{
 				"migration.storage.dell.com/migrate-to": "sc2",
+				"migration.storage.dell.com/namespace":  "namespace",
 			},
 		},
 		Spec: corev1.PersistentVolumeSpec{
@@ -282,11 +291,13 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileTargetScFailedF
 	sc1 := &storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
 		Provisioner: "provisionerName",
+		Parameters:  map[string]string{"test": "test"},
 	}
 
 	sc2 := &storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: "sc2"},
 		Provisioner: "provisionerName",
+		Parameters:  map[string]string{"test": "test"},
 	}
 
 	pv := &corev1.PersistentVolume{
@@ -294,6 +305,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileTargetScFailedF
 			Name: "pv",
 			Annotations: map[string]string{
 				"migration.storage.dell.com/migrate-to": "sc2",
+				"migration.storage.dell.com/namespace":  "namespace",
 			},
 		},
 		Spec: corev1.PersistentVolumeSpec{
@@ -331,6 +343,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileSameSc() {
 	sc1 := &storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
 		Provisioner: "provisionerName",
+		Parameters:  map[string]string{"test": "test"},
 	}
 
 	pv := &corev1.PersistentVolume{
@@ -338,6 +351,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileSameSc() {
 			Name: "pv",
 			Annotations: map[string]string{
 				"migration.storage.dell.com/migrate-to": "sc1",
+				"migration.storage.dell.com/namespace":  "namespace",
 			},
 		},
 		Spec: corev1.PersistentVolumeSpec{
@@ -386,6 +400,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileNonReplToRepl()
 			Name: "pv",
 			Annotations: map[string]string{
 				"migration.storage.dell.com/migrate-to": "sc2",
+				"migration.storage.dell.com/namespace":  "namespace",
 			},
 		},
 		Spec: corev1.PersistentVolumeSpec{
@@ -431,6 +446,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileReplToNonRepl()
 	sc2 := &storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: "sc2"},
 		Provisioner: "provisionerName",
+		Parameters:  map[string]string{"test": "test"},
 	}
 
 	pv := &corev1.PersistentVolume{
@@ -438,6 +454,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileReplToNonRepl()
 			Name: "pv",
 			Annotations: map[string]string{
 				"migration.storage.dell.com/migrate-to": "sc2",
+				"migration.storage.dell.com/namespace":  "namespace",
 			},
 		},
 		Spec: corev1.PersistentVolumeSpec{
@@ -475,11 +492,13 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileVolumeMigrate()
 	sc1 := &storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
 		Provisioner: "provisionerName",
+		Parameters:  map[string]string{"test": "test"},
 	}
 
 	sc2 := &storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: "sc2"},
 		Provisioner: "provisionerName",
+		Parameters:  map[string]string{"test": "test"},
 	}
 
 	pv := &corev1.PersistentVolume{
@@ -487,6 +506,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileVolumeMigrate()
 			Name: "pv",
 			Annotations: map[string]string{
 				"migration.storage.dell.com/migrate-to": "sc2",
+				"migration.storage.dell.com/namespace":  "namespace",
 			},
 		},
 		Spec: corev1.PersistentVolumeSpec{
@@ -512,7 +532,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileVolumeMigrate()
 
 	req := suite.getTypicalReconcileRequest(pv.Name)
 
-	suite.migrationClient.InjectError(fmt.Errorf("dgdsfgdf"))
+	suite.migrationClient.InjectError(fmt.Errorf("error"))
 
 	_, err = suite.reconciler.Reconcile(context.Background(), req)
 }
@@ -523,11 +543,13 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileNewPvFailedFetc
 	sc1 := &storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
 		Provisioner: "provisionerName",
+		Parameters:  map[string]string{"test": "test"},
 	}
 
 	sc2 := &storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: "sc2"},
 		Provisioner: "provisionerName",
+		Parameters:  map[string]string{"test": "test"},
 	}
 
 	pv := &corev1.PersistentVolume{
@@ -535,6 +557,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileNewPvFailedFetc
 			Name: "pv",
 			Annotations: map[string]string{
 				"migration.storage.dell.com/migrate-to": "sc2",
+				"migration.storage.dell.com/namespace":  "namespace",
 			},
 		},
 		Spec: corev1.PersistentVolumeSpec{
@@ -572,11 +595,13 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileCreatePv() {
 	sc1 := &storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
 		Provisioner: "provisionerName",
+		Parameters:  map[string]string{"test": "test"},
 	}
 
 	sc2 := &storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: "sc2"},
 		Provisioner: "provisionerName",
+		Parameters:  map[string]string{"test": "test"},
 	}
 
 	pv := &corev1.PersistentVolume{
@@ -584,6 +609,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileCreatePv() {
 			Name: "pv",
 			Annotations: map[string]string{
 				"migration.storage.dell.com/migrate-to": "sc2",
+				"migration.storage.dell.com/namespace":  "namespace",
 			},
 		},
 		Spec: corev1.PersistentVolumeSpec{
@@ -627,6 +653,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileUpdate() {
 	sc2 := &storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: "sc2"},
 		Provisioner: "provisionerName",
+		Parameters:  map[string]string{"test": "test"},
 	}
 
 	pv := &corev1.PersistentVolume{
@@ -634,6 +661,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileUpdate() {
 			Name: "pv",
 			Annotations: map[string]string{
 				"migration.storage.dell.com/migrate-to": "sc2",
+				"migration.storage.dell.com/namespace":  "namespace",
 			},
 		},
 		Spec: corev1.PersistentVolumeSpec{
