@@ -82,6 +82,7 @@ type ClusterInterface interface {
 	GetPersistentVolume(context.Context, string) (*v1.PersistentVolume, error)
 	ListPersistentVolumes(context.Context, ...client.ListOption) (*v1.PersistentVolumeList, error)
 	FilterPersistentVolumes(context.Context, string, string, string, string) ([]types.PersistentVolume, error)
+	UpdatePersistentVolume(ctx context.Context, pv *v1.PersistentVolume) error
 
 	GetNamespace(context.Context, string) (*v1.Namespace, error)
 	CreateNamespace(context.Context, *v1.Namespace) error
@@ -94,6 +95,7 @@ type ClusterInterface interface {
 
 	ListPersistentVolumeClaims(context.Context, ...client.ListOption) (*v1.PersistentVolumeClaimList, error)
 	FilterPersistentVolumeClaims(context.Context, string, string, string, string) (*types.PersistentVolumeClaimList, error)
+	GetPersistentVolumeClaim(context.Context, string, string) (*v1.PersistentVolumeClaim, error)
 
 	GetReplicationGroups(context.Context, string) (*v1alpha1.DellCSIReplicationGroup, error)
 	ListReplicationGroups(context.Context, ...client.ListOption) (*v1alpha1.DellCSIReplicationGroupList, error)
@@ -103,6 +105,8 @@ type ClusterInterface interface {
 
 	CreatePersistentVolumeClaimsFromPVs(context.Context, string, []types.PersistentVolume, string, bool) error
 	CreateObject(context.Context, []byte) (runtime.Object, error)
+
+	GetStatefulSet(context.Context, string, string) (*appsv1.StatefulSet, error)
 }
 
 // Cluster is implementation of ClusterInterface that represents some cluster
@@ -228,6 +232,11 @@ func (c *Cluster) UpdateSecret(ctx context.Context, secret *v1.Secret) error {
 	return c.client.Update(ctx, secret)
 }
 
+// UpdatePersistentVolume updates PV
+func (c *Cluster) UpdatePersistentVolume(ctx context.Context, pv *v1.PersistentVolume) error {
+	return c.client.Update(ctx, pv)
+}
+
 // ListStorageClass returns list of all storage class objects that are currently in cluster
 func (c *Cluster) ListStorageClass(ctx context.Context, opts ...client.ListOption) (*storagev1.StorageClassList, error) {
 	found := &storagev1.StorageClassList{}
@@ -267,6 +276,16 @@ func (c *Cluster) FilterStorageClass(ctx context.Context, driverName string, noF
 func (c *Cluster) ListPersistentVolumeClaims(ctx context.Context, opts ...client.ListOption) (*v1.PersistentVolumeClaimList, error) {
 	found := &v1.PersistentVolumeClaimList{}
 	err := c.client.List(ctx, found, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return found, nil
+}
+
+// GetPersistentVolumeClaim returns pvc by name
+func (c *Cluster) GetPersistentVolumeClaim(ctx context.Context, nsName string, pvcName string) (*v1.PersistentVolumeClaim, error) {
+	found := &v1.PersistentVolumeClaim{}
+	err := c.client.Get(ctx, apiTypes.NamespacedName{Namespace: nsName, Name: pvcName}, found)
 	if err != nil {
 		return nil, err
 	}
@@ -625,4 +644,14 @@ func (c *Cluster) GetReplicationGroups(ctx context.Context, rgID string) (*v1alp
 		return nil, err
 	}
 	return found, err
+}
+
+// GetStatefulSet returns sts by name
+func (c *Cluster) GetStatefulSet(ctx context.Context, nsName string, stsName string) (*appsv1.StatefulSet, error) {
+	found := &appsv1.StatefulSet{}
+	err := c.client.Get(ctx, apiTypes.NamespacedName{Namespace: nsName, Name: stsName}, found)
+	if err != nil {
+		return nil, err
+	}
+	return found, nil
 }
