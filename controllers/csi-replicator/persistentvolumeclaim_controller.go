@@ -75,10 +75,30 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 		log.Error(err, "Failed to find claim's namespace", "req.NamespacedName", req.NamespacedName)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+	var scName string
+	scList := new(storageV1.StorageClassList)
+	if claim.Spec.StorageClassName == nil {
+		listError := func() error {
+			err = r.List(ctx, scList, &client.ListOptions{})
+			for _, sc := range scList.Items {
+				if _, ok := sc.Annotations["storageclass.kubernetes.io/is-default-class"]; ok {
+					scName = sc.Name
+					return nil
+				}
+			}
+			log.Error(err, "No StorageClass specified and no default SC present in cluster")
+			return client.IgnoreNotFound(fmt.Errorf("%s", "Default SC not found "))
+		}()
+		if listError != nil {
+			return ctrl.Result{}, listError
+		}
+	} else {
+		scName = *claim.Spec.StorageClassName
+	}
 
 	storageClass := new(storageV1.StorageClass)
 	err = r.Get(ctx, client.ObjectKey{
-		Name: *claim.Spec.StorageClassName,
+		Name: scName,
 	}, storageClass)
 	if err != nil {
 		if errors.IsNotFound(err) {
