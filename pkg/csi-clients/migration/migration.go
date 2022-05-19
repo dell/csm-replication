@@ -25,7 +25,7 @@ import (
 
 // Migration is an interface that defines calls used for querying migration management calls to the driver
 type Migration interface {
-	VolumeMigrate(context.Context, string, string, *csiext.VolumeMigrateRequest_Type, map[string]string, bool) (*csiext.VolumeMigrateResponse, error)
+	VolumeMigrate(context.Context, string, string, *csiext.VolumeMigrateRequest_Type, map[string]string, map[string]string, bool) (*csiext.VolumeMigrateResponse, error)
 }
 
 // New returns new implementation of Replication interface
@@ -44,17 +44,18 @@ type migration struct {
 }
 
 // VolumeMigrate migrate volume
-func (m *migration) VolumeMigrate(ctx context.Context, volumeHandle string, storageClass string, migrateType *csiext.VolumeMigrateRequest_Type, scParams map[string]string, toClone bool) (*csiext.VolumeMigrateResponse, error) {
+func (m *migration) VolumeMigrate(ctx context.Context, volumeHandle string, storageClass string, migrateType *csiext.VolumeMigrateRequest_Type, scParams map[string]string, scSourceParams map[string]string, toClone bool) (*csiext.VolumeMigrateResponse, error) {
 	tc, cancel := context.WithTimeout(ctx, m.timeout)
 	defer cancel()
 	client := csiext.NewMigrationClient(m.conn)
 
 	req := &csiext.VolumeMigrateRequest{
-		VolumeHandle: volumeHandle,
-		StorageClass: storageClass,
-		MigrateTypes: migrateType,
-		ScParameters: scParams,
-		ShouldClone:  toClone,
+		VolumeHandle:       volumeHandle,
+		StorageClass:       storageClass,
+		MigrateTypes:       migrateType,
+		ScParameters:       scParams,
+		ScSourceParameters: scSourceParams,
+		ShouldClone:        toClone,
 	}
 
 	res, err := client.VolumeMigrate(tc, req)

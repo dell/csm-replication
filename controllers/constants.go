@@ -98,6 +98,8 @@ const (
 	remoteRGRetentionPolicy = "/remoteRGRetentionPolicy"
 	// Indicates if migration is requested for given volume. Value is the target SC.
 	migrateTo = "/migrate-to"
+	// Indicates target NS for migrated pvc
+	migrateNS = "/namespace"
 	// Indicates that this PV's been created by migrator sidecar
 	createdByMigrator = "/createdByMigrator"
 	// FailOver failover replication action name

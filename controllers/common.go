@@ -215,6 +215,8 @@ var (
 	RemoteRGRetentionPolicy string
 	// MigrationRequested  annotation indicates if migration is requested for given volume
 	MigrationRequested string
+	// MigrationNamespace indicates target pvc namespace
+	MigrationNamespace string
 	// CreatedByMigrator indicates that this PV's been created by migrator sidecar
 	CreatedByMigrator string
 )
@@ -248,5 +250,6 @@ func InitLabelsAndAnnotations(domain string) {
 	RemotePVRetentionPolicy = domain + remotePVRetentionPolicy
 	RemoteRGRetentionPolicy = domain + remoteRGRetentionPolicy
 	MigrationRequested = domain + migrateTo
+	MigrationNamespace = domain + migrateNS
 	CreatedByMigrator = domain + createdByMigrator
 }

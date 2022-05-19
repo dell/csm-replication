@@ -69,7 +69,7 @@ func NewFakeMigrationClient(contextPrefix string) MockMigration {
 
 // VolumeMigrate migrates volume
 func (m *MockMigration) VolumeMigrate(ctx context.Context, volumeHandle string, storageClass string, migrateType *csiext.VolumeMigrateRequest_Type,
-	scParams map[string]string, toClone bool) (*csiext.VolumeMigrateResponse, error) {
+	scParams map[string]string, sourcescParams map[string]string, toClone bool) (*csiext.VolumeMigrateResponse, error) {
 
 	defer m.ClearError(false)
 	if err := m.injectedError.getError(); err != nil {
