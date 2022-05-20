@@ -20,6 +20,7 @@ import (
 	"github.com/dell/repctl/pkg/k8s"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	v12 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"os"
@@ -63,7 +64,7 @@ func migratePVCommand() *cobra.Command {
 		Use:   "pv",
 		Short: "allows to execute migrate action on pv",
 		Example: `
-./repctl migrate pv <name> --to-sc <scName> (--target-ns=tns)`,
+./repctl migrate pv <name> --to-sc <scName> (--target-ns=tns) (--wait)`,
 		Long: `
 This command will perform a migrate command to target StorageClass.`,
 
@@ -75,11 +76,12 @@ This command will perform a migrate command to target StorageClass.`,
 			pvName := args[0]
 			toSc := viper.GetString("pvto-sc")
 			targetNs := viper.GetString("pvtarget-ns")
+			wait := viper.GetBool("pvwait")
 			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
 			if err != nil {
 				log.Fatalf("failover: error getting clusters folder path: %s\n", err.Error())
 			}
-			migrate(configFolder, "pv", pvName, "", toSc, targetNs)
+			migrate(configFolder, "pv", pvName, "", toSc, targetNs, wait, false)
 		},
 	}
 
@@ -87,6 +89,8 @@ This command will perform a migrate command to target StorageClass.`,
 	_ = viper.BindPFlag("pvto-sc", migrateCmd.Flags().Lookup("to-sc"))
 	migrateCmd.Flags().String("target-ns", "", "target namespace")
 	_ = viper.BindPFlag("pvtarget-ns", migrateCmd.Flags().Lookup("target-ns"))
+	migrateCmd.Flags().Bool("wait", true, "wait for action to complete")
+	_ = viper.BindPFlag("pvwait", migrateCmd.Flags().Lookup("wait"))
 	migrateCmd.MarkFlagRequired("to-sc")
 	return migrateCmd
 }
@@ -98,7 +102,7 @@ func migratePVCCommand() *cobra.Command {
 		Use:   "pvc",
 		Short: "allows to execute migrate action on pvc",
 		Example: `
-./repctl migrate pvc <name> --to-sc <scName> (--target-ns=tns)`,
+./repctl migrate pvc <name> --to-sc <scName> (--target-ns=tns) (--wait)`,
 		Long: `
 This command will perform a migrate command to target StorageClass.`,
 
@@ -111,11 +115,12 @@ This command will perform a migrate command to target StorageClass.`,
 			pvcNS := viper.GetString("pvcnamespace")
 			toSc := viper.GetString("pvcto-sc")
 			targetNs := viper.GetString("pvctarget-ns")
+			wait := viper.GetBool("pvcwait")
 			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
 			if err != nil {
 				log.Fatalf("failover: error getting clusters folder path: %s\n", err.Error())
 			}
-			migrate(configFolder, "pvc", pvcName, pvcNS, toSc, targetNs)
+			migrate(configFolder, "pvc", pvcName, pvcNS, toSc, targetNs, wait, false)
 		},
 	}
 
@@ -125,6 +130,8 @@ This command will perform a migrate command to target StorageClass.`,
 	_ = viper.BindPFlag("pvcto-sc", migrateCmd.Flags().Lookup("to-sc"))
 	migrateCmd.Flags().String("target-ns", "", "target namespace")
 	_ = viper.BindPFlag("pvctarget-ns", migrateCmd.Flags().Lookup("target-ns"))
+	migrateCmd.Flags().Bool("wait", true, "wait for action to complete")
+	_ = viper.BindPFlag("pvcwait", migrateCmd.Flags().Lookup("wait"))
 	migrateCmd.MarkFlagRequired("to-sc")
 	migrateCmd.MarkFlagRequired("namespace")
 	return migrateCmd
@@ -137,7 +144,7 @@ func migrateSTSCommand() *cobra.Command {
 		Use:   "sts",
 		Short: "allows to execute migrate action on sts",
 		Example: `
-./repctl migrate sts -n<ns> <name> --to-sc <scName> (--target-ns=tns)`,
+./repctl migrate sts -n<ns> <name> --to-sc <scName> (--target-ns=tns) (--wait)`,
 		Long: `
 This command will perform a migrate command to target StorageClass.`,
 
@@ -150,12 +157,13 @@ This command will perform a migrate command to target StorageClass.`,
 			stsNS := viper.GetString("stsnamespace")
 			toSc := viper.GetString("ststo-sc")
 			targetNs := viper.GetString("ststarget-ns")
-
+			wait := viper.GetBool("stswait")
+			ndu := viper.GetBool("ndu")
 			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
 			if err != nil {
 				log.Fatalf("failover: error getting clusters folder path: %s\n", err.Error())
 			}
-			migrate(configFolder, "sts", stsName, stsNS, toSc, targetNs)
+			migrate(configFolder, "sts", stsName, stsNS, toSc, targetNs, wait, ndu)
 		},
 	}
 
@@ -165,16 +173,17 @@ This command will perform a migrate command to target StorageClass.`,
 	_ = viper.BindPFlag("ststo-sc", migrateCmd.Flags().Lookup("to-sc"))
 	migrateCmd.Flags().String("target-ns", "", "target namespace")
 	_ = viper.BindPFlag("ststarget-ns", migrateCmd.Flags().Lookup("target-ns"))
+	migrateCmd.Flags().Bool("wait", true, "wait for action to complete")
+	_ = viper.BindPFlag("stswait", migrateCmd.Flags().Lookup("wait"))
+	migrateCmd.Flags().Bool("ndu", false, "recreate STS in NDU manner")
+	_ = viper.BindPFlag("ndu", migrateCmd.Flags().Lookup("ndu"))
 	migrateCmd.MarkFlagRequired("to-sc")
 	migrateCmd.MarkFlagRequired("namespace")
 	return migrateCmd
 }
 
-func migrate(configFolder, resource string, resName string, resNS string, toSC string, targetNS string) {
-	log.Info("migrate", configFolder, resource, resName, resNS, toSC, targetNS)
-	log.Info(toSC)
+func migrate(configFolder, resource string, resName string, resNS string, toSC string, targetNS string, wait bool, ndu bool) {
 	clusterIDs := viper.GetStringSlice(config.Clusters)
-	log.Info(clusterIDs)
 	mc := &k8s.MultiClusterConfigurator{}
 	clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
 	if err != nil {
@@ -185,7 +194,7 @@ func migrate(configFolder, resource string, resName string, resNS string, toSC s
 		wg := &sync.WaitGroup{}
 		for _, i := range clusters.Clusters {
 			wg.Add(1)
-			go migratePV(context.Background(), i, resName, toSC, targetNS, wg)
+			go migratePV(context.Background(), i, resName, toSC, targetNS, wg, wait)
 		}
 		wg.Wait()
 
@@ -200,7 +209,7 @@ func migrate(configFolder, resource string, resName string, resNS string, toSC s
 			log.Info(pvc.OwnerReferences)
 			pvName := pvc.Spec.VolumeName
 			wg.Add(1)
-			go migratePV(context.Background(), i, pvName, toSC, targetNS, wg)
+			go migratePV(context.Background(), i, pvName, toSC, targetNS, wg, wait)
 		}
 		wg.Wait()
 
@@ -226,19 +235,32 @@ func migrate(configFolder, resource string, resName string, resNS string, toSC s
 							os.Exit(1)
 						}
 						wg.Add(1)
-						go migratePV(context.Background(), i, pvc.Spec.VolumeName, toSC, targetNS, wg)
+						go migratePV(context.Background(), i, pvc.Spec.VolumeName, toSC, targetNS, wg, wait)
 					}
 				}
 			}
 		}
 		wg.Wait()
+		if ndu {
+			for _, i := range clusters.Clusters {
+				sts, err := i.GetStatefulSet(context.Background(), resNS, resName)
+				if err != nil {
+					log.Error(err)
+					os.Exit(1)
+				}
+				err = recreateStsNdu(i, sts, toSC)
+				if err != nil {
+					log.Error("Failed to recreate STS: ", err)
+				}
+			}
+		}
 	default:
 		log.Error("Unknown resource")
 		os.Exit(1)
 	}
 }
 
-func migratePV(ctx context.Context, cluster k8s.ClusterInterface, pvName string, toSC string, targetNS string, wg *sync.WaitGroup) {
+func migratePV(ctx context.Context, cluster k8s.ClusterInterface, pvName string, toSC string, targetNS string, wg *sync.WaitGroup, wait bool) {
 	defer wg.Done()
 	log.Info(pvName)
 	pv, err := cluster.GetPersistentVolume(context.Background(), pvName)
@@ -254,11 +276,15 @@ func migratePV(ctx context.Context, cluster k8s.ClusterInterface, pvName string,
 		log.Error(err, "unable to update persistent volume")
 		os.Exit(1)
 	}
-	done := waitForPVToBeBound(pvName+"-to-"+toSC, cluster)
-	if done {
-		log.Infof("Successfully updated pv %s in cluster %s. Consider using new PV: [%s]", pv.Name, cluster.GetID(), pvName+"-to-"+toSC)
+	if wait {
+		done := waitForPVToBeBound(pvName+"-to-"+toSC, cluster)
+		if done {
+			log.Infof("Successfully updated pv %s in cluster %s. Consider using new PV: [%s]", pv.Name, cluster.GetID(), pvName+"-to-"+toSC)
+		} else {
+			log.Error("time out waiting for the PV to be bound")
+		}
 	} else {
-		log.Error("time out waiting for the PV to be bound")
+		log.Infof("Successfully updated pv %s in cluster %s. Consider using new PV: [%s]", pv.Name, cluster.GetID(), pvName+"-to-"+toSC)
 	}
 }
 
@@ -285,4 +311,88 @@ func waitForPVToBeBound(pvName string, cluster k8s.ClusterInterface) bool {
 	}()
 	res := <-ret
 	return res
+}
+
+func waitForPodToBeReady(podName string, podNS string, cluster k8s.ClusterInterface) bool {
+	t := time.NewTicker(5 * time.Second)
+	ret := make(chan bool)
+	go func() {
+		log.Print("Waiting for action to complete ...")
+		for {
+			select {
+			case <-time.After(5 * time.Minute):
+				ret <- false
+			case <-t.C:
+				pod, err := cluster.GetPod(context.Background(), podName, podNS)
+				if err != nil && !errors.IsNotFound(err) {
+					log.Fatalf("migrate: error in fecthing pod info: %s\n", err.Error())
+				}
+				if pod != nil && pod.Status.Phase == v1.PodRunning {
+					for _, condition := range pod.Status.Conditions {
+						if condition.Type == v1.PodReady {
+							ret <- true
+							return
+						}
+					}
+
+				}
+			}
+		}
+	}()
+	res := <-ret
+	return res
+}
+
+func recreateStsNdu(cluster k8s.ClusterInterface, sts *v12.StatefulSet, targetSC string) error {
+	stsDeepCopy := sts.DeepCopy()
+	if sts.Spec.Replicas != nil {
+		if *sts.Spec.Replicas <= 1 {
+			return errors.NewBadRequest("Unable to perform NDU with replicas <= 1")
+		}
+	}
+	log.Info("Trying to delete original sts with orphan option")
+	err := cluster.DeleteStsOrphan(context.Background(), sts)
+	if err != nil {
+		return err
+	}
+	log.Info("Changing SC in STS manifest")
+	for _, template := range stsDeepCopy.Spec.VolumeClaimTemplates {
+		template.Spec.StorageClassName = &targetSC
+	}
+	log.Info("trying to apply modified sts")
+	err = cluster.CreateStatefulSet(context.Background(), stsDeepCopy)
+	if err != nil {
+		return err
+	}
+
+	list, err := cluster.FilterPods(context.Background(), sts.Namespace, sts.Name)
+	if err != nil {
+		return err
+	}
+	log.Info("trying to delete old resources")
+	for _, pod := range list.Items {
+		for _, volume := range pod.Spec.Volumes {
+			if volume.PersistentVolumeClaim != nil {
+				pvc, err := cluster.GetPersistentVolumeClaim(context.Background(), sts.Namespace, volume.PersistentVolumeClaim.ClaimName)
+				if err != nil {
+					return err
+				}
+				log.Infof("trying to delete pvc %s", pvc.Name)
+				err = cluster.DeletePersistentVolumeClaim(context.Background(), pvc, nil)
+				if err != nil {
+					return err
+				}
+				log.Infof("trying to delete pod %s", pod.Name)
+				err = cluster.DeletePod(context.Background(), &pod, nil)
+				if err != nil {
+					return err
+				}
+				done := waitForPodToBeReady(pod.Name, pod.Namespace, cluster)
+				if !done {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }

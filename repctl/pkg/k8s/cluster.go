@@ -96,6 +96,7 @@ type ClusterInterface interface {
 	ListPersistentVolumeClaims(context.Context, ...client.ListOption) (*v1.PersistentVolumeClaimList, error)
 	FilterPersistentVolumeClaims(context.Context, string, string, string, string) (*types.PersistentVolumeClaimList, error)
 	GetPersistentVolumeClaim(context.Context, string, string) (*v1.PersistentVolumeClaim, error)
+	DeletePersistentVolumeClaim(ctx context.Context, pvc *v1.PersistentVolumeClaim, opts ...client.DeleteOption) error
 
 	GetReplicationGroups(context.Context, string) (*v1alpha1.DellCSIReplicationGroup, error)
 	ListReplicationGroups(context.Context, ...client.ListOption) (*v1alpha1.DellCSIReplicationGroupList, error)
@@ -110,6 +111,11 @@ type ClusterInterface interface {
 
 	FilterPods(ctx context.Context, namespace string, stsName string) (*v1.PodList, error)
 	ListPods(ctx context.Context, opts ...client.ListOption) (*v1.PodList, error)
+	GetPod(ctx context.Context, name string, namespace string) (*v1.Pod, error)
+	DeletePod(ctx context.Context, pod *v1.Pod, opts ...client.DeleteOption) error
+
+	DeleteStsOrphan(ctx context.Context, sts *appsv1.StatefulSet) error
+	CreateStatefulSet(ctx context.Context, sts *appsv1.StatefulSet) error
 }
 
 // Cluster is implementation of ClusterInterface that represents some cluster
@@ -688,4 +694,49 @@ func (c *Cluster) ListPods(ctx context.Context, opts ...client.ListOption) (*v1.
 		return nil, err
 	}
 	return found, nil
+}
+
+// DeleteStsOrphan deletes sts with orphan option
+func (c *Cluster) DeleteStsOrphan(ctx context.Context, sts *appsv1.StatefulSet) error {
+	deletionOrphan := metav1.DeletePropagationOrphan
+	err := c.client.Delete(ctx, sts, &client.DeleteOptions{
+		PropagationPolicy: &deletionOrphan,
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// DeletePod deletes pod from cluster
+func (c *Cluster) DeletePod(ctx context.Context, pod *v1.Pod, opts ...client.DeleteOption) error {
+	err := c.client.Delete(ctx, pod, opts...)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// GetPod returns Pod from the cluster
+func (c *Cluster) GetPod(ctx context.Context, name string, namespace string) (*v1.Pod, error) {
+	found := &v1.Pod{}
+	err := c.client.Get(ctx, apiTypes.NamespacedName{Namespace: namespace, Name: name}, found)
+	if err != nil {
+		return nil, err
+	}
+	return found, nil
+}
+
+// DeletePersistentVolumeClaim deletes pvc from cluster
+func (c *Cluster) DeletePersistentVolumeClaim(ctx context.Context, pvc *v1.PersistentVolumeClaim, opts ...client.DeleteOption) error {
+	err := c.client.Delete(ctx, pvc, opts...)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// CreateStatefulSet creates new sts object in cluster
+func (c *Cluster) CreateStatefulSet(ctx context.Context, sts *appsv1.StatefulSet) error {
+	return c.GetClient().Create(ctx, sts)
 }
