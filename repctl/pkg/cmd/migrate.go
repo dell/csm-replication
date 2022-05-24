@@ -302,7 +302,7 @@ func waitForPVToBeBound(pvName string, cluster k8s.ClusterInterface) bool {
 				if err != nil && !errors.IsNotFound(err) {
 					log.Fatalf("migrate: error in fecthing pv info: %s\n", err.Error())
 				}
-				if pv != nil && pv.Status.Phase == v1.VolumeBound {
+				if pv != nil && (pv.Status.Phase == v1.VolumeBound || pv.Status.Phase == v1.VolumeAvailable) {
 					ret <- true
 					return
 				}
