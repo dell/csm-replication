@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"os"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sync"
 	"time"
 
@@ -379,12 +380,12 @@ func recreateStsNdu(cluster k8s.ClusterInterface, sts *v12.StatefulSet, targetSC
 					return err
 				}
 				log.Infof("trying to delete pvc %s", pvc.Name)
-				err = cluster.DeletePersistentVolumeClaim(context.Background(), pvc, nil)
+				err = cluster.DeletePersistentVolumeClaim(context.Background(), pvc, &client.DeleteOptions{})
 				if err != nil {
 					return err
 				}
 				log.Infof("trying to delete pod %s", pod.Name)
-				err = cluster.DeletePod(context.Background(), &pod, nil)
+				err = cluster.DeletePod(context.Background(), &pod, &client.DeleteOptions{})
 				if err != nil {
 					return err
 				}
