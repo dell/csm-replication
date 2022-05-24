@@ -5,6 +5,7 @@ package mocks
 import (
 	context "context"
 
+	appsv1 "k8s.io/api/apps/v1"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 
 	k8s "github.com/dell/repctl/pkg/k8s"
@@ -80,6 +81,76 @@ func (_m *ClusterInterface) CreatePersistentVolumeClaimsFromPVs(_a0 context.Cont
 	return r0
 }
 
+// CreateStatefulSet provides a mock function with given fields: ctx, sts
+func (_m *ClusterInterface) CreateStatefulSet(ctx context.Context, sts *appsv1.StatefulSet) error {
+	ret := _m.Called(ctx, sts)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *appsv1.StatefulSet) error); ok {
+		r0 = rf(ctx, sts)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// DeletePersistentVolumeClaim provides a mock function with given fields: ctx, pvc, opts
+func (_m *ClusterInterface) DeletePersistentVolumeClaim(ctx context.Context, pvc *v1.PersistentVolumeClaim, opts ...client.DeleteOption) error {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, pvc)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.PersistentVolumeClaim, ...client.DeleteOption) error); ok {
+		r0 = rf(ctx, pvc, opts...)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// DeletePod provides a mock function with given fields: ctx, pod, opts
+func (_m *ClusterInterface) DeletePod(ctx context.Context, pod *v1.Pod, opts ...client.DeleteOption) error {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, pod)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.Pod, ...client.DeleteOption) error); ok {
+		r0 = rf(ctx, pod, opts...)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// DeleteStsOrphan provides a mock function with given fields: ctx, sts
+func (_m *ClusterInterface) DeleteStsOrphan(ctx context.Context, sts *appsv1.StatefulSet) error {
+	ret := _m.Called(ctx, sts)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *appsv1.StatefulSet) error); ok {
+		r0 = rf(ctx, sts)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // FilterPersistentVolumeClaims provides a mock function with given fields: _a0, _a1, _a2, _a3, _a4
 func (_m *ClusterInterface) FilterPersistentVolumeClaims(_a0 context.Context, _a1 string, _a2 string, _a3 string, _a4 string) (*types.PersistentVolumeClaimList, error) {
 	ret := _m.Called(_a0, _a1, _a2, _a3, _a4)
@@ -119,6 +190,29 @@ func (_m *ClusterInterface) FilterPersistentVolumes(_a0 context.Context, _a1 str
 	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, string) error); ok {
 		r1 = rf(_a0, _a1, _a2, _a3, _a4)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// FilterPods provides a mock function with given fields: ctx, namespace, stsName
+func (_m *ClusterInterface) FilterPods(ctx context.Context, namespace string, stsName string) (*v1.PodList, error) {
+	ret := _m.Called(ctx, namespace, stsName)
+
+	var r0 *v1.PodList
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *v1.PodList); ok {
+		r0 = rf(ctx, namespace, stsName)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.PodList)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, namespace, stsName)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -290,6 +384,52 @@ func (_m *ClusterInterface) GetPersistentVolume(_a0 context.Context, _a1 string)
 	return r0, r1
 }
 
+// GetPersistentVolumeClaim provides a mock function with given fields: _a0, _a1, _a2
+func (_m *ClusterInterface) GetPersistentVolumeClaim(_a0 context.Context, _a1 string, _a2 string) (*v1.PersistentVolumeClaim, error) {
+	ret := _m.Called(_a0, _a1, _a2)
+
+	var r0 *v1.PersistentVolumeClaim
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *v1.PersistentVolumeClaim); ok {
+		r0 = rf(_a0, _a1, _a2)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.PersistentVolumeClaim)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(_a0, _a1, _a2)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetPod provides a mock function with given fields: ctx, name, namespace
+func (_m *ClusterInterface) GetPod(ctx context.Context, name string, namespace string) (*v1.Pod, error) {
+	ret := _m.Called(ctx, name, namespace)
+
+	var r0 *v1.Pod
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *v1.Pod); ok {
+		r0 = rf(ctx, name, namespace)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.Pod)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, name, namespace)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetReplicationGroups provides a mock function with given fields: _a0, _a1
 func (_m *ClusterInterface) GetReplicationGroups(_a0 context.Context, _a1 string) (*v1alpha1.DellCSIReplicationGroup, error) {
 	ret := _m.Called(_a0, _a1)
@@ -323,6 +463,29 @@ func (_m *ClusterInterface) GetSecret(_a0 context.Context, _a1 string, _a2 strin
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*v1.Secret)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(_a0, _a1, _a2)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetStatefulSet provides a mock function with given fields: _a0, _a1, _a2
+func (_m *ClusterInterface) GetStatefulSet(_a0 context.Context, _a1 string, _a2 string) (*appsv1.StatefulSet, error) {
+	ret := _m.Called(_a0, _a1, _a2)
+
+	var r0 *appsv1.StatefulSet
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *appsv1.StatefulSet); ok {
+		r0 = rf(_a0, _a1, _a2)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*appsv1.StatefulSet)
 		}
 	}
 
@@ -389,6 +552,36 @@ func (_m *ClusterInterface) ListPersistentVolumes(_a0 context.Context, _a1 ...cl
 	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, ...client.ListOption) error); ok {
 		r1 = rf(_a0, _a1...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ListPods provides a mock function with given fields: ctx, opts
+func (_m *ClusterInterface) ListPods(ctx context.Context, opts ...client.ListOption) (*v1.PodList, error) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *v1.PodList
+	if rf, ok := ret.Get(0).(func(context.Context, ...client.ListOption) *v1.PodList); ok {
+		r0 = rf(ctx, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.PodList)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, ...client.ListOption) error); ok {
+		r1 = rf(ctx, opts...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -473,6 +666,20 @@ func (_m *ClusterInterface) PatchReplicationGroup(_a0 context.Context, _a1 *v1al
 // SetClient provides a mock function with given fields: _a0
 func (_m *ClusterInterface) SetClient(_a0 k8s.ClientInterface) {
 	_m.Called(_a0)
+}
+
+// UpdatePersistentVolume provides a mock function with given fields: ctx, pv
+func (_m *ClusterInterface) UpdatePersistentVolume(ctx context.Context, pv *v1.PersistentVolume) error {
+	ret := _m.Called(ctx, pv)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.PersistentVolume) error); ok {
+		r0 = rf(ctx, pv)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // UpdateReplicationGroup provides a mock function with given fields: _a0, _a1

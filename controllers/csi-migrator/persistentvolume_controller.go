@@ -18,6 +18,7 @@ package csimigrator
 
 import (
 	"context"
+
 	"github.com/dell/dell-csi-extensions/migration"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -161,10 +162,11 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 						VolumeAttributes: migrate.GetMigratedVolume().GetVolumeContext(),
 					},
 				},
-				StorageClassName: targetStorageClassName,
-				AccessModes:      pv.Spec.AccessModes,
-				MountOptions:     pv.Spec.MountOptions,
-				Capacity:         v1.ResourceList{v1.ResourceStorage: bytesToQuantity(migrate.GetMigratedVolume().CapacityBytes)}},
+				PersistentVolumeReclaimPolicy: pv.Spec.PersistentVolumeReclaimPolicy,
+				StorageClassName:              targetStorageClassName,
+				AccessModes:                   pv.Spec.AccessModes,
+				MountOptions:                  pv.Spec.MountOptions,
+				Capacity:                      v1.ResourceList{v1.ResourceStorage: bytesToQuantity(migrate.GetMigratedVolume().CapacityBytes)}},
 		}
 		log.V(common.InfoLevel).Info("trying to create migrated PV")
 		err = r.Create(ctx, pvT, &client.CreateOptions{})

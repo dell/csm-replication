@@ -1,5 +1,5 @@
 /*
- Copyright © 2021 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2022 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -82,6 +82,7 @@ type ClusterInterface interface {
 	GetPersistentVolume(context.Context, string) (*v1.PersistentVolume, error)
 	ListPersistentVolumes(context.Context, ...client.ListOption) (*v1.PersistentVolumeList, error)
 	FilterPersistentVolumes(context.Context, string, string, string, string) ([]types.PersistentVolume, error)
+	UpdatePersistentVolume(ctx context.Context, pv *v1.PersistentVolume) error
 
 	GetNamespace(context.Context, string) (*v1.Namespace, error)
 	CreateNamespace(context.Context, *v1.Namespace) error
@@ -94,6 +95,8 @@ type ClusterInterface interface {
 
 	ListPersistentVolumeClaims(context.Context, ...client.ListOption) (*v1.PersistentVolumeClaimList, error)
 	FilterPersistentVolumeClaims(context.Context, string, string, string, string) (*types.PersistentVolumeClaimList, error)
+	GetPersistentVolumeClaim(context.Context, string, string) (*v1.PersistentVolumeClaim, error)
+	DeletePersistentVolumeClaim(ctx context.Context, pvc *v1.PersistentVolumeClaim, opts ...client.DeleteOption) error
 
 	GetReplicationGroups(context.Context, string) (*v1alpha1.DellCSIReplicationGroup, error)
 	ListReplicationGroups(context.Context, ...client.ListOption) (*v1alpha1.DellCSIReplicationGroupList, error)
@@ -103,6 +106,16 @@ type ClusterInterface interface {
 
 	CreatePersistentVolumeClaimsFromPVs(context.Context, string, []types.PersistentVolume, string, bool) error
 	CreateObject(context.Context, []byte) (runtime.Object, error)
+
+	GetStatefulSet(context.Context, string, string) (*appsv1.StatefulSet, error)
+
+	FilterPods(ctx context.Context, namespace string, stsName string) (*v1.PodList, error)
+	ListPods(ctx context.Context, opts ...client.ListOption) (*v1.PodList, error)
+	GetPod(ctx context.Context, name string, namespace string) (*v1.Pod, error)
+	DeletePod(ctx context.Context, pod *v1.Pod, opts ...client.DeleteOption) error
+
+	DeleteStsOrphan(ctx context.Context, sts *appsv1.StatefulSet) error
+	CreateStatefulSet(ctx context.Context, sts *appsv1.StatefulSet) error
 }
 
 // Cluster is implementation of ClusterInterface that represents some cluster
@@ -228,6 +241,11 @@ func (c *Cluster) UpdateSecret(ctx context.Context, secret *v1.Secret) error {
 	return c.client.Update(ctx, secret)
 }
 
+// UpdatePersistentVolume updates PV
+func (c *Cluster) UpdatePersistentVolume(ctx context.Context, pv *v1.PersistentVolume) error {
+	return c.client.Update(ctx, pv)
+}
+
 // ListStorageClass returns list of all storage class objects that are currently in cluster
 func (c *Cluster) ListStorageClass(ctx context.Context, opts ...client.ListOption) (*storagev1.StorageClassList, error) {
 	found := &storagev1.StorageClassList{}
@@ -267,6 +285,16 @@ func (c *Cluster) FilterStorageClass(ctx context.Context, driverName string, noF
 func (c *Cluster) ListPersistentVolumeClaims(ctx context.Context, opts ...client.ListOption) (*v1.PersistentVolumeClaimList, error) {
 	found := &v1.PersistentVolumeClaimList{}
 	err := c.client.List(ctx, found, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return found, nil
+}
+
+// GetPersistentVolumeClaim returns pvc by name
+func (c *Cluster) GetPersistentVolumeClaim(ctx context.Context, nsName string, pvcName string) (*v1.PersistentVolumeClaim, error) {
+	found := &v1.PersistentVolumeClaim{}
+	err := c.client.Get(ctx, apiTypes.NamespacedName{Namespace: nsName, Name: pvcName}, found)
 	if err != nil {
 		return nil, err
 	}
@@ -625,4 +653,90 @@ func (c *Cluster) GetReplicationGroups(ctx context.Context, rgID string) (*v1alp
 		return nil, err
 	}
 	return found, err
+}
+
+// GetStatefulSet returns sts by name
+func (c *Cluster) GetStatefulSet(ctx context.Context, nsName string, stsName string) (*appsv1.StatefulSet, error) {
+	found := &appsv1.StatefulSet{}
+	err := c.client.Get(ctx, apiTypes.NamespacedName{Namespace: nsName, Name: stsName}, found)
+	if err != nil {
+		return nil, err
+	}
+	return found, nil
+}
+
+// FilterPods returns filtered list of pod, managed by given sts
+func (c *Cluster) FilterPods(ctx context.Context, namespace string, stsName string) (*v1.PodList, error) {
+
+	podList, err := c.ListPods(ctx, client.InNamespace(namespace))
+	if err != nil {
+		return nil, err
+	}
+
+	myPodList := &v1.PodList{}
+
+	for _, item := range podList.Items {
+		for _, reference := range item.OwnerReferences {
+			if reference.Name == stsName && reference.Kind == "StatefulSet" {
+				myPodList.Items = append(myPodList.Items, item)
+			}
+		}
+	}
+
+	return myPodList, nil
+}
+
+// ListPods returns list of all pods in ns
+func (c *Cluster) ListPods(ctx context.Context, opts ...client.ListOption) (*v1.PodList, error) {
+	found := &v1.PodList{}
+	err := c.client.List(ctx, found, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return found, nil
+}
+
+// DeleteStsOrphan deletes sts with orphan option
+func (c *Cluster) DeleteStsOrphan(ctx context.Context, sts *appsv1.StatefulSet) error {
+	deletionOrphan := metav1.DeletePropagationOrphan
+	err := c.client.Delete(ctx, sts, &client.DeleteOptions{
+		PropagationPolicy: &deletionOrphan,
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// DeletePod deletes pod from cluster
+func (c *Cluster) DeletePod(ctx context.Context, pod *v1.Pod, opts ...client.DeleteOption) error {
+	err := c.client.Delete(ctx, pod, opts...)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// GetPod returns Pod from the cluster
+func (c *Cluster) GetPod(ctx context.Context, name string, namespace string) (*v1.Pod, error) {
+	found := &v1.Pod{}
+	err := c.client.Get(ctx, apiTypes.NamespacedName{Namespace: namespace, Name: name}, found)
+	if err != nil {
+		return nil, err
+	}
+	return found, nil
+}
+
+// DeletePersistentVolumeClaim deletes pvc from cluster
+func (c *Cluster) DeletePersistentVolumeClaim(ctx context.Context, pvc *v1.PersistentVolumeClaim, opts ...client.DeleteOption) error {
+	err := c.client.Delete(ctx, pvc, opts...)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// CreateStatefulSet creates new sts object in cluster
+func (c *Cluster) CreateStatefulSet(ctx context.Context, sts *appsv1.StatefulSet) error {
+	return c.GetClient().Create(ctx, sts)
 }
