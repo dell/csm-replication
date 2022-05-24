@@ -236,7 +236,7 @@ func migrate(configFolder, resource string, resName string, resNS string, toSC s
 							os.Exit(1)
 						}
 						wg.Add(1)
-						go migratePV(context.Background(), i, pvc.Spec.VolumeName, toSC, targetNS, wg, wait)
+						go migratePV(context.Background(), i, pvc.Spec.VolumeName, toSC, targetNS, wg, wait || ndu)
 					}
 				}
 			}
@@ -384,16 +384,17 @@ func recreateStsNdu(cluster k8s.ClusterInterface, sts *v12.StatefulSet, targetSC
 				if err != nil {
 					return err
 				}
-				log.Infof("trying to delete pod %s", pod.Name)
-				err = cluster.DeletePod(context.Background(), &pod, &client.DeleteOptions{})
-				if err != nil {
-					return err
-				}
-				done := waitForPodToBeReady(pod.Name, pod.Namespace, cluster)
-				if !done {
-					return err
-				}
+
 			}
+		}
+		log.Infof("trying to delete pod %s", pod.Name)
+		err = cluster.DeletePod(context.Background(), &pod, &client.DeleteOptions{})
+		if err != nil {
+			return err
+		}
+		done := waitForPodToBeReady(pod.Name, pod.Namespace, cluster)
+		if !done {
+			return err
 		}
 	}
 	return nil
