@@ -345,6 +345,7 @@ func waitForPodToBeReady(podName string, podNS string, cluster k8s.ClusterInterf
 
 func recreateStsNdu(cluster k8s.ClusterInterface, sts *v12.StatefulSet, targetSC string) error {
 	stsDeepCopy := sts.DeepCopy()
+	stsDeepCopy.ResourceVersion = ""
 	if sts.Spec.Replicas != nil {
 		if *sts.Spec.Replicas <= 1 {
 			return errors.NewBadRequest("Unable to perform NDU with replicas <= 1")
