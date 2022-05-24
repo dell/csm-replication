@@ -15,7 +15,9 @@
 package cmd
 
 import (
+	"bufio"
 	"context"
+	"fmt"
 	"github.com/dell/repctl/pkg/config"
 	"github.com/dell/repctl/pkg/k8s"
 	log "github.com/sirupsen/logrus"
@@ -34,6 +36,7 @@ import (
 var migrationPref = "migration.storage.dell.com"
 var migrationAnnotation = ""
 var migrationNS = ""
+var yes = false
 
 // GetMigrateCommand returns 'edit' cobra command
 func GetMigrateCommand() *cobra.Command {
@@ -145,7 +148,7 @@ func migrateSTSCommand() *cobra.Command {
 		Use:   "sts",
 		Short: "allows to execute migrate action on sts",
 		Example: `
-./repctl migrate sts -n<ns> <name> --to-sc <scName> (--target-ns=tns) (--wait)`,
+./repctl migrate sts -n<ns> <name> --to-sc <scName> (--target-ns=tns) (--wait) (--yes)`,
 		Long: `
 This command will perform a migrate command to target StorageClass.`,
 
@@ -160,6 +163,7 @@ This command will perform a migrate command to target StorageClass.`,
 			targetNs := viper.GetString("ststarget-ns")
 			wait := viper.GetBool("stswait")
 			ndu := viper.GetBool("ndu")
+			yes = viper.GetBool("yes")
 			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
 			if err != nil {
 				log.Fatalf("failover: error getting clusters folder path: %s\n", err.Error())
@@ -178,6 +182,8 @@ This command will perform a migrate command to target StorageClass.`,
 	_ = viper.BindPFlag("stswait", migrateCmd.Flags().Lookup("wait"))
 	migrateCmd.Flags().Bool("ndu", false, "recreate STS in NDU manner")
 	_ = viper.BindPFlag("ndu", migrateCmd.Flags().Lookup("ndu"))
+	migrateCmd.Flags().BoolP("yes", "y", false, "agree with prompts")
+	_ = viper.BindPFlag("yes", migrateCmd.Flags().Lookup("yes"))
 	migrateCmd.MarkFlagRequired("to-sc")
 	migrateCmd.MarkFlagRequired("namespace")
 	return migrateCmd
@@ -226,6 +232,33 @@ func migrate(configFolder, resource string, resName string, resNS string, toSC s
 			if err != nil {
 				log.Error(err)
 				os.Exit(1)
+			}
+			scMap := make(map[string]struct{})
+			for _, template := range sts.Spec.VolumeClaimTemplates {
+				if template.Spec.StorageClassName != nil {
+					scMap[*template.Spec.StorageClassName] = struct{}{}
+				}
+			}
+			if len(scMap) > 1 {
+				log.Warnf("Multiple source StorageClasses detected in StatefulSet. Make sure all of your volumes can be migrated to target SC.")
+				for s := range scMap {
+					log.Infof("SC: %s", s)
+				}
+				fmt.Println("Do you want to continue? [y/N]")
+				if !yes {
+					reader := bufio.NewReader(os.Stdin)
+					fmt.Print("-> ")
+					charContinue, _, err := reader.ReadRune()
+					if err != nil {
+						log.Error(err)
+					}
+					switch charContinue {
+					case 'y', 'Y':
+					default:
+						return
+					}
+				}
+				log.Info("Continuing")
 			}
 			for _, pod := range list.Items {
 				for _, volume := range pod.Spec.Volumes {
