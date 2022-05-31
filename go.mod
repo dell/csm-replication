@@ -1,6 +1,6 @@
 module github.com/dell/csm-replication
 
-go 1.17
+go 1.18
 
 replace github.com/dell/dell-csi-extensions/migration v1.1.0 => github.com/dell/dell-csi-extensions/migration v0.0.0-20220518094004-fd4b2bd2f440
 
