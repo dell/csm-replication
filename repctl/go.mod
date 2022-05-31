@@ -1,6 +1,6 @@
 module github.com/dell/repctl
 
-go 1.17
+go 1.18
 
 replace github.com/dell/csm-replication => ../
 
@@ -8,7 +8,6 @@ replace github.com/dell/dell-csi-extensions/migration v1.1.0 => github.com/dell/
 
 require (
 	github.com/dell/csm-replication v0.0.0
-	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
 	github.com/rifflock/lfshook v0.0.0-20180920164130-b9218ef580f5
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.4.0
@@ -42,6 +41,7 @@ require (
 	github.com/magiconair/properties v1.8.5 // indirect
 	github.com/mattn/go-colorable v0.1.9 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
+	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
