@@ -148,8 +148,9 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			ObjectMeta: metav1.ObjectMeta{
 				Name: pv.Name + "-to-" + targetStorageClassName,
 				Annotations: map[string]string{
-					controller.CreatedByMigrator:  "true",
-					controller.MigrationNamespace: targetPVCNamespace,
+					controller.CreatedByMigrator:      "true",
+					controller.MigrationNamespace:     targetPVCNamespace,
+					"pv.kubernetes.io/provisioned-by": pv.Annotations["pv.kubernetes.io/provisioned-by"],
 				},
 			},
 			Spec: v1.PersistentVolumeSpec{
