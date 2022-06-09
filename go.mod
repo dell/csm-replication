@@ -2,14 +2,10 @@ module github.com/dell/csm-replication
 
 go 1.18
 
-replace github.com/dell/dell-csi-extensions/migration v1.1.0 => github.com/dell/dell-csi-extensions/migration v0.0.0-20220518094004-fd4b2bd2f440
-
-replace github.com/dell/dell-csi-extensions/replication v1.1.0 => github.com/dell/dell-csi-extensions/replication v0.0.0-20220517124947-d6a2b1019d5a
-
 require (
-	github.com/dell/dell-csi-extensions/common v1.0.0
-	github.com/dell/dell-csi-extensions/migration v1.1.0
-	github.com/dell/dell-csi-extensions/replication v1.1.0
+	github.com/dell/dell-csi-extensions/common v1.0.1-0.20220526070836-43b4ac597bf3
+	github.com/dell/dell-csi-extensions/migration v1.0.1
+	github.com/dell/dell-csi-extensions/replication v1.2.1
 	github.com/fatih/color v1.13.0
 	github.com/fsnotify/fsnotify v1.5.1
 	github.com/go-chi/chi v1.5.4
