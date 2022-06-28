@@ -11,6 +11,9 @@ parameters:
   arrayId: 
     source: "APM000000001"
     target: "APM000000002"
+  storagePool:
+    source: "StoragePool"
+    target: "TargetStoragePool"  
   rpo: "60"
   ignoreNamespaces: "false"
   volumeGroupPrefix: "csi"  

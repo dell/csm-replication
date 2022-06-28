@@ -67,7 +67,8 @@ type GlobalParameters struct {
 	RootClientEnabled bool
 
 	// Unity
-	Protocol string
+	Protocol    string
+	StoragePool Mirrored
 }
 
 // RemoteRetentionPolicy structure that contains values for remoteRetentionPolicy for both PV and RGs

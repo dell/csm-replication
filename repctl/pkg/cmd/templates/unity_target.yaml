@@ -23,6 +23,8 @@ parameters:
   {{ .ReplicationPrefix }}/remoteRGRetentionPolicy: {{ .RemoteRetentionPolicy.RG }}
   {{ .ReplicationPrefix }}/remotePVRetentionPolicy: {{ .RemoteRetentionPolicy.PV }}
   {{ .ReplicationPrefix }}/remoteSystem: {{ .Parameters.ArrayID.Source }}
+  {{ .ReplicationPrefix }}/RemoteStoragePool: "{{ .Parameters.StoragePool.Source }}"
   arrayId: {{ .Parameters.ArrayID.Target }}
   protocol: {{ .Parameters.Protocol }}
+  storagePool: {{ .Parameters.StoragePool.Target }}
 
