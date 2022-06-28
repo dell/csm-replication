@@ -1,0 +1,26 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ .Name }}
+provisioner: csi-{{ .Driver }}.dellemc.com
+reclaimPolicy: {{ .ReclaimPolicy }}
+volumeBindingMode: Immediate
+parameters:
+  {{ .ReplicationPrefix }}/isReplicationEnabled: "true"
+  {{- if eq .TargetClusterID .SourceClusterID }}
+  {{ .ReplicationPrefix }}/remoteStorageClassName: {{ .Name }}-tgt
+  {{ .ReplicationPrefix }}/remoteClusterID: self
+  {{- else }}
+  {{ .ReplicationPrefix }}/remoteStorageClassName: {{ .Name }}
+  {{ .ReplicationPrefix }}/remoteClusterID: {{ .TargetClusterID }}
+  {{- end }}
+  {{ .ReplicationPrefix }}/rpo: {{ .Parameters.Rpo }}
+  {{ .ReplicationPrefix }}/ignoreNamespaces: "{{ .Parameters.IgnoreNamespaces }}"
+  {{ .ReplicationPrefix }}/volumeGroupPrefix: {{ .Parameters.VolumeGroupPrefix }}
+  {{ .ReplicationPrefix }}/remoteRGRetentionPolicy: {{ .RemoteRetentionPolicy.RG }}
+  {{ .ReplicationPrefix }}/remotePVRetentionPolicy: {{ .RemoteRetentionPolicy.PV }}
+  {{ .ReplicationPrefix }}/remoteSystem: {{ .Parameters.ArrayId.Target }}
+  arrayId: {{ .Parameters.ArrayId.Source }}
+  protocol: {{ .Parameters.Protocol }}
+
+
