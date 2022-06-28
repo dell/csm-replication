@@ -278,7 +278,7 @@ func failoverToCluster(configFolder, inputTargetCluster, rgName string, unplanne
 			return
 
 		}
-		log.Printf("RG (%s), successfully updatedd with action: failover\n", rg.Name)
+		log.Printf("RG (%s), successfully updated with action: failover\n", rg.Name)
 	}
 }
 
