@@ -19,8 +19,8 @@ parameters:
   {{ .ReplicationPrefix }}/volumeGroupPrefix: {{ .Parameters.VolumeGroupPrefix }}
   {{ .ReplicationPrefix }}/remoteRGRetentionPolicy: {{ .RemoteRetentionPolicy.RG }}
   {{ .ReplicationPrefix }}/remotePVRetentionPolicy: {{ .RemoteRetentionPolicy.PV }}
-  {{ .ReplicationPrefix }}/remoteSystem: {{ .Parameters.ArrayId.Target }}
-  arrayId: {{ .Parameters.ArrayId.Source }}
+  {{ .ReplicationPrefix }}/remoteSystem: {{ .Parameters.ArrayID.Target }}
+  arrayId: {{ .Parameters.ArrayID.Source }}
   protocol: {{ .Parameters.Protocol }}
 
 

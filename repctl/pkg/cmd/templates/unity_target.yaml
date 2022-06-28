@@ -22,7 +22,7 @@ parameters:
   {{ .ReplicationPrefix }}/volumeGroupPrefix: {{ .Parameters.VolumeGroupPrefix }}
   {{ .ReplicationPrefix }}/remoteRGRetentionPolicy: {{ .RemoteRetentionPolicy.RG }}
   {{ .ReplicationPrefix }}/remotePVRetentionPolicy: {{ .RemoteRetentionPolicy.PV }}
-  {{ .ReplicationPrefix }}/remoteSystem: {{ .Parameters.ArrayId.Source }}
-  arrayId: {{ .Parameters.ArrayId.Target }}
+  {{ .ReplicationPrefix }}/remoteSystem: {{ .Parameters.ArrayID.Source }}
+  arrayId: {{ .Parameters.ArrayID.Target }}
   protocol: {{ .Parameters.Protocol }}
 

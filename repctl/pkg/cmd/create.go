@@ -67,7 +67,6 @@ type GlobalParameters struct {
 	RootClientEnabled bool
 
 	// Unity
-	ArrayId  Mirrored
 	Protocol string
 }
 
