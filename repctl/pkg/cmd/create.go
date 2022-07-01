@@ -69,6 +69,7 @@ type GlobalParameters struct {
 	// Unity
 	Protocol    string
 	StoragePool Mirrored
+	NasServer   Mirrored
 }
 
 // RemoteRetentionPolicy structure that contains values for remoteRetentionPolicy for both PV and RGs

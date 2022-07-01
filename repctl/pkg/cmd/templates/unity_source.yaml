@@ -14,14 +14,15 @@ parameters:
   {{ .ReplicationPrefix }}/remoteStorageClassName: {{ .Name }}
   {{ .ReplicationPrefix }}/remoteClusterID: {{ .TargetClusterID }}
   {{- end }}
-  {{ .ReplicationPrefix }}/rpo: {{ .Parameters.Rpo }}
+  {{ .ReplicationPrefix }}/rpo: "{{ .Parameters.Rpo }}"
   {{ .ReplicationPrefix }}/ignoreNamespaces: "{{ .Parameters.IgnoreNamespaces }}"
   {{ .ReplicationPrefix }}/volumeGroupPrefix: {{ .Parameters.VolumeGroupPrefix }}
   {{ .ReplicationPrefix }}/remoteRGRetentionPolicy: {{ .RemoteRetentionPolicy.RG }}
   {{ .ReplicationPrefix }}/remotePVRetentionPolicy: {{ .RemoteRetentionPolicy.PV }}
   {{ .ReplicationPrefix }}/remoteSystem: {{ .Parameters.ArrayID.Target }}
-  {{ .ReplicationPrefix }}/RemoteStoragePool: "{{ .Parameters.StoragePool.Target }}"
+  {{ .ReplicationPrefix }}/remoteStoragePool: "{{ .Parameters.StoragePool.Target }}"
+  {{ .ReplicationPrefix }}/remoteNasServer: "{{ .Parameters.NasServer.Target }}"
   arrayId: {{ .Parameters.ArrayID.Source }}
   protocol: {{ .Parameters.Protocol }}
   storagePool: {{ .Parameters.StoragePool.Source }}
-
+  nasServer: {{ .Parameters.NasServer.Source }}

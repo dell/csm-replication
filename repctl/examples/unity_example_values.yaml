@@ -12,9 +12,12 @@ parameters:
     source: "APM000000001"
     target: "APM000000002"
   storagePool:
-    source: "StoragePool"
-    target: "TargetStoragePool"  
-  rpo: "60"
+    source: pool_123
+    target: pool_123
+  rpo: "0"
   ignoreNamespaces: "false"
-  volumeGroupPrefix: "csi"  
+  volumeGroupPrefix: "prefix"  
   protocol: "NFS"
+  nasServer:
+    source: nas_123
+    target: nas_123
