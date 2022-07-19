@@ -83,9 +83,11 @@ jobs:
         with:
           image-name: ${{ env.REGISTRY }}/dell-csi-replicator:${{ env.VERSION }}
           severity-threshold: HIGH
+          run-quality-checks: false
       - name: Scan dell-replication-controller Docker Image
         if: always() && env.PASSED_BUILD
         uses: Azure/container-scan@v0
         with:
           image-name: ${{ env.REGISTRY }}/dell-replication-controller:${{ env.VERSION }}
           severity-threshold: HIGH
+          run-quality-checks: false
