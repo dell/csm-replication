@@ -84,7 +84,6 @@ func ParseLevel(level string) (logrus.Level, error) {
 	return InfoLevel + 4, fmt.Errorf("not a valid logrus level, falling back to InfoLevel %s", level)
 }
 
-
 type key int
 
 const (
