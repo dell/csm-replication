@@ -60,7 +60,7 @@ jobs:
     name: Image Scanner
     runs-on: ubuntu-latest
     env:
-      REGISTRY: localhost:5000
+      REGISTRY: dell
       VERSION: ${{ github.sha }}
       CONTAINER_TOOL: docker
       PASSED_BUILD: false
