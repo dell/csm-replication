@@ -65,6 +65,11 @@ type GlobalParameters struct {
 	AccessZone        string
 	IsiPath           string
 	RootClientEnabled bool
+
+	// Unity
+	Protocol    string
+	StoragePool Mirrored
+	NasServer   Mirrored
 }
 
 // RemoteRetentionPolicy structure that contains values for remoteRetentionPolicy for both PV and RGs
@@ -336,7 +341,7 @@ func createPVCs(providedPVList []string, cluster k8s.ClusterInterface, rgName, t
 
 func createSCs(scConfig ScConfig, clusters *k8s.Clusters, dryRun bool) error {
 	switch scConfig.Driver {
-	case "powerstore", "powermax", "isilon":
+	case "powerstore", "powermax", "isilon", "unity":
 		break
 	default:
 		return fmt.Errorf("driver not supported")
