@@ -36,6 +36,9 @@ run-sidecar: pre static-crd
 run-controller: pre static-crd
 	go run cmd/replication-controller/main.go
 
+run-migrator: pre static-crd
+	go run cmd/csi-migrator/main.go
+
 static-crd: manifests
 	$(KUSTOMIZE) build config/crd > deploy/replicationcrds.all.yaml
 
@@ -73,7 +76,7 @@ deploy-controller: manifests
 
 # Generate CRD manifests
 manifests: tools
-	$(CONTROLLER_GEN) crd:trivialVersions=false paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) paths="./..." crd output:crd:artifacts:config=config/crd/bases
 
 controller-rbac: tools
 	$(CONTROLLER_GEN) rbac:roleName=manager-role paths="./cmd/replication-controller" paths="./controllers/replication-controller"

@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/bombsimon/logrusr/v3"
 	repV1Alpha1 "github.com/dell/csm-replication/api/v1alpha1"
 	"github.com/dell/csm-replication/controllers"
 	repController "github.com/dell/csm-replication/controllers/replication-controller"
@@ -27,7 +28,6 @@ import (
 	"github.com/dell/csm-replication/pkg/config"
 	"github.com/dell/csm-replication/pkg/connection"
 	"github.com/fsnotify/fsnotify"
-	"github.com/maxan98/logrusr"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -132,6 +132,7 @@ func createControllerManager(ctx context.Context, mgr ctrl.Manager) (*Controller
 		return nil, err
 	}
 	mgrLogger := mgr.GetLogger()
+
 	er := mgr.GetEventRecorderFor(common.DellReplicationController)
 	repConfig, err := config.GetConfig(ctx, client, opts, er, mgrLogger)
 	if err != nil {
@@ -178,7 +179,7 @@ func main() {
 		TimestampFormat: time.RFC3339Nano,
 	})
 
-	logger := logrusr.NewLogger(logrusLog)
+	logger := logrusr.New(logrusLog)
 	ctrl.SetLogger(logger)
 	setupLog.V(common.InfoLevel).Info(common.DellReplicationController, "Version", core.SemVer, "Commit ID", core.CommitSha32, "Commit SHA", core.CommitTime.Format(time.RFC1123))
 
