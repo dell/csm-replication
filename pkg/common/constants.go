@@ -17,8 +17,8 @@ package common
 import (
 	"context"
 	"fmt"
+	"github.com/bombsimon/logrusr/v3"
 	"github.com/go-logr/logr"
-	"github.com/maxan98/logrusr"
 	"github.com/sirupsen/logrus"
 	"strings"
 	"time"
@@ -46,42 +46,42 @@ const (
 
 const (
 	// PanicLevel represents logrus panic log level
-	PanicLevel = logrusr.PanicLevel
+	PanicLevel = int(logrus.PanicLevel) - 4
 	// FatalLevel represents logrus fatal log level
-	FatalLevel = logrusr.FatalLevel
+	FatalLevel = int(logrus.FatalLevel) - 4
 	// ErrorLevel represents logrus error log level
-	ErrorLevel = logrusr.ErrorLevel
+	ErrorLevel = int(logrus.ErrorLevel) - 4
 	// WarnLevel represents logrus warning log level
-	WarnLevel = logrusr.WarnLevel
+	WarnLevel = int(logrus.WarnLevel) - 4
 	// InfoLevel represents logrus info log level
-	InfoLevel = logrusr.InfoLevel
+	InfoLevel = int(logrus.InfoLevel) - 4
 	// DebugLevel represents logrus debug log level
-	DebugLevel = logrusr.DebugLevel
+	DebugLevel = int(logrus.DebugLevel) - 4
 	// TraceLevel represents logrus trace log level
-	TraceLevel = logrusr.TraceLevel
+	TraceLevel = int(logrus.TraceLevel) - 4
 )
 
 // ParseLevel returns correct logrus Level from given string name
 func ParseLevel(level string) (logrus.Level, error) {
 	switch strings.ToLower(level) {
 	case "panic":
-		return PanicLevel + 4, nil
+		return logrus.Level(PanicLevel + 4), nil
 	case "fatal":
-		return FatalLevel + 4, nil
+		return logrus.Level(FatalLevel + 4), nil
 	case "error":
-		return ErrorLevel + 4, nil
+		return logrus.Level(ErrorLevel + 4), nil
 	case "warn", "warning":
-		return WarnLevel + 4, nil
+		return logrus.Level(WarnLevel + 4), nil
 	case "info":
-		return InfoLevel + 4, nil
+		return logrus.Level(InfoLevel + 4), nil
 	case "debug":
-		return DebugLevel + 4, nil
+		return logrus.Level(DebugLevel + 4), nil
 	case "trace":
-		return TraceLevel + 4, nil
+		return logrus.Level(TraceLevel + 4), nil
 
 	}
 
-	return InfoLevel + 4, fmt.Errorf("not a valid logrus level, falling back to InfoLevel %s", level)
+	return logrus.Level(InfoLevel) + 4, fmt.Errorf("not a valid logrus level, falling back to InfoLevel %s", level)
 }
 
 type key int
@@ -100,7 +100,7 @@ func GetLoggerFromContext(ctx context.Context) logr.Logger {
 			TimestampFormat: time.RFC3339Nano,
 		})
 
-		logger := logrusr.NewLogger(logrusLog)
+		logger := logrusr.New(logrusLog)
 		return logger
 	}
 	return log

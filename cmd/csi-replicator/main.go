@@ -22,9 +22,9 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/bombsimon/logrusr/v3"
 	"github.com/dell/csm-replication/pkg/config"
 	"github.com/fsnotify/fsnotify"
-	"github.com/maxan98/logrusr"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -160,7 +160,7 @@ func main() {
 		TimestampFormat: time.RFC3339Nano,
 	})
 
-	logger := logrusr.NewLogger(logrusLog)
+	logger := logrusr.New(logrusLog)
 	ctrl.SetLogger(logger)
 
 	setupLog.V(1).Info("Prefix", "Domain", domain)
