@@ -115,6 +115,8 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return r.processMGInNoState(ctx, mg.DeepCopy())
 	case ErrorState:
 		if mg.Status.LastAction != "" {
+			NextState = mg.Status.LastAction
+		} else {
 			NextState = ReadyState
 		}
 		fallthrough
@@ -145,6 +147,7 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		//Implement code to call node sidecar and run rescan on all node (future)
 	} else if (NextAnnotationAction == "Migrate") || (NextAnnotationAction == "Commit") {
 
+		//Include format and config validation on the driver side
 		ArrayMigrateReqParams := map[string]string{
 			"DriverName":    mg.Spec.DriverName,
 			"SourceArrayID": mg.Spec.SourceID,

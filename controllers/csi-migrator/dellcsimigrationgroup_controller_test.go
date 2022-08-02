@@ -1,0 +1,193 @@
+/*
+Copyright © 2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package csimigrator
+
+import (
+	"context"
+	csimigration "github.com/dell/csm-replication/pkg/csi-clients/migration"
+	"testing"
+	"time"
+
+	storagev1alpha1 "github.com/dell/csm-replication/api/v1alpha1"
+	"github.com/dell/csm-replication/controllers"
+	constants "github.com/dell/csm-replication/pkg/common"
+	"github.com/dell/csm-replication/test/e2e-framework/utils"
+	"github.com/stretchr/testify/suite"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+)
+
+const (
+	protectionGroupID = "l-group-id-1"
+)
+
+type MGControllerTestSuite struct {
+	suite.Suite
+	client          client.Client
+	driver          utils.Driver
+	migrationClient *csimigration.MockMigration
+	mgReconcile     *MigrationGroupReconciler
+}
+
+func (suite *MGControllerTestSuite) SetupSuite() {
+	// do nothing
+}
+
+func (suite *MGControllerTestSuite) SetupTest() {
+	suite.Init()
+	suite.initReconciler()
+}
+
+func (suite *MGControllerTestSuite) Init() {
+	suite.driver = utils.GetDefaultDriver()
+	fakeClient := errorFakeCtrlRuntimeClient{
+		Client: utils.GetFakeClient(),
+	}
+	suite.client = fakeClient
+	migrationClient := csimigration.NewFakeMigrationClient(utils.ContextPrefix)
+	suite.migrationClient = &migrationClient
+}
+
+func (suite *MGControllerTestSuite) initReconciler() {
+	logger := ctrl.Log.WithName("controllers").WithName("DellCSIMigrationGroup")
+	fakeRecorder := record.NewFakeRecorder(100)
+	// Initialize the annotations & labels
+	controllers.InitLabelsAndAnnotations(constants.DefaultDomain)
+
+	suite.mgReconcile = &MigrationGroupReconciler{
+		Client:                     suite.client,
+		Log:                        logger,
+		Scheme:                     utils.Scheme,
+		DriverName:                 suite.driver.DriverName,
+		EventRecorder:              fakeRecorder,
+		MigrationClient:            suite.migrationClient,
+		MaxRetryDurationForActions: MaxRetryDurationForActions,
+	}
+}
+
+func TestMGControllerTestSuite(t *testing.T) {
+	testSuite := new(MGControllerTestSuite)
+	suite.Run(t, testSuite)
+}
+
+func (suite *MGControllerTestSuite) TearDownTest() {
+	suite.T().Log("Cleaning up resources...")
+}
+
+//MG with NoState
+func (suite *MGControllerTestSuite) TestMGReconcileWithNoState() {
+	//positive test
+	mg1 := &storagev1alpha1.DellCSIMigrationGroup{
+		ObjectMeta: metav1.ObjectMeta{Name: "mg1"},
+		Spec: storagev1alpha1.DellCSIMigrationGroupSpec{
+			DriverName:               "driverName",
+			SourceID:                 "001",
+			TargetID:                 "0002",
+			MigrationGroupAttributes: map[string]string{"test": "test"},
+		},
+		Status: storagev1alpha1.DellCSIMigrationGroupStatus{
+			LastAction: "",
+			State:      NoState,
+		},
+	}
+
+	suite.mgReconcile.Client = utils.GetFakeClient()
+
+	ctx := context.Background()
+	err := suite.client.Create(ctx, mg1)
+	suite.NoError(err)
+
+	req := suite.getTypicalReconcileRequest(mg1.Name)
+	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
+	suite.NoError(err)
+
+	mg := new(storagev1alpha1.DellCSIMigrationGroup)
+	err = suite.client.Get(ctx, req.NamespacedName, mg)
+	suite.NoError(err, "No error on MG get")
+	suite.Equal(ReadyState, mg.Status.State, "State should be Ready")
+	suite.Contains(mg.Finalizers, controllers.MigrationFinalizer, "Finalizer should be present")
+}
+
+//MG with ReadyState
+func (suite *MGControllerTestSuite) TestMGReconcileWithReadyState() {
+	mg1 := &storagev1alpha1.DellCSIMigrationGroup{
+		ObjectMeta: metav1.ObjectMeta{Name: "mg1"},
+		Spec: storagev1alpha1.DellCSIMigrationGroupSpec{
+			DriverName:               "driverName",
+			SourceID:                 "001",
+			TargetID:                 "0002",
+			MigrationGroupAttributes: map[string]string{"test": "test"},
+		},
+		Status: storagev1alpha1.DellCSIMigrationGroupStatus{
+			LastAction: "",
+			State:      ReadyState,
+		},
+	}
+
+	suite.mgReconcile.Client = utils.GetFakeClient()
+	ctx := context.Background()
+	err := suite.client.Create(ctx, mg1)
+	suite.NoError(err)
+
+	req := suite.getTypicalReconcileRequest(mg1.Name)
+	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
+	suite.NoError(err)
+
+	mg := new(storagev1alpha1.DellCSIMigrationGroup)
+	err = suite.client.Get(ctx, req.NamespacedName, mg)
+	suite.NoError(err, "No error on MG get")
+	suite.Equal(MigratedState, mg.Status.State, "State should be Ready")
+}
+
+/**
+
+//MG with MigratedState
+func (suite *MGControllerTestSuite) TestMGReconcileWithMigratedState()
+//MG with CommitReadyState
+func (suite *MGControllerTestSuite) TestMGReconcileWithCommitReadyState()
+//MG with CommittedState
+func (suite *MGControllerTestSuite) TestMGReconcileWithCommittedState()
+//MG with DeletingState
+func (suite *MGControllerTestSuite) TestMGReconcileWithDeletingState()
+//MG with ErrorState
+func (suite *MGControllerTestSuite) TestMGReconcileWithErrorState()
+//MG with InvalidState
+func (suite *MGControllerTestSuite) TestMGReconcileWithInvalidState()
+*/
+
+func (suite *MGControllerTestSuite) getTypicalReconcileRequest(name string) reconcile.Request {
+	req := reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Namespace: "",
+			Name:      name,
+		},
+	}
+	return req
+}
+
+func (suite *MGControllerTestSuite) TestSetupWithManagerMG() {
+	mgr := manager.Manager(nil)
+	expRateLimiter := workqueue.NewItemExponentialFailureRateLimiter(1*time.Second, 10*time.Second)
+	err := suite.mgReconcile.SetupWithManager(mgr, expRateLimiter, 1)
+	suite.Error(err, "Setup should fail when there is no manager")
+}

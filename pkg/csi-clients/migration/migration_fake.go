@@ -83,7 +83,7 @@ func (m *MockMigration) VolumeMigrate(ctx context.Context, volumeHandle string, 
 	return &response, nil
 }
 
-// ArrayMigrate migrates volume
+// ArrayMigrate migrates volume from source array to target
 func (m *MockMigration) ArrayMigrate(ctx context.Context, migrateAction *csiext.ArrayMigrateRequest_Action, Params map[string]string) (*csiext.ArrayMigrateResponse, error) {
 	defer m.ClearError(false)
 	if err := m.injectedError.getError(); err != nil {
