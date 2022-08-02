@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"strings"
 	"time"
 
@@ -79,7 +81,12 @@ type MigrationGroupReconciler struct {
 type ActionAnnotation struct {
 	ActionName string `json:"name"`
 }
-
+// NodeList has node names on which rescan will happen
+type NodeList struct {
+	NodeNames map[string]string
+	Synced bool
+}
+var NodeToRescan NodeList
 // +kubebuilder:rbac:groups=replication.storage.dell.com,resources=dellcsimigrationgroups,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=replication.storage.dell.com,resources=dellcsimigrationgroups/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=events,verbs=list;watch;create;update;patch
@@ -92,7 +99,7 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	log.V(common.InfoLevel).Info("Begin reconcile - MG Controller")
 
 	mg := new(storagev1alpha1.DellCSIMigrationGroup)
-	err := r.Get(ctx, req.NamespacedName, mg)
+	err := r.Client.Get(ctx, req.NamespacedName, mg)
 	if err != nil {
 		log.Error(err, "MG not found", "mg", mg)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -140,11 +147,40 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	default:
 		log.Info("Strange migration type..")
 		return ctrl.Result{}, fmt.Errorf("Unknown state")
-
 	}
 
 	if NodeRescan {
-		//Implement code to call node sidecar and run rescan on all node (future)
+		// Get all Node Pods in driver's namespace
+		podList := &corev1.PodList{}
+		opts := []client.ListOption{
+			client.InNamespace(req.Namespace),
+			client.MatchingLabels{"app": mg.Spec.DriverName + "-node"},
+		}
+		err = r.Client.List(ctx, podList, opts...)
+		if err != nil && errors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
+		// Sync node for scanning
+		if !NodeToRescan.Synced {
+			allNodesScanned := true
+			for _, nodePod := range podList.Items {
+				labels := nodePod.GetLabels()
+				if _, ok := labels[controllers.NodeReScanned]; !ok{
+					log.Info("Awaiting rescan on Nodes")
+					allNodesScanned = false
+					break
+				}
+			}
+			// All scanning done, in next reconcile skip this step
+			if allNodesScanned {
+				NodeToRescan.Synced = true
+			}
+		}
+		// Check if all node rescanned
+		if !NodeToRescan.Synced {
+			err := fmt.Errorf("few nodes awaiting rescan")
+			return ctrl.Result{}, err
+		}
 	} else if (NextAnnotationAction == "Migrate") || (NextAnnotationAction == "Commit") {
 
 		//Include format and config validation on the driver side
@@ -191,7 +227,7 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	//update annotation
 	isSpecUpdated := r.updateMGSpecWithActionResult(ctx, mg, NextAnnotationAction)
 	if isSpecUpdated {
-		if err := r.Update(ctx, mg.DeepCopy()); err != nil {
+		if err := r.Client.Update(ctx, mg.DeepCopy()); err != nil {
 			log.Error(err, "Failed to update spec", "mg", mg, "Next State", NextState)
 			return ctrl.Result{}, err
 		}
@@ -199,6 +235,10 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 	return ctrl.Result{}, err
 }
+
+//func getNodeName(nodeNameWithDomain string) string {
+//return strings.Split(nodeNameWithDomain, ".domain")[0]
+//}
 
 //Getting MG to its first valid state
 func (r *MigrationGroupReconciler) processMGInNoState(ctx context.Context, dellCSIMigrationGroup *storagev1alpha1.DellCSIMigrationGroup) (ctrl.Result, error) {

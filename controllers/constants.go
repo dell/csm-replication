@@ -121,4 +121,6 @@ const (
 	TestFailOver = "testfailover"
 	// TestFailOverStop stop test failover replication action name
 	TestFailOverStop = "testfailoverstop"
+	// Node Rescanned will flag the current rescan status
+	NodeReScanned = "node-rescanned"
 )
