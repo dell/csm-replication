@@ -81,12 +81,15 @@ type MigrationGroupReconciler struct {
 type ActionAnnotation struct {
 	ActionName string `json:"name"`
 }
+
 // NodeList has node names on which rescan will happen
 type NodeList struct {
 	NodeNames map[string]string
-	Synced bool
+	Synced    bool
 }
+
 var NodeToRescan NodeList
+
 // +kubebuilder:rbac:groups=replication.storage.dell.com,resources=dellcsimigrationgroups,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=replication.storage.dell.com,resources=dellcsimigrationgroups/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=events,verbs=list;watch;create;update;patch
@@ -165,7 +168,7 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			allNodesScanned := true
 			for _, nodePod := range podList.Items {
 				labels := nodePod.GetLabels()
-				if _, ok := labels[controllers.NodeReScanned]; !ok{
+				if _, ok := labels[controllers.NodeReScanned]; !ok {
 					log.Info("Awaiting rescan on Nodes")
 					allNodesScanned = false
 					break
@@ -199,12 +202,8 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 
 		ArrayMigrateResponse, err := r.MigrationClient.ArrayMigrate(ctx, ArrayMigrateReq, ArrayMigrateReqParams)
+		mg.Status.LastAction = currentState
 		CurrentAction := ArrayMigrateResponse.GetAction()
-		mg.Status.LastAction = CurrentAction.String()
-		if err := r.Status().Update(ctx, mg.DeepCopy()); err != nil {
-			log.Error(err, "Failed updating last Action", "Action", CurrentAction)
-			return ctrl.Result{}, err
-		}
 		if err != nil {
 			r.EventRecorder.Eventf(mg, v1.EventTypeWarning, "Error",
 				"Action [%s] on DellCSIMigrationGroup [%s] failed with error [%s] ",
@@ -215,11 +214,13 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			}
 			return ctrl.Result{}, err
 		}
+
 		if ArrayMigrateResponse.GetSuccess() {
 			log.V(common.InfoLevel).Info("Successfully executed action [%s]", CurrentAction.String())
 		}
+	} else if NextAnnotationAction == "Delete" {
+		mg.Status.LastAction = currentState
 	}
-
 	//update state field of the mg
 	if err := r.updateMGSpecWithState(ctx, mg.DeepCopy(), NextState); err != nil {
 		return ctrl.Result{}, err
