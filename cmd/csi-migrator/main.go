@@ -245,7 +245,7 @@ func main() {
 	}
 
 	if err = (&controller.MigrationGroupReconciler{
-		Client: mgr.GetClient(),
+		Client:                     mgr.GetClient(),
 		Log:                        ctrl.Log.WithName("controllers").WithName("DellCSIMigrationGroupTest"),
 		Scheme:                     mgr.GetScheme(),
 		EventRecorder:              mgr.GetEventRecorderFor(common.DellCSIMigrator),

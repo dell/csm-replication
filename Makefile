@@ -26,8 +26,8 @@ sidecar-manager: pre
 sidecar-migrator: pre
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/dell-csi-migrator cmd/csi-migrator/main.go
 # Build manager binary for csi-node re scanner
-sidecar-node-rescanner: pre
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/dell-csi-nodeRescaner cmd/csi-node-rescaner/main.go
+sidecar-node-rescaner: pre
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/dell-csi-node-rescaner cmd/csi-node-rescaner/main.go
 # Build manager binary for replication-controller
 controller-manager: pre
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/dell-replication-controller cmd/replication-controller/main.go
@@ -41,6 +41,9 @@ run-controller: pre static-crd
 
 run-migrator: pre static-crd
 	go run cmd/csi-migrator/main.go
+
+run-node-rescaner: pre static-crd
+	go run cmd/csi-node-rescaner/main.go
 
 static-crd: manifests
 	$(KUSTOMIZE) build config/crd > deploy/replicationcrds.all.yaml
@@ -116,6 +119,12 @@ image-migrator: gen-semver
 image-migrator-push: gen-semver
 	make -f image.mk sidecar-migrator-push
 
+image-node-rescaner: gen-semver
+	make -f image.mk sidecar-node-rescaner
+
+image-node-rescaner-push: gen-semver
+	make -f image.mk sidecar-node-rescaner-push
+
 # Build the container image
 image-controller: gen-semver
 	make -f image.mk controller
@@ -141,6 +150,8 @@ image-controller-dev: controller-manager
 image-migrator-dev: sidecar-migrator
 	make -f image.mk sidecar-migrator-dev
 
+image-node-rescaner-dev: sidecar-node-rescaner
+	make -f image.mk sidecar-node-rescaner-dev
 #To start mock-grpc server
 start-server-win:
 	go run test/mock-server/main.go --csi-address localhost:4772 --stubs test/mock-server/stubs

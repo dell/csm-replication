@@ -155,9 +155,9 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if NodeRescan {
 		// Get all Node Pods in driver's namespace
 		podList := &corev1.PodList{}
+		label := strings.Replace(mg.Spec.DriverName, "csi-", "", 1) + "-node"
 		opts := []client.ListOption{
-			client.InNamespace(req.Namespace),
-			client.MatchingLabels{"app": mg.Spec.DriverName + "-node"},
+			client.MatchingLabels{"app": label},
 		}
 		err = r.Client.List(ctx, podList, opts...)
 		if err != nil && errors.IsNotFound(err) {
@@ -167,8 +167,8 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		if !NodeToRescan.Synced {
 			allNodesScanned := true
 			for _, nodePod := range podList.Items {
-				labels := nodePod.GetLabels()
-				if _, ok := labels[controllers.NodeReScanned]; !ok {
+				annotations := nodePod.GetAnnotations()
+				if _, ok := annotations[controllers.NodeReScanned]; !ok {
 					log.Info("Awaiting rescan on Nodes")
 					allNodesScanned = false
 					break

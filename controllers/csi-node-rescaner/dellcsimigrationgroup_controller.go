@@ -32,10 +32,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	reconciler "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/ratelimiter"
+	"strings"
 	"time"
 )
 
 const (
+	// DeletingState name deletion state of MigrationGroup
+	DeletingState = "Deleting"
 	// MigratedState name of post migrate call state of MigrationGroup
 	MigratedState = "Migrated"
 	// MaxRetryDurationForActions maximum amount of time between retries of failed action
@@ -46,12 +49,12 @@ type ActionType string
 
 // NodeRescanReconciler reconciles PersistentVolume resources
 type NodeRescanReconciler struct {
-	Client client.Client
+	Client                     client.Client
 	Log                        logr.Logger
 	Scheme                     *runtime.Scheme
 	EventRecorder              record.EventRecorder
 	DriverName                 string
-	NodeName	string
+	NodeName                   string
 	MaxRetryDurationForActions time.Duration
 }
 
@@ -60,6 +63,7 @@ type NodeRescanReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=events,verbs=list;watch;create;update;patch
 
 var myNode *corev1.Pod
+
 // Reconcile contains reconciliation logic that updates MigrationGroup depending on it's current state
 func (r *NodeRescanReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("MigrationGroup", req.NamespacedName)
@@ -77,8 +81,10 @@ func (r *NodeRescanReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	currentState := mg.Status.State
 
 	switch currentState {
+	case DeletingState:
+		return r.processMGinDeletingState(ctx, mg.DeepCopy())
 	case MigratedState:
-		return r.processMGForRescan(ctx, req, mg.DeepCopy())
+		return r.processMGForRescan(ctx, mg.DeepCopy())
 	default:
 		log.Info(fmt.Sprintf("Ignoring MG (%s) for rescan in %s state", mg.Name, currentState))
 		return ctrl.Result{}, nil
@@ -86,35 +92,36 @@ func (r *NodeRescanReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 }
 
 //Update mg spec with current state
-func (r *NodeRescanReconciler) processMGForRescan(ctx context.Context, req ctrl.Request, mg *storagev1alpha1.DellCSIMigrationGroup) (ctrl.Result, error) {
+func (r *NodeRescanReconciler) processMGForRescan(ctx context.Context, mg *storagev1alpha1.DellCSIMigrationGroup) (ctrl.Result, error) {
 	// Get self POD details
 	// Get all Node Pods in driver's namespace
 	podList := &corev1.PodList{}
+	label := strings.Replace(mg.Spec.DriverName, "csi-", "", 1) + "-node"
 	opts := []client.ListOption{
-		client.InNamespace(req.Namespace),
-		client.MatchingLabels{"app": mg.Spec.DriverName + "-node"},
+		client.MatchingLabels{"app": label},
 	}
 	err := r.Client.List(ctx, podList, opts...)
 	if err != nil && errors.IsNotFound(err) {
 		return ctrl.Result{}, err
 	}
+	log := common.GetLoggerFromContext(ctx)
 	// Check if rescanned label is already on the pod
-	for _,pod := range podList.Items{
+	for _, pod := range podList.Items {
 		if pod.Spec.NodeName == r.NodeName {
 			myNode = pod.DeepCopy()
-			labels := pod.GetLabels()
-			if _, ok := labels[controller.NodeReScanned]; ok{
+			log.V(common.DebugLevel).Info(fmt.Sprintf("Found node: %+v", myNode))
+			annotations := pod.GetAnnotations()
+			if _, ok := annotations[controller.NodeReScanned]; ok {
 				r.Log.Info("rescan done on node: ", r.NodeName)
 				return ctrl.Result{}, nil
 			}
 		}
 
 	}
-	log := common.GetLoggerFromContext(ctx)
-	log.V(common.InfoLevel).Info("Begin rescan on node for MG spec", "Name", mg.Name)
+	log.V(common.DebugLevel).Info("Begin rescan on node for MG spec", "Name: ", mg.Name, "Node:", myNode.Name)
 	// Perform rescan on the node
-	err = utils.RescanNode()
-	if err!=nil {
+	err = utils.RescanNode(ctx)
+	if err != nil {
 		return ctrl.Result{}, err
 	}
 	// Update label on the node
@@ -126,6 +133,51 @@ func (r *NodeRescanReconciler) processMGForRescan(ctx context.Context, req ctrl.
 		return ctrl.Result{}, err
 	}
 	log.V(common.InfoLevel).Info("Pod was successfully updated with", "Node-Rescanned", "yes")
+	return ctrl.Result{}, err
+}
+
+//Update mg spec with current state
+func (r *NodeRescanReconciler) processMGinDeletingState(ctx context.Context, mg *storagev1alpha1.DellCSIMigrationGroup) (ctrl.Result, error) {
+	// Get self POD details
+	// Get all Node Pods in driver's namespace
+	podList := &corev1.PodList{}
+	label := strings.Replace(mg.Spec.DriverName, "csi-", "", 1) + "-node"
+	opts := []client.ListOption{
+		client.MatchingLabels{"app": label},
+	}
+	err := r.Client.List(ctx, podList, opts...)
+	if err != nil && errors.IsNotFound(err) {
+		return ctrl.Result{}, err
+	}
+	log := common.GetLoggerFromContext(ctx)
+	// Check if rescanned label is already on the pod
+	for _, pod := range podList.Items {
+		if pod.Spec.NodeName == r.NodeName {
+			myNode = pod.DeepCopy()
+			log.V(common.DebugLevel).Info(fmt.Sprintf("Found node: %+v", myNode))
+			annotations := pod.GetAnnotations()
+			if _, ok := annotations[controller.NodeReScanned]; ok {
+				// Remove annotation from the pod
+				return ctrl.Result{}, nil
+			}
+		}
+
+	}
+	log.V(common.DebugLevel).Info("Begin rescan on node for MG spec", "Name: ", mg.Name, "Node:", myNode.Name)
+	// Perform rescan on the node
+	err = utils.RescanNode(ctx)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	// Update label on the node
+	controller.AddAnnotation(myNode, controller.NodeReScanned, "")
+	log.V(common.InfoLevel).Info("deleting", "annotation", "")
+	err = r.Client.Update(ctx, myNode)
+	if err != nil {
+		log.Error(err, "Failed to delete", "annotation", "yes")
+		return ctrl.Result{}, err
+	}
+	log.V(common.InfoLevel).Info("Pod was successfully updated with", "Node-Rescanned", "nil")
 	return ctrl.Result{}, err
 }
 

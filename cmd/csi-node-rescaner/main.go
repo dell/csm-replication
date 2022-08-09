@@ -19,6 +19,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/bombsimon/logrusr/v3"
 	storagev1alpha1 "github.com/dell/csm-replication/api/v1alpha1"
 	"github.com/dell/csm-replication/controllers"
 	controller "github.com/dell/csm-replication/controllers/csi-node-rescaner"
@@ -28,7 +29,6 @@ import (
 	csiidentity "github.com/dell/csm-replication/pkg/csi-clients/identity"
 	"github.com/dell/dell-csi-extensions/migration"
 	"github.com/fsnotify/fsnotify"
-	"github.com/maxan98/logrusr"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -63,9 +63,9 @@ func init() {
 
 // NodeRescanner - Represents the controller manager and its configuration
 type NodeRescanner struct {
-	Opts    config.ControllerManagerOpts
-	Manager ctrl.Manager
-	config  *config.Config
+	Opts     config.ControllerManagerOpts
+	Manager  ctrl.Manager
+	config   *config.Config
 	NodeName string
 }
 
@@ -109,9 +109,9 @@ func createNodeReScannerManager(ctx context.Context, mgr ctrl.Manager) (*NodeRes
 		nodeName = ""
 	}
 	controllerManager := NodeRescanner{
-		Opts:    opts,
-		Manager: mgr,
-		config:  repConfig,
+		Opts:     opts,
+		Manager:  mgr,
+		config:   repConfig,
 		NodeName: nodeName,
 	}
 	return &controllerManager, nil
@@ -153,7 +153,7 @@ func main() {
 		TimestampFormat: time.RFC3339Nano,
 	})
 
-	logger := logrusr.NewLogger(logrusLog)
+	logger := logrusr.New(logrusLog)
 	ctrl.SetLogger(logger)
 
 	setupLog.V(1).Info("Prefix", "Domain", domain)
@@ -230,7 +230,7 @@ func main() {
 		Scheme:                     mgr.GetScheme(),
 		EventRecorder:              mgr.GetEventRecorderFor(common.DellCSINodeReScanner),
 		DriverName:                 driverName,
-		NodeName: 					rescanMgr.NodeName,
+		NodeName:                   rescanMgr.NodeName,
 		MaxRetryDurationForActions: maxRetryDurationForActions,
 	}).SetupWithManager(mgr, expRateLimiter, workerThreads); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "DellCSINodeReScanner")

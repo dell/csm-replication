@@ -7,6 +7,7 @@ require (
 	github.com/dell/dell-csi-extensions/common v1.0.1-0.20220526070836-43b4ac597bf3
 	github.com/dell/dell-csi-extensions/migration v1.0.2-0.20220705095823-4fee73a928d6
 	github.com/dell/dell-csi-extensions/replication v1.2.1
+	github.com/dell/gobrick v1.4.0
 	github.com/fatih/color v1.13.0
 	github.com/fsnotify/fsnotify v1.5.4
 	github.com/go-chi/chi v1.5.4
@@ -36,6 +37,8 @@ require (
 	github.com/bgentry/go-netrc v0.0.0-20140422174119-9fd32a8b3d3d // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/dell/goiscsi v1.4.0 // indirect
+	github.com/dell/gonvme v1.1.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.8.0 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/go-errors/errors v1.0.1 // indirect
@@ -54,6 +57,7 @@ require (
 	github.com/gobuffalo/flect v0.2.5 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
+	github.com/golang/mock v1.5.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/gnostic v0.6.9 // indirect
 	github.com/google/go-cmp v0.5.8 // indirect
