@@ -272,10 +272,145 @@ func (suite *MGControllerTestSuite) TestMGReconcileWithErrorState() {
 	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on MG reconcile")
 
+	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
+	suite.NoError(err, "No error on MG reconcile")
+
 	mg := new(storagev1alpha1.DellCSIMigrationGroup)
 	err = suite.client.Get(ctx, types.NamespacedName{Namespace: "", Name: mg1.Name}, mg)
 	suite.NoError(err, "No error on MG get")
 	suite.Equal(MigratedState, mg.Status.State, "State should be Ready")
+}
+
+//MG with ErrorState
+func (suite *MGControllerTestSuite) TestMGReconcileWithErrorState_fromReady() {
+	mg1 := &storagev1alpha1.DellCSIMigrationGroup{
+		ObjectMeta: metav1.ObjectMeta{Name: "mg1"},
+		Spec: storagev1alpha1.DellCSIMigrationGroupSpec{
+			DriverName:               "driverName",
+			SourceID:                 "001",
+			TargetID:                 "0002",
+			MigrationGroupAttributes: map[string]string{"test": "test"},
+		},
+		Status: storagev1alpha1.DellCSIMigrationGroupStatus{
+			LastAction: "Ready",
+			State:      ErrorState,
+		},
+	}
+
+	ctx := context.Background()
+	err := suite.client.Create(ctx, mg1)
+	suite.Nil(err)
+
+	req := suite.getTypicalReconcileRequest(mg1.Name)
+	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
+	suite.NoError(err, "No error on MG reconcile")
+
+	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
+	suite.NoError(err, "No error on MG reconcile")
+
+	mg := new(storagev1alpha1.DellCSIMigrationGroup)
+	err = suite.client.Get(ctx, types.NamespacedName{Namespace: "", Name: mg1.Name}, mg)
+	suite.NoError(err, "No error on MG get")
+	suite.Equal(MigratedState, mg.Status.State, "State should be Ready")
+}
+
+//MG with ErrorState
+func (suite *MGControllerTestSuite) TestMGReconcileWithErrorState_fromMigrated() {
+	mg1 := &storagev1alpha1.DellCSIMigrationGroup{
+		ObjectMeta: metav1.ObjectMeta{Name: "mg1"},
+		Spec: storagev1alpha1.DellCSIMigrationGroupSpec{
+			DriverName:               "driverName",
+			SourceID:                 "001",
+			TargetID:                 "0002",
+			MigrationGroupAttributes: map[string]string{"test": "test"},
+		},
+		Status: storagev1alpha1.DellCSIMigrationGroupStatus{
+			LastAction: "Migrated",
+			State:      ErrorState,
+		},
+	}
+
+	ctx := context.Background()
+	err := suite.client.Create(ctx, mg1)
+	suite.Nil(err)
+
+	req := suite.getTypicalReconcileRequest(mg1.Name)
+	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
+	suite.NoError(err, "No error on MG reconcile")
+
+	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
+	suite.NoError(err, "No error on MG reconcile")
+
+	mg := new(storagev1alpha1.DellCSIMigrationGroup)
+	err = suite.client.Get(ctx, types.NamespacedName{Namespace: "", Name: mg1.Name}, mg)
+	suite.NoError(err, "No error on MG get")
+	suite.Equal(CommitReadyState, mg.Status.State, "State should be Ready")
+}
+
+//MG with ErrorState
+func (suite *MGControllerTestSuite) TestMGReconcileWithErrorState_fromCommitReady() {
+	mg1 := &storagev1alpha1.DellCSIMigrationGroup{
+		ObjectMeta: metav1.ObjectMeta{Name: "mg1"},
+		Spec: storagev1alpha1.DellCSIMigrationGroupSpec{
+			DriverName:               "driverName",
+			SourceID:                 "001",
+			TargetID:                 "0002",
+			MigrationGroupAttributes: map[string]string{"test": "test"},
+		},
+		Status: storagev1alpha1.DellCSIMigrationGroupStatus{
+			LastAction: "CommitReady",
+			State:      ErrorState,
+		},
+	}
+
+	ctx := context.Background()
+	err := suite.client.Create(ctx, mg1)
+	suite.Nil(err)
+
+	req := suite.getTypicalReconcileRequest(mg1.Name)
+	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
+	suite.NoError(err, "No error on MG reconcile")
+
+	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
+	suite.NoError(err, "No error on MG reconcile")
+
+	mg := new(storagev1alpha1.DellCSIMigrationGroup)
+	err = suite.client.Get(ctx, types.NamespacedName{Namespace: "", Name: mg1.Name}, mg)
+	suite.NoError(err, "No error on MG get")
+	suite.Equal(CommittedState, mg.Status.State, "State should be Ready")
+}
+
+//MG with ErrorState
+func (suite *MGControllerTestSuite) TestMGReconcileWithErrorState_fromCommitted() {
+	mg1 := &storagev1alpha1.DellCSIMigrationGroup{
+		ObjectMeta: metav1.ObjectMeta{Name: "mg1"},
+		Spec: storagev1alpha1.DellCSIMigrationGroupSpec{
+			DriverName:               "driverName",
+			SourceID:                 "001",
+			TargetID:                 "0002",
+			MigrationGroupAttributes: map[string]string{"test": "test"},
+		},
+		Status: storagev1alpha1.DellCSIMigrationGroupStatus{
+			LastAction: "Committed",
+			State:      ErrorState,
+		},
+	}
+
+	ctx := context.Background()
+	err := suite.client.Create(ctx, mg1)
+	suite.Nil(err)
+
+	req := suite.getTypicalReconcileRequest(mg1.Name)
+	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
+	suite.NoError(err, "No error on MG reconcile")
+
+	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
+	suite.NoError(err, "No error on MG reconcile")
+
+	mg := new(storagev1alpha1.DellCSIMigrationGroup)
+	err = suite.client.Get(ctx, types.NamespacedName{Namespace: "", Name: mg1.Name}, mg)
+	suite.NoError(err, "No error on MG get")
+	suite.Equal(DeletingState, mg.Status.State, "State should be Ready")
 }
 
 //MG with InvalidState

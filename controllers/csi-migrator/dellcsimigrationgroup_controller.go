@@ -129,7 +129,7 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		} else {
 			NextState = ReadyState
 		}
-		fallthrough
+		NextAnnotationAction = "Retry"
 	case ReadyState:
 		ArrayMigrationAction = migration.ActionTypes_MG_MIGRATE
 		NextState = MigratedState
