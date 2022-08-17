@@ -19,6 +19,9 @@ package csi_node_rescaner
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
+
 	storagev1alpha1 "github.com/dell/csm-replication/api/v1alpha1"
 	controller "github.com/dell/csm-replication/controllers"
 	"github.com/dell/csm-replication/pkg/common"
@@ -32,8 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	reconciler "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/ratelimiter"
-	"strings"
-	"time"
 )
 
 const (
@@ -110,8 +111,8 @@ func (r *NodeRescanReconciler) processMGForRescan(ctx context.Context, mg *stora
 		if pod.Spec.NodeName == r.NodeName {
 			myNode = pod.DeepCopy()
 			log.V(common.DebugLevel).Info(fmt.Sprintf("Found node: %+v", myNode))
-			annotations := pod.GetAnnotations()
-			if _, ok := annotations[controller.NodeReScanned]; ok {
+			labels := pod.GetLabels()
+			if _, ok := labels[controller.NodeReScanned]; ok {
 				r.Log.Info("rescan done on node: ", r.NodeName)
 				return ctrl.Result{}, nil
 			}
@@ -125,11 +126,11 @@ func (r *NodeRescanReconciler) processMGForRescan(ctx context.Context, mg *stora
 		return ctrl.Result{}, err
 	}
 	// Update label on the node
-	controller.AddAnnotation(myNode, controller.NodeReScanned, "yes")
-	log.V(common.InfoLevel).Info("Updating", "annotation", "yes")
+	controller.AddLabel(myNode, controller.NodeReScanned, "yes")
+	log.V(common.InfoLevel).Info("Updating", "label", "yes")
 	err = r.Client.Update(ctx, myNode)
 	if err != nil {
-		log.Error(err, "Failed to update", "annotation", "yes")
+		log.Error(err, "Failed to update", "label", "yes")
 		return ctrl.Result{}, err
 	}
 	log.V(common.InfoLevel).Info("Pod was successfully updated with", "Node-Rescanned", "yes")
@@ -147,7 +148,7 @@ func (r *NodeRescanReconciler) processMGinDeletingState(ctx context.Context, mg 
 	}
 	err := r.Client.List(ctx, podList, opts...)
 	if err != nil && errors.IsNotFound(err) {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 	log := common.GetLoggerFromContext(ctx)
 	// Check if rescanned label is already on the pod
@@ -155,29 +156,23 @@ func (r *NodeRescanReconciler) processMGinDeletingState(ctx context.Context, mg 
 		if pod.Spec.NodeName == r.NodeName {
 			myNode = pod.DeepCopy()
 			log.V(common.DebugLevel).Info(fmt.Sprintf("Found node: %+v", myNode))
-			annotations := pod.GetAnnotations()
-			if _, ok := annotations[controller.NodeReScanned]; ok {
-				// Remove annotation from the pod
+			labels := pod.GetLabels()
+			if _, ok := labels[controller.NodeReScanned]; ok {
+				// Remove label from the pod
+				log.V(common.DebugLevel).Info("Begin deletion of label on node for MG spec", "Name: ", mg.Name, "Node:", myNode.Name)
+				// Update label on the node
+				controller.DeleteLabel(myNode, controller.NodeReScanned)
+				log.V(common.InfoLevel).Info("deleting", "label:", controller.NodeReScanned)
+				err = r.Client.Update(ctx, myNode)
+				if err != nil {
+					log.Error(err, "Failed to delete", "label", controller.NodeReScanned)
+					return ctrl.Result{}, err
+				}
+				log.V(common.InfoLevel).Info("Pod was successfully updated with", "Node-Rescanned", "nil")
 				return ctrl.Result{}, nil
 			}
 		}
-
 	}
-	log.V(common.DebugLevel).Info("Begin rescan on node for MG spec", "Name: ", mg.Name, "Node:", myNode.Name)
-	// Perform rescan on the node
-	err = utils.RescanNode(ctx)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	// Update label on the node
-	controller.AddAnnotation(myNode, controller.NodeReScanned, "")
-	log.V(common.InfoLevel).Info("deleting", "annotation", "")
-	err = r.Client.Update(ctx, myNode)
-	if err != nil {
-		log.Error(err, "Failed to delete", "annotation", "yes")
-		return ctrl.Result{}, err
-	}
-	log.V(common.InfoLevel).Info("Pod was successfully updated with", "Node-Rescanned", "nil")
 	return ctrl.Result{}, err
 }
 

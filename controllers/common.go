@@ -50,6 +50,16 @@ func AddLabel(obj metav1.Object, labelKey, labelValue string) {
 	obj.SetLabels(labels)
 }
 
+func DeleteLabel(obj metav1.Object, labelKey string) bool{
+	labels := obj.GetLabels()
+	if _, ok := labels[labelKey] ; !ok {
+		return true
+	}
+	delete(labels,labelKey)
+	obj.SetLabels(labels)
+	return true
+}
+
 // AddFinalizerIfNotExist adds a finalizer to k8s resource, if it doesn't already exist and
 // returns true else returns false
 func AddFinalizerIfNotExist(obj metav1.Object, name string) bool {

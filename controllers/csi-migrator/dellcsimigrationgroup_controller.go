@@ -20,10 +20,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"strings"
 	"time"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 
 	storagev1alpha1 "github.com/dell/csm-replication/api/v1alpha1"
 	"github.com/dell/csm-replication/controllers"
@@ -85,10 +86,10 @@ type ActionAnnotation struct {
 // NodeList has node names on which rescan will happen
 type NodeList struct {
 	NodeNames map[string]string
-	Synced    bool
+	AllSynced bool
 }
 
-var NodeToRescan NodeList
+var NodesToRescan NodeList
 
 // +kubebuilder:rbac:groups=replication.storage.dell.com,resources=dellcsimigrationgroups,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=replication.storage.dell.com,resources=dellcsimigrationgroups/status,verbs=get;update;patch
@@ -153,22 +154,23 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	if NodeRescan {
-		// Get all Node Pods in driver's namespace
-		podList := &corev1.PodList{}
-		label := strings.Replace(mg.Spec.DriverName, "csi-", "", 1) + "-node"
-		opts := []client.ListOption{
-			client.MatchingLabels{"app": label},
-		}
-		err = r.Client.List(ctx, podList, opts...)
-		if err != nil && errors.IsNotFound(err) {
-			return ctrl.Result{}, err
-		}
-		// Sync node for scanning
-		if !NodeToRescan.Synced {
+		// Wait for rescan on all nodes
+		if !NodesToRescan.AllSynced {
+			// Get all Node Pods in driver's namespace
+			podList := &corev1.PodList{}
+			label := strings.Replace(mg.Spec.DriverName, "csi-", "", 1) + "-node"
+			opts := []client.ListOption{
+				client.MatchingLabels{"app": label},
+			}
+			err = r.Client.List(ctx, podList, opts...)
+			if err != nil && errors.IsNotFound(err) {
+				return ctrl.Result{}, err
+			}
+			// Sync node for scanning
 			allNodesScanned := true
 			for _, nodePod := range podList.Items {
-				annotations := nodePod.GetAnnotations()
-				if _, ok := annotations[controllers.NodeReScanned]; !ok {
+				labels := nodePod.GetLabels()
+				if _, ok := labels[controllers.NodeReScanned]; !ok {
 					log.Info("Awaiting rescan on Nodes")
 					allNodesScanned = false
 					break
@@ -176,11 +178,11 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			}
 			// All scanning done, in next reconcile skip this step
 			if allNodesScanned {
-				NodeToRescan.Synced = true
+				NodesToRescan.AllSynced = true
 			}
 		}
 		// Check if all node rescanned
-		if !NodeToRescan.Synced {
+		if !NodesToRescan.AllSynced {
 			err := fmt.Errorf("few nodes awaiting rescan")
 			return ctrl.Result{}, err
 		}
@@ -219,6 +221,8 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			log.V(common.InfoLevel).Info("Successfully executed action [%s]", CurrentAction.String())
 		}
 	} else if NextAnnotationAction == "Delete" {
+		//reset NodesToRescan
+		NodesToRescan.AllSynced = false
 		mg.Status.LastAction = currentState
 	}
 	//update state field of the mg
@@ -236,10 +240,6 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 	return ctrl.Result{}, err
 }
-
-//func getNodeName(nodeNameWithDomain string) string {
-//return strings.Split(nodeNameWithDomain, ".domain")[0]
-//}
 
 //Getting MG to its first valid state
 func (r *MigrationGroupReconciler) processMGInNoState(ctx context.Context, dellCSIMigrationGroup *storagev1alpha1.DellCSIMigrationGroup) (ctrl.Result, error) {
