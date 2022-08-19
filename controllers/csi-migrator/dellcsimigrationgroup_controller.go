@@ -63,6 +63,10 @@ const (
 	MaxRetryDurationForActions = 1 * time.Hour
 	// MaxNumberOfConditions maximum length of conditions list
 	MaxNumberOfConditions = 20
+	// SymmetrixIDParam key for storing arrayID
+	SymmetrixIDParam = "SYMID"
+	// RemoteSymIDParam key for storing remote arrayID
+	RemoteSymIDParam = "RemoteSYMID"
 )
 
 type ActionType string
@@ -190,9 +194,9 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 		//Include format and config validation on the driver side
 		ArrayMigrateReqParams := map[string]string{
-			"DriverName":    mg.Spec.DriverName,
-			"SourceArrayID": mg.Spec.SourceID,
-			"TargetArrayID": mg.Spec.TargetID,
+			"DriverName":     mg.Spec.DriverName,
+			SymmetrixIDParam: mg.Spec.SourceID,
+			RemoteSymIDParam: mg.Spec.TargetID,
 		}
 
 		ActionType := &migration.Action{
