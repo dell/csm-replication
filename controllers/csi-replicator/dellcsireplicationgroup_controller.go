@@ -328,8 +328,10 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 }
 
-func (r *ReplicationGroupReconciler) getAction(actionType ActionType) (*csiext.ExecuteActionRequest_Action, error) {
+func (r *ReplicationGroupReconciler) getAction(log logr.Logger, actionType ActionType) (*csiext.ExecuteActionRequest_Action, error) {
+	// log := common.GetLoggerFromContext(ctx)
 	for _, supportedAction := range r.SupportedActions {
+		log.V(common.InfoLevel).Info("getAction", supportedAction)
 		if supportedAction == nil {
 			continue
 		}
@@ -456,7 +458,7 @@ func (r *ReplicationGroupReconciler) processRGInActionInProgressState(ctx contex
 			log.V(common.DebugLevel).Info("Action set")
 
 			actionType := ActionType(rg.Spec.Action)
-			_, err := r.getAction(actionType)
+			_, err := r.getAction(log, actionType)
 			if err != nil {
 				// Action invalid
 				r.EventRecorder.Event(rg, v1.EventTypeWarning, "Invalid",
@@ -520,7 +522,7 @@ func (r *ReplicationGroupReconciler) processRGInActionInProgressState(ctx contex
 		r.EventRecorder.Eventf(rg, v1.EventTypeWarning, "InProgress",
 			"Action [%s] on DellCSIReplicationGroup [%s] is in Progress, cannot execute [%s] ", actionType.String(), rg.Name, rg.Spec.Action)
 	}
-	action, err := r.getAction(actionType)
+	action, err := r.getAction(log, actionType)
 	if err != nil {
 		r.EventRecorder.Eventf(rg, v1.EventTypeWarning, "Unsupported",
 			"Action changed to an invalid value %s while another action execution was in progress. [%s]",
@@ -624,7 +626,7 @@ func (r *ReplicationGroupReconciler) processRG(ctx context.Context, dellCSIRepli
 			return ctrl.Result{}, err
 		}
 		actionType := ActionType(dellCSIReplicationGroup.Spec.Action)
-		_, err = r.getAction(actionType)
+		_, err = r.getAction(log, actionType)
 		// Invalid action type
 		if err != nil {
 			// Reset the action to empty & raise an event
