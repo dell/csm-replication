@@ -21,6 +21,7 @@ import (
 	"sync"
 
 	"github.com/dell/csm-replication/pkg/common"
+	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/go-logr/logr"
@@ -262,6 +263,11 @@ func (c *RemoteK8sControllerClient) GetPersistentVolumeClaim(ctx context.Context
 // UpdatePersistentVolumeClaim updates persistent volume claim object in current cluster
 func (c *RemoteK8sControllerClient) UpdatePersistentVolumeClaim(ctx context.Context, claim *corev1.PersistentVolumeClaim) error {
 	return c.Client.Update(ctx, claim)
+}
+
+// CreateSnapshotContent creates the snapshot content on the remote cluster
+func (c *RemoteK8sControllerClient) CreateSnapshotContent(ctx context.Context, content *s1.VolumeSnapshotContent) error {
+	return c.Client.Create(ctx, content)
 }
 
 // GetControllerClient - Returns a controller client which reads and writes directly to API server

@@ -94,11 +94,12 @@ func (a ActionType) getErrorString(errorMsg string) string {
 
 // ActionResult represents end result of replication action
 type ActionResult struct {
-	ActionType   ActionType
-	Time         time.Time
-	Error        error
-	IsFinalError bool
-	PGStatus     *csiext.StorageProtectionGroupStatus
+	ActionType       ActionType
+	Time             time.Time
+	Error            error
+	IsFinalError     bool
+	PGStatus         *csiext.StorageProtectionGroupStatus
+	ActionAttributes map[string]string
 }
 
 // ActionAnnotation represents annotation that contains information about replication action
@@ -209,8 +210,11 @@ func updateRGStatusWithActionResult(ctx context.Context, rg *repv1.DellCSIReplic
 			rg.Status.State = ErrorState
 		}
 	}
+
 	updateConditionsWithActionResult(ctx, rg, result)
 	updateLastAction(ctx, rg, result)
+	updateActionAttributes(ctx, rg, result)
+
 	// Update the RG link state if we got a status
 	if result.PGStatus != nil {
 		log.V(common.InfoLevel).Info("RG link state was updated")
@@ -229,8 +233,9 @@ func updateConditionsWithActionResult(ctx context.Context, rg *repv1.DellCSIRepl
 	log.V(common.InfoLevel).Info("Begin updating condition with action result")
 
 	condition := repv1.LastAction{
-		Condition: result.ActionType.getSuccessfulString(),
-		Time:      &metav1.Time{Time: result.Time},
+		Condition:        result.ActionType.getSuccessfulString(),
+		Time:             &metav1.Time{Time: result.Time},
+		ActionAttributes: result.ActionAttributes,
 	}
 	if result.Error != nil && result.IsFinalError {
 		condition.Condition = result.ActionType.getErrorString(result.Error.Error())
@@ -259,6 +264,22 @@ func updateLastAction(ctx context.Context, rg *repv1.DellCSIReplicationGroup, re
 	}
 
 	log.V(common.InfoLevel).Info("Last action was updated")
+}
+
+func updateActionAttributes(ctx context.Context, rg *storagev1alpha1.DellCSIReplicationGroup, result *ActionResult) {
+	log := common.GetLoggerFromContext(ctx)
+	log.V(common.InfoLevel).Info("[FC] Updating the action attributes!")
+
+	switch result.ActionType {
+	case "CREATE_SNAPSHOT":
+		log.V(common.InfoLevel).Info("Finished Create Snapshot, Attributes:")
+		for key, val := range result.ActionAttributes {
+			log.V(common.InfoLevel).Info("Key: " + key + " Value: " + val)
+		}
+		rg.Status.LastAction.ActionAttributes = result.ActionAttributes
+	default:
+		log.V(common.InfoLevel).Info("[FC] ActionType Response Unknown")
+	}
 }
 
 // ReplicationGroupReconciler is a structure that watches and reconciles events on ReplicationGroup resources
@@ -331,7 +352,7 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 func (r *ReplicationGroupReconciler) getAction(log logr.Logger, actionType ActionType) (*csiext.ExecuteActionRequest_Action, error) {
 	// log := common.GetLoggerFromContext(ctx)
 	for _, supportedAction := range r.SupportedActions {
-		log.V(common.InfoLevel).Info("getAction", supportedAction)
+		// log.V(common.InfoLevel).Info("getAction", supportedAction)
 		if supportedAction == nil {
 			continue
 		}
@@ -554,16 +575,23 @@ func (r *ReplicationGroupReconciler) processRGInActionInProgressState(ctx contex
 		r.Log.Error(err, "Failed to update status with action result", "Action Result", actionResult)
 		return ctrl.Result{}, err
 	}
+
 	err = r.Status().Update(ctx, rg)
 	if err != nil {
 		r.Log.Error(err, "Failed to update status")
 		return ctrl.Result{}, err
 	}
+
 	log.Info("Successfully updated status", "state", rg.Status.State)
 	// In case of Action success & successful status update, we raise an event
 	if actionResult.Error == nil {
 		r.EventRecorder.Eventf(rg, v1.EventTypeNormal, "Updated",
 			"DellCSIReplicationGroup [%s] state updated to [%s] after successful action ", rg.Name, ReadyState)
+
+		// if actionResult.ActionType == "CREATE_SNAPSHOT" {
+		// 	r.EventRecorder.AnnotatedEventf(rg, result.ActionAttributes, v1.EventTypeNormal, "Snapshot",
+		// 		"DellCSIReplicationGroup [%s] snapshot was created on remote system", rg.Name)
+		// }
 	}
 
 	return ctrl.Result{}, controllers.IgnoreIfFinalError(actionResult.Error)
@@ -586,6 +614,7 @@ func (r *ReplicationGroupReconciler) executeAction(ctx context.Context, rg *repv
 	actionResult.Error = err
 	if res != nil {
 		actionResult.PGStatus = res.GetStatus()
+		actionResult.ActionAttributes = res.ActionAttributes
 	}
 	actionResult.Time = time.Now()
 	if err != nil {

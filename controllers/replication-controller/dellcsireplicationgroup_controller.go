@@ -25,6 +25,8 @@ import (
 	repv1 "github.com/dell/csm-replication/api/v1"
 	controller "github.com/dell/csm-replication/controllers"
 	"github.com/dell/csm-replication/pkg/connection"
+	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	reconcile "sigs.k8s.io/controller-runtime/pkg/controller"
@@ -301,8 +303,74 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
+	// TODO: Add check for the snapshot existence.
+	r.processSnapshotEvent(ctx, localRG, remoteClient, log)
+
 	log.V(common.InfoLevel).Info("RG has already been synced to the remote cluster")
 	return ctrl.Result{}, nil
+}
+
+func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, group *storagev1alpha1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
+	lastAction := group.Status.LastAction
+
+	if !strings.Contains(lastAction.Condition, "CREATE_SNAPSHOT") {
+		return nil
+	}
+
+	for key, value := range lastAction.ActionAttributes {
+		msg := "[FC] ActionAttributes - Key: " + key + ", Value: " + value
+		log.V(common.InfoLevel).Info(msg)
+
+		snapRef := makeSnapReference(value)
+		sc := makeStorageClassContent()
+		snapContent := makeVolSnapContent(value, key, *snapRef, sc)
+
+		// TODO: Add check to create only once
+		remoteClient.CreateSnapshotContent(ctx, snapContent)
+	}
+
+	// t := metav1.Time{Time: time.Now()}
+
+	// log.V(common.InfoLevel).Info("[FC] Last Action: " + lastAction.Condition + " " + lastAction.Time.String() + "Time: " + t.String())
+
+	return nil
+}
+
+func makeSnapReference(snapName string) *v1.ObjectReference {
+	return &v1.ObjectReference{
+		Kind:       "VolumeSnapshot",
+		APIVersion: "snapshot.storage.k8s.io/v1",
+		Name:       "snapshot-" + snapName,
+	}
+}
+
+func makeStorageClassContent() *s1.VolumeSnapshotClass {
+	return &s1.VolumeSnapshotClass{
+		// TODO: Passable parameter
+		Driver:         "csi-vxflexos.dellemc.com",
+		DeletionPolicy: "Retain",
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "vxflexos-snapclass",
+		},
+	}
+}
+
+func makeVolSnapContent(snapName, volumeName string, snapRef v1.ObjectReference, sc *s1.VolumeSnapshotClass) *s1.VolumeSnapshotContent {
+	volsnapcontent := &s1.VolumeSnapshotContent{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "volume-" + volumeName,
+		},
+		Spec: s1.VolumeSnapshotContentSpec{
+			VolumeSnapshotRef: snapRef,
+			Source: s1.VolumeSnapshotContentSource{
+				SnapshotHandle: &snapName,
+			},
+			VolumeSnapshotClassName: &sc.Name,
+			DeletionPolicy:          sc.DeletionPolicy,
+			Driver:                  sc.Driver,
+		},
+	}
+	return volsnapcontent
 }
 
 // SetupWithManager start using reconciler by creating new controller managed by provided manager
