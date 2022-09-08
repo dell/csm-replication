@@ -18,6 +18,7 @@ import (
 	"context"
 
 	repV1Alpha1 "github.com/dell/csm-replication/api/v1alpha1"
+	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	storageV1 "k8s.io/api/storage/v1"
 	apiExtensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -39,6 +40,9 @@ type RemoteClusterClient interface {
 	UpdateReplicationGroup(ctx context.Context, group *repV1Alpha1.DellCSIReplicationGroup) error
 	ListReplicationGroup(ctx context.Context) (*repV1Alpha1.DellCSIReplicationGroupList, error)
 	CreateReplicationGroup(ctx context.Context, group *repV1Alpha1.DellCSIReplicationGroup) error
+
+	//TODO: Snapshot Content
+	CreateSnapshotContent(ctx context.Context, content *s1.VolumeSnapshotContent) error
 }
 
 // ConnHandler - Interface

@@ -52,6 +52,9 @@ type LastAction struct {
 
 	// ErrorMessage is the last error message associated with the condition
 	ErrorMessage string `json:"errorMessage,omitempty"`
+
+	// ActionAttributes content unique on response to an action
+	ActionAttributes map[string]string `json:"actionAttributes,omitempty"`
 }
 
 // ReplicationLinkState - Stores the Replication Link State
