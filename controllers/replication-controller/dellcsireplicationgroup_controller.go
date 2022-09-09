@@ -17,6 +17,7 @@ package replicationcontroller
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -304,34 +305,57 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	// TODO: Add check for the snapshot existence.
-	r.processSnapshotEvent(ctx, localRG, remoteClient, log)
+	r.processLastActionResult(ctx, localRG, remoteClient, log)
 
 	log.V(common.InfoLevel).Info("RG has already been synced to the remote cluster")
 	return ctrl.Result{}, nil
 }
 
-func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, group *storagev1alpha1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
-	lastAction := group.Status.LastAction
-
-	if !strings.Contains(lastAction.Condition, "CREATE_SNAPSHOT") {
+func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context, group *storagev1alpha1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
+	if len(group.Status.Conditions) == 0 || group.Status.LastAction.Time == nil {
+		log.V(common.InfoLevel).Info("[FC] No action to process")
 		return nil
 	}
 
-	for key, value := range lastAction.ActionAttributes {
-		msg := "[FC] ActionAttributes - Key: " + key + ", Value: " + value
-		log.V(common.InfoLevel).Info(msg)
-
-		snapRef := makeSnapReference(value)
-		sc := makeStorageClassContent()
-		snapContent := makeVolSnapContent(value, key, *snapRef, sc)
-
-		// TODO: Add check to create only once
-		remoteClient.CreateSnapshotContent(ctx, snapContent)
+	if strings.Contains(group.Status.LastAction.Condition, "CREATE_SNAPSHOT") {
+		return r.processSnapshotEvent(ctx, group, remoteClient, log)
 	}
 
-	// t := metav1.Time{Time: time.Now()}
+	return nil
+}
 
-	// log.V(common.InfoLevel).Info("[FC] Last Action: " + lastAction.Condition + " " + lastAction.Time.String() + "Time: " + t.String())
+func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, group *storagev1alpha1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
+	lastAction := group.Status.LastAction
+	lastTime := lastAction.Time
+	currTime := time.Now()
+	diffTime := currTime.Sub(lastTime.Time).Seconds()
+
+	if diffTime > 30 {
+		log.V(common.InfoLevel).Info("[FC] LastAction executed greater than the threshold")
+		return nil
+	}
+
+	for volumeHandle, snapshotHandle := range lastAction.ActionAttributes {
+		msg := "[FC] ActionAttributes - volumeHandle: " + volumeHandle + ", snapshotHandle: " + snapshotHandle
+		log.V(common.InfoLevel).Info(msg)
+
+		snapRef := makeSnapReference(snapshotHandle)
+		sc := makeStorageClassContent()
+		snapContent := makeVolSnapContent(snapshotHandle, volumeHandle, *snapRef, sc)
+
+		err := remoteClient.CreateSnapshotContent(ctx, snapContent)
+		if err != nil {
+			log.V(common.InfoLevel).Info("[FC] SnapContent - " + err.Error())
+			return err
+		}
+
+		snapshot := makeSnapshotObject(snapRef.Name, snapContent.Name, sc.ObjectMeta.Name)
+		err = remoteClient.CreateSnapshotObject(ctx, snapshot)
+		if err != nil {
+			log.V(common.InfoLevel).Info("[FC] Create Snapshot error - " + err.Error())
+			return err
+		}
+	}
 
 	return nil
 }
@@ -341,7 +365,25 @@ func makeSnapReference(snapName string) *v1.ObjectReference {
 		Kind:       "VolumeSnapshot",
 		APIVersion: "snapshot.storage.k8s.io/v1",
 		Name:       "snapshot-" + snapName,
+		Namespace:  defaultSnapshotNamespace,
 	}
+}
+
+func makeSnapshotObject(snapName string, contentName string, className string) *s1.VolumeSnapshot {
+	volsnap := &s1.VolumeSnapshot{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: snapName,
+			// TODO: Make configurable?
+			Namespace: defaultSnapshotNamespace,
+		},
+		Spec: s1.VolumeSnapshotSpec{
+			Source: s1.VolumeSnapshotSource{
+				VolumeSnapshotContentName: &contentName,
+			},
+			VolumeSnapshotClassName: &className,
+		},
+	}
+	return volsnap
 }
 
 func makeStorageClassContent() *s1.VolumeSnapshotClass {
@@ -358,7 +400,7 @@ func makeStorageClassContent() *s1.VolumeSnapshotClass {
 func makeVolSnapContent(snapName, volumeName string, snapRef v1.ObjectReference, sc *s1.VolumeSnapshotClass) *s1.VolumeSnapshotContent {
 	volsnapcontent := &s1.VolumeSnapshotContent{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "volume-" + volumeName,
+			Name: "volume-" + volumeName + "-" + strconv.FormatInt(time.Now().Unix(), 10),
 		},
 		Spec: s1.VolumeSnapshotContentSpec{
 			VolumeSnapshotRef: snapRef,

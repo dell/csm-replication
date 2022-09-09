@@ -43,6 +43,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/dell/csm-replication/core"
+	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -59,6 +60,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(repv1.AddToScheme(scheme))
+	utilruntime.Must(s1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 

@@ -90,6 +90,7 @@ func (k8sConnHandler *RemoteK8sConnHandler) getControllerClient(clusterID string
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(repv1.AddToScheme(scheme))
 	utilruntime.Must(apiExtensionsv1.AddToScheme(scheme))
+	utilruntime.Must(s1.AddToScheme(scheme))
 	if clientConfig, ok := k8sConnHandler.configs[clusterID]; ok {
 		client, err := GetControllerClient(clientConfig, scheme)
 		//client, err := ctrlClient.New(clientConfig, ctrlClient.Options{Scheme: scheme})
@@ -267,6 +268,11 @@ func (c *RemoteK8sControllerClient) UpdatePersistentVolumeClaim(ctx context.Cont
 
 // CreateSnapshotContent creates the snapshot content on the remote cluster
 func (c *RemoteK8sControllerClient) CreateSnapshotContent(ctx context.Context, content *s1.VolumeSnapshotContent) error {
+	return c.Client.Create(ctx, content)
+}
+
+// CreateSnapshotObject creates the snapshot on the remote cluster
+func (c *RemoteK8sControllerClient) CreateSnapshotObject(ctx context.Context, content *s1.VolumeSnapshot) error {
 	return c.Client.Create(ctx, content)
 }
 

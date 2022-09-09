@@ -41,6 +41,7 @@ type RemoteClusterClient interface {
 	ListReplicationGroup(ctx context.Context) (*repv1.DellCSIReplicationGroupList, error)
 	CreateReplicationGroup(ctx context.Context, group *repv1.DellCSIReplicationGroup) error
 	CreateSnapshotContent(ctx context.Context, content *s1.VolumeSnapshotContent) error
+	CreateSnapshotObject(ctx context.Context, content *s1.VolumeSnapshot) error
 }
 
 // ConnHandler - Interface
