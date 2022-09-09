@@ -43,6 +43,7 @@ type RemoteClusterClient interface {
 
 	//TODO: Snapshot Content
 	CreateSnapshotContent(ctx context.Context, content *s1.VolumeSnapshotContent) error
+	CreateSnapshotObject(ctx context.Context, content *s1.VolumeSnapshot) error
 }
 
 // ConnHandler - Interface
