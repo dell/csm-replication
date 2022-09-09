@@ -340,7 +340,7 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 		log.V(common.InfoLevel).Info(msg)
 
 		snapRef := makeSnapReference(snapshotHandle)
-		sc := makeStorageClassContent()
+		sc := makeStorageClassContent(controller.DriverName)
 		snapContent := makeVolSnapContent(snapshotHandle, volumeHandle, *snapRef, sc)
 
 		err := remoteClient.CreateSnapshotContent(ctx, snapContent)
@@ -372,8 +372,7 @@ func makeSnapReference(snapName string) *v1.ObjectReference {
 func makeSnapshotObject(snapName string, contentName string, className string) *s1.VolumeSnapshot {
 	volsnap := &s1.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: snapName,
-			// TODO: Make configurable?
+			Name:      snapName,
 			Namespace: defaultSnapshotNamespace,
 		},
 		Spec: s1.VolumeSnapshotSpec{
@@ -386,12 +385,12 @@ func makeSnapshotObject(snapName string, contentName string, className string) *
 	return volsnap
 }
 
-func makeStorageClassContent() *s1.VolumeSnapshotClass {
+func makeStorageClassContent(driver string) *s1.VolumeSnapshotClass {
 	return &s1.VolumeSnapshotClass{
-		// TODO: Passable parameter
-		Driver:         "csi-vxflexos.dellemc.com",
+		Driver:         driver,
 		DeletionPolicy: "Retain",
 		ObjectMeta: metav1.ObjectMeta{
+			// TODO: Make configurable.
 			Name: "vxflexos-snapclass",
 		},
 	}
