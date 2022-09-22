@@ -32,13 +32,15 @@ func GetSnapshotCommand() *cobra.Command {
 		Short: "allows to execute snapshot actionat the specified cluster or rg",
 		Example: `
 For single cluster config:
-./repctl --rg <rg-id> snapshot`,
+./repctl --rg <rg-id> --sn-namespace <namespace> snapshot`,
 		Long: `
 This command will perform a snapshot at specified cluster or at the RG.\n
 Note: More information to be added.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			rgName := viper.GetString(config.ReplicationGroup)
 			inputCluster := viper.GetString("target")
+			prefix := viper.GetString(config.ReplicationPrefix)
+			snNamespace := viper.GetString("sn-namespace")
 			verbose := viper.GetBool(config.Verbose)
 			wait := viper.GetBool("snapshot-wait")
 			input, res := verifyInputForSnapshotAction(inputCluster, rgName)
@@ -49,7 +51,7 @@ Note: More information to be added.`,
 			}
 
 			if input == "rg" {
-				createSnapshot(configFolder, res, verbose, wait)
+				createSnapshot(configFolder, res, prefix, snNamespace, verbose, wait)
 			} else {
 				log.Fatal("Unexpected input received")
 			}
@@ -58,6 +60,8 @@ Note: More information to be added.`,
 
 	snapshotCmd.Flags().String("at", "", "target to execute the snapshot")
 	_ = viper.BindPFlag("target", snapshotCmd.Flags().Lookup("at"))
+	snapshotCmd.Flags().String("sn-namespace", "", "target to execute the snapshot")
+	_ = viper.BindPFlag("sn-namespace", snapshotCmd.Flags().Lookup("sn-namespace"))
 
 	snapshotCmd.Flags().Bool("wait", false, "wait for action to complete")
 	_ = viper.BindPFlag("snapshot-waitt", snapshotCmd.Flags().Lookup("wait"))
@@ -100,7 +104,7 @@ func verifyInputForSnapshotAction(input string, rg string) (res string, tgt stri
 	return "", ""
 }
 
-func createSnapshot(configFolder, rgName string, verbose bool, wait bool) {
+func createSnapshot(configFolder, rgName, prefix, snNamespace string, verbose bool, wait bool) {
 	if verbose {
 		log.Printf("fetching RG and cluster info...\n")
 	}
@@ -127,6 +131,13 @@ func createSnapshot(configFolder, rgName string, verbose bool, wait bool) {
 		log.Fatalf("snapshot: error executing UpdateAction %s\n", err.Error())
 		return
 	}
+
+	namespace := "default"
+	if snNamespace != "" {
+		namespace = snNamespace
+	}
+
+	rg.Annotations[prefix+"/namespace"] = namespace
 
 	if wait {
 		success := waitForStateToUpdate(rgName, cluster, rLinkState)
