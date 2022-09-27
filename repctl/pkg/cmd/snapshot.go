@@ -127,17 +127,20 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace string, verbose bo
 	}
 
 	rg.Spec.Action = config.ActionCreateSnapshot
-	if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
-		log.Fatalf("snapshot: error executing UpdateAction %s\n", err.Error())
-		return
-	}
 
 	namespace := "default"
 	if snNamespace != "" {
 		namespace = snNamespace
 	}
 
+	log.Printf("Namespace: %s, Annotation: %s", namespace, prefix+"/namespace")
+
 	rg.Annotations[prefix+"/namespace"] = namespace
+
+	if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
+		log.Fatalf("snapshot: error executing UpdateAction %s\n", err.Error())
+		return
+	}
 
 	if wait {
 		success := waitForStateToUpdate(rgName, cluster, rLinkState)

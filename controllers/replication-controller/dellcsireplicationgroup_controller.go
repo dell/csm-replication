@@ -16,11 +16,13 @@ package replicationcontroller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
+	csireplicator "github.com/dell/csm-replication/controllers/csi-replicator"
 	"github.com/dell/csm-replication/pkg/common"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
@@ -335,12 +337,25 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 		return nil
 	}
 
+	val, ok := group.Annotations[csireplicator.Action]
+	if !ok {
+		log.V(common.InfoLevel).Info("No action", "val", val)
+	}
+
+	var actionAnnotation csireplicator.ActionAnnotation
+	err := json.Unmarshal([]byte(val), &actionAnnotation)
+	if err != nil {
+		log.Error(err, "JSON unmarshal error", "actionAnnotation", actionAnnotation)
+	}
+
+	log.V(common.InfoLevel).Info("[FC] Action Namespace - " + actionAnnotation.Namespace)
+
 	for volumeHandle, snapshotHandle := range lastAction.ActionAttributes {
 		msg := "[FC] ActionAttributes - volumeHandle: " + volumeHandle + ", snapshotHandle: " + snapshotHandle
 		log.V(common.InfoLevel).Info(msg)
 
-		snapRef := makeSnapReference(snapshotHandle)
-		sc := makeStorageClassContent(controller.DriverName)
+		snapRef := makeSnapReference(snapshotHandle, actionAnnotation.Namespace)
+		sc := makeStorageClassContent(group.Labels[controller.DriverName])
 		snapContent := makeVolSnapContent(snapshotHandle, volumeHandle, *snapRef, sc)
 
 		err := remoteClient.CreateSnapshotContent(ctx, snapContent)
@@ -349,7 +364,7 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 			return err
 		}
 
-		snapshot := makeSnapshotObject(snapRef.Name, snapContent.Name, sc.ObjectMeta.Name)
+		snapshot := makeSnapshotObject(snapRef.Name, snapContent.Name, sc.ObjectMeta.Name, actionAnnotation.Namespace)
 		err = remoteClient.CreateSnapshotObject(ctx, snapshot)
 		if err != nil {
 			log.V(common.InfoLevel).Info("[FC] Create Snapshot error - " + err.Error())
@@ -360,20 +375,20 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 	return nil
 }
 
-func makeSnapReference(snapName string) *v1.ObjectReference {
+func makeSnapReference(snapName, namespace string) *v1.ObjectReference {
 	return &v1.ObjectReference{
 		Kind:       "VolumeSnapshot",
 		APIVersion: "snapshot.storage.k8s.io/v1",
 		Name:       "snapshot-" + snapName,
-		Namespace:  defaultSnapshotNamespace,
+		Namespace:  namespace,
 	}
 }
 
-func makeSnapshotObject(snapName string, contentName string, className string) *s1.VolumeSnapshot {
+func makeSnapshotObject(snapName, contentName, className, namespace string) *s1.VolumeSnapshot {
 	volsnap := &s1.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      snapName,
-			Namespace: defaultSnapshotNamespace,
+			Namespace: namespace,
 		},
 		Spec: s1.VolumeSnapshotSpec{
 			Source: s1.VolumeSnapshotSource{

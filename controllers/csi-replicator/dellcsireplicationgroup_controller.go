@@ -109,6 +109,7 @@ type ActionAnnotation struct {
 	FinalError            string `json:"finalError"`
 	FinishTime            string `json:"finishTime"`
 	ProtectionGroupStatus string `json:"protectionGroupStatus"`
+	Namespace             string `json:"namespace"`
 }
 
 func updateRGSpecWithActionResult(ctx context.Context, rg *repv1.DellCSIReplicationGroup, result *ActionResult) bool {
@@ -132,6 +133,16 @@ func updateRGSpecWithActionResult(ctx context.Context, rg *repv1.DellCSIReplicat
 		finishTime := &metav1.Time{Time: result.Time}
 		buff, _ := json.Marshal(finishTime)
 		actionAnnotation.FinishTime = string(buff)
+
+		// TODO: Don't use the MigrationNamespace?
+		if ns, ok := rg.Annotations[controllers.MigrationNamespace]; ok {
+			actionAnnotation.Namespace = ns
+		} else {
+			actionAnnotation.Namespace = "default"
+		}
+
+		log.V(common.InfoLevel).Info("[FC] ActionAnnotation - " + actionAnnotation.Namespace + " " + controllers.MigrationNamespace)
+
 		bytes, _ := json.Marshal(&actionAnnotation)
 		controllers.AddAnnotation(rg, Action, string(bytes))
 
@@ -276,9 +287,10 @@ func updateActionAttributes(ctx context.Context, rg *storagev1alpha1.DellCSIRepl
 		for key, val := range result.ActionAttributes {
 			log.V(common.InfoLevel).Info("Key: " + key + " Value: " + val)
 		}
+
 		rg.Status.LastAction.ActionAttributes = result.ActionAttributes
 	default:
-		log.V(common.InfoLevel).Info("[FC] ActionType Response Unknown")
+		log.V(common.InfoLevel).Info("[FC] Update Action Attributes to default")
 	}
 }
 
@@ -587,11 +599,6 @@ func (r *ReplicationGroupReconciler) processRGInActionInProgressState(ctx contex
 	if actionResult.Error == nil {
 		r.EventRecorder.Eventf(rg, v1.EventTypeNormal, "Updated",
 			"DellCSIReplicationGroup [%s] state updated to [%s] after successful action ", rg.Name, ReadyState)
-
-		// if actionResult.ActionType == "CREATE_SNAPSHOT" {
-		// 	r.EventRecorder.AnnotatedEventf(rg, result.ActionAttributes, v1.EventTypeNormal, "Snapshot",
-		// 		"DellCSIReplicationGroup [%s] snapshot was created on remote system", rg.Name)
-		// }
 	}
 
 	return ctrl.Result{}, controllers.IgnoreIfFinalError(actionResult.Error)
@@ -615,6 +622,7 @@ func (r *ReplicationGroupReconciler) executeAction(ctx context.Context, rg *repv
 	if res != nil {
 		actionResult.PGStatus = res.GetStatus()
 		actionResult.ActionAttributes = res.ActionAttributes
+
 	}
 	actionResult.Time = time.Now()
 	if err != nil {
