@@ -337,7 +337,7 @@ func createPVCs(providedPVList []string, cluster k8s.ClusterInterface, rgName, t
 
 func createSCs(scConfig ScConfig, clusters *k8s.Clusters, dryRun bool) error {
 	switch scConfig.Driver {
-	case "powerstore", "powermax", "isilon":
+	case "powerstore", "powermax", "isilon", "vxflexos":
 		break
 	default:
 		return fmt.Errorf("driver not supported")
