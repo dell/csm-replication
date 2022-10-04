@@ -64,7 +64,7 @@ Note: More information to be added.`,
 	_ = viper.BindPFlag("sn-namespace", snapshotCmd.Flags().Lookup("sn-namespace"))
 
 	snapshotCmd.Flags().Bool("wait", false, "wait for action to complete")
-	_ = viper.BindPFlag("snapshot-waitt", snapshotCmd.Flags().Lookup("wait"))
+	_ = viper.BindPFlag("snapshot-wait", snapshotCmd.Flags().Lookup("wait"))
 	return snapshotCmd
 }
 
@@ -109,7 +109,7 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace string, verbose bo
 		log.Printf("fetching RG and cluster info...\n")
 	}
 
-	cluster, rg, err := GetRGAndClusterFromRGID(configFolder, rgName, "")
+	cluster, rg, err := GetRGAndClusterFromRGID(configFolder, rgName, "src")
 	if err != nil {
 		log.Fatalf("snapshot to RG: error fetching RG info: (%s)\n", err.Error())
 	}
