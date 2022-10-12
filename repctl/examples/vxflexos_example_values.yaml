@@ -1,0 +1,19 @@
+sourceClusterID: "cluster-k211"
+targetClusterID: "cluster-k212"
+name: "vxflexos-replication"
+driver: "vxflexos"
+reclaimPolicy: "Delete"
+replicationPrefix: "replication.storage.dell.com"
+remoteRetentionPolicy:
+  RG: "Delete"
+  PV: "Retain"
+parameters:
+  storagePool:
+    source: "pool1"
+    target: "pool1"
+  remoteSystem:
+    source: "7ad2b6e84ac1c70f"
+    target: "4c33e14b19f0380f"
+  rpo: "60"
+  ignoreNamespaces: "false"
+  volumeGroupPrefix: "csi"
