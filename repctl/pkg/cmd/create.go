@@ -66,6 +66,9 @@ type GlobalParameters struct {
 	AzServiceIP       Mirrored
 	IsiPath           string
 	RootClientEnabled Mirrored
+
+	// Vxflexos
+	ConsistencyGroupName string
 }
 
 // RemoteRetentionPolicy structure that contains values for remoteRetentionPolicy for both PV and RGs

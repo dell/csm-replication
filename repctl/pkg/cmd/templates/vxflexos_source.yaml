@@ -4,7 +4,7 @@ metadata:
   name: {{ .Name }}
 provisioner: csi-{{ .Driver }}.dellemc.com
 reclaimPolicy: {{ .ReclaimPolicy }}
-volumeBindingMode: WaitForFirstConsumer
+volumeBindingMode: Immediate
 allowVolumeExpansion: true
 parameters:
   storagepool: {{ .Parameters.StoragePool.Source }}
@@ -24,6 +24,7 @@ parameters:
   {{ .ReplicationPrefix }}/volumeGroupPrefix: {{ .Parameters.VolumeGroupPrefix }}
   {{ .ReplicationPrefix }}/remoteRGRetentionPolicy: {{ .RemoteRetentionPolicy.RG }}
   {{ .ReplicationPrefix }}/remotePVRetentionPolicy: {{ .RemoteRetentionPolicy.PV }}
+  {{ .ReplicationPrefix }}/consistencyGroupName: {{ .Parameters.ConsistencyGroupName }}
 allowedTopologies:
 - matchLabelExpressions:
   - key: csi-{{ .Driver }}.dellemc.com/{{ .Parameters.RemoteSystem.Source }}
