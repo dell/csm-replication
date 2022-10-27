@@ -62,9 +62,10 @@ type GlobalParameters struct {
 
 	// PowerScale
 	ClusterName       Mirrored
-	AccessZone        string
+	AccessZone        Mirrored
+	AzServiceIP       Mirrored
 	IsiPath           string
-	RootClientEnabled bool
+	RootClientEnabled Mirrored
 
 	// Unity
 	Protocol    string
