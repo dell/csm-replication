@@ -24,12 +24,12 @@ parameters:
   {{ .ReplicationPrefix }}/remoteRGRetentionPolicy: {{ .RemoteRetentionPolicy.RG }}
   {{ .ReplicationPrefix }}/remotePVRetentionPolicy: {{ .RemoteRetentionPolicy.PV }}
   {{ .ReplicationPrefix }}/remoteAccessZone: {{ .Parameters.AccessZone.Source }}
-  {{- if .Parameters.AzServiceIP }}
+  {{- if .Parameters.AzServiceIP.Source }}
   {{ .ReplicationPrefix }}/remoteAzServiceIP: {{ .Parameters.AzServiceIP.Source }}
   {{- end }}
-  {{ .ReplicationPrefix }}/remoteRootClientEnabled: {{ .Parameters.RootClientEnabled.Source }}
+  {{ .ReplicationPrefix }}/remoteRootClientEnabled: "{{ .Parameters.RootClientEnabled.Source }}"
   AccessZone: {{ .Parameters.AccessZone.Target }}
-  {{- if .Parameters.AzServiceIP }}
+  {{- if .Parameters.AzServiceIP.Target }}
   AzServiceIP: {{ .Parameters.AzServiceIP.Target }}
   {{- end }}
   IsiPath: {{ .Parameters.IsiPath}}
