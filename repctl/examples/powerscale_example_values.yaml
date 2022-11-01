@@ -11,9 +11,16 @@ parameters:
   rpo: "Five_Minutes"
   ignoreNamespaces: "false"
   volumeGroupPrefix: "csi"
-  accessZone: "System"
   isiPath: "/ifs/data/csi"
-  rootClientEnabled: "false"
   clusterName:
     source: "cluster-1"
     target: "cluster-2"
+  rootClientEnabled:
+    source: "false"
+    target: "false"
+  accessZone:
+    source: "System"
+    target: "System"
+  #azServiceIP:
+    #source: "192.168.1.1"
+    #target: "192.168.1.2"

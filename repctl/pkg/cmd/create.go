@@ -62,9 +62,10 @@ type GlobalParameters struct {
 
 	// PowerScale
 	ClusterName       Mirrored
-	AccessZone        string
+	AccessZone        Mirrored
+	AzServiceIP       Mirrored
 	IsiPath           string
-	RootClientEnabled bool
+	RootClientEnabled Mirrored
 
 	// Unity
 	Protocol    string
@@ -371,7 +372,7 @@ func createSCs(scConfig ScConfig, clusters *k8s.Clusters, dryRun bool) error {
 			log.Print("Creating storage class in source cluster")
 			_, err := cluster.CreateObject(context.Background(), srcSC)
 			if err != nil {
-				log.Printf("Encountered error during creating object. Error: %s\n",
+				log.Errorf("Encountered error during creating object. Error: %s\n",
 					err.Error())
 				continue
 			}
@@ -381,7 +382,7 @@ func createSCs(scConfig ScConfig, clusters *k8s.Clusters, dryRun bool) error {
 			log.Print("Creating storage class in target cluster")
 			_, err := cluster.CreateObject(context.Background(), tgtSC)
 			if err != nil {
-				log.Printf("Encountered error during creating object. Error: %s\n",
+				log.Errorf("Encountered error during creating object. Error: %s\n",
 					err.Error())
 				continue
 			}

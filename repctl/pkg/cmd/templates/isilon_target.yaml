@@ -23,8 +23,15 @@ parameters:
   {{ .ReplicationPrefix }}/remoteSystem: {{ .Parameters.ClusterName.Source }}
   {{ .ReplicationPrefix }}/remoteRGRetentionPolicy: {{ .RemoteRetentionPolicy.RG }}
   {{ .ReplicationPrefix }}/remotePVRetentionPolicy: {{ .RemoteRetentionPolicy.PV }}
-  AccessZone: {{ .Parameters.AccessZone}}
+  {{ .ReplicationPrefix }}/remoteAccessZone: {{ .Parameters.AccessZone.Source }}
+  {{- if .Parameters.AzServiceIP.Source }}
+  {{ .ReplicationPrefix }}/remoteAzServiceIP: {{ .Parameters.AzServiceIP.Source }}
+  {{- end }}
+  {{ .ReplicationPrefix }}/remoteRootClientEnabled: "{{ .Parameters.RootClientEnabled.Source }}"
+  AccessZone: {{ .Parameters.AccessZone.Target }}
+  {{- if .Parameters.AzServiceIP.Target }}
+  AzServiceIP: {{ .Parameters.AzServiceIP.Target }}
+  {{- end }}
   IsiPath: {{ .Parameters.IsiPath}}
-  RootClientEnabled: "{{ .Parameters.RootClientEnabled }}"
+  RootClientEnabled: "{{ .Parameters.RootClientEnabled.Target }}"
   ClusterName: {{ .Parameters.ClusterName.Target }}
-
