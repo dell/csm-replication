@@ -535,7 +535,7 @@ func generateConfigsFromSA(mc *k8s.MultiClusterConfigurator, clusterIDs []string
 		cfgPath := fmt.Sprintf("/tmp/repctl/%s", cluster.GetID())
 
 		// #nosec G204
-		c := exec.Command("/bin/bash", "/tmp/repctl/gen_kubeconfig.sh", "-s", "default", "-n", namespace, "-o", cfgPath)
+		c := exec.Command("/bin/bash", "/tmp/repctl/gen_kubeconfig.sh", "-s", "dell-replication-controller-sa", "-n", namespace, "-o", cfgPath)
 		c.Stdout = os.Stdout
 		c.Stderr = os.Stderr
 
