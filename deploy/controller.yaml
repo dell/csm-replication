@@ -265,3 +265,66 @@ spec:
           name: dell-replication-controller-config
           optional: true
         name: configmap-volume
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  annotations:
+      "helm.sh/hook": pre-install
+      "helm.sh/hook-weight": "-5"
+      "helm.sh/hook-delete-policy": hook-succeeded
+  name: default
+  namespace: dell-replication-controller
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  verbs:
+  - get
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": hook-succeeded
+  name: default
+  namespace: dell-replication-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: default
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: dell-replication-controller
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: replication-secret
+  namespace: dell-replication-controller
+  annotations:
+    kubernetes.io/service-account.name: default
+    kubernetes.io/service-account.namespace: dell-replication-controller
+type: kubernetes.io/service-account-token
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-mountable-secret
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: sa
+        image: bitnami/kubectl
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh","-c", "kubectl patch serviceaccount default -p '{\"secrets\": [{\"name\": \"replication-secret\"}]}'"]
