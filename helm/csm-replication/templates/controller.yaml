@@ -1,3 +1,11 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dell-replication-controller-sa
+  namespace: dell-replication-controller
+secrets:
+- name: replication-secret
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -146,6 +154,16 @@ rules:
   verbs:
   - create
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: replication-secret
+  namespace: dell-replication-controller
+  annotations:
+    kubernetes.io/service-account.name: dell-replication-controller-sa
+    kubernetes.io/service-account.namespace: dell-replication-controller
+type: kubernetes.io/service-account-token
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -156,7 +174,7 @@ roleRef:
   name: dell-replication-manager-role
 subjects:
 - kind: ServiceAccount
-  name: default
+  name: dell-replication-controller-sa
   namespace: dell-replication-controller
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -169,7 +187,7 @@ roleRef:
   name: dell-replication-proxy-role
 subjects:
 - kind: ServiceAccount
-  name: default
+  name: dell-replication-controller-sa
   namespace: dell-replication-controller
 ---
 {{- $secret := (lookup "v1" "ConfigMap" "dell-replication-controller" "dell-replication-controller-config").data -}}
@@ -227,6 +245,7 @@ spec:
       hostAliases:
       {{- toYaml .Values.hostAliases | nindent 6 }}
       {{- end }}
+      serviceAccountName: dell-replication-controller-sa
       containers:
       - args:
         - prefix=replication.storage.dell.com
