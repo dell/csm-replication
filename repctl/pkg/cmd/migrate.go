@@ -18,6 +18,10 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"os"
+	"sync"
+	"time"
+
 	"github.com/dell/repctl/pkg/config"
 	"github.com/dell/repctl/pkg/k8s"
 	log "github.com/sirupsen/logrus"
@@ -25,10 +29,7 @@ import (
 	v12 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"os"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sync"
-	"time"
 
 	"github.com/spf13/cobra"
 )

@@ -1,17 +1,15 @@
 /*
-Copyright © 2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+      http://www.apache.org/licenses/LICENSE-2.0
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
 */
 
 package csireplicator
@@ -20,10 +18,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/dell/csm-replication/pkg/common"
-	v1 "k8s.io/api/core/v1"
 	"strings"
 	"time"
+
+	"github.com/dell/csm-replication/pkg/common"
+	v1 "k8s.io/api/core/v1"
 
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -607,9 +606,9 @@ func (r *ReplicationGroupReconciler) executeAction(ctx context.Context, rg *stor
 // If action is not empty -
 // If it is Invalid       - Reset it to empty, raise an event & finish the Reconcile
 // If it is Valid         - Remove any old LastSuccessful annotation
-//                        - Add an ActionInProgress annotation
-//                        - Update the spec
-//                        - Update status.State to <ACTION>_IN_PROGRESS
+//   - Add an ActionInProgress annotation
+//   - Update the spec
+//   - Update status.State to <ACTION>_IN_PROGRESS
 func (r *ReplicationGroupReconciler) processRG(ctx context.Context, dellCSIReplicationGroup *storagev1alpha1.DellCSIReplicationGroup) (ctrl.Result, error) {
 	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Start process RG")
