@@ -1,5 +1,5 @@
 /*
- Copyright © 2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@ package config
 
 import (
 	"fmt"
+
 	"github.com/dell/csm-replication/api/v1alpha1"
 	"github.com/dell/csm-replication/pkg/connection"
 	fake_client "github.com/dell/csm-replication/test/e2e-framework/fake-client"

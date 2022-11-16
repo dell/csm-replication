@@ -1,5 +1,5 @@
 /*
- Copyright © 2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -17,9 +17,10 @@ package connection
 import (
 	"context"
 	"fmt"
-	"github.com/dell/csm-replication/pkg/common"
 	"log"
 	"sync"
+
+	"github.com/dell/csm-replication/pkg/common"
 
 	repV1Alpha1 "github.com/dell/csm-replication/api/v1alpha1"
 	"github.com/go-logr/logr"
