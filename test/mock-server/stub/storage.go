@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package stub
 
 import (
@@ -71,7 +72,7 @@ func findStub(stub *findStubPayload) (*Output, error) {
 	mx.Lock()
 	defer mx.Unlock()
 	if _, ok := stubStorage[stub.Service]; !ok {
-		return nil, fmt.Errorf("Can't find stub for Service: %s", stub.Service)
+		return nil, fmt.Errorf("can't find stub for Service: %s", stub.Service)
 	}
 
 	if _, ok := stubStorage[stub.Service][stub.Method]; !ok {
