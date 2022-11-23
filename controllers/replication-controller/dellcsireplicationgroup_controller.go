@@ -364,7 +364,19 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 		sc := makeStorageClassContent(group.Labels[controller.DriverName], actionAnnotation.SnapshotClass)
 		snapContent := makeVolSnapContent(snapshotHandle, volumeHandle, *snapRef, sc)
 
-		err := remoteClient.CreateSnapshotContent(ctx, snapContent)
+		_, err := remoteClient.GetNamespace(ctx, actionAnnotation.Namespace)
+		if err != nil {
+			log.V(common.InfoLevel).Info("[FC] Namespace - " + actionAnnotation.Namespace + " not found, creating it.")
+			nsRef := makeNamespaceReference(actionAnnotation.Namespace)
+
+			err = remoteClient.CreateNamespace(ctx, nsRef)
+			if err != nil {
+				log.V(common.InfoLevel).Info("[FC] Unable to create the desired namespace - " + err.Error())
+				return err
+			}
+		}
+
+		err = remoteClient.CreateSnapshotContent(ctx, snapContent)
 		if err != nil {
 			log.V(common.InfoLevel).Info("[FC] SnapContent - " + err.Error())
 			return err
@@ -379,6 +391,14 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 	}
 
 	return nil
+}
+
+func makeNamespaceReference(namespace string) *v1.Namespace {
+	return &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespace,
+		},
+	}
 }
 
 func makeSnapReference(snapName, namespace string) *v1.ObjectReference {
