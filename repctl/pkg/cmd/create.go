@@ -69,6 +69,7 @@ type GlobalParameters struct {
 
 	// Vxflexos
 	ConsistencyGroupName string
+	ProtectionDomain     Mirrored
 }
 
 // RemoteRetentionPolicy structure that contains values for remoteRetentionPolicy for both PV and RGs

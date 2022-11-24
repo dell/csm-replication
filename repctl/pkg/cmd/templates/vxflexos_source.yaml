@@ -9,6 +9,7 @@ allowVolumeExpansion: true
 parameters:
   storagepool: {{ .Parameters.StoragePool.Source }}
   systemID: {{ .Parameters.RemoteSystem.Source }}
+  protectionDomain: {{ .Parameters.ProtectionDomain.Source }}
   {{ .ReplicationPrefix }}/isReplicationEnabled: "true"
   {{- if eq .TargetClusterID .SourceClusterID }}
   {{ .ReplicationPrefix }}/remoteStorageClassName: {{ .Name }}-tgt
@@ -25,6 +26,7 @@ parameters:
   {{ .ReplicationPrefix }}/remoteRGRetentionPolicy: {{ .RemoteRetentionPolicy.RG }}
   {{ .ReplicationPrefix }}/remotePVRetentionPolicy: {{ .RemoteRetentionPolicy.PV }}
   {{ .ReplicationPrefix }}/consistencyGroupName: {{ .Parameters.ConsistencyGroupName }}
+  {{ .ReplicationPrefix }}/protectionDomain: {{ .Parameters.ProtectionDomain.Target }}
 allowedTopologies:
 - matchLabelExpressions:
   - key: csi-{{ .Driver }}.dellemc.com/{{ .Parameters.RemoteSystem.Source }}
