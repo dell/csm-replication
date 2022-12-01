@@ -117,7 +117,7 @@ func failbackToRG(configFolder, rgName string, discard, verbose bool, wait bool)
 		return
 
 	}
-	log.Printf("RG (%s), successfully updated with action: faiback\n", rg.Name)
+	log.Printf("RG (%s), successfully updated with action: failback\n", rg.Name)
 }
 
 func failbackToCluster(configFolder, inputSourceCluster, rgName string, discard, verbose bool, wait bool) {
@@ -170,5 +170,5 @@ func failbackToCluster(configFolder, inputSourceCluster, rgName string, discard,
 		return
 
 	}
-	log.Printf("RG (%s), successfully updated with action: faiback\n", rg.Name)
+	log.Printf("RG (%s), successfully updated with action: failback\n", rg.Name)
 }
