@@ -505,6 +505,26 @@ func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object
 			return nil, err
 		}
 		log.Print("Successfully created config map: ", cmObj.Name)
+	case *v1.ServiceAccount:
+		cmObj, ok := runtimeObj.(*v1.ServiceAccount)
+		if !ok {
+			return nil, fmt.Errorf("unsupported object type")
+		}
+		err := c.client.Create(ctx, cmObj)
+		if err != nil {
+			return nil, err
+		}
+		log.Print("Successfully created ServiceAccount: ", cmObj.Name)
+	case *v1.Secret:
+		cmObj, ok := runtimeObj.(*v1.Secret)
+		if !ok {
+			return nil, fmt.Errorf("unsupported object type")
+		}
+		err := c.client.Create(ctx, cmObj)
+		if err != nil {
+			return nil, err
+		}
+		log.Print("Successfully created Secret: ", cmObj.Name)
 	default:
 		return nil, fmt.Errorf("unsupported object type %+v", runtimeObj.GetObjectKind())
 	}
