@@ -51,6 +51,7 @@ type PersistentVolumeReconciler struct {
 	ContextPrefix     string
 	SingleFlightGroup singleflight.Group
 	Domain            string
+	ClusterUID        string
 }
 
 const protectionIndexKey = "protection_id"
@@ -221,6 +222,11 @@ func (r *PersistentVolumeReconciler) processVolumeForReplicationGroup(ctx contex
 func (r *PersistentVolumeReconciler) createProtectionGroupAndRG(ctx context.Context, volumeHandle string, scParams map[string]string) (string, error) {
 	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Creating protection-group anf RG")
+
+	if r.ClusterUID != "" {
+		log.V(common.InfoLevel).Info("Adding Cluster UUID to storage parameters")
+		scParams[controller.ClusterUID] = r.ClusterUID
+	}
 
 	res, err := r.ReplicationClient.CreateStorageProtectionGroup(ctx, volumeHandle, scParams)
 	if err != nil {
