@@ -177,13 +177,16 @@ func updateRGLinkStatus(ctx context.Context, client client.Client, rg *storagev1
 
 func (r *ReplicationGroupMonitoring) isUpdateRequired(rg storagev1alpha1.DellCSIReplicationGroup) bool {
 	currTime := time.Now()
-	if rg.Status.ReplicationLinkState.LastSuccessfulUpdate.IsZero() {
+	lastTime := rg.Status.ReplicationLinkState.LastSuccessfulUpdate
+	if lastTime.IsZero() {
 		return true
 	}
-	lastTime := rg.Status.ReplicationLinkState.LastSuccessfulUpdate.Time
-	// Need to wait for at least MonitoringInterval before updating the RG again
-	if currTime.Sub(lastTime) < r.MonitoringInterval {
+
+	// Skip update if any action is being executed
+	if rg.Spec.Action != "" {
 		return false
 	}
-	return true
+
+	// Need to wait for at least MonitoringInterval before updating the RG again
+	return currTime.Sub(lastTime.Time) >= r.MonitoringInterval
 }
