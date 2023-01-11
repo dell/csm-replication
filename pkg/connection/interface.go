@@ -17,7 +17,7 @@ package connection
 import (
 	"context"
 
-	repV1Alpha1 "github.com/dell/csm-replication/api/v1alpha1"
+	repv1 "github.com/dell/csm-replication/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	storageV1 "k8s.io/api/storage/v1"
 	apiExtensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -35,10 +35,10 @@ type RemoteClusterClient interface {
 	UpdatePersistentVolume(ctx context.Context, volume *corev1.PersistentVolume) error
 	GetPersistentVolumeClaim(ctx context.Context, namespace, claimName string) (*corev1.PersistentVolumeClaim, error)
 	UpdatePersistentVolumeClaim(ctx context.Context, claim *corev1.PersistentVolumeClaim) error
-	GetReplicationGroup(ctx context.Context, replicationGroupName string) (*repV1Alpha1.DellCSIReplicationGroup, error)
-	UpdateReplicationGroup(ctx context.Context, group *repV1Alpha1.DellCSIReplicationGroup) error
-	ListReplicationGroup(ctx context.Context) (*repV1Alpha1.DellCSIReplicationGroupList, error)
-	CreateReplicationGroup(ctx context.Context, group *repV1Alpha1.DellCSIReplicationGroup) error
+	GetReplicationGroup(ctx context.Context, replicationGroupName string) (*repv1.DellCSIReplicationGroup, error)
+	UpdateReplicationGroup(ctx context.Context, group *repv1.DellCSIReplicationGroup) error
+	ListReplicationGroup(ctx context.Context) (*repv1.DellCSIReplicationGroupList, error)
+	CreateReplicationGroup(ctx context.Context, group *repv1.DellCSIReplicationGroup) error
 }
 
 // ConnHandler - Interface

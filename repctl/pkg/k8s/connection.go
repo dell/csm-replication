@@ -15,7 +15,7 @@
 package k8s
 
 import (
-	"github.com/dell/csm-replication/api/v1alpha1"
+	repv1 "github.com/dell/csm-replication/api/v1"
 	apiExtensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -26,12 +26,9 @@ import (
 
 func getControllerRuntimeClient(kubeconfig string) (client.Client, error) {
 	scheme := runtime.NewScheme()
-	// repGroupVersion := schema.GroupVersion{Group: "replication.storage.dell.com", Version: "v1alpha1"}
-	// schemeBuilder := &ctrlScheme.Builder{GroupVersion: repGroupVersion}
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	// utilruntime.Must(schemeBuilder.AddToScheme(scheme))
 	utilruntime.Must(apiExtensionsv1.AddToScheme(scheme))
-	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+	utilruntime.Must(repv1.AddToScheme(scheme))
 	clientConfig, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
 		return nil, err

@@ -17,7 +17,7 @@ package types
 import (
 	"os"
 
-	"github.com/dell/csm-replication/api/v1alpha1"
+	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/repctl/pkg/display"
 	"github.com/dell/repctl/pkg/metadata"
 )
@@ -54,7 +54,7 @@ func (r *RGList) Print() {
 }
 
 // GetRG converts extension DellCSIReplicationGroup type to custom representation
-func GetRG(group v1alpha1.DellCSIReplicationGroup) RG {
+func GetRG(group repv1.DellCSIReplicationGroup) RG {
 	remoteClusterID := group.Annotations[metadata.RemoteClusterID]
 	remoteRGName := group.Annotations[metadata.RemoteReplicationGroup]
 	myRG := RG{

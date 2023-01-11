@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	storagev1alpha1 "github.com/dell/csm-replication/api/v1alpha1"
+	repv1 "github.com/dell/csm-replication/api/v1"
 	controller "github.com/dell/csm-replication/controllers"
 	"github.com/dell/csm-replication/pkg/common"
 	"github.com/dell/dell-csi-extensions/replication"
@@ -290,7 +290,7 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		updatePVAnnotations(pv, volume, localClusterID, localAnnotations[controller.RemotePVRetentionPolicy], string(resourceRequests))
 
 		// Query local RG object to verify if RemoteReplicationGroup annotation is available
-		localRG := new(storagev1alpha1.DellCSIReplicationGroup)
+		localRG := new(repv1.DellCSIReplicationGroup)
 		err = r.Get(ctx, types.NamespacedName{Name: localRGName}, localRG)
 		if err != nil {
 			// Requeue

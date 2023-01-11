@@ -19,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	storagev1alpha1 "github.com/dell/csm-replication/api/v1alpha1"
+	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
 	"github.com/dell/csm-replication/pkg/common"
 	csireplication "github.com/dell/csm-replication/pkg/csi-clients/replication"
@@ -62,7 +62,7 @@ func (r *ReplicationGroupMonitoring) monitorReplicationGroups(ticker <-chan time
 
 	r.Log.V(common.InfoLevel).Info("Start monitoring replication-group")
 
-	dellCSIReplicationGroupsList := new(storagev1alpha1.DellCSIReplicationGroupList)
+	dellCSIReplicationGroupsList := new(repv1.DellCSIReplicationGroupList)
 	select {
 	case <-ticker:
 		ctx, cancel := context.WithTimeout(context.Background(), r.MonitoringInterval)
@@ -102,7 +102,7 @@ func (r *ReplicationGroupMonitoring) monitorReplicationGroups(ticker <-chan time
 			}
 
 			// Fetch the RG details once more as we may have a stale copy
-			var refreshedRG storagev1alpha1.DellCSIReplicationGroup
+			var refreshedRG repv1.DellCSIReplicationGroup
 			err = r.Get(ctx, types.NamespacedName{Name: rg.Name}, &refreshedRG)
 			if err != nil {
 				r.Log.Error(err, "Error encountered while getting RG details")
@@ -138,7 +138,7 @@ func (r *ReplicationGroupMonitoring) monitorReplicationGroups(ticker <-chan time
 	}
 }
 
-func updateRGLinkState(rg *storagev1alpha1.DellCSIReplicationGroup, status string, isSource bool, errorMsg string) {
+func updateRGLinkState(rg *repv1.DellCSIReplicationGroup, status string, isSource bool, errorMsg string) {
 	lastSuccessfulUpdate := new(metav1.Time)
 	if errorMsg != "" {
 		if rg.Status.ReplicationLinkState.LastSuccessfulUpdate != nil {
@@ -149,14 +149,14 @@ func updateRGLinkState(rg *storagev1alpha1.DellCSIReplicationGroup, status strin
 	}
 
 	if rg.Status.ReplicationLinkState.IsSource != isSource {
-		condition := storagev1alpha1.LastAction{
+		condition := repv1.LastAction{
 			Condition: fmt.Sprintf("Replication Link State:IsSource changed from (%v) to (%v)", rg.Status.ReplicationLinkState.IsSource, isSource),
 			Time:      &metav1.Time{Time: time.Now()},
 		}
 		controllers.UpdateConditions(rg, condition, MaxNumberOfConditions)
 	}
 
-	rg.Status.ReplicationLinkState = storagev1alpha1.ReplicationLinkState{
+	rg.Status.ReplicationLinkState = repv1.ReplicationLinkState{
 		State:                status,
 		LastSuccessfulUpdate: lastSuccessfulUpdate,
 		ErrorMessage:         errorMsg,
@@ -164,7 +164,7 @@ func updateRGLinkState(rg *storagev1alpha1.DellCSIReplicationGroup, status strin
 	}
 }
 
-func updateRGLinkStatus(ctx context.Context, client client.Client, rg *storagev1alpha1.DellCSIReplicationGroup, status string,
+func updateRGLinkStatus(ctx context.Context, client client.Client, rg *repv1.DellCSIReplicationGroup, status string,
 	isSource bool, errMsg string) error {
 	log := common.GetLoggerFromContext(ctx)
 	updateRGLinkState(rg, status, isSource, errMsg)
@@ -175,7 +175,7 @@ func updateRGLinkStatus(ctx context.Context, client client.Client, rg *storagev1
 	return nil
 }
 
-func (r *ReplicationGroupMonitoring) isUpdateRequired(rg storagev1alpha1.DellCSIReplicationGroup) bool {
+func (r *ReplicationGroupMonitoring) isUpdateRequired(rg repv1.DellCSIReplicationGroup) bool {
 	currTime := time.Now()
 	lastTime := rg.Status.ReplicationLinkState.LastSuccessfulUpdate
 	if lastTime.IsZero() {

@@ -20,7 +20,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dell/csm-replication/api/v1alpha1"
+	repv1 "github.com/dell/csm-replication/api/v1"
 	fake_client "github.com/dell/csm-replication/test/e2e-framework/fake-client"
 	"github.com/dell/repctl/pkg/k8s"
 	"github.com/dell/repctl/pkg/metadata"
@@ -46,7 +46,7 @@ var _ client.Client = &fake_client.Client{}
 func (suite *ClusterTestSuite) SetupSuite() {
 	metadata.Init("replication.storage.dell.com")
 	suite.cluster = &k8s.Cluster{}
-	_ = v1alpha1.AddToScheme(scheme.Scheme)
+	_ = repv1.AddToScheme(scheme.Scheme)
 }
 
 func (suite *ClusterTestSuite) TearDownSuite() {
@@ -401,13 +401,13 @@ func (suite *ClusterTestSuite) TestCreateObject() {
 }
 
 func (suite *ClusterTestSuite) TestListReplicationGroups() {
-	rg1 := &v1alpha1.DellCSIReplicationGroup{
+	rg1 := &repv1.DellCSIReplicationGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-rg-1",
 		},
 	}
 
-	rg2 := &v1alpha1.DellCSIReplicationGroup{
+	rg2 := &repv1.DellCSIReplicationGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-rg-2",
 		},
@@ -430,7 +430,7 @@ func (suite *ClusterTestSuite) TestFilterReplicationGroups() {
 	labelsAndAnnotationsA := make(map[string]string)
 	labelsAndAnnotationsA[metadata.RemoteClusterID] = "cluster-A"
 
-	rg1 := &v1alpha1.DellCSIReplicationGroup{
+	rg1 := &repv1.DellCSIReplicationGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "test-rg-1",
 			Labels:      labelsAndAnnotationsA,
@@ -441,7 +441,7 @@ func (suite *ClusterTestSuite) TestFilterReplicationGroups() {
 	labelsAndAnnotationsB := make(map[string]string)
 	labelsAndAnnotationsB[metadata.RemoteClusterID] = "cluster-B"
 
-	rg2 := &v1alpha1.DellCSIReplicationGroup{
+	rg2 := &repv1.DellCSIReplicationGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "test-rg-2",
 			Labels:      labelsAndAnnotationsB,

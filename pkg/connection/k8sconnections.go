@@ -22,7 +22,7 @@ import (
 
 	"github.com/dell/csm-replication/pkg/common"
 
-	repV1Alpha1 "github.com/dell/csm-replication/api/v1alpha1"
+	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	storageV1 "k8s.io/api/storage/v1"
@@ -87,7 +87,7 @@ func (k8sConnHandler *RemoteK8sConnHandler) getControllerClient(clusterID string
 	}
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(repV1Alpha1.AddToScheme(scheme))
+	utilruntime.Must(repv1.AddToScheme(scheme))
 	utilruntime.Must(apiExtensionsv1.AddToScheme(scheme))
 	if clientConfig, ok := k8sConnHandler.configs[clusterID]; ok {
 		client, err := GetControllerClient(clientConfig, scheme)
@@ -134,7 +134,7 @@ func (k8sConnHandler *RemoteK8sConnHandler) verifyControllerClients(ctx context.
 				if err != nil {
 					return fmt.Errorf("failed to get CRD definition for DellCSIReplicationGroup for ClusterId: %s. error - %s", clusterID, err.Error())
 				}
-				if crd.Spec.Group == repV1Alpha1.GroupVersion.Group && crd.Spec.Names.Kind == "DellCSIReplicationGroup" {
+				if crd.Spec.Group == repv1.GroupVersion.Group && crd.Spec.Names.Kind == "DellCSIReplicationGroup" {
 					found = true
 					break
 				}
@@ -199,8 +199,8 @@ func (c *RemoteK8sControllerClient) UpdatePersistentVolume(ctx context.Context, 
 }
 
 // GetReplicationGroup returns replication group object by querying cluster using replication group name
-func (c *RemoteK8sControllerClient) GetReplicationGroup(ctx context.Context, replicationGroupName string) (*repV1Alpha1.DellCSIReplicationGroup, error) {
-	found := &repV1Alpha1.DellCSIReplicationGroup{}
+func (c *RemoteK8sControllerClient) GetReplicationGroup(ctx context.Context, replicationGroupName string) (*repv1.DellCSIReplicationGroup, error) {
+	found := &repv1.DellCSIReplicationGroup{}
 	err := c.Client.Get(ctx, types.NamespacedName{Name: replicationGroupName}, found)
 	if err != nil {
 		return nil, err
@@ -209,19 +209,19 @@ func (c *RemoteK8sControllerClient) GetReplicationGroup(ctx context.Context, rep
 }
 
 // UpdateReplicationGroup updates replication group object in current cluster
-func (c *RemoteK8sControllerClient) UpdateReplicationGroup(ctx context.Context, replicationGroup *repV1Alpha1.DellCSIReplicationGroup) error {
+func (c *RemoteK8sControllerClient) UpdateReplicationGroup(ctx context.Context, replicationGroup *repv1.DellCSIReplicationGroup) error {
 	return c.Client.Update(ctx, replicationGroup)
 
 }
 
 // CreateReplicationGroup creates replication group object in current cluster
-func (c *RemoteK8sControllerClient) CreateReplicationGroup(ctx context.Context, group *repV1Alpha1.DellCSIReplicationGroup) error {
+func (c *RemoteK8sControllerClient) CreateReplicationGroup(ctx context.Context, group *repv1.DellCSIReplicationGroup) error {
 	return c.Client.Create(ctx, group)
 }
 
 // ListReplicationGroup returns list of all replication group objects that are currently in cluster
-func (c *RemoteK8sControllerClient) ListReplicationGroup(ctx context.Context) (*repV1Alpha1.DellCSIReplicationGroupList, error) {
-	rgList := &repV1Alpha1.DellCSIReplicationGroupList{}
+func (c *RemoteK8sControllerClient) ListReplicationGroup(ctx context.Context) (*repv1.DellCSIReplicationGroupList, error) {
+	rgList := &repv1.DellCSIReplicationGroupList{}
 	err := c.Client.List(ctx, rgList)
 	if err != nil {
 		return nil, err

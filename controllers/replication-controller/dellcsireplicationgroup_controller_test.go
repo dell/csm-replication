@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	storagev1alpha1 "github.com/dell/csm-replication/api/v1alpha1"
+	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
 	constants "github.com/dell/csm-replication/pkg/common"
 	"github.com/dell/csm-replication/pkg/config"
@@ -87,21 +87,21 @@ func (suite *RGControllerTestSuite) getRemoteParams() map[string]string {
 	return utils.GetParams(suite.driver.SourceClusterID, suite.driver.StorageClass)
 }
 
-func (suite *RGControllerTestSuite) getLocalRG(name, clusterID string) *storagev1alpha1.DellCSIReplicationGroup {
+func (suite *RGControllerTestSuite) getLocalRG(name, clusterID string) *repv1.DellCSIReplicationGroup {
 	//creating fake resource group
 	replicationGroup := utils.GetRGObj(name, suite.driver.DriverName, clusterID,
 		utils.LocalPGID, utils.RemotePGID, suite.getLocalParams(), suite.getRemoteParams())
 	return replicationGroup
 }
 
-func (suite *RGControllerTestSuite) getRemoteRG(name, clusterID string) *storagev1alpha1.DellCSIReplicationGroup {
+func (suite *RGControllerTestSuite) getRemoteRG(name, clusterID string) *repv1.DellCSIReplicationGroup {
 	//creating fake resource group
 	replicationGroup := utils.GetRGObj(name, suite.driver.DriverName, clusterID,
 		utils.RemotePGID, utils.LocalPGID, suite.getRemoteParams(), suite.getLocalParams())
 	return replicationGroup
 }
 
-func (suite *RGControllerTestSuite) getRGWithoutSyncComplete(name string, local bool, self bool) *storagev1alpha1.DellCSIReplicationGroup {
+func (suite *RGControllerTestSuite) getRGWithoutSyncComplete(name string, local bool, self bool) *repv1.DellCSIReplicationGroup {
 	annotations := make(map[string]string)
 	annotations[controllers.RemoteReplicationGroup] = name
 	annotations[controllers.ContextPrefix] = utils.ContextPrefix
@@ -110,7 +110,7 @@ func (suite *RGControllerTestSuite) getRGWithoutSyncComplete(name string, local 
 
 	rgFinalizers := []string{controllers.RGFinalizer}
 
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 	if local {
 		if self {
 			annotations[controllers.RemoteClusterID] = utils.Self
@@ -133,7 +133,7 @@ func (suite *RGControllerTestSuite) getRGWithoutSyncComplete(name string, local 
 	return rg
 }
 
-func (suite *RGControllerTestSuite) getRGWithSyncComplete(name string) *storagev1alpha1.DellCSIReplicationGroup {
+func (suite *RGControllerTestSuite) getRGWithSyncComplete(name string) *repv1.DellCSIReplicationGroup {
 	annotations := make(map[string]string)
 	annotations[controllers.RGSyncComplete] = "yes"
 	annotations[controllers.RemoteReplicationGroup] = suite.driver.RGName
@@ -150,7 +150,7 @@ func (suite *RGControllerTestSuite) getTypicalSC() *storagev1.StorageClass {
 	return sc
 }
 
-func (suite *RGControllerTestSuite) createSCAndRG(sc *storagev1.StorageClass, rg *storagev1alpha1.DellCSIReplicationGroup) {
+func (suite *RGControllerTestSuite) createSCAndRG(sc *storagev1.StorageClass, rg *repv1.DellCSIReplicationGroup) {
 	ctx := context.Background()
 	err := suite.client.Create(ctx, sc)
 	suite.NoError(err)
@@ -245,7 +245,7 @@ func (suite *RGControllerTestSuite) TestReconcileWithRGWithoutAnnotations() {
 func (suite *RGControllerTestSuite) TestReconcileRGWithAnnotations() {
 	// scenario: RG without sync complete
 	suite.createSCAndRG(suite.getTypicalSC(), suite.getRGWithoutSyncComplete(suite.driver.RGName, true, false))
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 	req := suite.getTypicalRequest()
 
 	err := suite.client.Get(context.Background(), req.NamespacedName, rg)
@@ -291,7 +291,7 @@ func (suite *RGControllerTestSuite) TestReconcileRGWithAnnotationsSingleCluster(
 	err := suite.client.Create(context.Background(), sc2)
 	suite.NoError(err)
 
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 	req := suite.getTypicalRequest()
 
 	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
@@ -371,7 +371,7 @@ func (suite *RGControllerTestSuite) TestReconcileRGWithSyncCompleteWithError() {
 	resp, err := suite.reconciler.Reconcile(context.Background(), req)
 	suite.NoError(err)
 	suite.Equal(false, resp.Requeue)
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
 	suite.NoError(err)
 	suite.T().Log(rg.Annotations)
@@ -403,7 +403,7 @@ func (suite *RGControllerTestSuite) TestRGSyncDeletion() {
 	err := suite.client.Create(context.Background(), sc2)
 	suite.NoError(err)
 
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 	req := suite.getTypicalRequest()
 
 	err = suite.client.Get(context.Background(), req.NamespacedName, rg)

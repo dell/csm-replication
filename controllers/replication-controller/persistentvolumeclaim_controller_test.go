@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	storagev1alpha1 "github.com/dell/csm-replication/api/v1alpha1"
+	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
 	constants "github.com/dell/csm-replication/pkg/common"
 	"github.com/dell/csm-replication/pkg/config"
@@ -264,27 +264,27 @@ func (suite *PVControllerTestSuite) TestRemoteReplication() {
 	annotations[controllers.ContextPrefix] = "csi-fake"
 
 	//creating fake resource group
-	resourceGroup := storagev1alpha1.DellCSIReplicationGroup{
+	resourceGroup := repv1.DellCSIReplicationGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "fake-rg",
 			Annotations: annotations,
 			//Namespace: suite.mockUtils.Specs.Namespace,
 		},
-		Spec: storagev1alpha1.DellCSIReplicationGroupSpec{
+		Spec: repv1.DellCSIReplicationGroupSpec{
 			DriverName:                suite.driver.DriverName,
 			RemoteClusterID:           "remote-123",
 			ProtectionGroupAttributes: parameters,
 			ProtectionGroupID:         "PG-1",
 		},
-		Status: storagev1alpha1.DellCSIReplicationGroupStatus{
+		Status: repv1.DellCSIReplicationGroupStatus{
 			State:       "",
 			RemoteState: "",
-			ReplicationLinkState: storagev1alpha1.ReplicationLinkState{
+			ReplicationLinkState: repv1.ReplicationLinkState{
 				State:                "",
 				LastSuccessfulUpdate: &metav1.Time{},
 				ErrorMessage:         "",
 			},
-			LastAction: storagev1alpha1.LastAction{
+			LastAction: repv1.LastAction{
 				Condition:    "",
 				Time:         &metav1.Time{},
 				ErrorMessage: "",

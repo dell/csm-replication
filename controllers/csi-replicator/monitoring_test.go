@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	storagev1alpha1 "github.com/dell/csm-replication/api/v1alpha1"
+	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
 	csireplication "github.com/dell/csm-replication/pkg/csi-clients/replication"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
@@ -99,7 +99,7 @@ func (suite *MonitoringControllerTestSuite) runMonitor() {
 
 func (suite *MonitoringControllerTestSuite) TestMonitorReplicationGroups() {
 	time.Sleep(2 * time.Second)
-	var rgList storagev1alpha1.DellCSIReplicationGroupList
+	var rgList repv1.DellCSIReplicationGroupList
 	err := suite.client.List(context.Background(), &rgList)
 	suite.NoError(err)
 	updateTimes := make(map[string]time.Time)
@@ -121,7 +121,7 @@ func (suite *MonitoringControllerTestSuite) TestMonitorReplicationGroups() {
 
 func (suite *MonitoringControllerTestSuite) TestMonitorReplicationGroupsWithErrors() {
 	time.Sleep(2500 * time.Millisecond)
-	var rgList storagev1alpha1.DellCSIReplicationGroupList
+	var rgList repv1.DellCSIReplicationGroupList
 	err := suite.client.List(context.Background(), &rgList)
 	suite.NoError(err)
 	updateTimes := make(map[string]time.Time)

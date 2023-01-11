@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	storagev1alpha1 "github.com/dell/csm-replication/api/v1alpha1"
+	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
 	controller "github.com/dell/csm-replication/controllers/csi-replicator"
 	replicationController "github.com/dell/csm-replication/controllers/replication-controller"
@@ -281,7 +281,7 @@ func (suite *FakeReplicationTestSuite) testCreatePVC() {
 	// Find out RG name
 	rgReq := suite.getTypicalReconcileRequest(annotations[controllers.ReplicationGroup], "")
 	// Fetch RG details
-	rg := storagev1alpha1.DellCSIReplicationGroup{}
+	rg := repv1.DellCSIReplicationGroup{}
 	err = suite.client.Get(context.Background(), rgReq.NamespacedName, &rg)
 	suite.NoError(err)
 	// Lets reconcile the RG to see if it goes to Ready state
@@ -340,7 +340,7 @@ func (suite *FakeReplicationTestSuite) testSyncAllObjects() {
 	wg.Wait()
 	// Check if RG object is updated with the remote RG name
 	// Fetch RG details
-	rg := storagev1alpha1.DellCSIReplicationGroup{}
+	rg := repv1.DellCSIReplicationGroup{}
 	rgReq := suite.getTypicalReconcileRequest(rgName, "")
 	err = suite.client.Get(context.Background(), rgReq.NamespacedName, &rg)
 	suite.NoError(err)

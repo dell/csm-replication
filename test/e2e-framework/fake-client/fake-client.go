@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"reflect"
 
-	storagev1alpha1 "github.com/dell/csm-replication/api/v1alpha1"
+	repv1 "github.com/dell/csm-replication/api/v1"
 	core_v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -133,8 +133,8 @@ func (f Client) List(ctx context.Context, list client.ObjectList, opts ...client
 		return f.listPersistentVolumeClaim(list.(*core_v1.PersistentVolumeClaimList), opts...)
 	case *core_v1.PersistentVolumeList:
 		return f.listPersistentVolume(list.(*core_v1.PersistentVolumeList), opts...)
-	case *storagev1alpha1.DellCSIReplicationGroupList:
-		return f.listReplicationGroup(list.(*storagev1alpha1.DellCSIReplicationGroupList), opts...)
+	case *repv1.DellCSIReplicationGroupList:
+		return f.listReplicationGroup(list.(*repv1.DellCSIReplicationGroupList), opts...)
 	default:
 		return fmt.Errorf("unknown type: %s", reflect.TypeOf(list))
 	}
@@ -185,7 +185,7 @@ func (f *Client) listPersistentVolume(list *core_v1.PersistentVolumeList, opts .
 	return nil
 }
 
-func (f *Client) listReplicationGroup(list *storagev1alpha1.DellCSIReplicationGroupList, opts ...client.ListOption) error {
+func (f *Client) listReplicationGroup(list *repv1.DellCSIReplicationGroupList, opts ...client.ListOption) error {
 	lo := &client.ListOptions{}
 	for _, option := range opts {
 		option.ApplyToList(lo)
@@ -193,11 +193,11 @@ func (f *Client) listReplicationGroup(list *storagev1alpha1.DellCSIReplicationGr
 
 	for k, v := range f.Objects {
 		if k.Kind == "DellCSIReplicationGroup" {
-			rg := *v.(*storagev1alpha1.DellCSIReplicationGroup)
+			rg := *v.(*repv1.DellCSIReplicationGroup)
 			if lo.LabelSelector != nil && !lo.LabelSelector.Matches(labels.Set(rg.Labels)) {
 				continue
 			}
-			list.Items = append(list.Items, *v.(*storagev1alpha1.DellCSIReplicationGroup))
+			list.Items = append(list.Items, *v.(*repv1.DellCSIReplicationGroup))
 		}
 	}
 	return nil

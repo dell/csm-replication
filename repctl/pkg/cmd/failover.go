@@ -16,10 +16,10 @@ package cmd
 
 import (
 	"context"
-	"github.com/dell/csm-replication/api/v1alpha1"
 	"path"
 	"time"
 
+	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/repctl/pkg/config"
 	"github.com/dell/repctl/pkg/k8s"
 	log "github.com/sirupsen/logrus"
@@ -282,7 +282,7 @@ func failoverToCluster(configFolder, inputTargetCluster, rgName string, unplanne
 	}
 }
 
-func waitForStateToUpdate(rgName string, cluster k8s.ClusterInterface, repllinkstate v1alpha1.ReplicationLinkState) bool {
+func waitForStateToUpdate(rgName string, cluster k8s.ClusterInterface, repllinkstate repv1.ReplicationLinkState) bool {
 
 	ret := make(chan bool)
 	go func() {

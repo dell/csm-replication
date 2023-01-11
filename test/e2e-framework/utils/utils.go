@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	storagev1alpha1 "github.com/dell/csm-replication/api/v1alpha1"
+	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
 	fakeclient "github.com/dell/csm-replication/test/e2e-framework/fake-client"
 	"github.com/dell/csm-replication/test/mock-server/server"
@@ -123,11 +123,11 @@ var Scheme = runtime.NewScheme()
 // PVCName name of testing PVC
 const PVCName = "test-pvc"
 
-// InitializeSchemes inits client-go and replication v1alpha1 schemes
+// InitializeSchemes inits client-go and replication v1 schemes
 func InitializeSchemes() {
 
 	utilruntime.Must(clientgoscheme.AddToScheme(Scheme))
-	utilruntime.Must(storagev1alpha1.AddToScheme(Scheme))
+	utilruntime.Must(repv1.AddToScheme(Scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -329,13 +329,13 @@ func GetNonReplicationEnabledSC(provisionerName, scName string) *storagev1.Stora
 
 // GetRGObj returns DellCSIReplicationGroup testing object
 func GetRGObj(name, driverName, remoteClusterID, pgID, remotePGID string, params,
-	remoteParams map[string]string) *storagev1alpha1.DellCSIReplicationGroup {
-	replicationGroup := storagev1alpha1.DellCSIReplicationGroup{
+	remoteParams map[string]string) *repv1.DellCSIReplicationGroup {
+	replicationGroup := repv1.DellCSIReplicationGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: "",
 		},
-		Spec: storagev1alpha1.DellCSIReplicationGroupSpec{
+		Spec: repv1.DellCSIReplicationGroupSpec{
 			DriverName:                      driverName,
 			RemoteClusterID:                 remoteClusterID,
 			ProtectionGroupAttributes:       params,
@@ -343,15 +343,15 @@ func GetRGObj(name, driverName, remoteClusterID, pgID, remotePGID string, params
 			RemoteProtectionGroupID:         remotePGID,
 			RemoteProtectionGroupAttributes: remoteParams,
 		},
-		Status: storagev1alpha1.DellCSIReplicationGroupStatus{
+		Status: repv1.DellCSIReplicationGroupStatus{
 			State:       "",
 			RemoteState: "",
-			ReplicationLinkState: storagev1alpha1.ReplicationLinkState{
+			ReplicationLinkState: repv1.ReplicationLinkState{
 				State:                "",
 				LastSuccessfulUpdate: &metav1.Time{},
 				ErrorMessage:         "",
 			},
-			LastAction: storagev1alpha1.LastAction{
+			LastAction: repv1.LastAction{
 				Condition:    "",
 				Time:         &metav1.Time{},
 				ErrorMessage: "",
