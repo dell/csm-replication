@@ -3,6 +3,14 @@ kind: Namespace
 metadata:
   name: dell-replication-controller
 ---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dell-replication-controller-sa
+  namespace: dell-replication-controller
+secrets:
+- name: replication-secret
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -151,6 +159,16 @@ rules:
   verbs:
   - create
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: replication-secret
+  namespace: dell-replication-controller
+  annotations:
+    kubernetes.io/service-account.name: dell-replication-controller-sa
+    kubernetes.io/service-account.namespace: dell-replication-controller
+type: kubernetes.io/service-account-token
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -161,7 +179,7 @@ roleRef:
   name: dell-replication-manager-role
 subjects:
 - kind: ServiceAccount
-  name: default
+  name: dell-replication-controller-sa
   namespace: dell-replication-controller
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -174,7 +192,7 @@ roleRef:
   name: dell-replication-proxy-role
 subjects:
 - kind: ServiceAccount
-  name: default
+  name: dell-replication-controller-sa
   namespace: dell-replication-controller
 ---
 apiVersion: v1
@@ -220,6 +238,7 @@ spec:
       labels:
         control-plane: controller-manager
     spec:
+      serviceAccountName: dell-replication-controller-sa
       containers:
       - args:
         - --enable-leader-election
