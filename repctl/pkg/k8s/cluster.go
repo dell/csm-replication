@@ -1,5 +1,5 @@
 /*
- Copyright © 2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -505,6 +505,26 @@ func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object
 			return nil, err
 		}
 		log.Print("Successfully created config map: ", cmObj.Name)
+	case *v1.ServiceAccount:
+		cmObj, ok := runtimeObj.(*v1.ServiceAccount)
+		if !ok {
+			return nil, fmt.Errorf("unsupported object type")
+		}
+		err := c.client.Create(ctx, cmObj)
+		if err != nil {
+			return nil, err
+		}
+		log.Print("Successfully created ServiceAccount: ", cmObj.Name)
+	case *v1.Secret:
+		cmObj, ok := runtimeObj.(*v1.Secret)
+		if !ok {
+			return nil, fmt.Errorf("unsupported object type")
+		}
+		err := c.client.Create(ctx, cmObj)
+		if err != nil {
+			return nil, err
+		}
+		log.Print("Successfully created Secret: ", cmObj.Name)
 	default:
 		return nil, fmt.Errorf("unsupported object type %+v", runtimeObj.GetObjectKind())
 	}
