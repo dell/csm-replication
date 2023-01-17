@@ -17,6 +17,8 @@ package controllers
 import (
 	"context"
 
+	"os"
+
 	storagev1alpha1 "github.com/dell/csm-replication/api/v1alpha1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -24,7 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	"os"
 	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -217,6 +218,8 @@ var (
 	MigrationNamespace string
 	// CreatedByMigrator indicates that this PV's been created by migrator sidecar
 	CreatedByMigrator string
+	// SnapshotClass name of the desired snapshot class.
+	SnapshotClass string
 )
 
 // InitLabelsAndAnnotations initializes package visible constants by using customizable domain variable
@@ -250,4 +253,5 @@ func InitLabelsAndAnnotations(domain string) {
 	MigrationRequested = domain + migrateTo
 	MigrationNamespace = domain + migrateNS
 	CreatedByMigrator = domain + createdByMigrator
+	SnapshotClass = domain + snapshotClass
 }

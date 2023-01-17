@@ -276,6 +276,16 @@ func (c *RemoteK8sControllerClient) CreateSnapshotObject(ctx context.Context, co
 	return c.Client.Create(ctx, content)
 }
 
+// GetSnapshotClass returns snapshot class object by querying cluster using snapshot class name.
+func (c *RemoteK8sControllerClient) GetSnapshotClass(ctx context.Context, snapClassName string) (*s1.VolumeSnapshotClass, error) {
+	found := &s1.VolumeSnapshotClass{}
+	err := c.Client.Get(ctx, types.NamespacedName{Name: snapClassName}, found)
+	if err != nil {
+		return nil, err
+	}
+	return found, nil
+}
+
 // GetControllerClient - Returns a controller client which reads and writes directly to API server
 func GetControllerClient(restConfig *rest.Config, scheme *runtime.Scheme) (ctrlClient.Client, error) {
 	// Create a temp client and use it

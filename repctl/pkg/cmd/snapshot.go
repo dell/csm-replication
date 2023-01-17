@@ -32,7 +32,7 @@ func GetSnapshotCommand() *cobra.Command {
 		Short: "allows to execute snapshot actionat the specified cluster or rg",
 		Example: `
 For single cluster config:
-./repctl --rg <rg-id> --sn-namespace <namespace> snapshot`,
+./repctl --rg <rg-id> --sn-namespace <namespace> --sn-class <snapshot class> snapshot`,
 		Long: `
 This command will perform a snapshot at specified cluster or at the RG.\n
 Note: More information to be added.`,
@@ -41,6 +41,7 @@ Note: More information to be added.`,
 			inputCluster := viper.GetString("target")
 			prefix := viper.GetString(config.ReplicationPrefix)
 			snNamespace := viper.GetString("sn-namespace")
+			snClass := viper.GetString("sn-class")
 			verbose := viper.GetBool(config.Verbose)
 			wait := viper.GetBool("snapshot-wait")
 			input, res := verifyInputForSnapshotAction(inputCluster, rgName)
@@ -51,7 +52,7 @@ Note: More information to be added.`,
 			}
 
 			if input == "rg" {
-				createSnapshot(configFolder, res, prefix, snNamespace, verbose, wait)
+				createSnapshot(configFolder, res, prefix, snNamespace, snClass, verbose, wait)
 			} else {
 				log.Fatal("Unexpected input received")
 			}
@@ -60,8 +61,10 @@ Note: More information to be added.`,
 
 	snapshotCmd.Flags().String("at", "", "target to execute the snapshot")
 	_ = viper.BindPFlag("target", snapshotCmd.Flags().Lookup("at"))
-	snapshotCmd.Flags().String("sn-namespace", "", "target to execute the snapshot")
+	snapshotCmd.Flags().String("sn-namespace", "", "namespace to create the snapshots in")
 	_ = viper.BindPFlag("sn-namespace", snapshotCmd.Flags().Lookup("sn-namespace"))
+	snapshotCmd.Flags().String("sn-class", "", "target snapshot class to use")
+	_ = viper.BindPFlag("sn-class", snapshotCmd.Flags().Lookup("sn-class"))
 
 	snapshotCmd.Flags().Bool("wait", false, "wait for action to complete")
 	_ = viper.BindPFlag("snapshot-wait", snapshotCmd.Flags().Lookup("wait"))
@@ -104,7 +107,7 @@ func verifyInputForSnapshotAction(input string, rg string) (res string, tgt stri
 	return "", ""
 }
 
-func createSnapshot(configFolder, rgName, prefix, snNamespace string, verbose bool, wait bool) {
+func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass string, verbose bool, wait bool) {
 	if verbose {
 		log.Printf("fetching RG and cluster info...\n")
 	}
@@ -112,6 +115,7 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace string, verbose bo
 	cluster, rg, err := GetRGAndClusterFromRGID(configFolder, rgName, "src")
 	if err != nil {
 		log.Fatalf("snapshot to RG: error fetching RG info: (%s)\n", err.Error())
+		return
 	}
 
 	if verbose {
@@ -126,6 +130,11 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace string, verbose bo
 		return
 	}
 
+	if snClass == "" {
+		log.Fatal("Aborted. Snapshot class not provided.")
+		return
+	}
+
 	rg.Spec.Action = config.ActionCreateSnapshot
 
 	namespace := "default"
@@ -133,9 +142,10 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace string, verbose bo
 		namespace = snNamespace
 	}
 
-	log.Printf("Namespace: %s, Annotation: %s", namespace, prefix+"/namespace")
+	log.Printf("Namespace: %s, Annotation: %s, Snapshot Class: %s", namespace, prefix+"/namespace", snClass)
 
 	rg.Annotations[prefix+"/namespace"] = namespace
+	rg.Annotations[prefix+"/snapshotClass"] = snClass
 
 	if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
 		log.Fatalf("snapshot: error executing UpdateAction %s\n", err.Error())

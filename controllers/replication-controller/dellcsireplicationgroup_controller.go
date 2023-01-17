@@ -306,7 +306,6 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	// TODO: Add check for the snapshot existence.
 	r.processLastActionResult(ctx, localRG, remoteClient, log)
 
 	log.V(common.InfoLevel).Info("RG has already been synced to the remote cluster")
@@ -350,12 +349,19 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 
 	log.V(common.InfoLevel).Info("[FC] Action Namespace - " + actionAnnotation.Namespace)
 
+	if _, err := remoteClient.GetSnapshotClass(ctx, actionAnnotation.SnapshotClass); err != nil {
+		log.Error(err, "Snapshot class does not exist on remote cluster. Not creating the remote snapshots.")
+		return err
+	}
+
+	log.V(common.InfoLevel).Info("[FC] Action Snapshot Class - " + actionAnnotation.SnapshotClass)
+
 	for volumeHandle, snapshotHandle := range lastAction.ActionAttributes {
 		msg := "[FC] ActionAttributes - volumeHandle: " + volumeHandle + ", snapshotHandle: " + snapshotHandle
 		log.V(common.InfoLevel).Info(msg)
 
 		snapRef := makeSnapReference(snapshotHandle, actionAnnotation.Namespace)
-		sc := makeStorageClassContent(group.Labels[controller.DriverName])
+		sc := makeStorageClassContent(group.Labels[controller.DriverName], actionAnnotation.SnapshotClass)
 		snapContent := makeVolSnapContent(snapshotHandle, volumeHandle, *snapRef, sc)
 
 		err := remoteClient.CreateSnapshotContent(ctx, snapContent)
@@ -400,13 +406,12 @@ func makeSnapshotObject(snapName, contentName, className, namespace string) *s1.
 	return volsnap
 }
 
-func makeStorageClassContent(driver string) *s1.VolumeSnapshotClass {
+func makeStorageClassContent(driver, snapClass string) *s1.VolumeSnapshotClass {
 	return &s1.VolumeSnapshotClass{
 		Driver:         driver,
 		DeletionPolicy: "Retain",
 		ObjectMeta: metav1.ObjectMeta{
-			// TODO: Make configurable.
-			Name: "vxflexos-snapclass",
+			Name: snapClass,
 		},
 	}
 }

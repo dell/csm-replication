@@ -114,4 +114,6 @@ const (
 	TestFailOver = "testfailover"
 	// TestFailOverStop stop test failover replication action name
 	TestFailOverStop = "testfailoverstop"
+	// Indicates the snapshot class to use when performing a remote snapshot.
+	snapshotClass = "/snapshotClass"
 )
