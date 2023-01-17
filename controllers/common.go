@@ -218,6 +218,8 @@ var (
 	MigrationNamespace string
 	// CreatedByMigrator indicates that this PV's been created by migrator sidecar
 	CreatedByMigrator string
+	// SnapshotClass name of the desired snapshot class.
+	SnapshotClass string
 )
 
 // InitLabelsAndAnnotations initializes package visible constants by using customizable domain variable
@@ -251,4 +253,5 @@ func InitLabelsAndAnnotations(domain string) {
 	MigrationRequested = domain + migrateTo
 	MigrationNamespace = domain + migrateNS
 	CreatedByMigrator = domain + createdByMigrator
+	SnapshotClass = domain + snapshotClass
 }

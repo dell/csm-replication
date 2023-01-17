@@ -110,6 +110,7 @@ type ActionAnnotation struct {
 	FinishTime            string `json:"finishTime"`
 	ProtectionGroupStatus string `json:"protectionGroupStatus"`
 	Namespace             string `json:"namespace"`
+	SnapshotClass         string `json:"snapshotClass"`
 }
 
 func updateRGSpecWithActionResult(ctx context.Context, rg *repv1.DellCSIReplicationGroup, result *ActionResult) bool {
@@ -134,11 +135,14 @@ func updateRGSpecWithActionResult(ctx context.Context, rg *repv1.DellCSIReplicat
 		buff, _ := json.Marshal(finishTime)
 		actionAnnotation.FinishTime = string(buff)
 
-		// TODO: Don't use the MigrationNamespace?
 		if ns, ok := rg.Annotations[controllers.MigrationNamespace]; ok {
 			actionAnnotation.Namespace = ns
 		} else {
 			actionAnnotation.Namespace = "default"
+		}
+
+		if snClass, ok := rg.Annotations[controllers.SnapshotClass]; ok {
+			actionAnnotation.SnapshotClass = snClass
 		}
 
 		log.V(common.InfoLevel).Info("[FC] ActionAnnotation - " + actionAnnotation.Namespace + " " + controllers.MigrationNamespace)
@@ -282,7 +286,7 @@ func updateActionAttributes(ctx context.Context, rg *storagev1alpha1.DellCSIRepl
 	log.V(common.InfoLevel).Info("[FC] Updating the action attributes!")
 
 	switch result.ActionType {
-	case "CREATE_SNAPSHOT":
+	case ActionType(csiext.ActionTypes_CREATE_SNAPSHOT.String()):
 		log.V(common.InfoLevel).Info("Finished Create Snapshot, Attributes:")
 		for key, val := range result.ActionAttributes {
 			log.V(common.InfoLevel).Info("Key: " + key + " Value: " + val)
@@ -362,9 +366,7 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 }
 
 func (r *ReplicationGroupReconciler) getAction(log logr.Logger, actionType ActionType) (*csiext.ExecuteActionRequest_Action, error) {
-	// log := common.GetLoggerFromContext(ctx)
 	for _, supportedAction := range r.SupportedActions {
-		// log.V(common.InfoLevel).Info("getAction", supportedAction)
 		if supportedAction == nil {
 			continue
 		}
