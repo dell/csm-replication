@@ -365,8 +365,6 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 		return err
 	}
 
-	log.V(common.InfoLevel).Info("Action Namespace - " + actionAnnotation.SnapshotNamespace)
-
 	if _, err := remoteClient.GetSnapshotClass(ctx, actionAnnotation.SnapshotClass); err != nil {
 		log.Error(err, "Snapshot class does not exist on remote cluster. Not creating the remote snapshots.")
 		return err
@@ -394,14 +392,14 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 
 		err = remoteClient.CreateSnapshotContent(ctx, snapContent)
 		if err != nil {
-			log.Error(err, "create snapshotContent error")
+			log.Error(err, "unable to create snapshot content")
 			return err
 		}
 
 		snapshot := makeSnapshotObject(snapRef.Name, snapContent.Name, sc.ObjectMeta.Name, actionAnnotation.SnapshotNamespace)
 		err = remoteClient.CreateSnapshotObject(ctx, snapshot)
 		if err != nil {
-			log.Error(err, "create snapshot error")
+			log.Error(err, "unable to create snapshot object")
 			return err
 		}
 	}
