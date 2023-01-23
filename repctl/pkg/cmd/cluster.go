@@ -437,7 +437,7 @@ func updateClusters(kubeConfig, clusterName, path string, force bool) error {
 	}
 
 	destFileName := filepath.Join(folderPath, clusterName)
-	destFile, err := os.Create(destFileName) // creates if file doesn't exist
+	destFile, err := os.Create(filepath.Clean(destFileName)) // creates if file doesn't exist
 	if err != nil {
 		return fmt.Errorf("failed to create file: %s, error: %s", destFileName, err.Error())
 	}
