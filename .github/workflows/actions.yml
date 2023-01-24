@@ -56,13 +56,11 @@ jobs:
       - name: Navigate to directory
         run: cd repctl
       - name: Download GoSec
-        run: wget https://github.com/securego/gosec/releases/download/v2.3.0/gosec_2.3.0_linux_amd64.tar.gz
+        run: wget https://github.com/securego/gosec/releases/download/v2.14.0/gosec_2.14.0_linux_amd64.tar.gz
       - name: Unpack GoSec
-        run:  tar xzf gosec_2.3.0_linux_amd64.tar.gz
+        run:  tar xzf gosec_2.14.0_linux_amd64.tar.gz
       - name: GoSec scan
         run: ./gosec  ./...
-
-
   malware_security_scan:
     name: Malware Scanner
     runs-on: ubuntu-latest
