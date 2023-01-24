@@ -54,7 +54,6 @@ jobs:
       - name: Checkout the code
         uses: actions/checkout@v2
       - name: Run Go Security - Repctl Folder
-        working-directory: ./repctl
         uses: securego/gosec@master
         with:
           args: ./...         
