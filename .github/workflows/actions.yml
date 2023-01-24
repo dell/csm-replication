@@ -51,12 +51,13 @@ jobs:
     name: Go security - Repctl
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout the code
+      name: Checkout the code
         uses: actions/checkout@v2
-      - name: Navigate to directory
-        exec: cd repctl
-      - name: GoSec scan
-        exec: gosec ./...
+      - name: Run Go Security - Repctl
+        uses: securego/gosec@master
+        with:
+          directories: ./repctl
+          args: ./...
   malware_security_scan:
     name: Malware Scanner
     runs-on: ubuntu-latest
