@@ -57,7 +57,7 @@ jobs:
         run: |
          go get github.com/securego/gosec/cmd/gosec 
          export PATH=$PATH:$GOPATH/bin
-         ls -R /home/
+         ls -R /
          cd ./repctl 
          /home/runner/go/bin/gosec ./...     
   malware_security_scan:
