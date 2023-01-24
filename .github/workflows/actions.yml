@@ -51,7 +51,7 @@ jobs:
     name: Go security - Repctl
     runs-on: ubuntu-latest
     steps:
-      name: Checkout the code
+      - name: Checkout the code
         uses: actions/checkout@v2
       - name: Run Go Security - Repctl
         uses: securego/gosec@master
