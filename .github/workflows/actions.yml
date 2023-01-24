@@ -34,7 +34,7 @@ jobs:
       - uses: actions/setup-go@v2
         with:
           go-version: ^1.19
-      - run: cd repctl && make test
+      - run: cd repctl && pwd && make test
       - name: Run unit tests and check package coverage
         run: make gen-coverage
   go_security_scan:
