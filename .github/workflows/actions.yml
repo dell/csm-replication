@@ -55,9 +55,13 @@ jobs:
         uses: actions/checkout@v2
       - name: Run Go Security - Repctl Folder
         run: |
-         export PATH=$PATH:$(go env GOPATH)/bin 
+         go get github.com/securego/gosec/cmd/gosec 
+         echo $PATH
+         echo $GOPATH
+         pwd
+         export PATH=$PATH:$GOPATH/bin
          cd ./repctl 
-         go get github.com/securego/gosec/cmd/gosec
+         pwd
          gosec ./...     
   malware_security_scan:
     name: Malware Scanner
