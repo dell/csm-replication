@@ -38,7 +38,7 @@ jobs:
       - name: Run unit tests and check package coverage
         run: make gen-coverage
   go_security_scan:
-    name: Go security
+    name: Go security - Main Folder
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the code
@@ -47,14 +47,14 @@ jobs:
         uses: securego/gosec@master
         with:
           args: -exclude-dir=repctl ./...
-   go_security_scan_repctl:
+  go_security_scan_repctl:
     name: Go security - Repctl
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the code
         uses: actions/checkout@v2
       - run: cd repctl
-      - name: Run Go Security
+      - name: Run Go Security - Repctl Folder
         uses: securego/gosec@master
         with:
           args: ./...         
