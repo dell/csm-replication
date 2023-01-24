@@ -55,11 +55,8 @@ jobs:
         uses: actions/checkout@v2
       - name: Run Go Security - Repctl Folder
         run: |
-         go mod download && go mod vendor
-         which gosec
-         ls -R $(go env GOPATH)
          export PATH=$PATH:$(go env GOPATH)/bin
-         go env
+         go get github.com/securego/gosec/cmd/gosec
          cd ./repctl 
          gosec ./...     
   malware_security_scan:
