@@ -57,8 +57,8 @@ jobs:
         run: cd repctl
       - name: Get latest release information
         run: |
-        latest_release=$(curl -s https://api.github.com/repos/securego/gosec/releases/latest)
-        download_url=$(echo $latest_release | jq -r '.assets[0].browser_download_url')
+          latest_release=$(curl -s https://api.github.com/repos/securego/gosec/releases/latest)
+          download_url=$(echo $latest_release | jq -r '.assets[0].browser_download_url')
       - name: Download GoSec
         run: wget $download_url -O gosec.tar.gz
       - name: Unpack GoSec
