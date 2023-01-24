@@ -53,12 +53,8 @@ jobs:
     steps:
       - name: Checkout the code
         uses: actions/checkout@v2
-      - run: cd repctl
       - run: export PATH=$PATH:$(go env GOPATH)/bin
-      - name: Run Go Security - Repctl Folder
-        uses: securego/gosec@master
-        with:
-          args: ./...         
+      - run: cd repctl && gosec ./...
   malware_security_scan:
     name: Malware Scanner
     runs-on: ubuntu-latest
