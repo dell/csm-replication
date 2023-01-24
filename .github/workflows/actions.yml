@@ -56,7 +56,7 @@ jobs:
       - name: Run Go Security - Repctl
         uses: securego/gosec@master
         with:
-          directories: ./repctl
+          entryPoint: ./repctl
           args: ./...
   malware_security_scan:
     name: Malware Scanner
