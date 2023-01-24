@@ -66,6 +66,7 @@ func RunStubServer(opt Options) {
 		server := &http.Server{
 			Addr:              addr,
 			ReadHeaderTimeout: 3 * time.Second,
+			Handler:           r,
 		}
 		err := server.ListenAndServe()
 		log.Println(err)

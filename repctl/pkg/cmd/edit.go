@@ -160,7 +160,7 @@ func editSecretCommand() *cobra.Command {
 			if !existence {
 				editor = "vi"
 			}
-			command := exec.Command(editor, tmpFile.Name()) // #nosec G204 -- editor could hardcode to VI, but tmpFile.Name() MUST be variable
+			command := exec.Command(editor, tmpFile.Name()) // #nosec G204 --neither editor nor tmpFile.Name() can be hardcoded
 			command.Stdout = os.Stdout
 			command.Stderr = os.Stderr
 			command.Stdin = os.Stdin
