@@ -53,14 +53,12 @@ jobs:
     steps:
       - name: Checkout the code
         uses: actions/checkout@v2
-      - name: Navigate to directory
-        run: cd repctl
       - name: Download GoSec
-        run: wget https://github.com/securego/gosec/releases/download/v2.14.0/gosec_2.14.0_linux_amd64.tar.gz
+        run: cd ./repctl && wget https://github.com/securego/gosec/releases/download/v2.14.0/gosec_2.14.0_linux_amd64.tar.gz
       - name: Unpack GoSec
-        run:  tar xzf gosec_2.14.0_linux_amd64.tar.gz
+        run:  cd ./repctl && tar xzf gosec_2.14.0_linux_amd64.tar.gz
       - name: GoSec scan
-        run: ./gosec  ./...
+        run: cd ./repctl && ./gosec  ./...
   malware_security_scan:
     name: Malware Scanner
     runs-on: ubuntu-latest
