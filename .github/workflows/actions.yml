@@ -55,13 +55,13 @@ jobs:
         uses: actions/checkout@v2
       - name: Run Go Security - Repctl Folder
         run: |
-         go get github.com/securego/gosec/cmd/gosec 
-         export PATH=$PATH:$GOPATH/bin
-         ls -R /
-         find / -name gosec
+         go mod download && go mod vendor
+         which gosec
+         ls -R $(go env GOPATH)
+         export PATH=$PATH:$(go env GOPATH)/bin
          go env
          cd ./repctl 
-         /home/runner/go/bin/gosec ./...     
+         gosec ./...     
   malware_security_scan:
     name: Malware Scanner
     runs-on: ubuntu-latest
