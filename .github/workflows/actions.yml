@@ -53,11 +53,19 @@ jobs:
     steps:
       - name: Checkout the code
         uses: actions/checkout@v2
-      - name: Run Go Security - Repctl
-        uses: securego/gosec@master
-        with:
-          entryPoint: ./repctl
-          args: ./...
+      - name: Navigate to directory
+        run: cd repctl
+      - name: Get latest release information
+        run: |
+        latest_release=$(curl -s https://api.github.com/repos/securego/gosec/releases/latest)
+        download_url=$(echo $latest_release | jq -r '.assets[0].browser_download_url')
+      - name: Download GoSec
+        run: wget $download_url -O gosec.tar.gz
+      - name: Unpack GoSec
+        run: tar xzf gosec.tar.gz
+      - name: GoSec scan
+        run: ./gosec ./...
+
   malware_security_scan:
     name: Malware Scanner
     runs-on: ubuntu-latest
