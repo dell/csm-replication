@@ -55,16 +55,13 @@ jobs:
         uses: actions/checkout@v2
       - name: Navigate to directory
         run: cd repctl
-      - name: Get latest release information
-        run: |
-          latest_release=$(curl -s https://api.github.com/repos/securego/gosec/releases/latest)
-          download_url=$(echo $latest_release | jq -r '.assets[0].browser_download_url')
       - name: Download GoSec
-        run: wget $download_url -O gosec.tar.gz
+        run: wget https://github.com/securego/gosec/releases/download/v2.3.0/gosec_2.3.0_linux_amd64.tar.gz
       - name: Unpack GoSec
-        run: tar xzf gosec.tar.gz
+        run:  tar xzf gosec_2.3.0_linux_amd64.tar.gz
       - name: GoSec scan
-        run: ./gosec ./...
+        run: ./gosec  ./...
+
 
   malware_security_scan:
     name: Malware Scanner
