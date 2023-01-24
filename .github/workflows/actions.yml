@@ -56,9 +56,8 @@ jobs:
       - name: Run Go Security - Repctl Folder
         run: |
          go get github.com/securego/gosec/cmd/gosec 
-         echo $PATH
-         echo $GOPATH
-         pwd
+         go env GOPATH
+         ls -r $(go env GOPATH)
          export PATH=$PATH:$GOPATH/bin
          cd ./repctl 
          pwd
