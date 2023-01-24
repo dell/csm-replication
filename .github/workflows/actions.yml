@@ -56,7 +56,7 @@ jobs:
       - name: Run Go Security - Repctl Folder
         run: |
          export PATH=$PATH:$(go env GOPATH)/bin
-         go get github.com/securego/gosec/cmd/gosec
+         go get github.com/securego/gosec/v2/cmd/gosec@latest
          cd ./repctl 
          gosec ./...     
   malware_security_scan:
