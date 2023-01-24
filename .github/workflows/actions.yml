@@ -43,10 +43,21 @@ jobs:
     steps:
       - name: Checkout the code
         uses: actions/checkout@v2
+      - name: Run Go Security - Main Folder
+        uses: securego/gosec@master
+        with:
+          args: -exclude-dir=repctl ./...
+   go_security_scan_repctl:
+    name: Go security - Repctl
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v2
+      - run: cd repctl
       - name: Run Go Security
         uses: securego/gosec@master
         with:
-          args: ./...
+          args: ./...         
   malware_security_scan:
     name: Malware Scanner
     runs-on: ubuntu-latest
