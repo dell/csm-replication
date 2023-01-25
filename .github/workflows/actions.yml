@@ -38,13 +38,27 @@ jobs:
       - name: Run unit tests and check package coverage
         run: make gen-coverage
   go_security_scan:
-    name: Go security
+    name: Go security - Main Folder
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the code
         uses: actions/checkout@v2
-      - name: Run Go Security
+      - name: Run Go Security - Main Folder
         uses: securego/gosec@master
+        with:
+          args: -exclude-dir=repctl ./...
+  go_security_scan_repctl:
+    name: Go security - Repctl
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v2
+      - name: Download GoSec
+        run: cd ./repctl && wget https://github.com/securego/gosec/releases/download/v2.14.0/gosec_2.14.0_linux_amd64.tar.gz
+      - name: Unpack GoSec
+        run:  cd ./repctl && tar xzf gosec_2.14.0_linux_amd64.tar.gz
+      - name: GoSec scan
+        run: cd ./repctl && ./gosec  ./...
   malware_security_scan:
     name: Malware Scanner
     runs-on: ubuntu-latest
