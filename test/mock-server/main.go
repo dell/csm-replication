@@ -25,8 +25,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/dell/dell-csi-extensions/migration"
-
 	"github.com/dell/csm-replication/test/mock-server/server"
 	"github.com/dell/csm-replication/test/mock-server/stub"
 
@@ -68,7 +66,6 @@ func main() {
 	s := grpc.NewServer()
 
 	replication.RegisterReplicationServer(s, &server.Replication{})
-	migration.RegisterMigrationServer(s, &server.Replication{})
 
 	fmt.Printf("Serving gRPC on %s\n", csiAddress)
 	errChan := make(chan error)

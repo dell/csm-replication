@@ -78,7 +78,7 @@ func (r *ReplicationGroupMonitoring) monitorReplicationGroups(ticker <-chan time
 				// silently ignore the RGs not owned by this sidecar
 				continue
 			}
-			r.Log.V(common.DebugLevel).Info("Processing RG " + rg.Name + "for monitoring")
+			r.Log.V(common.DebugLevel).Info("Processing RG " + rg.Name + " for monitoring")
 			// Check if there are any PVs in the cluster with the RG label
 			var persistentVolumes v1.PersistentVolumeList
 			matchingLabels := make(map[string]string)
