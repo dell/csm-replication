@@ -1,6 +1,6 @@
 module github.com/dell/csm-replication
 
-go 1.18
+go 1.19
 
 require (
 	github.com/bombsimon/logrusr/v3 v3.0.0
