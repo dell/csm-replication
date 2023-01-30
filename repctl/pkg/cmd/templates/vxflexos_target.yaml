@@ -1,0 +1,36 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  {{- if eq .TargetClusterID .SourceClusterID }}
+  name: {{ .Name }}-tgt
+  {{- else }}
+  name: {{ .Name }}
+  {{- end }}
+provisioner: csi-{{ .Driver }}.dellemc.com
+reclaimPolicy: {{ .ReclaimPolicy }}
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+parameters:
+  storagepool: {{ .Parameters.StoragePool.Target }}
+  systemID: {{ .Parameters.ArrayID.Target }}
+  protectiondomain: {{ .Parameters.ProtectionDomain.Target }}
+  {{ .ReplicationPrefix }}/isReplicationEnabled: "true"
+  {{ .ReplicationPrefix }}/remoteStorageClassName: {{ .Name }}
+  {{- if eq .TargetClusterID .SourceClusterID }}
+  {{ .ReplicationPrefix }}/remoteClusterID: self
+  {{- else }}
+  {{ .ReplicationPrefix }}/remoteClusterID: {{ .SourceClusterID }}
+  {{- end }}
+  {{ .ReplicationPrefix }}/remoteSystem: {{ .Parameters.ArrayID.Source }}
+  {{ .ReplicationPrefix }}/remoteStoragePool: {{ .Parameters.StoragePool.Source }}
+  {{ .ReplicationPrefix }}/rpo: "{{ .Parameters.Rpo }}"
+  {{ .ReplicationPrefix }}/volumeGroupPrefix: {{ .Parameters.VolumeGroupPrefix }}
+  {{ .ReplicationPrefix }}/remoteRGRetentionPolicy: {{ .RemoteRetentionPolicy.RG }}
+  {{ .ReplicationPrefix }}/remotePVRetentionPolicy: {{ .RemoteRetentionPolicy.PV }}
+  {{ .ReplicationPrefix }}/consistencyGroupName: {{ .Parameters.ConsistencyGroupName }}
+  {{ .ReplicationPrefix }}/protectionDomain: {{ .Parameters.ProtectionDomain.Source }}
+allowedTopologies:
+- matchLabelExpressions:
+  - key: csi-{{ .Driver }}.dellemc.com/{{ .Parameters.RemoteSystem.Target }}
+    values:
+    - csi-{{ .Driver }}.dellemc.com
