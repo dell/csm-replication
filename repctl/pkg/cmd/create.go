@@ -70,6 +70,7 @@ type GlobalParameters struct {
 	// PowerFlex
 	ConsistencyGroupName string
 	ProtectionDomain     Mirrored
+	StoragePool          Mirrored
 }
 
 // RemoteRetentionPolicy structure that contains values for remoteRetentionPolicy for both PV and RGs

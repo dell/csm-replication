@@ -31,6 +31,6 @@ parameters:
   {{ .ReplicationPrefix }}/protectionDomain: {{ .Parameters.ProtectionDomain.Source }}
 allowedTopologies:
 - matchLabelExpressions:
-  - key: csi-{{ .Driver }}.dellemc.com/{{ .Parameters.RemoteSystem.Target }}
+  - key: csi-{{ .Driver }}.dellemc.com/{{ .Parameters.ArrayID.Target }}
     values:
     - csi-{{ .Driver }}.dellemc.com

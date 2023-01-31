@@ -28,6 +28,6 @@ parameters:
   {{ .ReplicationPrefix }}/protectionDomain: {{ .Parameters.ProtectionDomain.Target }}
 allowedTopologies:
 - matchLabelExpressions:
-  - key: csi-{{ .Driver }}.dellemc.com/{{ .Parameters.RemoteSystem.Source }}
+  - key: csi-{{ .Driver }}.dellemc.com/{{ .Parameters.ArrayID.Source }}
     values:
     - csi-{{ .Driver }}.dellemc.com
