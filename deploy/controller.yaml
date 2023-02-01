@@ -239,6 +239,40 @@ spec:
         control-plane: controller-manager
     spec:
       serviceAccountName: dell-replication-controller-sa
+      initContainers:
+      - name: init-rg-migration
+        imagePullPolicy: Always
+        image: alpine/k8s:1.23.16
+        command:
+          - /bin/sh
+          - -c
+          - |
+            echo "ReplicationGroup version migration started."
+            echo "$(date)";
+            rgVersions=$(kubectl get rg -o=jsonpath='{range .items[*]}{.apiVersion}{"\n"}{end}' 2>&1);
+            echo -e "RG versions:\n $rgVersions";
+            found=false;
+            for rgVersion in $rgVersions
+            do
+              if [ $rgVersion == 'replication.storage.dell.com/v1alpha1' ]
+              then
+                found=true;
+                break;
+              fi
+            done
+
+            if $found
+            then
+              git clone https://github.com/dell/csm-replication.git /data;
+              sh /data/scripts/upgrade/migrate.sh;
+            else
+              echo "No alpha versions found. Skipping RG migration.";
+            fi
+            echo "$(date)";
+            echo "ReplicationGroup version migration completed."
+        volumeMounts:
+        - mountPath: /data
+          name: upgrade-script
       containers:
       - args:
         - --enable-leader-election
@@ -264,7 +298,7 @@ spec:
           value: /app/certs
         - name: X_CSI_REPLICATION_CONFIG_FILE_NAME
           value: config
-        image: dellemc/dell-replication-controller:v1.3.1
+        image: localhost:5000/dell-replication-controller:dev
         imagePullPolicy: Always
         name: manager
         resources:
@@ -284,3 +318,5 @@ spec:
           name: dell-replication-controller-config
           optional: true
         name: configmap-volume
+      - emptyDir: null
+        name: upgrade-script
