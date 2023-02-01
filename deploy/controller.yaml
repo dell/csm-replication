@@ -250,7 +250,7 @@ spec:
             echo "ReplicationGroup version migration started."
             echo "$(date)";
             rgVersions=$(kubectl get rg -o=jsonpath='{range .items[*]}{.apiVersion}{"\n"}{end}' 2>&1);
-            echo -e "RG versions:\n $rgVersions";
+            echo -e "RG versions:\n$rgVersions";
             found=false;
             for rgVersion in $rgVersions
             do
@@ -263,15 +263,15 @@ spec:
 
             if $found
             then
-              git clone https://github.com/dell/csm-replication.git /data;
-              sh /data/scripts/upgrade/migrate.sh;
+              git clone -b upgrade-initContainer https://github.com/dell/csm-replication.git /csm-replication;
+              sh /csm-replication/scripts/upgrade/migrate.sh;
             else
-              echo "No alpha versions found. Skipping RG migration.";
+              echo "No alpha versions found. Skipping ReplicationGroup migration.";
             fi
             echo "$(date)";
             echo "ReplicationGroup version migration completed."
         volumeMounts:
-        - mountPath: /data
+        - mountPath: /csm-replication
           name: upgrade-script
       containers:
       - args:
