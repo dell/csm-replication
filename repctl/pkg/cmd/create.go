@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -66,6 +66,11 @@ type GlobalParameters struct {
 	AzServiceIP       Mirrored
 	IsiPath           string
 	RootClientEnabled Mirrored
+
+	// PowerFlex
+	ConsistencyGroupName string
+	ProtectionDomain     Mirrored
+	StoragePool          Mirrored
 }
 
 // RemoteRetentionPolicy structure that contains values for remoteRetentionPolicy for both PV and RGs
@@ -337,7 +342,7 @@ func createPVCs(providedPVList []string, cluster k8s.ClusterInterface, rgName, t
 
 func createSCs(scConfig ScConfig, clusters *k8s.Clusters, dryRun bool) error {
 	switch scConfig.Driver {
-	case "powerstore", "powermax", "isilon":
+	case "powerstore", "powermax", "isilon", "vxflexos":
 		break
 	default:
 		return fmt.Errorf("driver not supported")
