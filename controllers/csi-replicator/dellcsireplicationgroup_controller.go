@@ -109,7 +109,7 @@ type ActionAnnotation struct {
 	FinalError            string `json:"finalError"`
 	FinishTime            string `json:"finishTime"`
 	ProtectionGroupStatus string `json:"protectionGroupStatus"`
-	Namespace             string `json:"namespace"`
+	SnapshotNamespace     string `json:"snapshotNamespace"`
 	SnapshotClass         string `json:"snapshotClass"`
 }
 
@@ -135,17 +135,17 @@ func updateRGSpecWithActionResult(ctx context.Context, rg *repv1.DellCSIReplicat
 		buff, _ := json.Marshal(finishTime)
 		actionAnnotation.FinishTime = string(buff)
 
-		if ns, ok := rg.Annotations[controllers.MigrationNamespace]; ok {
-			actionAnnotation.Namespace = ns
+		if ns, ok := rg.Annotations[controllers.SnapshotNamespace]; ok {
+			actionAnnotation.SnapshotNamespace = ns
 		} else {
-			actionAnnotation.Namespace = "default"
+			actionAnnotation.SnapshotNamespace = "default"
 		}
 
 		if snClass, ok := rg.Annotations[controllers.SnapshotClass]; ok {
 			actionAnnotation.SnapshotClass = snClass
 		}
 
-		log.V(common.InfoLevel).Info("[FC] ActionAnnotation - " + actionAnnotation.Namespace + " " + controllers.MigrationNamespace)
+		log.V(common.InfoLevel).Info("ActionAnnotation - " + actionAnnotation.SnapshotNamespace + " " + controllers.SnapshotNamespace)
 
 		bytes, _ := json.Marshal(&actionAnnotation)
 		controllers.AddAnnotation(rg, Action, string(bytes))
@@ -281,9 +281,9 @@ func updateLastAction(ctx context.Context, rg *repv1.DellCSIReplicationGroup, re
 	log.V(common.InfoLevel).Info("Last action was updated")
 }
 
-func updateActionAttributes(ctx context.Context, rg *storagev1alpha1.DellCSIReplicationGroup, result *ActionResult) {
+func updateActionAttributes(ctx context.Context, rg *repv1.DellCSIReplicationGroup, result *ActionResult) {
 	log := common.GetLoggerFromContext(ctx)
-	log.V(common.InfoLevel).Info("[FC] Updating the action attributes!")
+	log.V(common.InfoLevel).Info("Updating the action attributes")
 
 	switch result.ActionType {
 	case ActionType(csiext.ActionTypes_CREATE_SNAPSHOT.String()):
@@ -294,7 +294,7 @@ func updateActionAttributes(ctx context.Context, rg *storagev1alpha1.DellCSIRepl
 
 		rg.Status.LastAction.ActionAttributes = result.ActionAttributes
 	default:
-		log.V(common.InfoLevel).Info("[FC] Update Action Attributes to default")
+		log.V(common.InfoLevel).Info("Update Action Attributes to default")
 	}
 }
 
@@ -365,7 +365,7 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 }
 
-func (r *ReplicationGroupReconciler) getAction(log logr.Logger, actionType ActionType) (*csiext.ExecuteActionRequest_Action, error) {
+func (r *ReplicationGroupReconciler) getAction(actionType ActionType) (*csiext.ExecuteActionRequest_Action, error) {
 	for _, supportedAction := range r.SupportedActions {
 		if supportedAction == nil {
 			continue
@@ -493,7 +493,7 @@ func (r *ReplicationGroupReconciler) processRGInActionInProgressState(ctx contex
 			log.V(common.DebugLevel).Info("Action set")
 
 			actionType := ActionType(rg.Spec.Action)
-			_, err := r.getAction(log, actionType)
+			_, err := r.getAction(actionType)
 			if err != nil {
 				// Action invalid
 				r.EventRecorder.Event(rg, v1.EventTypeWarning, "Invalid",
@@ -557,7 +557,7 @@ func (r *ReplicationGroupReconciler) processRGInActionInProgressState(ctx contex
 		r.EventRecorder.Eventf(rg, v1.EventTypeWarning, "InProgress",
 			"Action [%s] on DellCSIReplicationGroup [%s] is in Progress, cannot execute [%s] ", actionType.String(), rg.Name, rg.Spec.Action)
 	}
-	action, err := r.getAction(log, actionType)
+	action, err := r.getAction(actionType)
 	if err != nil {
 		r.EventRecorder.Eventf(rg, v1.EventTypeWarning, "Unsupported",
 			"Action changed to an invalid value %s while another action execution was in progress. [%s]",
@@ -665,7 +665,7 @@ func (r *ReplicationGroupReconciler) processRG(ctx context.Context, dellCSIRepli
 			return ctrl.Result{}, err
 		}
 		actionType := ActionType(dellCSIReplicationGroup.Spec.Action)
-		_, err = r.getAction(log, actionType)
+		_, err = r.getAction(actionType)
 		// Invalid action type
 		if err != nil {
 			// Reset the action to empty & raise an event

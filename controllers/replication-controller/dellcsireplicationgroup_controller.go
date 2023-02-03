@@ -306,15 +306,23 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	r.processLastActionResult(ctx, localRG, remoteClient, log)
+	err = r.processLastActionResult(ctx, localRG, remoteClient, log)
+	if err != nil {
+		r.EventRecorder.Eventf(localRG, eventTypeWarning, eventReasonUpdated,
+			"failed to process the last action %s", localRG.Status.LastAction.Condition)
+	}
 
 	log.V(common.InfoLevel).Info("RG has already been synced to the remote cluster")
 	return ctrl.Result{}, nil
 }
 
-func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context, group *storagev1alpha1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
+func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
+	if group.Status.LastAction.ErrorMessage != "" {
+		return fmt.Errorf("error in processing the last action")
+	}
+
 	if len(group.Status.Conditions) == 0 || group.Status.LastAction.Time == nil {
-		log.V(common.InfoLevel).Info("[FC] No action to process")
+		log.V(common.InfoLevel).Info("No action to process")
 		return nil
 	}
 
@@ -325,14 +333,14 @@ func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context
 	return nil
 }
 
-func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, group *storagev1alpha1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
+func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
 	lastAction := group.Status.LastAction
 	lastTime := lastAction.Time
 	currTime := time.Now()
 	diffTime := currTime.Sub(lastTime.Time).Seconds()
 
 	if diffTime > 30 {
-		log.V(common.InfoLevel).Info("[FC] LastAction executed greater than the threshold")
+		log.V(common.InfoLevel).Info("LastAction executed greater than the threshold")
 		return nil
 	}
 
@@ -345,35 +353,34 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 	err := json.Unmarshal([]byte(val), &actionAnnotation)
 	if err != nil {
 		log.Error(err, "JSON unmarshal error", "actionAnnotation", actionAnnotation)
+		return err
 	}
 
-	log.V(common.InfoLevel).Info("[FC] Action Namespace - " + actionAnnotation.Namespace)
+	log.V(common.InfoLevel).Info("Action Namespace - " + actionAnnotation.SnapshotNamespace)
 
 	if _, err := remoteClient.GetSnapshotClass(ctx, actionAnnotation.SnapshotClass); err != nil {
 		log.Error(err, "Snapshot class does not exist on remote cluster. Not creating the remote snapshots.")
 		return err
 	}
 
-	log.V(common.InfoLevel).Info("[FC] Action Snapshot Class - " + actionAnnotation.SnapshotClass)
-
 	for volumeHandle, snapshotHandle := range lastAction.ActionAttributes {
-		msg := "[FC] ActionAttributes - volumeHandle: " + volumeHandle + ", snapshotHandle: " + snapshotHandle
+		msg := "ActionAttributes - volumeHandle: " + volumeHandle + ", snapshotHandle: " + snapshotHandle
 		log.V(common.InfoLevel).Info(msg)
 
-		snapRef := makeSnapReference(snapshotHandle, actionAnnotation.Namespace)
+		snapRef := makeSnapReference(snapshotHandle, actionAnnotation.SnapshotNamespace)
 		sc := makeStorageClassContent(group.Labels[controller.DriverName], actionAnnotation.SnapshotClass)
 		snapContent := makeVolSnapContent(snapshotHandle, volumeHandle, *snapRef, sc)
 
 		err := remoteClient.CreateSnapshotContent(ctx, snapContent)
 		if err != nil {
-			log.V(common.InfoLevel).Info("[FC] SnapContent - " + err.Error())
+			log.Error(err, "create snapshotContent error")
 			return err
 		}
 
-		snapshot := makeSnapshotObject(snapRef.Name, snapContent.Name, sc.ObjectMeta.Name, actionAnnotation.Namespace)
+		snapshot := makeSnapshotObject(snapRef.Name, snapContent.Name, sc.ObjectMeta.Name, actionAnnotation.SnapshotNamespace)
 		err = remoteClient.CreateSnapshotObject(ctx, snapshot)
 		if err != nil {
-			log.V(common.InfoLevel).Info("[FC] Create Snapshot error - " + err.Error())
+			log.Error(err, "create snapshot error")
 			return err
 		}
 	}

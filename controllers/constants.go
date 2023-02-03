@@ -116,4 +116,6 @@ const (
 	TestFailOverStop = "testfailoverstop"
 	// Indicates the snapshot class to use when performing a remote snapshot.
 	snapshotClass = "/snapshotClass"
+	// Indicates the snapshot namespace to use when performing a remote snapshot.
+	snapshotNamespace = "/snapshotNamespace"
 )

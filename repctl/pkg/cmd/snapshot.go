@@ -29,7 +29,7 @@ import (
 func GetSnapshotCommand() *cobra.Command {
 	snapshotCmd := &cobra.Command{
 		Use:   "snapshot",
-		Short: "allows to execute snapshot actionat the specified cluster or rg",
+		Short: "allows to execute snapshot action at the specified cluster or rg",
 		Example: `
 For single cluster config:
 ./repctl --rg <rg-id> --sn-namespace <namespace> --sn-class <snapshot class> snapshot`,
@@ -48,7 +48,7 @@ Note: More information to be added.`,
 
 			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
 			if err != nil {
-				log.Fatalf("reprotect: error getting clusters folder path: %s\n", err.Error())
+				log.Fatalf("snapshot: error getting clusters folder path: %s\n", err.Error())
 			}
 
 			if input == "rg" {
@@ -94,7 +94,7 @@ func verifyInputForSnapshotAction(input string, rg string) (res string, tgt stri
 	for _, cluster := range clusters.Clusters {
 		rgList, err := cluster.ListReplicationGroups(context.Background())
 		if err != nil {
-			log.Printf("Encountered error during filtering persistent volume claims. Error: %s",
+			log.Printf("Encountered error during filtering preplication groups. Error: %s",
 				err.Error())
 			continue
 		}
@@ -126,7 +126,7 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass string, v
 
 	rLinkState := rg.Status.ReplicationLinkState
 	if rLinkState.LastSuccessfulUpdate == nil {
-		log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
+		log.Fatal("Aborted. One of your RGs is in an error state. Please verify RGs logs/events and try again.")
 		return
 	}
 
@@ -142,9 +142,9 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass string, v
 		namespace = snNamespace
 	}
 
-	log.Printf("Namespace: %s, Annotation: %s, Snapshot Class: %s", namespace, prefix+"/namespace", snClass)
+	log.Printf("Executing CreateSnapshot on Namespace: %s, Snapshot Class: %s", namespace, snClass)
 
-	rg.Annotations[prefix+"/namespace"] = namespace
+	rg.Annotations[prefix+"/snapshotNamespace"] = namespace
 	rg.Annotations[prefix+"/snapshotClass"] = snClass
 
 	if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
@@ -159,7 +159,7 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass string, v
 			return
 		}
 
-		log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
+		log.Printf("RG (%s), timed out with action: snapshot\n", rg.Name)
 		return
 	}
 
