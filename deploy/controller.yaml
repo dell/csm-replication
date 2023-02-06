@@ -253,36 +253,9 @@ spec:
       initContainers:
       - name: init-rg-migration
         imagePullPolicy: Always
-        image: alpine/k8s:1.25.6
+        image: localhost:5000/dell-replication-init:v0.0.1.065
         command:
-          - /bin/sh
-          - -c
-          - |
-            echo "ReplicationGroup version migration started."
-            echo "$(date)";
-            rgVersions=$(kubectl get rg -o=jsonpath='{range .items[*]}{.apiVersion}{"\n"}{end}' 2>&1);
-            echo -e "RG versions:\n$rgVersions";
-            found=false;
-            for rgVersion in $rgVersions
-            do
-              if [ $rgVersion == 'replication.storage.dell.com/v1alpha1' ]
-              then
-                found=true;
-                break;
-              fi
-            done
-            if $found
-            then
-              git clone -b upgrade-initContainer https://github.com/dell/csm-replication.git /csm-replication;
-              sh /csm-replication/scripts/upgrade/migrate.sh;
-            else
-              echo "No alpha versions found. Skipping ReplicationGroup migration.";
-            fi
-            echo "$(date)";
-            echo "ReplicationGroup version migration completed."
-        volumeMounts:
-        - mountPath: /csm-replication
-          name: upgrade-script
+        - /upgrade/migrate.sh
       containers:
       - args:
         - --enable-leader-election
@@ -328,5 +301,3 @@ spec:
           name: dell-replication-controller-config
           optional: true
         name: configmap-volume
-      - emptyDir: null
-        name: upgrade-script

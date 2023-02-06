@@ -104,6 +104,9 @@ generate: tools
 pre: gen-semver fmt vet tools generate
 
 # Build the container image
+image-init: gen-semver
+	make -f image.mk init
+
 image-sidecar: gen-semver
 	make -f image.mk sidecar
 
@@ -116,6 +119,9 @@ image-migrator-push: gen-semver
 # Build the container image
 image-controller: gen-semver
 	make -f image.mk controller
+
+image-init-push: gen-semver
+	make -f image.mk init-push
 
 image-sidecar-push: gen-semver
 	make -f image.mk sidecar-push
