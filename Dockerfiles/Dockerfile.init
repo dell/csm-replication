@@ -2,5 +2,5 @@
 FROM bitnami/kubectl:1.25.6 AS init
 WORKDIR /upgrade
 COPY --chown=1001 scripts/upgrade ./
-RUN chmod +x ./migrate.sh
-ENTRYPOINT ["/upgrade/migrate.sh"]
+RUN chmod +x ./migrate_rg.sh
+ENTRYPOINT ["/upgrade/migrate_rg.sh"]

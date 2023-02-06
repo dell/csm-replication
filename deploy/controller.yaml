@@ -255,7 +255,7 @@ spec:
         imagePullPolicy: Always
         image: localhost:5000/dell-replication-init:v0.0.1.065
         command:
-        - /upgrade/migrate.sh
+        - /upgrade/migrate_rg.sh
       containers:
       - args:
         - --enable-leader-election
