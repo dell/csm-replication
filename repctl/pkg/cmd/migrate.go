@@ -406,8 +406,10 @@ func recreateStsNdu(cluster k8s.ClusterInterface, sts *v12.StatefulSet, targetSC
 		return err
 	}
 	log.Info("trying to delete old resources")
-	for _, pod := range list.Items {
-		for _, volume := range pod.Spec.Volumes {
+	for i := range list.Items {
+		pod := list.Items[i]
+		for j := range pod.Spec.Volumes {
+			volume := pod.Spec.Volumes[j]
 			if volume.PersistentVolumeClaim != nil {
 				pvc, err := cluster.GetPersistentVolumeClaim(context.Background(), sts.Namespace, volume.PersistentVolumeClaim.ClaimName)
 				if err != nil {

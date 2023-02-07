@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/dell/repctl/pkg/config"
 	"github.com/dell/repctl/pkg/k8s"
@@ -159,7 +160,7 @@ func editSecretCommand() *cobra.Command {
 			if !existence {
 				editor = "vi"
 			}
-			command := exec.Command(editor, tmpFile.Name())
+			command := exec.Command(editor, tmpFile.Name()) // #nosec G204 --neither editor nor tmpFile.Name() can be hardcoded
 			command.Stdout = os.Stdout
 			command.Stderr = os.Stderr
 			command.Stdin = os.Stdin
@@ -211,7 +212,7 @@ func objectYAML(obj interface{}) string {
 
 // parseSecret parses *one* secret out of a YAML file and returns it
 func parseSecret(path string) (*v1.Secret, error) {
-	content, err := ioutil.ReadFile(path)
+	content, err := ioutil.ReadFile(filepath.Clean(path))
 	if err != nil {
 		return nil, err
 	}

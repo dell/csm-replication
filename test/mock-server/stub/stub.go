@@ -23,6 +23,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi"
 )
@@ -62,7 +63,12 @@ func RunStubServer(opt Options) {
 
 	fmt.Println("Serving stub admin on http://" + addr)
 	go func() {
-		err := http.ListenAndServe(addr, r)
+		server := &http.Server{
+			Addr:              addr,
+			ReadHeaderTimeout: 3 * time.Second,
+			Handler:           r,
+		}
+		err := server.ListenAndServe()
 		log.Println(err)
 	}()
 }

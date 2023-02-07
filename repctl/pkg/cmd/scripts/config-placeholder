@@ -1,0 +1,1 @@
+#This file is a placeholder to satisfy GoSec scans. It will be replaced by one in csm-replication/scripts upon compilation using makefile. 
