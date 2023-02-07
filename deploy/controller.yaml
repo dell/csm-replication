@@ -240,7 +240,6 @@ metadata:
   namespace: dell-replication-controller
 spec:
   replicas: 1
-  revisionHistoryLimit: 0
   selector:
     matchLabels:
       control-plane: controller-manager
@@ -253,7 +252,7 @@ spec:
       initContainers:
       - name: init-rg-migration
         imagePullPolicy: Always
-        image: localhost:5000/dell-replication-init:v0.0.1.065
+        image: dellemc/dell-replication-init:v1.0
         command:
         - /upgrade/migrate_rg.sh
       containers:
@@ -281,7 +280,7 @@ spec:
           value: /app/certs
         - name: X_CSI_REPLICATION_CONFIG_FILE_NAME
           value: config
-        image: localhost:5000/dell-replication-controller:dev
+        image: dellemc/dell-replication-controller:v1.3.1
         imagePullPolicy: Always
         name: manager
         resources:
