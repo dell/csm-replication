@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import (
 	"path"
 	"testing"
 
-	storagev1alpha1 "github.com/dell/csm-replication/api/v1alpha1"
+	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
 	constants "github.com/dell/csm-replication/pkg/common"
 	csireplication "github.com/dell/csm-replication/pkg/csi-clients/replication"
@@ -106,7 +106,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcile() {
 		"PV protection should be complete")
 	rgName := updatedPV.Annotations[controllers.ReplicationGroup]
 	// Check if RG was created
-	var rg storagev1alpha1.DellCSIReplicationGroup
+	var rg repv1.DellCSIReplicationGroup
 	err = suite.client.Get(context.Background(), types.NamespacedName{Name: rgName}, &rg)
 	suite.NoError(err)
 }
@@ -139,7 +139,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileWithTransientEr
 		"PV protection should be complete")
 	rgName := updatedPV.Annotations[controllers.ReplicationGroup]
 	// Check if RG was created
-	var rg storagev1alpha1.DellCSIReplicationGroup
+	var rg repv1.DellCSIReplicationGroup
 	err = suite.client.Get(context.Background(), types.NamespacedName{Name: rgName}, &rg)
 	suite.NoError(err)
 }
@@ -165,7 +165,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestRGAdd() {
 		"PV protection should be complete")
 	rgName := updatedPV.Annotations[controllers.ReplicationGroup]
 	// Check if RG was created
-	var rg storagev1alpha1.DellCSIReplicationGroup
+	var rg repv1.DellCSIReplicationGroup
 	err = suite.client.Get(context.Background(), types.NamespacedName{Name: rgName}, &rg)
 	suite.NoError(err)
 

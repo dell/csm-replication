@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ package config
 import (
 	"fmt"
 
-	"github.com/dell/csm-replication/api/v1alpha1"
+	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/pkg/connection"
 	fake_client "github.com/dell/csm-replication/test/e2e-framework/fake-client"
 	v1 "k8s.io/api/core/v1"
@@ -104,7 +104,7 @@ func NewFakeConfig(source string, targets ...string) connection.MultiClusterClie
 	}
 	scheme1 := runtime.NewScheme()
 	runtime2.Must(scheme.AddToScheme(scheme1))
-	runtime2.Must(v1alpha1.AddToScheme(scheme1))
+	runtime2.Must(repv1.AddToScheme(scheme1))
 	for _, target := range targets {
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme1).Build()
 		config.clusterClient[target] = &connection.RemoteK8sControllerClient{
@@ -123,7 +123,7 @@ func NewFakeConfigForSingleCluster(selfClient client.Client, source string, targ
 	}
 	scheme1 := runtime.NewScheme()
 	runtime2.Must(scheme.AddToScheme(scheme1))
-	runtime2.Must(v1alpha1.AddToScheme(scheme1))
+	runtime2.Must(repv1.AddToScheme(scheme1))
 	for _, target := range targets {
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme1).Build()
 		config.clusterClient[target] = &connection.RemoteK8sControllerClient{

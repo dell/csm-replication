@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	storagev1alpha1 "github.com/dell/csm-replication/api/v1alpha1"
+	repv1 "github.com/dell/csm-replication/api/v1"
 	controller "github.com/dell/csm-replication/controllers"
 	"github.com/dell/csm-replication/pkg/common"
 	csireplication "github.com/dell/csm-replication/pkg/csi-clients/replication"
@@ -230,7 +230,7 @@ func (r *PersistentVolumeReconciler) createProtectionGroupAndRG(ctx context.Cont
 
 	log.V(common.DebugLevel).Info("Checking if a DellCSIReplicationGroup instance already exists for the ProtectionGroup")
 
-	rgList := new(storagev1alpha1.DellCSIReplicationGroupList)
+	rgList := new(repv1.DellCSIReplicationGroupList)
 	if err = r.List(ctx, rgList, client.MatchingFields{
 		protectionIndexKey: res.GetLocalProtectionGroupId(),
 	}); err != nil {
@@ -238,7 +238,7 @@ func (r *PersistentVolumeReconciler) createProtectionGroupAndRG(ctx context.Cont
 		return "", err
 	}
 
-	var replicationGroup *storagev1alpha1.DellCSIReplicationGroup
+	var replicationGroup *repv1.DellCSIReplicationGroup
 	if len(rgList.Items) == 0 {
 		// DellCSIReplicationGroup instance doesn't exists for the ProtectionGroup;
 		// creating a new one
@@ -256,17 +256,17 @@ func (r *PersistentVolumeReconciler) createProtectionGroupAndRG(ctx context.Cont
 	return replicationGroup.Name, nil
 }
 
-func (r *PersistentVolumeReconciler) createReplicationGroupOnce(ctx context.Context, res *replication.CreateStorageProtectionGroupResponse, remoteClusterID string, remoteRGRetentionPolicy string) (*storagev1alpha1.DellCSIReplicationGroup, error) {
+func (r *PersistentVolumeReconciler) createReplicationGroupOnce(ctx context.Context, res *replication.CreateStorageProtectionGroupResponse, remoteClusterID string, remoteRGRetentionPolicy string) (*repv1.DellCSIReplicationGroup, error) {
 	rgObj, err, _ := r.SingleFlightGroup.Do(res.GetLocalProtectionGroupId(), func() (interface{}, error) {
 		return r.createReplicationGroup(ctx, res, remoteClusterID, remoteRGRetentionPolicy)
 	})
 	if err != nil {
 		return nil, err
 	}
-	return rgObj.(*storagev1alpha1.DellCSIReplicationGroup), nil
+	return rgObj.(*repv1.DellCSIReplicationGroup), nil
 }
 
-func (r *PersistentVolumeReconciler) createReplicationGroup(ctx context.Context, res *replication.CreateStorageProtectionGroupResponse, remoteClusterID string, remoteRGRetentionPolicy string) (*storagev1alpha1.DellCSIReplicationGroup, error) {
+func (r *PersistentVolumeReconciler) createReplicationGroup(ctx context.Context, res *replication.CreateStorageProtectionGroupResponse, remoteClusterID string, remoteRGRetentionPolicy string) (*repv1.DellCSIReplicationGroup, error) {
 	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Creating replication-group")
 
@@ -298,14 +298,14 @@ func (r *PersistentVolumeReconciler) createReplicationGroup(ctx context.Context,
 		annotations[controller.RemoteRGRetentionPolicy] = controller.RemoteRetentionValueRetain
 	}
 
-	replicationGroup := &storagev1alpha1.DellCSIReplicationGroup{
+	replicationGroup := &repv1.DellCSIReplicationGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "rg-" + uuid.New().String(),
 			Finalizers:  []string{controller.ReplicationFinalizer},
 			Annotations: annotations,
 			Labels:      labels,
 		},
-		Spec: storagev1alpha1.DellCSIReplicationGroupSpec{
+		Spec: repv1.DellCSIReplicationGroupSpec{
 			DriverName:                      r.DriverName,
 			ProtectionGroupID:               res.GetLocalProtectionGroupId(),
 			ProtectionGroupAttributes:       res.GetLocalProtectionGroupAttributes(),
@@ -325,8 +325,8 @@ func (r *PersistentVolumeReconciler) createReplicationGroup(ctx context.Context,
 
 // SetupWithManager start using reconciler by creating new controller managed by provided manager
 func (r *PersistentVolumeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, limiter ratelimiter.RateLimiter, maxReconcilers int) error {
-	if err := mgr.GetFieldIndexer().IndexField(ctx, &storagev1alpha1.DellCSIReplicationGroup{}, protectionIndexKey, func(object client.Object) []string {
-		replicationGroup := object.(*storagev1alpha1.DellCSIReplicationGroup)
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &repv1.DellCSIReplicationGroup{}, protectionIndexKey, func(object client.Object) []string {
+		replicationGroup := object.(*repv1.DellCSIReplicationGroup)
 		if replicationGroup.Spec.ProtectionGroupID != "" {
 			return []string{replicationGroup.Spec.ProtectionGroupID}
 		}

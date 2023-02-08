@@ -1,5 +1,5 @@
 /*
-Copyright © 2021 Dell Inc. or its subsidiaries. All Rights Reserved.
+Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/workqueue"
 
-	"github.com/dell/csm-replication/api/v1alpha1"
+	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
 	controller "github.com/dell/csm-replication/controllers/csi-replicator"
 	"github.com/dell/csm-replication/pkg/connection"
@@ -180,7 +180,7 @@ func (suite *ReplicationTestSuite) connectToCluster() {
 		suite.T().Error(err)
 	}
 
-	err = v1alpha1.AddToScheme(scheme.Scheme)
+	err = repv1.AddToScheme(scheme.Scheme)
 
 	// Connecting to host and creating new Kubernetes Client
 	kubeClient, kubeErr := client.New(config, client.Options{Scheme: scheme.Scheme})
@@ -198,7 +198,7 @@ func (suite *ReplicationTestSuite) performAction(action string, expectedState st
 	pvc, err := suite.getLocalPVCFromCluster()
 	assert.NoError(suite.T(), err, "Fetched PVC successfully")
 
-	rg := &v1alpha1.DellCSIReplicationGroup{}
+	rg := &repv1.DellCSIReplicationGroup{}
 	err = suite.realUtils.KubernetesClient.Get(context.Background(), types.NamespacedName{
 		Name: pvc.Annotations[controllers.ReplicationGroup],
 	}, rg)
@@ -212,7 +212,7 @@ func (suite *ReplicationTestSuite) performAction(action string, expectedState st
 	time.Sleep(10 * time.Second)
 
 	//validate the RG for the updated action
-	rg = &v1alpha1.DellCSIReplicationGroup{}
+	rg = &repv1.DellCSIReplicationGroup{}
 	err = suite.realUtils.KubernetesClient.Get(context.Background(), types.NamespacedName{
 		Name: pvc.Annotations[controllers.ReplicationGroup],
 	}, rg)
@@ -242,7 +242,7 @@ func (suite *ReplicationTestSuite) TearDownTestSuite() {
 		assert.NoError(suite.T(), err, "PVC Deleted successfully")
 
 		//Delete RG
-		rg := &v1alpha1.DellCSIReplicationGroup{}
+		rg := &repv1.DellCSIReplicationGroup{}
 		err = suite.realUtils.KubernetesClient.Get(context.Background(), types.NamespacedName{
 			Name: pvc.Annotations[controllers.ReplicationGroup],
 		}, rg)

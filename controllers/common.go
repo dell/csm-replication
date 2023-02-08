@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -17,14 +17,15 @@ package controllers
 import (
 	"context"
 
-	storagev1alpha1 "github.com/dell/csm-replication/api/v1alpha1"
+	"os"
+
+	repv1 "github.com/dell/csm-replication/api/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	"os"
 	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -117,8 +118,8 @@ func IgnoreIfFinalError(err error) error {
 }
 
 // UpdateConditions updates conditions status field by adding last action condition
-func UpdateConditions(rg *storagev1alpha1.DellCSIReplicationGroup, condition storagev1alpha1.LastAction, maxConditions int) {
-	rg.Status.Conditions = append([]storagev1alpha1.LastAction{condition}, rg.Status.Conditions...)
+func UpdateConditions(rg *repv1.DellCSIReplicationGroup, condition repv1.LastAction, maxConditions int) {
+	rg.Status.Conditions = append([]repv1.LastAction{condition}, rg.Status.Conditions...)
 	if len(rg.Status.Conditions) > maxConditions {
 		rg.Status.Conditions = rg.Status.Conditions[:maxConditions]
 	}

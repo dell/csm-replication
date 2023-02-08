@@ -1,5 +1,5 @@
 /*
-Copyright © 2021 Dell Inc. or its subsidiaries. All Rights Reserved.
+Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dell/csm-replication/api/v1alpha1"
+	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
 	constants "github.com/dell/csm-replication/pkg/common"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
@@ -114,7 +114,7 @@ func (suite *ReplicationControllerTestSuite) TestReplicatedRG() {
 	assert.NoError(suite.T(), err, "Fetched local PVC Successfully")
 
 	// Validate Remote RG by fetching it from the remote cluster
-	remoteRg := &v1alpha1.DellCSIReplicationGroup{}
+	remoteRg := &repv1.DellCSIReplicationGroup{}
 	err = suite.realUtils.RemoteKubernetesClient.Get(context.Background(), types.NamespacedName{
 		Name: pvc.Annotations[controllers.ReplicationGroup],
 	}, remoteRg)
@@ -203,7 +203,7 @@ func (suite *ReplicationControllerTestSuite) createLocalRG() error {
 		controllers.RemoteStorageClassAnnotation: suite.driver.StorageClass,
 	}
 
-	newRG := v1alpha1.DellCSIReplicationGroup{
+	newRG := repv1.DellCSIReplicationGroup{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: LocalRg,
@@ -213,7 +213,7 @@ func (suite *ReplicationControllerTestSuite) createLocalRG() error {
 			},
 			Annotations: annotations,
 		},
-		Spec: v1alpha1.DellCSIReplicationGroupSpec{
+		Spec: repv1.DellCSIReplicationGroupSpec{
 			DriverName:                      suite.driver.DriverName,
 			Action:                          "",
 			RemoteClusterID:                 "lglap066",
@@ -239,11 +239,11 @@ func (suite *ReplicationControllerTestSuite) createLocalRG() error {
 		Name: LocalRg,
 	}, &newRG)
 
-	newRG.Status = v1alpha1.DellCSIReplicationGroupStatus{
+	newRG.Status = repv1.DellCSIReplicationGroupStatus{
 		State:                "Created",
 		RemoteState:          "",
-		ReplicationLinkState: v1alpha1.ReplicationLinkState{},
-		LastAction:           v1alpha1.LastAction{},
+		ReplicationLinkState: repv1.ReplicationLinkState{},
+		LastAction:           repv1.LastAction{},
 		Conditions:           nil,
 	}
 	err = suite.realUtils.KubernetesClient.Status().Update(ctx, &newRG)
@@ -301,7 +301,7 @@ func (suite *ReplicationControllerTestSuite) connectToRemoteCluster() {
 		suite.T().Error(err)
 	}
 
-	err = v1alpha1.AddToScheme(scheme.Scheme)
+	err = repv1.AddToScheme(scheme.Scheme)
 
 	// Connecting to host and creating new Kubernetes Client
 	kubeClient, kubeErr := client.New(config, client.Options{Scheme: scheme.Scheme})
@@ -346,7 +346,7 @@ func (suite *ReplicationControllerTestSuite) TearDownTestSuite() {
 		}
 
 		// Clean up local RG
-		rg := new(v1alpha1.DellCSIReplicationGroup)
+		rg := new(repv1.DellCSIReplicationGroup)
 		rg.Name = pvc.Annotations[controllers.ReplicationGroup]
 		err = suite.realUtils.KubernetesClient.Delete(context.Background(), rg)
 		if err != nil {
@@ -360,7 +360,7 @@ func (suite *ReplicationControllerTestSuite) TearDownTestSuite() {
 		}
 
 		// Clean up remote RG
-		remoteRG := new(v1alpha1.DellCSIReplicationGroup)
+		remoteRG := new(repv1.DellCSIReplicationGroup)
 		remoteRG.Name = pvc.Annotations[controllers.ReplicationGroup]
 		err = suite.realUtils.RemoteKubernetesClient.Delete(context.Background(), remoteRG)
 		if err != nil {

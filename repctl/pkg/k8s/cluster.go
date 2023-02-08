@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dell/csm-replication/api/v1alpha1"
+	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/repctl/pkg/display"
 	"github.com/dell/repctl/pkg/metadata"
 	"github.com/dell/repctl/pkg/types"
@@ -98,11 +98,11 @@ type ClusterInterface interface {
 	GetPersistentVolumeClaim(context.Context, string, string) (*v1.PersistentVolumeClaim, error)
 	DeletePersistentVolumeClaim(ctx context.Context, pvc *v1.PersistentVolumeClaim, opts ...client.DeleteOption) error
 
-	GetReplicationGroups(context.Context, string) (*v1alpha1.DellCSIReplicationGroup, error)
-	ListReplicationGroups(context.Context, ...client.ListOption) (*v1alpha1.DellCSIReplicationGroupList, error)
+	GetReplicationGroups(context.Context, string) (*repv1.DellCSIReplicationGroup, error)
+	ListReplicationGroups(context.Context, ...client.ListOption) (*repv1.DellCSIReplicationGroupList, error)
 	FilterReplicationGroups(context.Context, string, string) (*types.RGList, error)
-	PatchReplicationGroup(context.Context, *v1alpha1.DellCSIReplicationGroup, client.Patch) error
-	UpdateReplicationGroup(context.Context, *v1alpha1.DellCSIReplicationGroup) error
+	PatchReplicationGroup(context.Context, *repv1.DellCSIReplicationGroup, client.Patch) error
+	UpdateReplicationGroup(context.Context, *repv1.DellCSIReplicationGroup) error
 
 	CreatePersistentVolumeClaimsFromPVs(context.Context, string, []types.PersistentVolume, string, bool) error
 	CreateObject(context.Context, []byte) (runtime.Object, error)
@@ -159,12 +159,12 @@ func (c *Cluster) SetClient(client ClientInterface) {
 }
 
 // PatchReplicationGroup patches replication group
-func (c *Cluster) PatchReplicationGroup(ctx context.Context, rg *v1alpha1.DellCSIReplicationGroup, patch client.Patch) error {
+func (c *Cluster) PatchReplicationGroup(ctx context.Context, rg *repv1.DellCSIReplicationGroup, patch client.Patch) error {
 	return c.client.Patch(ctx, rg, patch)
 }
 
 // UpdateReplicationGroup updates replication group
-func (c *Cluster) UpdateReplicationGroup(ctx context.Context, rg *v1alpha1.DellCSIReplicationGroup) error {
+func (c *Cluster) UpdateReplicationGroup(ctx context.Context, rg *repv1.DellCSIReplicationGroup) error {
 	return c.client.Update(ctx, rg)
 }
 
@@ -391,7 +391,7 @@ func (c *Cluster) CreatePersistentVolumeClaimsFromPVs(ctx context.Context, names
 func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object, error) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+	utilruntime.Must(repv1.AddToScheme(scheme))
 	utilruntime.Must(apiExtensionsv1.AddToScheme(scheme))
 
 	runtimeObj, _, err := serializer.NewCodecFactory(scheme).UniversalDeserializer().Decode(data, nil, nil)
@@ -533,8 +533,8 @@ func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object
 }
 
 // ListReplicationGroups returns list of all replication group objects that are currently in cluster
-func (c *Cluster) ListReplicationGroups(ctx context.Context, opts ...client.ListOption) (*v1alpha1.DellCSIReplicationGroupList, error) {
-	found := &v1alpha1.DellCSIReplicationGroupList{}
+func (c *Cluster) ListReplicationGroups(ctx context.Context, opts ...client.ListOption) (*repv1.DellCSIReplicationGroupList, error) {
+	found := &repv1.DellCSIReplicationGroupList{}
 	err := c.client.List(ctx, found, opts...)
 	if err != nil {
 		return nil, err
@@ -666,8 +666,8 @@ func CreateCluster(clusterID, kubeconfig string) (ClusterInterface, error) {
 }
 
 // GetReplicationGroups returns replication group object by querying cluster using replication group name
-func (c *Cluster) GetReplicationGroups(ctx context.Context, rgID string) (*v1alpha1.DellCSIReplicationGroup, error) {
-	found := &v1alpha1.DellCSIReplicationGroup{}
+func (c *Cluster) GetReplicationGroups(ctx context.Context, rgID string) (*repv1.DellCSIReplicationGroup, error) {
+	found := &repv1.DellCSIReplicationGroup{}
 	err := c.client.Get(ctx, apiTypes.NamespacedName{Name: rgID}, found)
 	if err != nil {
 		return nil, err

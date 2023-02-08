@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	storagev1alpha1 "github.com/dell/csm-replication/api/v1alpha1"
+	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
 	constants "github.com/dell/csm-replication/pkg/common"
 	csiidentity "github.com/dell/csm-replication/pkg/csi-clients/identity"
@@ -66,7 +66,6 @@ func (suite *RGControllerTestSuite) SetupTest() {
 }
 
 func (suite *RGControllerTestSuite) Init() {
-	//_ = storagev1alpha1.AddToScheme(scheme.Scheme)
 	suite.driver = utils.GetDefaultDriver()
 	suite.client = utils.GetFakeClient()
 	ctx := context.Background()
@@ -114,7 +113,7 @@ func (suite *RGControllerTestSuite) TearDownTest() {
 	suite.T().Log("Cleaning up resources...")
 }
 
-func (suite *RGControllerTestSuite) getLocalRG(name string) storagev1alpha1.DellCSIReplicationGroup {
+func (suite *RGControllerTestSuite) getLocalRG(name string) repv1.DellCSIReplicationGroup {
 	//creating fake replication group
 	if name == "" {
 		name = suite.driver.RGName
@@ -124,7 +123,7 @@ func (suite *RGControllerTestSuite) getLocalRG(name string) storagev1alpha1.Dell
 	return *replicationGroup
 }
 
-func (suite *RGControllerTestSuite) getRemoteRG(name string) storagev1alpha1.DellCSIReplicationGroup {
+func (suite *RGControllerTestSuite) getRemoteRG(name string) repv1.DellCSIReplicationGroup {
 	//creating fake replication group
 	if name == "" {
 		name = suite.driver.RGName
@@ -135,7 +134,7 @@ func (suite *RGControllerTestSuite) getRemoteRG(name string) storagev1alpha1.Del
 }
 
 func (suite *RGControllerTestSuite) createRGInActionInProgressState(name string, actionName string,
-	completed bool, deleteInProgress bool) (*storagev1alpha1.DellCSIReplicationGroup, error) {
+	completed bool, deleteInProgress bool) (*repv1.DellCSIReplicationGroup, error) {
 
 	rg := suite.getLocalRG(name)
 	actionType := ActionType(actionName)
@@ -214,7 +213,7 @@ func (suite *RGControllerTestSuite) TestReconcileWithNoState() {
 	_, err = suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on RG reconcile")
 
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 	err = suite.client.Get(ctx, req.NamespacedName, rg)
 	suite.NoError(err, "No error on RG get")
 	suite.Equal(ReadyState, rg.Status.State, "State should be Ready")
@@ -232,7 +231,7 @@ func (suite *RGControllerTestSuite) TestReconcileWithEmptyPGID() {
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 	_, err = suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.EqualError(err, "missing protection group id")
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 	err = suite.client.Get(ctx, req.NamespacedName, rg)
 	suite.NoError(err, "No error on RG get")
 	suite.Equal(InvalidState, rg.Status.State, "State is set to invalid")
@@ -267,7 +266,7 @@ func (suite *RGControllerTestSuite) TestReconcileWithInvalidStateRepeated() {
 	_, err = suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on RG reconcile")
 
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 	err = suite.client.Get(ctx, req.NamespacedName, rg)
 	suite.NoError(err)
 	suite.Equal(InvalidState, rg.Status.State, "State is still Invalid")
@@ -286,7 +285,7 @@ func (suite *RGControllerTestSuite) TestReconcileWithInvalidStateAfterFix() {
 	_, err = suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on RG reconcile")
 
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 	err = suite.client.Get(ctx, req.NamespacedName, rg)
 	suite.NoError(err)
 	suite.Equal("", rg.Status.State, "State changed to empty")
@@ -309,7 +308,7 @@ func (suite *RGControllerTestSuite) TestDeleteWithInvalidStateAndNoPGID() {
 	suite.NoError(err, "No error on RG reconcile")
 	suite.Equal(res.Requeue, false, "Requeue should be set to false")
 
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 	err = suite.client.Get(ctx, req.NamespacedName, rg)
 	// State should change to deleting
 	suite.Equal(DeletingState, rg.Status.State, "State changed to Deleting")
@@ -329,7 +328,7 @@ func (suite *RGControllerTestSuite) TestDeleteWithNoPGID() {
 	_, err = suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on reconcile")
 
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 	err = suite.client.Get(ctx, req.NamespacedName, rg)
 	suite.NoError(err, "no error on RG get")
 	suite.Equal(DeletingState, rg.Status.State)
@@ -375,7 +374,7 @@ func (suite *RGControllerTestSuite) TestDeleteWithReadyState() {
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 	_, err = suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err)
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 	err = suite.client.Get(ctx, req.NamespacedName, rg)
 	suite.Error(err, "RG object not found")
 }
@@ -404,7 +403,7 @@ func (suite *RGControllerTestSuite) TestDeleteWithErrors() {
 		suite.EqualError(err, errorMsg, "error should match injected error")
 	}
 
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 	err = suite.client.Get(ctx, req.NamespacedName, rg)
 	suite.NoError(err)
 	suite.Equal(DeletingState, rg.Status.State, "State should be set to Deleting")
@@ -440,7 +439,7 @@ func (suite *RGControllerTestSuite) TestDeleteWithPersistentError() {
 		suite.EqualError(err, errorMsg, "error should match injected error")
 	}
 
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 	err = suite.client.Get(ctx, req.NamespacedName, rg)
 	suite.NoError(err)
 	suite.Equal(DeletingState, rg.Status.State, "State should be set to Deleting")
@@ -472,7 +471,7 @@ func (suite *RGControllerTestSuite) TestDeleteWithFinalError() {
 	suite.NoError(err, "no error after a final error")
 	suite.Equal(false, resp.Requeue, "Requeue should not be true")
 
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 	err = suite.client.Get(ctx, req.NamespacedName, rg)
 	suite.NoError(err)
 	suite.Equal(DeletingState, rg.Status.State, "State should be set to Deleting")
@@ -494,14 +493,14 @@ func (suite *RGControllerTestSuite) TestDeleteWithActionInProgress() {
 	suite.Nil(err)
 
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 	err = suite.client.Get(ctx, req.NamespacedName, rg)
 	suite.NoError(err)
 
 	// Reconcile
 	_, err = suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on RG reconcile")
-	var latestRG storagev1alpha1.DellCSIReplicationGroup
+	var latestRG repv1.DellCSIReplicationGroup
 	err = suite.client.Get(context.Background(), req.NamespacedName, &latestRG)
 	suite.NoError(err, "No error on RG Get")
 	// Verify if status is changed to "Ready"
@@ -525,7 +524,7 @@ func (suite *RGControllerTestSuite) TestDeleteWithActionInProgress() {
 	suite.Error(err, "RG not found")
 }
 
-func (suite *RGControllerTestSuite) prettyPrint(rg storagev1alpha1.DellCSIReplicationGroup) {
+func (suite *RGControllerTestSuite) prettyPrint(rg repv1.DellCSIReplicationGroup) {
 	suite.T().Log("RG Name", rg.Name)
 	suite.T().Log("RG Annotations", rg.GetAnnotations())
 	suite.T().Log("RG Labels", rg.GetLabels())
@@ -553,7 +552,7 @@ func (suite *RGControllerTestSuite) TestActionInReadyState() {
 	suite.NoError(err, "No error on RG reconcile")
 
 	// Get the updated RG
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
 	suite.NoError(err, "No error on RG Get")
 
@@ -584,7 +583,7 @@ func (suite *RGControllerTestSuite) TestActionInProgressState() {
 	suite.NoError(err, "No error on RG reconcile")
 
 	// Get the updated RG
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
 	suite.NoError(err, "No error on RG Get")
 
@@ -622,7 +621,7 @@ func (suite *RGControllerTestSuite) TestActionInProgressStateWithSingleError() {
 	suite.EqualError(err, errorMsg)
 
 	// Get the updated RG
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
 	suite.NoError(err, "No error on RG Get")
 
@@ -674,7 +673,7 @@ func (suite *RGControllerTestSuite) TestActionInProgressStateWithContextDeadline
 	suite.EqualError(err, deadlineExceededError.Error())
 
 	// Get the updated RG
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 
 	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
 	suite.NoError(err, "No error on RG Get")
@@ -725,7 +724,7 @@ func (suite *RGControllerTestSuite) TestActionInProgressWithFinalError() {
 	suite.NoError(err)
 
 	// Get the updated RG
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 
 	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
 	suite.NoError(err, "No error on RG Get")
@@ -755,7 +754,7 @@ func (suite *RGControllerTestSuite) TestActionInProgressStateWithPersistentError
 	replicationGroup, err := suite.createRGInActionInProgressState("", actionName, false, false)
 	suite.Nil(err)
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 
 	errorMsg := "can't process request"
 	suite.repClient.InjectErrorClearAfterN(fmt.Errorf("%s", errorMsg), 10)
@@ -773,7 +772,7 @@ func (suite *RGControllerTestSuite) TestActionInProgressStateWithPersistentError
 	_, err = suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on reconcile")
 	// Refresh RG
-	var latestRG storagev1alpha1.DellCSIReplicationGroup
+	var latestRG repv1.DellCSIReplicationGroup
 	err = suite.client.Get(context.TODO(), req.NamespacedName, &latestRG)
 	suite.NoError(err, "No error on RG Get")
 
@@ -813,7 +812,7 @@ func (suite *RGControllerTestSuite) TestActionInProgressStateWithTimeout() {
 	for i := 0; i < 4; i++ {
 		_, err = suite.rgReconcile.Reconcile(context.Background(), req)
 		// Get the updated RG
-		rg := new(storagev1alpha1.DellCSIReplicationGroup)
+		rg := new(repv1.DellCSIReplicationGroup)
 		err = suite.client.Get(context.Background(), req.NamespacedName, rg)
 		suite.NoError(err, "No error on RG Get")
 		var gotAnnotation ActionAnnotation
@@ -865,7 +864,7 @@ func (suite *RGControllerTestSuite) TestActionInProgressWithSuccessfulAction() {
 	suite.NoError(err, "No error on RG reconcile")
 
 	// Get the updated RG
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
 	suite.NoError(err, "No error on RG Get")
 
@@ -886,7 +885,7 @@ func (suite *RGControllerTestSuite) TestActionInProgressWithSuccessfulAction() {
 	suite.Equal(true, conditionPresent(rg.Status.Conditions, actionType.getSuccessfulString()))
 }
 
-func conditionPresent(conditions []storagev1alpha1.LastAction, msg string) bool {
+func conditionPresent(conditions []repv1.LastAction, msg string) bool {
 	found := false
 	for _, condition := range conditions {
 		if strings.Contains(condition.Condition, msg) {
@@ -926,7 +925,7 @@ func (suite *RGControllerTestSuite) TestActionInProgressWithFailedAction() {
 	suite.NoError(err, "No error on RG reconcile")
 
 	// Get the updated RG
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
 	suite.NoError(err, "No error on RG Get")
 
@@ -953,7 +952,7 @@ func (suite *RGControllerTestSuite) TestActionInProgressWithMissingAnnotation() 
 	suite.NoError(err, "No error on RG reconcile")
 
 	// Get the updated RG
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
 	suite.NoError(err, "No error on RG Get")
 
@@ -986,7 +985,7 @@ func (suite *RGControllerTestSuite) TestActionInProgressWithMissingEverything() 
 	suite.NoError(err, "No error on RG reconcile")
 
 	// Get the updated RG
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
 	suite.NoError(err, "No error on RG Get")
 
@@ -1007,7 +1006,7 @@ func (suite *RGControllerTestSuite) TestActionInProgressWithIncorrectAnnotation(
 	suite.NoError(err, "No error on RG reconcile")
 
 	// Get the updated RG
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
 	suite.NoError(err, "No error on RG Get")
 
@@ -1038,7 +1037,7 @@ func (suite *RGControllerTestSuite) TestActionInProgressWithMismatchingAction() 
 	suite.NoError(err, "No error on RG reconcile")
 
 	// Get the updated RG
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
 	suite.NoError(err, "No error on RG Get")
 
@@ -1074,7 +1073,7 @@ func (suite *RGControllerTestSuite) TestActionInErrorStateWithContextDeadlineErr
 	suite.NoError(err)
 
 	// Get the updated RG
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 
 	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
 	suite.NoError(err, "No error on RG Get")
@@ -1164,7 +1163,7 @@ func (suite *RGControllerTestSuite) TestInvalidAction() {
 	suite.Nil(err, "RG Reconcile shouldn't fail")
 
 	// Get the updated RG
-	rg := new(storagev1alpha1.DellCSIReplicationGroup)
+	rg := new(repv1.DellCSIReplicationGroup)
 	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
 	suite.NoError(err, "No error on RG Get")
 	suite.Equal(ReadyState, rg.Status.State, "State is still Ready")

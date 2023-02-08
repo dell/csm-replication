@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -19,9 +19,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dell/csm-replication/api/v1alpha1"
 	log "github.com/sirupsen/logrus"
 
+	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/repctl/pkg/config"
 	"github.com/dell/repctl/pkg/k8s"
 	"github.com/spf13/cobra"
@@ -109,7 +109,7 @@ func getSupportedMaintenanceAction(action string) (string, error) {
 
 // GetRGAndClusterFromRGID returns a ClusterInterface and DellCSIReplicationGroup given the rgID
 // filter can be used to fetch a source, a target
-func GetRGAndClusterFromRGID(configFolder, rgID, filter string) (k8s.ClusterInterface, *v1alpha1.DellCSIReplicationGroup, error) {
+func GetRGAndClusterFromRGID(configFolder, rgID, filter string) (k8s.ClusterInterface, *repv1.DellCSIReplicationGroup, error) {
 	mc := &k8s.MultiClusterConfigurator{}
 	clusters, err := mc.GetAllClusters([]string{}, configFolder)
 	if err != nil {

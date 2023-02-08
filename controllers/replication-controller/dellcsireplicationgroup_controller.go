@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 
 	"github.com/dell/csm-replication/pkg/common"
 
-	storagev1alpha1 "github.com/dell/csm-replication/api/v1alpha1"
+	repv1 "github.com/dell/csm-replication/api/v1"
 	controller "github.com/dell/csm-replication/controllers"
 	"github.com/dell/csm-replication/pkg/connection"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -63,7 +63,7 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	log := r.Log.WithValues("dellcsireplicationgroup", req.Name)
 	ctx = context.WithValue(ctx, common.LoggerContextKey, log)
 
-	localRG := new(storagev1alpha1.DellCSIReplicationGroup)
+	localRG := new(repv1.DellCSIReplicationGroup)
 	err := r.Get(ctx, req.NamespacedName, localRG)
 	if err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -119,13 +119,13 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 	}
 
-	remoteRG := &storagev1alpha1.DellCSIReplicationGroup{
+	remoteRG := &repv1.DellCSIReplicationGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        remoteRGName,
 			Annotations: annotations,
 			Labels:      labels,
 		},
-		Spec: storagev1alpha1.DellCSIReplicationGroupSpec{
+		Spec: repv1.DellCSIReplicationGroupSpec{
 			DriverName:                      localRG.Spec.DriverName,
 			Action:                          "",
 			RemoteClusterID:                 localClusterID,
@@ -308,7 +308,7 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 // SetupWithManager start using reconciler by creating new controller managed by provided manager
 func (r *ReplicationGroupReconciler) SetupWithManager(mgr ctrl.Manager, limiter ratelimiter.RateLimiter, maxReconcilers int) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&storagev1alpha1.DellCSIReplicationGroup{}).
+		For(&repv1.DellCSIReplicationGroup{}).
 		WithOptions(reconcile.Options{
 			RateLimiter:             limiter,
 			MaxConcurrentReconciles: maxReconcilers,

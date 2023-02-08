@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ import (
 
 	controller "github.com/dell/csm-replication/controllers/csi-replicator"
 
-	storagev1alpha1 "github.com/dell/csm-replication/api/v1alpha1"
+	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/core"
 	"github.com/dell/csm-replication/pkg/connection"
 	csiidentity "github.com/dell/csm-replication/pkg/csi-clients/identity"
@@ -64,7 +64,7 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(storagev1alpha1.AddToScheme(scheme))
+	utilruntime.Must(repv1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 

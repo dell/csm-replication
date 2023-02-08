@@ -1,5 +1,5 @@
 /*
-Copyright © 2021 Dell Inc. or its subsidiaries. All Rights Reserved.
+Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -52,7 +53,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/dell/csm-replication/api/v1alpha1"
 	"github.com/dell/csm-replication/controllers"
 	controller "github.com/dell/csm-replication/controllers/csi-replicator"
 	"github.com/dell/csm-replication/pkg/common"
@@ -171,7 +171,7 @@ func (ss *SidecarTestSuite) registerSchemes() error {
 	if err != nil {
 		return err
 	}
-	return v1alpha1.AddToScheme(scheme)
+	return repv1.AddToScheme(scheme)
 }
 
 func (ss *SidecarTestSuite) createCSIConnection() error {
