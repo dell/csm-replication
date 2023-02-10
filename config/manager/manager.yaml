@@ -18,7 +18,7 @@ spec:
       initContainers:
       - name: init-rg-migration
         imagePullPolicy: Always
-        image: dellemc/dell-replication-init:v1.0
+        image: dellemc/dell-replication-init:v1.0.0
         command:
         - /upgrade/migrate_rg.sh
       containers:
