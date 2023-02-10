@@ -317,13 +317,13 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 }
 
 func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
-	if group.Status.LastAction.ErrorMessage != "" {
-		return fmt.Errorf("error in processing the last action")
-	}
-
 	if len(group.Status.Conditions) == 0 || group.Status.LastAction.Time == nil {
 		log.V(common.InfoLevel).Info("No action to process")
 		return nil
+	}
+
+	if group.Status.LastAction.ErrorMessage != "" {
+		return fmt.Errorf("last action failed: %s", group.Status.LastAction.Condition)
 	}
 
 	if strings.Contains(group.Status.LastAction.Condition, "CREATE_SNAPSHOT") {
@@ -338,15 +338,17 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 	lastTime := lastAction.Time
 	currTime := time.Now()
 	diffTime := currTime.Sub(lastTime.Time).Seconds()
+	thresholdSeconds := float64(30)
 
-	if diffTime > 30 {
-		log.V(common.InfoLevel).Info("LastAction executed greater than the threshold")
+	if diffTime > thresholdSeconds {
+		log.V(common.InfoLevel).Info("Last Create Snapshot action processed greater than the threshold %f seconds", thresholdSeconds)
 		return nil
 	}
 
 	val, ok := group.Annotations[csireplicator.Action]
 	if !ok {
 		log.V(common.InfoLevel).Info("No action", "val", val)
+		return nil
 	}
 
 	var actionAnnotation csireplicator.ActionAnnotation
