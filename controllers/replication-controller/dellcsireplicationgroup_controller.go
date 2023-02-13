@@ -326,24 +326,31 @@ func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context
 		return fmt.Errorf("last action failed: %s", group.Status.LastAction.Condition)
 	}
 
-	if strings.Contains(group.Status.LastAction.Condition, "CREATE_SNAPSHOT") {
-		return r.processSnapshotEvent(ctx, group, remoteClient, log)
+	val, ok := group.Annotations[controller.ActionProcessedTime]
+	if !ok {
+		log.V(common.InfoLevel).Info("Action Processed does not exist.")
+		return nil
 	}
 
-	return nil
+	if val == group.Status.LastAction.Time.GoString() {
+		log.V(common.InfoLevel).Info("Last action has already been processed")
+		return nil
+	}
+
+	if strings.Contains(group.Status.LastAction.Condition, "CREATE_SNAPSHOT") {
+		if err := r.processSnapshotEvent(ctx, group, remoteClient, log); err != nil {
+			return err
+		}
+	}
+
+	// Informing the RG that the last action has been processed.
+	controller.AddAnnotation(group, controller.ActionProcessedTime, group.Status.LastAction.Time.GoString())
+
+	return r.Update(ctx, group)
 }
 
 func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
 	lastAction := group.Status.LastAction
-	lastTime := lastAction.Time
-	currTime := time.Now()
-	diffTime := currTime.Sub(lastTime.Time).Seconds()
-	thresholdSeconds := float64(30)
-
-	if diffTime > thresholdSeconds {
-		log.V(common.InfoLevel).Info("Last Create Snapshot action processed greater than the threshold %f seconds", thresholdSeconds)
-		return nil
-	}
 
 	val, ok := group.Annotations[csireplicator.Action]
 	if !ok {

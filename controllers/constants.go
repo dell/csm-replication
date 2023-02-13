@@ -118,4 +118,6 @@ const (
 	snapshotClass = "/snapshotClass"
 	// Indicates the snapshot namespace to use when performing a remote snapshot.
 	snapshotNamespace = "/snapshotNamespace"
+	// Indicates the time which the last action was processed.
+	actionProcessedTime = "/actionProcessedTime"
 )

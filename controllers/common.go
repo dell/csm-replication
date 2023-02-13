@@ -222,6 +222,8 @@ var (
 	SnapshotClass string
 	// SnapshotNamespace name of the target namespace to create snapshots in.
 	SnapshotNamespace string
+	// ActionProcessedTime indicates when the last action was proccessed by the controller (if needed).
+	ActionProcessedTime string
 )
 
 // InitLabelsAndAnnotations initializes package visible constants by using customizable domain variable
@@ -257,4 +259,5 @@ func InitLabelsAndAnnotations(domain string) {
 	CreatedByMigrator = domain + createdByMigrator
 	SnapshotClass = domain + snapshotClass
 	SnapshotNamespace = domain + snapshotNamespace
+	ActionProcessedTime = domain + actionProcessedTime
 }

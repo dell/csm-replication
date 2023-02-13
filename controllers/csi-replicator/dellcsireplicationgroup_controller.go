@@ -152,6 +152,10 @@ func updateRGSpecWithActionResult(ctx context.Context, rg *repv1.DellCSIReplicat
 
 		log.V(common.InfoLevel).Info("RG was successfully updated with", "Action Result", result)
 
+		log.V(common.InfoLevel).Info("Resetting the action processed time annotation.")
+		// Indicates that the action needs to be processed by the controller.
+		controllers.AddAnnotation(rg, controllers.ActionProcessedTime, "")
+
 		isUpdated = true
 		return isUpdated
 	}
@@ -639,6 +643,7 @@ func (r *ReplicationGroupReconciler) executeAction(ctx context.Context, rg *repv
 			}
 		}
 	}
+
 	return &actionResult
 }
 
