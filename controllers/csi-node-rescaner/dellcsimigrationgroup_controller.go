@@ -44,6 +44,8 @@ const (
 	MigratedState = "Migrated"
 	// MaxRetryDurationForActions maximum amount of time between retries of failed action
 	MaxRetryDurationForActions = 1 * time.Hour
+	// NodeLabelFilter is filter to get all pmax nodes
+	NodeLabelFilter = "powermax-node"
 )
 
 type ActionType string
@@ -92,14 +94,13 @@ func (r *NodeRescanReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 }
 
-//Update mg spec with current state
+// Update mg spec with current state
 func (r *NodeRescanReconciler) processMGForRescan(ctx context.Context, mg *storagev1alpha1.DellCSIMigrationGroup) (ctrl.Result, error) {
 	// Get self POD details
 	// Get all Node Pods in driver's namespace
 	podList := &corev1.PodList{}
-	label := strings.Replace(mg.Spec.DriverName, "csi-", "", 1) + "-node"
 	opts := []client.ListOption{
-		client.MatchingLabels{"app": label},
+		client.MatchingLabels{"app": NodeLabelFilter},
 	}
 	err := r.Client.List(ctx, podList, opts...)
 	if err != nil && errors.IsNotFound(err) {
@@ -137,7 +138,7 @@ func (r *NodeRescanReconciler) processMGForRescan(ctx context.Context, mg *stora
 	return ctrl.Result{}, err
 }
 
-//Update mg spec with current state
+// Update mg spec with current state
 func (r *NodeRescanReconciler) processMGinDeletingState(ctx context.Context, mg *storagev1alpha1.DellCSIMigrationGroup) (ctrl.Result, error) {
 	// Get self POD details
 	// Get all Node Pods in driver's namespace

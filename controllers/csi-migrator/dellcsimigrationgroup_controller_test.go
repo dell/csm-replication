@@ -94,7 +94,7 @@ func (suite *MGControllerTestSuite) TearDownTest() {
 	suite.T().Log("Cleaning up resources...")
 }
 
-//MG with ReadyState
+// MG with ReadyState
 func (suite *MGControllerTestSuite) TestMGReconcileWithReadyState() {
 	mg1 := &storagev1alpha1.DellCSIMigrationGroup{
 		ObjectMeta: metav1.ObjectMeta{Name: "mg1"},
@@ -125,7 +125,7 @@ func (suite *MGControllerTestSuite) TestMGReconcileWithReadyState() {
 	suite.Equal(ReadyState, mg.Status.LastAction, "State should be Ready")
 }
 
-//MG with MigratedState
+// MG with MigratedState
 func (suite *MGControllerTestSuite) TestMGReconcileWithMigratedState() {
 	mg1 := &storagev1alpha1.DellCSIMigrationGroup{
 		ObjectMeta: metav1.ObjectMeta{Name: "mg1"},
@@ -156,7 +156,7 @@ func (suite *MGControllerTestSuite) TestMGReconcileWithMigratedState() {
 
 }
 
-//MG with CommitReadyState
+// MG with CommitReadyState
 func (suite *MGControllerTestSuite) TestMGReconcileWithCommitReadyState() {
 	mg1 := &storagev1alpha1.DellCSIMigrationGroup{
 		ObjectMeta: metav1.ObjectMeta{Name: "mg1"},
@@ -188,7 +188,7 @@ func (suite *MGControllerTestSuite) TestMGReconcileWithCommitReadyState() {
 
 }
 
-//MG with CommittedState
+// MG with CommittedState
 func (suite *MGControllerTestSuite) TestMGReconcileWithCommittedState() {
 	mg1 := &storagev1alpha1.DellCSIMigrationGroup{
 		ObjectMeta: metav1.ObjectMeta{Name: "mg1"},
@@ -219,7 +219,7 @@ func (suite *MGControllerTestSuite) TestMGReconcileWithCommittedState() {
 	suite.Equal(CommittedState, mg.Status.LastAction, "State should be Ready")
 }
 
-//MG with DeletingState
+// MG with DeletingState
 func (suite *MGControllerTestSuite) TestMGReconcileWithDeletingState() {
 	mg1 := &storagev1alpha1.DellCSIMigrationGroup{
 		ObjectMeta: metav1.ObjectMeta{Name: "mg1"},
@@ -248,7 +248,7 @@ func (suite *MGControllerTestSuite) TestMGReconcileWithDeletingState() {
 	suite.NoError(err, "No error on MG get")
 }
 
-//MG with ErrorState
+// MG with ErrorState
 func (suite *MGControllerTestSuite) TestMGReconcileWithErrorState() {
 	mg1 := &storagev1alpha1.DellCSIMigrationGroup{
 		ObjectMeta: metav1.ObjectMeta{Name: "mg1"},
@@ -281,7 +281,7 @@ func (suite *MGControllerTestSuite) TestMGReconcileWithErrorState() {
 	suite.Equal(MigratedState, mg.Status.State, "State should be Ready")
 }
 
-//MG with ErrorState
+// MG with ErrorState
 func (suite *MGControllerTestSuite) TestMGReconcileWithErrorState_fromReady() {
 	mg1 := &storagev1alpha1.DellCSIMigrationGroup{
 		ObjectMeta: metav1.ObjectMeta{Name: "mg1"},
@@ -314,7 +314,7 @@ func (suite *MGControllerTestSuite) TestMGReconcileWithErrorState_fromReady() {
 	suite.Equal(MigratedState, mg.Status.State, "State should be Ready")
 }
 
-//MG with ErrorState
+// MG with ErrorState
 func (suite *MGControllerTestSuite) TestMGReconcileWithErrorState_fromMigrated() {
 	mg1 := &storagev1alpha1.DellCSIMigrationGroup{
 		ObjectMeta: metav1.ObjectMeta{Name: "mg1"},
@@ -347,7 +347,7 @@ func (suite *MGControllerTestSuite) TestMGReconcileWithErrorState_fromMigrated()
 	suite.Equal(CommitReadyState, mg.Status.State, "State should be Ready")
 }
 
-//MG with ErrorState
+// MG with ErrorState
 func (suite *MGControllerTestSuite) TestMGReconcileWithErrorState_fromCommitReady() {
 	mg1 := &storagev1alpha1.DellCSIMigrationGroup{
 		ObjectMeta: metav1.ObjectMeta{Name: "mg1"},
@@ -380,7 +380,7 @@ func (suite *MGControllerTestSuite) TestMGReconcileWithErrorState_fromCommitRead
 	suite.Equal(CommittedState, mg.Status.State, "State should be Ready")
 }
 
-//MG with ErrorState
+// MG with ErrorState
 func (suite *MGControllerTestSuite) TestMGReconcileWithErrorState_fromCommitted() {
 	mg1 := &storagev1alpha1.DellCSIMigrationGroup{
 		ObjectMeta: metav1.ObjectMeta{Name: "mg1"},
@@ -413,7 +413,7 @@ func (suite *MGControllerTestSuite) TestMGReconcileWithErrorState_fromCommitted(
 	suite.Equal(DeletingState, mg.Status.State, "State should be Ready")
 }
 
-//MG with InvalidState
+// MG with InvalidState
 func (suite *MGControllerTestSuite) TestMGReconcileWithInvalidState() {
 	mg1 := &storagev1alpha1.DellCSIMigrationGroup{
 		ObjectMeta: metav1.ObjectMeta{Name: "mg1"},

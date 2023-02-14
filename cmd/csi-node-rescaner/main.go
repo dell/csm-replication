@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -98,11 +98,11 @@ func (mgr *NodeRescanner) setupConfigMapWatcher(loggerConfig *logrus.Logger) {
 func createNodeReScannerManager(ctx context.Context, mgr ctrl.Manager) (*NodeRescanner, error) {
 	opts := config.GetControllerManagerOpts()
 	opts.Mode = "sidecar"
-	mgrLogger := mgr.GetLogger()
-	repConfig, err := config.GetConfig(ctx, nil, opts, nil, mgrLogger)
-	if err != nil {
-		return nil, err
-	}
+	//mgrLogger := mgr.GetLogger()
+	//repConfig, err := config.GetConfig(ctx, nil, opts, nil, mgrLogger)
+	//if err != nil {
+	//	return nil, err
+	//}
 	nodeName, found := os.LookupEnv(common.EnvNodeName)
 	if !found {
 		logrus.Warning("Node name not found")
@@ -111,7 +111,6 @@ func createNodeReScannerManager(ctx context.Context, mgr ctrl.Manager) (*NodeRes
 	controllerManager := NodeRescanner{
 		Opts:     opts,
 		Manager:  mgr,
-		config:   repConfig,
 		NodeName: nodeName,
 	}
 	return &controllerManager, nil
@@ -211,11 +210,12 @@ func main() {
 		setupLog.Error(err, "failed to configure the node re-rescanner manager")
 		os.Exit(1)
 	}
+	log.Printf("Rescan manager configured: (+%v)", rescanMgr)
 	// Start the watch on configmap
-	rescanMgr.setupConfigMapWatcher(logrusLog)
+	//rescanMgr.setupConfigMapWatcher(logrusLog)
 
 	// Process the config. Get initial log level
-	level, err := common.ParseLevel(rescanMgr.config.LogLevel)
+	level, err := common.ParseLevel("debug")
 	if err != nil {
 		log.Println("Unable to parse ", err)
 	}

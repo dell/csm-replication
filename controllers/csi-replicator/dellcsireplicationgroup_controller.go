@@ -607,9 +607,9 @@ func (r *ReplicationGroupReconciler) executeAction(ctx context.Context, rg *stor
 // If action is not empty -
 // If it is Invalid       - Reset it to empty, raise an event & finish the Reconcile
 // If it is Valid         - Remove any old LastSuccessful annotation
-//                        - Add an ActionInProgress annotation
-//                        - Update the spec
-//                        - Update status.State to <ACTION>_IN_PROGRESS
+//   - Add an ActionInProgress annotation
+//   - Update the spec
+//   - Update status.State to <ACTION>_IN_PROGRESS
 func (r *ReplicationGroupReconciler) processRG(ctx context.Context, dellCSIReplicationGroup *storagev1alpha1.DellCSIReplicationGroup) (ctrl.Result, error) {
 	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Start process RG")

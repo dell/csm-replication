@@ -35,7 +35,6 @@ import (
 	csimigration "github.com/dell/csm-replication/pkg/csi-clients/migration"
 	migration "github.com/dell/dell-csi-extensions/migration"
 	"github.com/go-logr/logr"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -67,6 +66,8 @@ const (
 	SymmetrixIDParam = "SYMID"
 	// RemoteSymIDParam key for storing remote arrayID
 	RemoteSymIDParam = "RemoteSYMID"
+	// NodeLabelFilter is filter to get all pmax nodes
+	NodeLabelFilter = "powermax-node"
 )
 
 type ActionType string
@@ -119,11 +120,14 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if !mg.DeletionTimestamp.IsZero() && strings.Contains(currentState, DeletingState) {
 		return r.processMGForDeletion(ctx, mg.DeepCopy())
 	}
+	if !mg.DeletionTimestamp.IsZero() {
+		//If MG in migrating state; TODO - cancel migration state
+		err := fmt.Errorf("MG is not ready for deletion; If you want to cancel migration, please follow manual steps")
+		return ctrl.Result{}, err
+	}
 
-	var NodeRescan bool //Defining a flag to call the node rescan call
 	var NextState, NextAnnotationAction string
 	var ArrayMigrationAction migration.ActionTypes
-	NodeRescan = false
 	switch currentState {
 	case NoState:
 		log.V(common.InfoLevel).Info("Processing MG with no state")
@@ -140,7 +144,6 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		NextState = MigratedState
 		NextAnnotationAction = "Migrate"
 	case MigratedState:
-		NodeRescan = true
 		NextState = CommitReadyState
 		NextAnnotationAction = "NodeRescan"
 	case CommitReadyState:
@@ -157,14 +160,13 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, fmt.Errorf("Unknown state")
 	}
 
-	if NodeRescan {
+	if NextAnnotationAction == "NodeRescan" {
 		// Wait for rescan on all nodes
 		if !NodesToRescan.AllSynced {
 			// Get all Node Pods in driver's namespace
 			podList := &corev1.PodList{}
-			label := strings.Replace(mg.Spec.DriverName, "csi-", "", 1) + "-node"
 			opts := []client.ListOption{
-				client.MatchingLabels{"app": label},
+				client.MatchingLabels{"app": NodeLabelFilter},
 			}
 			err = r.Client.List(ctx, podList, opts...)
 			if err != nil && errors.IsNotFound(err) {
@@ -187,6 +189,9 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 		// Check if all node rescanned
 		if !NodesToRescan.AllSynced {
+			if err := r.updateMGOnError(ctx, mg.DeepCopy(), currentState, NextAnnotationAction); err != nil {
+				return ctrl.Result{}, err
+			}
 			err := fmt.Errorf("few nodes awaiting rescan")
 			return ctrl.Result{}, err
 		}
@@ -208,17 +213,12 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 
 		ArrayMigrateResponse, err := r.MigrationClient.ArrayMigrate(ctx, ArrayMigrateReq, ArrayMigrateReqParams)
-		mg.Status.LastAction = currentState
 		CurrentAction := ArrayMigrateResponse.GetAction()
-		if err != nil {
-			r.EventRecorder.Eventf(mg, v1.EventTypeWarning, "Error",
-				"Action [%s] on DellCSIMigrationGroup [%s] failed with error [%s] ",
-				CurrentAction.String(), mg.Name, err)
-			NextState = ErrorState
-			if err := r.updateMGSpecWithState(ctx, mg.DeepCopy(), NextState); err != nil {
+
+		if (err != nil) || (!ArrayMigrateResponse.GetSuccess()) {
+			if err := r.updateMGOnError(ctx, mg.DeepCopy(), currentState, NextAnnotationAction); err != nil {
 				return ctrl.Result{}, err
 			}
-			return ctrl.Result{}, err
 		}
 
 		if ArrayMigrateResponse.GetSuccess() {
@@ -245,7 +245,7 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	return ctrl.Result{}, err
 }
 
-//Getting MG to its first valid state
+// Getting MG to its first valid state
 func (r *MigrationGroupReconciler) processMGInNoState(ctx context.Context, dellCSIMigrationGroup *storagev1alpha1.DellCSIMigrationGroup) (ctrl.Result, error) {
 	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Processing MG in NoState")
@@ -262,7 +262,7 @@ func (r *MigrationGroupReconciler) processMGInNoState(ctx context.Context, dellC
 	return ctrl.Result{}, nil
 }
 
-//Update mg spec with current state
+// Update mg spec with current state
 func (r *MigrationGroupReconciler) updateMGSpecWithState(ctx context.Context, mg *storagev1alpha1.DellCSIMigrationGroup, NextState string) error {
 	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Begin updating MG spec with", "State", NextState)
@@ -275,14 +275,30 @@ func (r *MigrationGroupReconciler) updateMGSpecWithState(ctx context.Context, mg
 	return nil
 }
 
-//Update mg with annotation
-func (r *MigrationGroupReconciler) updateMGSpecWithActionResult(ctx context.Context, mg *storagev1alpha1.DellCSIMigrationGroup, NextState string) bool {
+// Update mg on error
+func (r *MigrationGroupReconciler) updateMGOnError(ctx context.Context, mg *storagev1alpha1.DellCSIMigrationGroup, currentState string, CurrentAction string) error {
 	log := common.GetLoggerFromContext(ctx)
-	log.V(common.InfoLevel).Info("Begin updating MG status with", "Annotation", NextState)
+	log.V(common.InfoLevel).Info("Begin updating MG status with", "ErrorState", ErrorState)
+	mg.Status.LastAction = currentState
+	/*
+		r.EventRecorder.Eventf(mg, v1.EventTypeWarning, "Error",
+			"Action [%s] on DellCSIMigrationGroup [%s] failed with error ",
+			CurrentAction, mg.Name)
+	*/
+	if err := r.updateMGSpecWithState(ctx, mg.DeepCopy(), ErrorState); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Update mg with annotation
+func (r *MigrationGroupReconciler) updateMGSpecWithActionResult(ctx context.Context, mg *storagev1alpha1.DellCSIMigrationGroup, NextAnnotation string) bool {
+	log := common.GetLoggerFromContext(ctx)
+	log.V(common.InfoLevel).Info("Begin updating MG status with", "Annotation", NextAnnotation)
 
 	isUpdated := false
 	actionAnnotation := ActionAnnotation{
-		ActionName: NextState,
+		ActionName: NextAnnotation,
 	}
 	bytes, _ := json.Marshal(&actionAnnotation)
 	controllers.AddAnnotation(mg, ArrayMigrationState, string(bytes))
@@ -292,7 +308,7 @@ func (r *MigrationGroupReconciler) updateMGSpecWithActionResult(ctx context.Cont
 		log.Error(err, "Failed to update", "annotation", string(bytes))
 		return isUpdated
 	}
-	log.V(common.InfoLevel).Info("MG was successfully updated with", "Action Result", NextState)
+	log.V(common.InfoLevel).Info("MG was successfully updated with", "Action Result", NextAnnotation)
 
 	isUpdated = true
 	return isUpdated
@@ -312,7 +328,7 @@ func (r *MigrationGroupReconciler) SetupWithManager(mgr ctrl.Manager, limiter ra
 		Complete(r)
 }
 
-//Function to add a Finalizer to MG
+// Function to add a Finalizer to MG
 func (r *MigrationGroupReconciler) addFinalizer(ctx context.Context, mg *storagev1alpha1.DellCSIMigrationGroup) (bool, error) {
 	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Adding finalizer")
@@ -328,7 +344,7 @@ func (r *MigrationGroupReconciler) addFinalizer(ctx context.Context, mg *storage
 	return ok, nil
 }
 
-//processing for deletion
+// processing for deletion
 func (r *MigrationGroupReconciler) processMGForDeletion(ctx context.Context, dellCSIMigrationGroup *storagev1alpha1.DellCSIMigrationGroup) (ctrl.Result, error) {
 	//log := common.GetLoggerFromContext(ctx)
 
