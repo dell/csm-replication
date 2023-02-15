@@ -34,8 +34,7 @@ func GetSnapshotCommand() *cobra.Command {
 For single cluster config:
 ./repctl --rg <rg-id> --sn-namespace <namespace> --sn-class <snapshot class> snapshot`,
 		Long: `
-This command will perform a snapshot at specified cluster or at the RG.\n
-Note: More information to be added.`,
+This command will create a snapshot for the specified RG on the target cluster.\n`,
 		Run: func(cmd *cobra.Command, args []string) {
 			rgName := viper.GetString(config.ReplicationGroup)
 			inputCluster := viper.GetString("target")
