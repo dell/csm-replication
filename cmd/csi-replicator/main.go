@@ -50,7 +50,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -233,9 +232,8 @@ func main() {
 	logrusLog.SetLevel(level)
 
 	// Get the kube-system content
-	er := mgr.GetEventRecorderFor(common.DellReplicationController)
 	var clusterUID string
-	ns, err := getClusterUID(ctx, er)
+	ns, err := getClusterUID(ctx)
 	if err != nil {
 		log.Println("getClusterUuid error: ", err.Error())
 	} else {
@@ -316,7 +314,7 @@ func main() {
 
 }
 
-func getClusterUID(ctx context.Context, recorder record.EventRecorder) (*v1.Namespace, error) {
+func getClusterUID(ctx context.Context) (*v1.Namespace, error) {
 	client, err := connection.GetControllerClient(nil, scheme)
 	if err != nil {
 		return nil, err
