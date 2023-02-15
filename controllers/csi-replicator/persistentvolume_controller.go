@@ -220,7 +220,7 @@ func (r *PersistentVolumeReconciler) processVolumeForReplicationGroup(ctx contex
 
 func (r *PersistentVolumeReconciler) createProtectionGroupAndRG(ctx context.Context, volumeHandle string, scParams map[string]string) (string, error) {
 	log := common.GetLoggerFromContext(ctx)
-	log.V(common.InfoLevel).Info("Creating protection-group anf RG")
+	log.V(common.InfoLevel).Info("Creating protection-group and RG")
 
 	res, err := r.ReplicationClient.CreateStorageProtectionGroup(ctx, volumeHandle, scParams)
 	if err != nil {
