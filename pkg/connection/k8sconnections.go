@@ -287,12 +287,12 @@ func (c *RemoteK8sControllerClient) GetSnapshotClass(ctx context.Context, snapCl
 	return found, nil
 }
 
-// CreateNamespace creates a desired namespace on the remote cluster
+// CreateNamespace creates a desired namespace on the remote cluster.
 func (c *RemoteK8sControllerClient) CreateNamespace(ctx context.Context, content *corev1.Namespace) error {
 	return c.Client.Create(ctx, content)
 }
 
-// GetNamespace creates a desired namespace on the remote cluster
+// GetNamespace returns the desired namespace from the remote cluster.
 func (c *RemoteK8sControllerClient) GetNamespace(ctx context.Context, namespace string) (*corev1.Namespace, error) {
 	found := &corev1.Namespace{}
 
