@@ -21,6 +21,7 @@ import (
 	"sync"
 
 	"github.com/dell/csm-replication/pkg/common"
+	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/go-logr/logr"
@@ -89,6 +90,7 @@ func (k8sConnHandler *RemoteK8sConnHandler) getControllerClient(clusterID string
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(repv1.AddToScheme(scheme))
 	utilruntime.Must(apiExtensionsv1.AddToScheme(scheme))
+	utilruntime.Must(s1.AddToScheme(scheme))
 	if clientConfig, ok := k8sConnHandler.configs[clusterID]; ok {
 		client, err := GetControllerClient(clientConfig, scheme)
 		//client, err := ctrlClient.New(clientConfig, ctrlClient.Options{Scheme: scheme})
@@ -262,6 +264,26 @@ func (c *RemoteK8sControllerClient) GetPersistentVolumeClaim(ctx context.Context
 // UpdatePersistentVolumeClaim updates persistent volume claim object in current cluster
 func (c *RemoteK8sControllerClient) UpdatePersistentVolumeClaim(ctx context.Context, claim *corev1.PersistentVolumeClaim) error {
 	return c.Client.Update(ctx, claim)
+}
+
+// CreateSnapshotContent creates the snapshot content on the remote cluster
+func (c *RemoteK8sControllerClient) CreateSnapshotContent(ctx context.Context, content *s1.VolumeSnapshotContent) error {
+	return c.Client.Create(ctx, content)
+}
+
+// CreateSnapshotObject creates the snapshot on the remote cluster
+func (c *RemoteK8sControllerClient) CreateSnapshotObject(ctx context.Context, content *s1.VolumeSnapshot) error {
+	return c.Client.Create(ctx, content)
+}
+
+// GetSnapshotClass returns snapshot class object by querying cluster using snapshot class name.
+func (c *RemoteK8sControllerClient) GetSnapshotClass(ctx context.Context, snapClassName string) (*s1.VolumeSnapshotClass, error) {
+	found := &s1.VolumeSnapshotClass{}
+	err := c.Client.Get(ctx, types.NamespacedName{Name: snapClassName}, found)
+	if err != nil {
+		return nil, err
+	}
+	return found, nil
 }
 
 // GetControllerClient - Returns a controller client which reads and writes directly to API server

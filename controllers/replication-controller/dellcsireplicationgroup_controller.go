@@ -16,15 +16,20 @@ package replicationcontroller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
+	csireplicator "github.com/dell/csm-replication/controllers/csi-replicator"
 	"github.com/dell/csm-replication/pkg/common"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	controller "github.com/dell/csm-replication/controllers"
 	"github.com/dell/csm-replication/pkg/connection"
+	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	reconcile "sigs.k8s.io/controller-runtime/pkg/controller"
@@ -301,8 +306,148 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
+	err = r.processLastActionResult(ctx, localRG, remoteClient, log)
+	if err != nil {
+		r.EventRecorder.Eventf(localRG, eventTypeWarning, eventReasonUpdated,
+			"failed to process the last action %s", localRG.Status.LastAction.Condition)
+	}
+
 	log.V(common.InfoLevel).Info("RG has already been synced to the remote cluster")
 	return ctrl.Result{}, nil
+}
+
+func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
+	if len(group.Status.Conditions) == 0 || group.Status.LastAction.Time == nil {
+		log.V(common.InfoLevel).Info("No action to process")
+		return nil
+	}
+
+	if group.Status.LastAction.ErrorMessage != "" {
+		return fmt.Errorf("last action failed: %s", group.Status.LastAction.Condition)
+	}
+
+	val, ok := group.Annotations[controller.ActionProcessedTime]
+	if !ok {
+		log.V(common.InfoLevel).Info("Action Processed does not exist.")
+		return nil
+	}
+
+	if val == group.Status.LastAction.Time.GoString() {
+		log.V(common.InfoLevel).Info("Last action has already been processed")
+		return nil
+	}
+
+	if strings.Contains(group.Status.LastAction.Condition, "CREATE_SNAPSHOT") {
+		if err := r.processSnapshotEvent(ctx, group, remoteClient, log); err != nil {
+			return err
+		}
+	}
+
+	// Informing the RG that the last action has been processed.
+	controller.AddAnnotation(group, controller.ActionProcessedTime, group.Status.LastAction.Time.GoString())
+
+	return r.Update(ctx, group)
+}
+
+func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
+	lastAction := group.Status.LastAction
+
+	val, ok := group.Annotations[csireplicator.Action]
+	if !ok {
+		log.V(common.InfoLevel).Info("No action", "val", val)
+		return nil
+	}
+
+	var actionAnnotation csireplicator.ActionAnnotation
+	err := json.Unmarshal([]byte(val), &actionAnnotation)
+	if err != nil {
+		log.Error(err, "JSON unmarshal error", "actionAnnotation", actionAnnotation)
+		return err
+	}
+
+	log.V(common.InfoLevel).Info("Action Namespace - " + actionAnnotation.SnapshotNamespace)
+
+	if _, err := remoteClient.GetSnapshotClass(ctx, actionAnnotation.SnapshotClass); err != nil {
+		log.Error(err, "Snapshot class does not exist on remote cluster. Not creating the remote snapshots.")
+		return err
+	}
+
+	for volumeHandle, snapshotHandle := range lastAction.ActionAttributes {
+		msg := "ActionAttributes - volumeHandle: " + volumeHandle + ", snapshotHandle: " + snapshotHandle
+		log.V(common.InfoLevel).Info(msg)
+
+		snapRef := makeSnapReference(snapshotHandle, actionAnnotation.SnapshotNamespace)
+		sc := makeStorageClassContent(group.Labels[controller.DriverName], actionAnnotation.SnapshotClass)
+		snapContent := makeVolSnapContent(snapshotHandle, volumeHandle, *snapRef, sc)
+
+		err := remoteClient.CreateSnapshotContent(ctx, snapContent)
+		if err != nil {
+			log.Error(err, "create snapshotContent error")
+			return err
+		}
+
+		snapshot := makeSnapshotObject(snapRef.Name, snapContent.Name, sc.ObjectMeta.Name, actionAnnotation.SnapshotNamespace)
+		err = remoteClient.CreateSnapshotObject(ctx, snapshot)
+		if err != nil {
+			log.Error(err, "create snapshot error")
+			return err
+		}
+	}
+
+	return nil
+}
+
+func makeSnapReference(snapName, namespace string) *v1.ObjectReference {
+	return &v1.ObjectReference{
+		Kind:       "VolumeSnapshot",
+		APIVersion: "snapshot.storage.k8s.io/v1",
+		Name:       "snapshot-" + snapName,
+		Namespace:  namespace,
+	}
+}
+
+func makeSnapshotObject(snapName, contentName, className, namespace string) *s1.VolumeSnapshot {
+	volsnap := &s1.VolumeSnapshot{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      snapName,
+			Namespace: namespace,
+		},
+		Spec: s1.VolumeSnapshotSpec{
+			Source: s1.VolumeSnapshotSource{
+				VolumeSnapshotContentName: &contentName,
+			},
+			VolumeSnapshotClassName: &className,
+		},
+	}
+	return volsnap
+}
+
+func makeStorageClassContent(driver, snapClass string) *s1.VolumeSnapshotClass {
+	return &s1.VolumeSnapshotClass{
+		Driver:         driver,
+		DeletionPolicy: "Retain",
+		ObjectMeta: metav1.ObjectMeta{
+			Name: snapClass,
+		},
+	}
+}
+
+func makeVolSnapContent(snapName, volumeName string, snapRef v1.ObjectReference, sc *s1.VolumeSnapshotClass) *s1.VolumeSnapshotContent {
+	volsnapcontent := &s1.VolumeSnapshotContent{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "volume-" + volumeName + "-" + strconv.FormatInt(time.Now().Unix(), 10),
+		},
+		Spec: s1.VolumeSnapshotContentSpec{
+			VolumeSnapshotRef: snapRef,
+			Source: s1.VolumeSnapshotContentSource{
+				SnapshotHandle: &snapName,
+			},
+			VolumeSnapshotClassName: &sc.Name,
+			DeletionPolicy:          sc.DeletionPolicy,
+			Driver:                  sc.Driver,
+		},
+	}
+	return volsnapcontent
 }
 
 // SetupWithManager start using reconciler by creating new controller managed by provided manager

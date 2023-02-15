@@ -94,11 +94,12 @@ func (a ActionType) getErrorString(errorMsg string) string {
 
 // ActionResult represents end result of replication action
 type ActionResult struct {
-	ActionType   ActionType
-	Time         time.Time
-	Error        error
-	IsFinalError bool
-	PGStatus     *csiext.StorageProtectionGroupStatus
+	ActionType       ActionType
+	Time             time.Time
+	Error            error
+	IsFinalError     bool
+	PGStatus         *csiext.StorageProtectionGroupStatus
+	ActionAttributes map[string]string
 }
 
 // ActionAnnotation represents annotation that contains information about replication action
@@ -108,6 +109,8 @@ type ActionAnnotation struct {
 	FinalError            string `json:"finalError"`
 	FinishTime            string `json:"finishTime"`
 	ProtectionGroupStatus string `json:"protectionGroupStatus"`
+	SnapshotNamespace     string `json:"snapshotNamespace"`
+	SnapshotClass         string `json:"snapshotClass"`
 }
 
 func updateRGSpecWithActionResult(ctx context.Context, rg *repv1.DellCSIReplicationGroup, result *ActionResult) bool {
@@ -131,10 +134,27 @@ func updateRGSpecWithActionResult(ctx context.Context, rg *repv1.DellCSIReplicat
 		finishTime := &metav1.Time{Time: result.Time}
 		buff, _ := json.Marshal(finishTime)
 		actionAnnotation.FinishTime = string(buff)
+
+		if ns, ok := rg.Annotations[controllers.SnapshotNamespace]; ok {
+			actionAnnotation.SnapshotNamespace = ns
+		} else {
+			actionAnnotation.SnapshotNamespace = "default"
+		}
+
+		if snClass, ok := rg.Annotations[controllers.SnapshotClass]; ok {
+			actionAnnotation.SnapshotClass = snClass
+		}
+
+		log.V(common.InfoLevel).Info("ActionAnnotation - " + actionAnnotation.SnapshotNamespace + " " + controllers.SnapshotNamespace)
+
 		bytes, _ := json.Marshal(&actionAnnotation)
 		controllers.AddAnnotation(rg, Action, string(bytes))
 
 		log.V(common.InfoLevel).Info("RG was successfully updated with", "Action Result", result)
+
+		log.V(common.InfoLevel).Info("Resetting the action processed time annotation.")
+		// Indicates that the action needs to be processed by the controller.
+		controllers.AddAnnotation(rg, controllers.ActionProcessedTime, "")
 
 		isUpdated = true
 		return isUpdated
@@ -209,8 +229,11 @@ func updateRGStatusWithActionResult(ctx context.Context, rg *repv1.DellCSIReplic
 			rg.Status.State = ErrorState
 		}
 	}
+
 	updateConditionsWithActionResult(ctx, rg, result)
 	updateLastAction(ctx, rg, result)
+	updateActionAttributes(ctx, rg, result)
+
 	// Update the RG link state if we got a status
 	if result.PGStatus != nil {
 		log.V(common.InfoLevel).Info("RG link state was updated")
@@ -229,8 +252,9 @@ func updateConditionsWithActionResult(ctx context.Context, rg *repv1.DellCSIRepl
 	log.V(common.InfoLevel).Info("Begin updating condition with action result")
 
 	condition := repv1.LastAction{
-		Condition: result.ActionType.getSuccessfulString(),
-		Time:      &metav1.Time{Time: result.Time},
+		Condition:        result.ActionType.getSuccessfulString(),
+		Time:             &metav1.Time{Time: result.Time},
+		ActionAttributes: result.ActionAttributes,
 	}
 	if result.Error != nil && result.IsFinalError {
 		condition.Condition = result.ActionType.getErrorString(result.Error.Error())
@@ -259,6 +283,23 @@ func updateLastAction(ctx context.Context, rg *repv1.DellCSIReplicationGroup, re
 	}
 
 	log.V(common.InfoLevel).Info("Last action was updated")
+}
+
+func updateActionAttributes(ctx context.Context, rg *repv1.DellCSIReplicationGroup, result *ActionResult) {
+	log := common.GetLoggerFromContext(ctx)
+	log.V(common.InfoLevel).Info("Updating the action attributes")
+
+	switch result.ActionType {
+	case ActionType(csiext.ActionTypes_CREATE_SNAPSHOT.String()):
+		log.V(common.InfoLevel).Info("Finished Create Snapshot, Attributes:")
+		for key, val := range result.ActionAttributes {
+			log.V(common.InfoLevel).Info("Key: " + key + " Value: " + val)
+		}
+
+		rg.Status.LastAction.ActionAttributes = result.ActionAttributes
+	default:
+		log.V(common.InfoLevel).Info("Update Action Attributes to default")
+	}
 }
 
 // ReplicationGroupReconciler is a structure that watches and reconciles events on ReplicationGroup resources
@@ -552,11 +593,13 @@ func (r *ReplicationGroupReconciler) processRGInActionInProgressState(ctx contex
 		r.Log.Error(err, "Failed to update status with action result", "Action Result", actionResult)
 		return ctrl.Result{}, err
 	}
+
 	err = r.Status().Update(ctx, rg)
 	if err != nil {
 		r.Log.Error(err, "Failed to update status")
 		return ctrl.Result{}, err
 	}
+
 	log.Info("Successfully updated status", "state", rg.Status.State)
 	// In case of Action success & successful status update, we raise an event
 	if actionResult.Error == nil {
@@ -584,6 +627,8 @@ func (r *ReplicationGroupReconciler) executeAction(ctx context.Context, rg *repv
 	actionResult.Error = err
 	if res != nil {
 		actionResult.PGStatus = res.GetStatus()
+		actionResult.ActionAttributes = res.ActionAttributes
+
 	}
 	actionResult.Time = time.Now()
 	if err != nil {
@@ -598,6 +643,7 @@ func (r *ReplicationGroupReconciler) executeAction(ctx context.Context, rg *repv
 			}
 		}
 	}
+
 	return &actionResult
 }
 

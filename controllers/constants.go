@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -114,4 +114,10 @@ const (
 	TestFailOver = "testfailover"
 	// TestFailOverStop stop test failover replication action name
 	TestFailOverStop = "testfailoverstop"
+	// Indicates the snapshot class to use when performing a remote snapshot.
+	snapshotClass = "/snapshotClass"
+	// Indicates the snapshot namespace to use when performing a remote snapshot.
+	snapshotNamespace = "/snapshotNamespace"
+	// Indicates the time which the last action was processed.
+	actionProcessedTime = "/actionProcessedTime"
 )

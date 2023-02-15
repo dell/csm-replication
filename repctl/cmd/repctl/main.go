@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -95,6 +95,7 @@ func main() {
 	repctl.AddCommand(cmd.GetExecCommand())
 	repctl.AddCommand(cmd.GetEditCommand())
 	repctl.AddCommand(cmd.GetMigrateCommand())
+	repctl.AddCommand(cmd.GetSnapshotCommand())
 
 	err := repctl.Execute()
 	if err != nil {
