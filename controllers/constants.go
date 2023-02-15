@@ -120,4 +120,8 @@ const (
 	snapshotNamespace = "/snapshotNamespace"
 	// Indicates the time which the last action was processed.
 	actionProcessedTime = "/actionProcessedTime"
+	// KubeSystemNamespace indicates the namespace of the system which the controller is installed on.
+	KubeSystemNamespace = "kube-system"
+	// ClusterUID indicates the clusterUID retrieved from the KubeSystem.
+	ClusterUID = "clusterUID"
 )
