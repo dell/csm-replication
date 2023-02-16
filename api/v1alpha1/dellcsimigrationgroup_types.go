@@ -40,6 +40,7 @@ type DellCSIMigrationGroupStatus struct {
 // +kubebuilder:printcolumn:name="Source ID",type=string,JSONPath=`.spec.sourceID`,description="Source ID"
 // +kubebuilder:printcolumn:name="Target ID",type=string,JSONPath=`.spec.targetID`,description="Target ID"
 
+// DellCSIMigrationGroup is the Schema for the dellcsimigrationgroup API
 type DellCSIMigrationGroup struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
