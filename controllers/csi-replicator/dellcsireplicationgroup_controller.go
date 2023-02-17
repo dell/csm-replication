@@ -145,8 +145,6 @@ func updateRGSpecWithActionResult(ctx context.Context, rg *repv1.DellCSIReplicat
 			actionAnnotation.SnapshotClass = snClass
 		}
 
-		log.V(common.InfoLevel).Info("ActionAnnotation - " + actionAnnotation.SnapshotNamespace + " " + controllers.SnapshotNamespace)
-
 		bytes, _ := json.Marshal(&actionAnnotation)
 		controllers.AddAnnotation(rg, Action, string(bytes))
 

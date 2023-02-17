@@ -44,7 +44,9 @@ import (
 	"github.com/dell/csm-replication/pkg/connection"
 	csiidentity "github.com/dell/csm-replication/pkg/csi-clients/identity"
 	csireplication "github.com/dell/csm-replication/pkg/csi-clients/replication"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -229,6 +231,16 @@ func main() {
 	log.Println("set level to", level)
 	logrusLog.SetLevel(level)
 
+	// Get the kube-system content
+	var clusterUID string
+	ns, err := getClusterUID(ctx)
+	if err != nil {
+		log.Println("getClusterUuid error: ", err.Error())
+	} else {
+		log.Println("getClusterUuid got uuid: ", ns.GetUID())
+		clusterUID = string(ns.GetUID())
+	}
+
 	expRateLimiter := workqueue.NewItemExponentialFailureRateLimiter(retryIntervalStart, retryIntervalMax)
 	if err = (&controller.PersistentVolumeClaimReconciler{
 		Client:            mgr.GetClient(),
@@ -255,6 +267,7 @@ func main() {
 		ContextPrefix:     pgContextKeyPrefix,
 		SingleFlightGroup: singleflight.Group{},
 		Domain:            domain,
+		ClusterUID:        clusterUID,
 	}).SetupWithManager(ctx, mgr, expRateLimiter, workerThreads); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PersistentVolume")
 		os.Exit(1)
@@ -299,4 +312,19 @@ func main() {
 		os.Exit(1)
 	}
 
+}
+
+func getClusterUID(ctx context.Context) (*v1.Namespace, error) {
+	client, err := connection.GetControllerClient(nil, scheme)
+	if err != nil {
+		return nil, err
+	}
+
+	ns := new(v1.Namespace)
+	err = client.Get(ctx, types.NamespacedName{Name: controllers.KubeSystemNamespace}, ns)
+	if err != nil {
+		return nil, err
+	}
+
+	return ns, nil
 }
