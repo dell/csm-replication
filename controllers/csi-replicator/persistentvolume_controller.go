@@ -221,7 +221,7 @@ func (r *PersistentVolumeReconciler) processVolumeForReplicationGroup(ctx contex
 
 func (r *PersistentVolumeReconciler) createProtectionGroupAndRG(ctx context.Context, volumeHandle string, scParams map[string]string) (string, error) {
 	log := common.GetLoggerFromContext(ctx)
-	log.V(common.InfoLevel).Info("Creating protection-group anf RG")
+	log.V(common.InfoLevel).Info("Creating protection-group and RG")
 
 	if r.ClusterUID != "" {
 		log.V(common.InfoLevel).Info("Adding Cluster UUID to storage parameters")
