@@ -26,6 +26,7 @@ import (
 // Migration is an interface that defines calls used for querying migration management calls to the driver
 type Migration interface {
 	VolumeMigrate(context.Context, string, string, *csiext.VolumeMigrateRequest_Type, map[string]string, map[string]string, bool) (*csiext.VolumeMigrateResponse, error)
+	ArrayMigrate(context.Context, *csiext.ArrayMigrateRequest_Action, map[string]string) (*csiext.ArrayMigrateResponse, error)
 }
 
 // New returns new implementation of Replication interface
@@ -59,5 +60,21 @@ func (m *migration) VolumeMigrate(ctx context.Context, volumeHandle string, stor
 	}
 
 	res, err := client.VolumeMigrate(tc, req)
+	return res, err
+}
+
+// ArrayMigrate
+func (m *migration) ArrayMigrate(ctx context.Context, migrateAction *csiext.ArrayMigrateRequest_Action, Params map[string]string) (*csiext.ArrayMigrateResponse, error) {
+
+	tc, cancel := context.WithTimeout(ctx, m.timeout)
+	defer cancel()
+	client := csiext.NewMigrationClient(m.conn)
+
+	req := &csiext.ArrayMigrateRequest{
+		ActionTypes: migrateAction,
+		Parameters:  Params,
+	}
+
+	res, err := client.ArrayMigrate(tc, req)
 	return res, err
 }

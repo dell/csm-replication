@@ -17,3 +17,9 @@ FROM container-base AS migrator
 WORKDIR /
 COPY bin/dell-csi-migrator ./
 ENTRYPOINT ["/dell-csi-migrator"]
+
+# Sidecar
+FROM container-base AS node-rescanner
+WORKDIR /
+COPY bin/dell-csi-node-rescanner ./
+ENTRYPOINT ["/dell-csi-node-rescanner"]

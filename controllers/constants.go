@@ -75,6 +75,11 @@ const (
 	// ReplicationGroup
 	// Contains the name of the local DellCSIReplicationGroup object
 	replicationGroup = "/replicationGroupName"
+	// MigrationGroup
+	// Contains the name of the local DellCSIMigrationGroup object
+	migrationGroup = "/migrationGroupName"
+	// migrationFinalizer—finalizer used by the dell-csi-migrator sidecar and utils controller for pre delete hook
+	migrationFinalizer = "/migrationGroupObject"
 	// CreatedBy
 	// Annotation which indicates that this object was created by the replication-controller-manager
 	createdBy = "/createdBy"
@@ -124,4 +129,6 @@ const (
 	KubeSystemNamespace = "kube-system"
 	// ClusterUID indicates the clusterUID retrieved from the KubeSystem.
 	ClusterUID = "clusterUID"
+	// NodeReScanned will flag the current rescan status
+	NodeReScanned = "node-rescanned"
 )

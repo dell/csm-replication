@@ -25,10 +25,12 @@ INIT_IMAGE_NAME ?= dell-replication-init
 # Default Sidecar image name
 SIDECAR_IMAGE_NAME ?= dell-csi-replicator
 SIDECAR_M_IMAGE_NAME ?= dell-csi-migrator
+SIDECAR_NR_IMAGE_NAME ?= dell-csi-node-rescanner
 # Default Common controller image name
 CONTROLLER_IMAGE_NAME ?= dell-replication-controller
 
 INIT_IMAGE_TAG ?= "$(REGISTRY)/$(INIT_IMAGE_NAME):$(VERSION)"
+SIDECAR_IMAGE_NR_TAG ?= "$(REGISTRY)/$(SIDECAR_NR_IMAGE_NAME):$(VERSION)"
 SIDECAR_IMAGE_M_TAG ?= "$(REGISTRY)/$(SIDECAR_M_IMAGE_NAME):$(VERSION)"
 SIDECAR_IMAGE_TAG ?= "$(REGISTRY)/$(SIDECAR_IMAGE_NAME):$(VERSION)"
 CONTROLLER_IMAGE_TAG ?= "$(REGISTRY)/$(CONTROLLER_IMAGE_NAME):$(VERSION)"
@@ -38,6 +40,12 @@ init:
 
 sidecar:
 	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_TAG} -f Dockerfiles/Dockerfile --target sidecar ${NOCACHE_ARG}
+
+sidecar-node-rescanner:
+	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_NR_TAG} -f Dockerfiles/Dockerfile --target node-rescanner ${NOCACHE_ARG}
+
+sidecar-node-rescanner-push:
+	$(CONTAINER_TOOL) push ${SIDECAR_IMAGE_NR_TAG}
 
 sidecar-migrator:
 	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_M_TAG} -f Dockerfiles/Dockerfile --target migrator ${NOCACHE_ARG}
@@ -57,8 +65,9 @@ controller:
 controller-push:
 	$(CONTAINER_TOOL) push ${CONTROLLER_IMAGE_TAG}
 
-images: init sidecar controller sidecar-migrator
-images-push: init-push sidecar-push controller-push sidecar-migrator-push
+
+images: init sidecar controller sidecar-migrator sidecar-node-rescanner
+images-push: init-push sidecar-push controller-push sidecar-migrator-push sidecar-node-rescanner-push
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 deploy-controller:
@@ -76,3 +85,6 @@ sidecar-dev:
 
 sidecar-migrator-dev:
 	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_M_TAG} -f Dockerfiles/Dockerfile.dev --target migrator
+
+sidecar-node-rescanner-dev:
+	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_NR_TAG} -f Dockerfiles/Dockerfile.dev --target node-rescanner

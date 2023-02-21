@@ -1,1 +1,19 @@
-#This file is a placeholder to satisfy GoSec scans. It will be replaced by one in csm-replication/scripts upon compilation using makefile. 
+#This file is a placeholder to satisfy GoSec scans. It will be replaced by one in csm-replication/scripts upon compilation using makefile.
+=======
+apiVersion: v1
+kind: Config
+users:
+- name: svcs-acct
+  user:
+    token: ${gntoken}
+clusters:
+- cluster:
+    certificate-authority-data: ${gncert}
+    server: ${gnserver}
+  name: self-hosted-cluster
+contexts:
+- context:
+    cluster: self-hosted-cluster
+    user: svcs-acct
+  name: svcs-acct-context
+current-context: svcs-acct-context

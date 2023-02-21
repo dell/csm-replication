@@ -58,6 +58,7 @@ func GetMigrateCommand() *cobra.Command {
 	migrateCmd.AddCommand(migratePVCommand())
 	migrateCmd.AddCommand(migratePVCCommand())
 	migrateCmd.AddCommand(migrateSTSCommand())
+	migrateCmd.AddCommand(migrateMGCommand())
 
 	return migrateCmd
 }
@@ -187,6 +188,41 @@ This command will perform a migrate command to target StorageClass.`,
 	_ = viper.BindPFlag("yes", migrateCmd.Flags().Lookup("yes"))
 	migrateCmd.MarkFlagRequired("to-sc")
 	migrateCmd.MarkFlagRequired("namespace")
+	return migrateCmd
+}
+
+// GetMigrateArrayCommand returns 'migrate' cobra command
+/* #nosec G104 */
+func migrateMGCommand() *cobra.Command {
+	migrateCmd := &cobra.Command{
+		Use:   "mg",
+		Short: "allows to execute migrate action on mg",
+		Example: `
+./repctl migrate mg <name> (--target-ns=tns) (--wait)`,
+		Long: `
+This command will perform a migration of all volumes on source to target.`,
+
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) <= 0 {
+				_ = cmd.Help()
+				os.Exit(0)
+			}
+			mgName := args[0]
+			targetNs := viper.GetString("ststarget-ns")
+			wait := viper.GetBool("stswait")
+			ndu := viper.GetBool("ndu")
+			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
+			if err != nil {
+				log.Fatalf("migrate: error getting clusters folder path: %s\n", err.Error())
+			}
+			migrateMG(configFolder, "mg", mgName, targetNs, wait, ndu)
+		},
+	}
+
+	migrateCmd.Flags().String("target-ns", "", "target namespace")
+	_ = viper.BindPFlag("mgtarget-ns", migrateCmd.Flags().Lookup("target-ns"))
+	migrateCmd.Flags().Bool("wait", true, "wait for action to complete")
+	_ = viper.BindPFlag("mgwait", migrateCmd.Flags().Lookup("wait"))
 	return migrateCmd
 }
 
@@ -434,4 +470,80 @@ func recreateStsNdu(cluster k8s.ClusterInterface, sts *v12.StatefulSet, targetSC
 		}
 	}
 	return nil
+}
+
+func migrateMG(configFolder, resource string, resName string, targetNS string, wait bool, ndu bool) {
+	clusterIDs := viper.GetStringSlice(config.Clusters)
+	mc := &k8s.MultiClusterConfigurator{}
+	clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
+	if err != nil {
+		log.Fatalf("edit secret: error in initializing cluster info: %s", err.Error())
+	}
+	wg := &sync.WaitGroup{}
+	for _, cluster := range clusters.Clusters {
+		_, err := cluster.GetMigrationGroup(context.Background(), resName)
+		if err != nil {
+			// skip the cluster on which MG is not found
+			continue
+		}
+		wg.Add(1)
+		go migrateArray(context.Background(), cluster, resName, targetNS, wg, wait)
+	}
+	wg.Wait()
+
+}
+
+func migrateArray(ctx context.Context, cluster k8s.ClusterInterface, mgName string, targetNS string, wg *sync.WaitGroup, wait bool) {
+	defer wg.Done()
+	log.Info(mgName)
+	mg, err := cluster.GetMigrationGroup(context.Background(), mgName)
+	if err != nil {
+		log.Error(err, "Unable to find mg")
+		os.Exit(1)
+	}
+	migrationAnnotation = "ArrayMigrate"
+	Action := "Ready"
+	log.Infof("Setting Array migration annotation %s on mg %s", migrationAnnotation+"/"+Action, mg.Name)
+	mg.Annotations[migrationAnnotation] = Action
+	err = cluster.UpdateMigrationGroup(context.Background(), mg)
+	if err != nil {
+		log.Error(err, "unable to update mg")
+		os.Exit(1)
+	}
+	//Command exit criteria
+	if wait {
+		done := waitForArrayMigration(mgName, cluster)
+		if done {
+			log.Infof("Successfully migrated all volumes from source array to target")
+		} else {
+			log.Error("time out waiting for array migration")
+		}
+	} else {
+		log.Infof("Successfully migrated all volumes from source array to target")
+	}
+}
+
+func waitForArrayMigration(mgName string, cluster k8s.ClusterInterface) bool {
+	t := time.NewTicker(5 * time.Second)
+	ret := make(chan bool)
+	go func() {
+		log.Print("Waiting for action to complete ...")
+		for {
+			select {
+			case <-time.After(5 * time.Minute):
+				ret <- false
+			case <-t.C:
+				mg, err := cluster.GetMigrationGroup(context.Background(), mgName)
+				if err != nil && !errors.IsNotFound(err) {
+					log.Fatalf("migrate: error in fecthing pv info: %s\n", err.Error())
+				}
+				if mg != nil && (mg.Status.State == "Committed") {
+					ret <- true
+					return
+				}
+			}
+		}
+	}()
+	res := <-ret
+	return res
 }
