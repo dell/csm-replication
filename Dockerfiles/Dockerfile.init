@@ -1,5 +1,9 @@
 # Init container
-FROM bitnami/kubectl:1.25.6 AS init
+
+# some arguments that must be supplied
+ARG BASEIMAGE
+
+FROM $BASEIMAGE AS init
 WORKDIR /upgrade
 COPY --chown=1001 scripts/upgrade ./
 RUN chmod +x ./migrate_rg.sh

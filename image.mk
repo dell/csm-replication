@@ -7,6 +7,11 @@ else
         CONTAINER_TOOL ?= docker
 endif
 
+# Base image
+# Requires: RHEL host with subscription
+# UBI Image: ubi8/ubi-minimal:8.7-1085
+BASEIMAGE="registry.access.redhat.com/ubi8/ubi-minimal@sha256:ab03679e683010d485ef0399e056b09a38d7843ba4a36ee7dec337dd0037f7a7"
+
 # Options for '--no-cache'
 NOCACHE ?= false
 ifeq ($(NOCACHE), true)
@@ -36,19 +41,19 @@ SIDECAR_IMAGE_TAG ?= "$(REGISTRY)/$(SIDECAR_IMAGE_NAME):$(VERSION)"
 CONTROLLER_IMAGE_TAG ?= "$(REGISTRY)/$(CONTROLLER_IMAGE_NAME):$(VERSION)"
 
 init:
-	$(CONTAINER_TOOL) build . -t ${INIT_IMAGE_TAG} -f Dockerfiles/Dockerfile.init --target init ${NOCACHE_ARG}
+	$(CONTAINER_TOOL) build . -t ${INIT_IMAGE_TAG} -f Dockerfiles/Dockerfile.init --target init --build-arg BASEIMAGE=$(BASEIMAGE) ${NOCACHE_ARG}
 
 sidecar:
-	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_TAG} -f Dockerfiles/Dockerfile --target sidecar ${NOCACHE_ARG}
+	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_TAG} -f Dockerfiles/Dockerfile --target sidecar --build-arg BASEIMAGE=$(BASEIMAGE) ${NOCACHE_ARG}
 
 sidecar-node-rescanner:
-	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_NR_TAG} -f Dockerfiles/Dockerfile --target node-rescanner ${NOCACHE_ARG}
+	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_NR_TAG} -f Dockerfiles/Dockerfile --target node-rescanner --build-arg BASEIMAGE=$(BASEIMAGE) ${NOCACHE_ARG}
 
 sidecar-node-rescanner-push:
 	$(CONTAINER_TOOL) push ${SIDECAR_IMAGE_NR_TAG}
 
 sidecar-migrator:
-	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_M_TAG} -f Dockerfiles/Dockerfile --target migrator ${NOCACHE_ARG}
+	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_M_TAG} -f Dockerfiles/Dockerfile --target migrator --build-arg BASEIMAGE=$(BASEIMAGE) ${NOCACHE_ARG}
 
 init-push:
 	$(CONTAINER_TOOL) push ${INIT_IMAGE_TAG}
@@ -60,7 +65,7 @@ sidecar-push:
 	$(CONTAINER_TOOL) push ${SIDECAR_IMAGE_TAG}
 
 controller:
-	$(CONTAINER_TOOL) build . -t ${CONTROLLER_IMAGE_TAG} -f Dockerfiles/Dockerfile --target controller ${NOCACHE_ARG}
+	$(CONTAINER_TOOL) build . -t ${CONTROLLER_IMAGE_TAG} -f Dockerfiles/Dockerfile --target controller --build-arg BASEIMAGE=$(BASEIMAGE) ${NOCACHE_ARG}
 
 controller-push:
 	$(CONTAINER_TOOL) push ${CONTROLLER_IMAGE_TAG}
@@ -77,14 +82,14 @@ deploy-controller:
 
 # Build controller image in dev environment with Golang
 controller-dev:
-	$(CONTAINER_TOOL) build . -t ${CONTROLLER_IMAGE_TAG} -f Dockerfiles/Dockerfile.dev --target controller
+	$(CONTAINER_TOOL) build . -t ${CONTROLLER_IMAGE_TAG} -f Dockerfiles/Dockerfile.dev --target controller --build-arg BASEIMAGE=$(BASEIMAGE)
 
 # Build sidecar image in dev environment with Golang
 sidecar-dev:
-	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_TAG} -f Dockerfiles/Dockerfile.dev --target sidecar
+	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_TAG} -f Dockerfiles/Dockerfile.dev --target sidecar --build-arg BASEIMAGE=$(BASEIMAGE)
 
 sidecar-migrator-dev:
-	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_M_TAG} -f Dockerfiles/Dockerfile.dev --target migrator
+	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_M_TAG} -f Dockerfiles/Dockerfile.dev --target migrator --build-arg BASEIMAGE=$(BASEIMAGE)
 
 sidecar-node-rescanner-dev:
-	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_NR_TAG} -f Dockerfiles/Dockerfile.dev --target node-rescanner
+	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_NR_TAG} -f Dockerfiles/Dockerfile.dev --target node-rescanner --build-arg BASEIMAGE=$(BASEIMAGE)
