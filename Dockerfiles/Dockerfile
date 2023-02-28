@@ -1,5 +1,8 @@
+# some arguments that must be supplied
+ARG BASEIMAGE
+
 # Build the manager binary
-FROM golang:1.19 as builder
+FROM golang:1.20 as builder
 
 RUN mkdir -p /workspace/dell-csi-replicator
 WORKDIR /workspace/dell-csi-replicator
@@ -27,8 +30,8 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o dell-csi
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o dell-csi-migrator migrator.go
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o dell-csi-node-rescanner node-rescanner.go
 
-# Base image for controller and sidecar
-FROM scratch AS container-base
+# Base image
+FROM $BASEIMAGE AS container-base
 
 # Controller
 FROM container-base AS controller

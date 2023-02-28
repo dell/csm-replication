@@ -1,4 +1,7 @@
-FROM scratch AS container-base
+# some arguments that must be supplied
+ARG BASEIMAGE
+
+FROM $BASEIMAGE AS container-base
 
 # Controller
 FROM container-base AS controller
