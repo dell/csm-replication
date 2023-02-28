@@ -5,6 +5,13 @@ ARG BASEIMAGE
 
 FROM $BASEIMAGE AS init
 WORKDIR /upgrade
-COPY --chown=1001 scripts/upgrade ./
-RUN chmod +x ./migrate_rg.sh
+COPY scripts/upgrade ./
+RUN microdnf update -y && \
+    microdnf install -y shadow-utils wget && \
+    wget -v https://dl.k8s.io/release/v1.25.6/bin/linux/amd64/kubectl && \
+    microdnf -y remove shadow-utils wget libmetalink expat libsemanage && \
+    microdnf clean all && \
+    chmod +x ./kubectl && \
+    mv ./kubectl /usr/local/bin && \
+    chmod +x /upgrade/migrate_rg.sh
 ENTRYPOINT ["/upgrade/migrate_rg.sh"]
