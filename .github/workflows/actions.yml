@@ -105,3 +105,24 @@ jobs:
           image-name: ${{ env.REGISTRY }}/dell-replication-controller:${{ env.VERSION }}
           severity-threshold: HIGH
           run-quality-checks: false
+      - name: Scan dell-replication-init Docker Image
+        if: always() && env.PASSED_BUILD
+        uses: Azure/container-scan@v0
+        with:
+          image-name: ${{ env.REGISTRY }}/dell-replication-init:${{ env.VERSION }}
+          severity-threshold: HIGH
+          run-quality-checks: false
+      - name: Scan dell-csi-migrator Docker Image
+        if: always() && env.PASSED_BUILD
+        uses: Azure/container-scan@v0
+        with:
+          image-name: ${{ env.REGISTRY }}/dell-csi-migrator:${{ env.VERSION }}
+          severity-threshold: HIGH
+          run-quality-checks: false
+      - name: Scan dell-csi-node-rescanner Docker Image
+        if: always() && env.PASSED_BUILD
+        uses: Azure/container-scan@v0
+        with:
+          image-name: ${{ env.REGISTRY }}/dell-csi-node-rescanner:${{ env.VERSION }}
+          severity-threshold: HIGH
+          run-quality-checks: false
