@@ -54,9 +54,9 @@ jobs:
       - name: Checkout the code
         uses: actions/checkout@v2
       - name: Download GoSec
-        run: cd ./repctl && wget https://github.com/securego/gosec/releases/download/v2.14.0/gosec_2.14.0_linux_amd64.tar.gz
+        run: cd ./repctl && wget https://github.com/securego/gosec/releases/download/v2.15.0/gosec_2.15.0_linux_amd64.tar.gz
       - name: Unpack GoSec
-        run:  cd ./repctl && tar xzf gosec_2.14.0_linux_amd64.tar.gz
+        run:  cd ./repctl && tar xzf gosec_2.15.0_linux_amd64.tar.gz
       - name: GoSec scan
         run: cd ./repctl && ./gosec  ./...
   malware_security_scan:
@@ -103,5 +103,26 @@ jobs:
         uses: Azure/container-scan@v0
         with:
           image-name: ${{ env.REGISTRY }}/dell-replication-controller:${{ env.VERSION }}
+          severity-threshold: HIGH
+          run-quality-checks: false
+      - name: Scan dell-replication-init Docker Image
+        if: always() && env.PASSED_BUILD
+        uses: Azure/container-scan@v0
+        with:
+          image-name: ${{ env.REGISTRY }}/dell-replication-init:${{ env.VERSION }}
+          severity-threshold: HIGH
+          run-quality-checks: false
+      - name: Scan dell-csi-migrator Docker Image
+        if: always() && env.PASSED_BUILD
+        uses: Azure/container-scan@v0
+        with:
+          image-name: ${{ env.REGISTRY }}/dell-csi-migrator:${{ env.VERSION }}
+          severity-threshold: HIGH
+          run-quality-checks: false
+      - name: Scan dell-csi-node-rescanner Docker Image
+        if: always() && env.PASSED_BUILD
+        uses: Azure/container-scan@v0
+        with:
+          image-name: ${{ env.REGISTRY }}/dell-csi-node-rescanner:${{ env.VERSION }}
           severity-threshold: HIGH
           run-quality-checks: false
