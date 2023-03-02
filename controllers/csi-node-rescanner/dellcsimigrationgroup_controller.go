@@ -19,7 +19,6 @@ package csinoderescanner
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	storagev1 "github.com/dell/csm-replication/api/v1"
@@ -148,9 +147,8 @@ func (r *NodeRescanReconciler) processMGinDeletingState(ctx context.Context, mg 
 	// Get self POD details
 	// Get all Node Pods in driver's namespace
 	podList := &corev1.PodList{}
-	label := strings.Replace(mg.Spec.DriverName, "csi-", "", 1) + "-node"
 	opts := []client.ListOption{
-		client.MatchingLabels{"app": label},
+		client.MatchingLabels{"app": NodeLabelFilter},
 	}
 	err := r.Client.List(ctx, podList, opts...)
 	if err != nil && errors.IsNotFound(err) {
