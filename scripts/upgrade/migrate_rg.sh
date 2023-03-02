@@ -17,45 +17,43 @@
 set -e
 
 SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-RGVERSION="replication.storage.dell.com/v1alpha1"
+ALPHAVERSION="v1alpha1"
 
-echo "ReplicationGroup version migration started."
+echo "ReplicationGroup CRD version migration started."
 
-rgVersions=$(kubectl get rg -o=jsonpath='{range .items[*]}{.apiVersion}{"\n"}{end}' 2>&1)
-echo -e "ReplicationGroup API versions found:\n$rgVersions"
+crdVersion=$(kubectl get customresourcedefinitions dellcsireplicationgroups.replication.storage.dell.com -o=jsonpath='{.status.storedVersions}' 2>&1)
+echo -e "ReplicationGroup CRD version found: $crdVersion"
 found=false
-for rgVersion in $rgVersions
-do
-  if [ $rgVersion == $RGVERSION ]
-  then
-    found=true
-    break
-  fi
-done
-
+if [[ $crdVersion == *$ALPHAVERSION* ]]
+then
+  found=true
+fi
 
 if $found
 then
-  echo "Alpha versions found. Starting migration..."
+  echo "Alpha version found. Starting migration..."
 
-  echo "Step-1: Updating CRD with both v1alpha1 and v1 versions"
+  echo "Step-1: Updating replicationgroup CRD with both v1alpha1 and v1 versions"
   kubectl replace -f "${SCRIPTDIR}"/replicationcrds.v1alpha1-v1.yaml
 
-  echo "Step-2: Migrating ReplicationGroups to v1 version"
-  rgs=$(kubectl get rg -o=jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>&1)
+  echo "Step-2: Migrating replicationgroup CRs to v1 version"
+  rgs=$(kubectl get dellcsireplicationgroup -o=jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>&1)
   echo -e "ReplicationGroup IDs:\n$rgs"
   for rg in $rgs
   do
-    kubectl get rg $rg -o json | kubectl replace -f -
+    kubectl get dellcsireplicationgroup $rg -o json | kubectl replace -f -
   done
 
-  echo "Step-3: Updating CRD to remove v1alpha1 from stored versions"
+  echo "Step-3: Updating replicationgroup CRD to remove v1alpha1 from stored versions"
   kubectl patch customresourcedefinitions dellcsireplicationgroups.replication.storage.dell.com --subresource='status' --type='merge' -p '{"status":{"storedVersions":["v1"]}}'
 
-  echo "Step-4: Updating CRD to remove v1alpha1 version"
+  echo "Step-4: Updating replicationgroup CRD to remove v1alpha1 version"
   kubectl replace -f "${SCRIPTDIR}"/replicationcrds.v1.yaml
+
+  echo "Step-5: Creating new migrationgroup CRD"
+  kubectl apply -f "${SCRIPTDIR}"/replicationcrds.migration-v1.yaml
 else
-  echo "No alpha versions found. Skipping migration."
+  echo "No alpha version found. Skipping migration."
 fi
 
-echo "ReplicationGroup version migration completed."
+echo "ReplicationGroup CRD version migration completed."
