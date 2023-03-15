@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -153,6 +153,26 @@ func (m *MockReplication) CreateRemoteVolume(ctx context.Context, volumeHandle s
 	volParams[path.Join(m.contextPrefix, "arrayParam2")] = "arrayVal2"
 	response := csiext.CreateRemoteVolumeResponse{
 		RemoteVolume: &csiext.Volume{
+			CapacityBytes: 1024 * 1024 * 1024,
+			VolumeId:      fmt.Sprintf("remote-%s-fake-volume", volumeHandle),
+			VolumeContext: volParams,
+		},
+	}
+	return &response, nil
+}
+
+// DeleteLocalVolume mocks call
+func (m *MockReplication) DeleteLocalVolume(ctx context.Context, volumeHandle string,
+	params map[string]string) (*csiext.DeleteLocalVolumeResponse, error) {
+	defer m.ClearErrorAndCondition(false)
+	if err := m.injectedError.getError(); err != nil {
+		return nil, err
+	}
+	volParams := params
+	volParams[path.Join(m.contextPrefix, "arrayParam1")] = "arrayVal1"
+	volParams[path.Join(m.contextPrefix, "arrayParam2")] = "arrayVal2"
+	response := csiext.DeleteLocalVolumeResponse{
+		LocalVolume: &csiext.Volume{
 			CapacityBytes: 1024 * 1024 * 1024,
 			VolumeId:      fmt.Sprintf("remote-%s-fake-volume", volumeHandle),
 			VolumeContext: volParams,

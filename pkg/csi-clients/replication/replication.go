@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import (
 // Replication is an interface that defines calls used for querying replication management calls to the driver
 type Replication interface {
 	CreateRemoteVolume(context.Context, string, map[string]string) (*csiext.CreateRemoteVolumeResponse, error)
+	DeleteLocalVolume(context.Context, string, map[string]string) (*csiext.DeleteLocalVolumeResponse, error)
 	CreateStorageProtectionGroup(context.Context, string, map[string]string) (*csiext.CreateStorageProtectionGroupResponse, error)
 	DeleteStorageProtectionGroup(context.Context, string, map[string]string) error
 	ExecuteAction(context.Context, string, *csiext.ExecuteActionRequest_Action, map[string]string, string, map[string]string) (*csiext.ExecuteActionResponse, error)
@@ -112,6 +113,18 @@ func (r *replication) CreateRemoteVolume(ctx context.Context, volumeHandle strin
 	}
 
 	res, err := client.CreateRemoteVolume(tctx, req)
+	return res, err
+}
+
+// DeleteLocalVolume sends deletion request of a specified volumeHandle
+func (r *replication) DeleteLocalVolume(ctx context.Context, volumeHandle string, params map[string]string) (*csiext.DeleteLocalVolumeResponse, error) {
+	tctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	client := csiext.NewReplicationClient(r.conn)
+
+	req := &csiext.DeleteLocalVolumeRequest{}
+
+	res, err := client.DeleteLocalVolume(tctx, req)
 	return res, err
 }
 

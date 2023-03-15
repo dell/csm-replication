@@ -87,6 +87,8 @@ const (
 	resourceRequest = "/resourceRequest"
 	// DeletionRequested annotation to set for the deleted object
 	deletionRequested = "/deletionRequested"
+	// SynchronizedDeletionStatus annotation to communicate RemoteVolumeDeletion between cluster
+	synchronizedDeletionStatus = "/synchronizedDeletionStatus"
 	// Self typically used when remote cluster is same as source
 	Self = "self"
 	// RemotePVRetentionPolicy

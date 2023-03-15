@@ -130,6 +130,13 @@ func (s *Replication) CreateRemoteVolume(ctx context.Context, in *replication.Cr
 	return out, err
 }
 
+// DeleteLocalVolume calls stub for DeleteLocalVolume
+func (s *Replication) DeleteLocalVolume(ctx context.Context, in *replication.DeleteLocalVolumeRequest) (*replication.DeleteLocalVolumeResponse, error) {
+	out := &replication.DeleteLocalVolumeResponse{}
+	err := FindStub("Replication", "DeleteLocalVolume", in, out)
+	return out, err
+}
+
 // DeleteStorageProtectionGroup calls stub for DeleteStorageProtectionGroup
 func (s *Replication) DeleteStorageProtectionGroup(ctx context.Context, in *replication.DeleteStorageProtectionGroupRequest) (*replication.DeleteStorageProtectionGroupResponse, error) {
 	out := &replication.DeleteStorageProtectionGroupResponse{}
