@@ -122,7 +122,10 @@ func (r *replication) DeleteLocalVolume(ctx context.Context, volumeHandle string
 	defer cancel()
 	client := csiext.NewReplicationClient(r.conn)
 
-	req := &csiext.DeleteLocalVolumeRequest{}
+	req := &csiext.DeleteLocalVolumeRequest{
+		VolumeHandle:     volumeHandle,
+		VolumeAttributes: params,
+	}
 
 	res, err := client.DeleteLocalVolume(tctx, req)
 	return res, err

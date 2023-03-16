@@ -146,10 +146,18 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 						// Resetting the rate-limiter to requeue for the deletion of remote PV
 						return ctrl.Result{RequeueAfter: 1 * time.Millisecond}, nil
 					}
-					// Requeueing because the remote PV still exists
+					// Requeueing local PV because the remote PV still exists.
 					return ctrl.Result{Requeue: true}, nil
 				}
 			}
+		}
+
+		// Check for the sync deletion annotation. If it exists and is not complete, requeue.
+		// Otherwise, remove finalizer.
+		syncDeleteStatus, ok := volume.Annotations[controller.SynchronizedDeletionStatus]
+		if ok && syncDeleteStatus != "complete" {
+			log.V(common.InfoLevel).Info("Synchronized Deletion annotation exists and is not complete, requeueing.")
+			return ctrl.Result{Requeue: true}, nil
 		}
 
 		log.V(common.InfoLevel).Info("Removing finalizer on local volume")
@@ -166,19 +174,10 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		log.V(common.DebugLevel).Info("Finalizer not found, adding it")
 		return ctrl.Result{}, r.Update(ctx, volumeCopy)
 	}
-	// Check for deletion request annotation
+	// Check for deletion request annotation.
 	if _, ok := volumeCopy.Annotations[controller.DeletionRequested]; ok {
 		log.V(common.InfoLevel).Info("Deletion Requested by remote's controller, annotation found")
-
-		// Check for the sync deletion annotation. If it's 'complete' or nonexistent, delete the PV.
-		// If it's 'requested', wait.
-		syncDeleteStatus, ok := volume.Annotations[controller.SynchronizedDeletionStatus]
-		if !ok || syncDeleteStatus == "complete" {
-			log.V(common.InfoLevel).Info("Synchronized Deletion annotation either complete or not set, deleting PV")
-			return ctrl.Result{}, r.Delete(ctx, volumeCopy)
-		}
-
-		log.V(common.InfoLevel).Info("Synchronized Deletion annotation exists and is not complete, cannot delete PV")
+		return ctrl.Result{}, r.Delete(ctx, volumeCopy)
 	}
 
 	_, ok = volume.Annotations[controller.PVProtectionComplete]
@@ -321,7 +320,6 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			log.V(common.DebugLevel).Info("Remote RG annotation has not been set on the local RG")
 		} else {
 			// Update the annotation for the remote PV object
-			// TODO: Also add local volume information to remote PV
 			controller.AddAnnotation(pv, controller.ReplicationGroup, remoteRGName)
 			controller.AddLabel(pv, controller.ReplicationGroup, remoteRGName)
 		}

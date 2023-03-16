@@ -6,7 +6,7 @@ require (
 	github.com/bombsimon/logrusr/v3 v3.0.0
 	github.com/dell/dell-csi-extensions/common v1.1.1
 	github.com/dell/dell-csi-extensions/migration v1.1.0
-	github.com/dell/dell-csi-extensions/replication v1.3.1-0.20230315203650-c10cd09b0057
+	github.com/dell/dell-csi-extensions/replication v1.3.1-0.20230316192210-d1b46db0cbe0
 	github.com/dell/gobrick v1.4.0
 	github.com/fatih/color v1.13.0
 	github.com/fsnotify/fsnotify v1.5.4

@@ -168,16 +168,7 @@ func (m *MockReplication) DeleteLocalVolume(ctx context.Context, volumeHandle st
 	if err := m.injectedError.getError(); err != nil {
 		return nil, err
 	}
-	volParams := params
-	volParams[path.Join(m.contextPrefix, "arrayParam1")] = "arrayVal1"
-	volParams[path.Join(m.contextPrefix, "arrayParam2")] = "arrayVal2"
-	response := csiext.DeleteLocalVolumeResponse{
-		LocalVolume: &csiext.Volume{
-			CapacityBytes: 1024 * 1024 * 1024,
-			VolumeId:      fmt.Sprintf("remote-%s-fake-volume", volumeHandle),
-			VolumeContext: volParams,
-		},
-	}
+	response := csiext.DeleteLocalVolumeResponse{}
 	return &response, nil
 }
 

@@ -220,8 +220,8 @@ var (
 	// DeletionRequested annotation which will be set to the PV on the object deletion
 	DeletionRequested string
 	// SynchronizedDeletionStatus indicates what state the PV's synchronized deletion process is in
-	// requested: local PV has been issued a delete command and needs to run DeleteRemoteVolume.
-	// complete: DeleteRemoteVolume has completed. Placed on local PV by replicator sidecar, propogated to remote PV via controller.
+	// requested: PV has been issued a delete command by the remote controller and needs to run DeleteLocalVolume.
+	// complete: DeleteLocalVolume has completed. Placed on PV by replicator sidecar to inform controller that deletion is done.
 	SynchronizedDeletionStatus string
 	// RemotePVRetentionPolicy indicates whether to retain or delete the target PV
 	RemotePVRetentionPolicy string

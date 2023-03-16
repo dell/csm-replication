@@ -141,18 +141,26 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 	}
 
+	log.V(common.DebugLevel).Info("Checking if PV protection complete annotation is applied")
+	if _, ok := pv.Annotations[controller.PVProtectionComplete]; !ok {
+		controller.AddAnnotation(pv, controller.PVProtectionComplete, "yes")
+		if err := r.Update(ctx, pv); err != nil {
+			log.Error(err, "Failed to add PV protection complete annotation to the PV")
+		}
+	}
+
 	log.V(common.DebugLevel).Info("Checking if synchronized deletion annotation is applied")
 	syncDeleteStatus, ok := pv.Annotations[controller.SynchronizedDeletionStatus]
 	if ok && syncDeleteStatus == "requested" {
 		log.V(common.InfoLevel).Info("Synchronized Deletion requested by annotation, deleting local backend volume")
 		volumeHandle := pv.Spec.PersistentVolumeSource.CSI.VolumeHandle
-		if !ok {
+		if volumeHandle == "" {
 			log.Error(err, "Failed to retrieve the PV's remote volume handle for deletion")
 			return ctrl.Result{}, err
 		}
 		_, err := r.ReplicationClient.DeleteLocalVolume(ctx, volumeHandle, storageClass.Parameters)
 		if err != nil {
-			log.Error(err, "Failed to delete the local volume", "VolumeHandle", pv.Spec.CSI.VolumeHandle)
+			log.Error(err, "Failed to delete the local volume", "VolumeHandle", pv.Spec.PersistentVolumeSource.CSI.VolumeHandle)
 			return ctrl.Result{}, err
 		}
 		pvObj := pv.DeepCopy()
@@ -161,7 +169,6 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			log.Error(err, "Failed to add SynchronizedDeletionStatus complete annotation to the PV")
 			return ctrl.Result{}, err
 		}
-		isPVUpdated = true
 	}
 
 	return ctrl.Result{}, nil
