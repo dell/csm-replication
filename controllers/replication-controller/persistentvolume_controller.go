@@ -176,9 +176,9 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		if !ok || syncDeleteStatus == "complete" {
 			log.V(common.InfoLevel).Info("Synchronized Deletion annotation either complete or not set, deleting PV")
 			return ctrl.Result{}, r.Delete(ctx, volumeCopy)
-		} else {
-			log.V(common.InfoLevel).Info("Synchronized Deletion annotation exists and is not complete, cannot delete PV")
 		}
+
+		log.V(common.InfoLevel).Info("Synchronized Deletion annotation exists and is not complete, cannot delete PV")
 	}
 
 	_, ok = volume.Annotations[controller.PVProtectionComplete]
