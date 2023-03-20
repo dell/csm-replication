@@ -155,7 +155,7 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		log.V(common.InfoLevel).Info("Synchronized Deletion requested by annotation, deleting local backend volume")
 		volumeHandle := pv.Spec.PersistentVolumeSource.CSI.VolumeHandle
 		if volumeHandle == "" {
-			log.Error(err, "Failed to retrieve the PV's remote volume handle for deletion")
+			log.Error(err, "Failed to retrieve the PV's volume handle for deletion")
 			return ctrl.Result{}, err
 		}
 		_, err := r.ReplicationClient.DeleteLocalVolume(ctx, volumeHandle, storageClass.Parameters)
