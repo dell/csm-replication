@@ -22,7 +22,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/bombsimon/logrusr/v3"
+	"github.com/bombsimon/logrusr/v4"
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
 	repController "github.com/dell/csm-replication/controllers/replication-controller"
