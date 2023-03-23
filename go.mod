@@ -4,9 +4,9 @@ go 1.20
 
 require (
 	github.com/bombsimon/logrusr/v4 v4.0.0
-	github.com/dell/dell-csi-extensions/common v1.1.1
-	github.com/dell/dell-csi-extensions/migration v1.1.0
-	github.com/dell/dell-csi-extensions/replication v1.3.1-0.20230323155056-c1e97ca5ae54
+	github.com/dell/dell-csi-extensions/common v1.1.2-0.20230323214633-35e10bebd00c
+	github.com/dell/dell-csi-extensions/migration v1.1.1-0.20230323214633-35e10bebd00c
+	github.com/dell/dell-csi-extensions/replication v1.3.1-0.20230323214633-35e10bebd00c
 	github.com/dell/gobrick v1.7.0
 	github.com/fatih/color v1.15.0
 	github.com/fsnotify/fsnotify v1.6.0
@@ -118,7 +118,7 @@ require (
 	golang.org/x/tools v0.6.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20230322174352-cde4c949918d // indirect
+	google.golang.org/genproto v0.0.0-20230323203342-db269f900576 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
