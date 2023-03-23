@@ -29,6 +29,6 @@ export NAMESPACE="test"
 export STORAGE_CLASS="replicated-sc"
 
 # Provisioner settings
-export PROVISIONER_IMAGE="k8s.gcr.io/sig-storage/csi-provisioner:v2.2.1"
+export PROVISIONER_IMAGE="registry.k8s.io/sig-storage/csi-provisioner:v2.2.1"
 export VOL_PREFIX="rep"
 export VOL_UUID_LENGTH="10"
