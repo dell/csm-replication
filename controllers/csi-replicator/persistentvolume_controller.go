@@ -163,9 +163,8 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			log.Error(err, "Failed to delete the local volume", "VolumeHandle", pv.Spec.PersistentVolumeSource.CSI.VolumeHandle)
 			return ctrl.Result{}, err
 		}
-		pvObj := pv.DeepCopy()
-		controller.AddAnnotation(pvObj, controller.SynchronizedDeletionStatus, "complete")
-		if err := r.Update(ctx, pvObj); err != nil {
+		controller.AddAnnotation(pv, controller.SynchronizedDeletionStatus, "complete")
+		if err := r.Update(ctx, pv); err != nil {
 			log.Error(err, "Failed to add SynchronizedDeletionStatus complete annotation to the PV")
 			return ctrl.Result{}, err
 		}
