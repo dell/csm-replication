@@ -131,19 +131,36 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 					if _, ok := remoteVolume.Annotations[controller.DeletionRequested]; !ok {
 						// Add annotation on the remote PV to request its deletion
 						remoteVolumeCopy := remoteVolume.DeepCopy()
+						log.V(common.InfoLevel).Info("Adding deletion requested annotation to remote volume")
 						controller.AddAnnotation(remoteVolumeCopy, controller.DeletionRequested, "yes")
+
+						// also apply new annotation - SynchronizedDeletionStatus
+						log.V(common.InfoLevel).Info("Adding sync delete annotation to remote")
+						controller.AddAnnotation(remoteVolumeCopy, controller.SynchronizedDeletionStatus, "requested")
 						err := rClient.UpdatePersistentVolume(ctx, remoteVolumeCopy)
 						if err != nil {
+							log.V(common.InfoLevel).Info("Error encountered in updating remote volume")
 							return ctrl.Result{}, err
 						}
+
 						// Resetting the rate-limiter to requeue for the deletion of remote PV
 						return ctrl.Result{RequeueAfter: 1 * time.Millisecond}, nil
 					}
-					// Requeueing because the remote PV still exists
+					// Requeueing local PV because the remote PV still exists.
 					return ctrl.Result{Requeue: true}, nil
 				}
 			}
 		}
+
+		// Check for the sync deletion annotation. If it exists and is not complete, requeue.
+		// Otherwise, remove finalizer.
+		syncDeleteStatus, ok := volume.Annotations[controller.SynchronizedDeletionStatus]
+		if ok && syncDeleteStatus != "complete" {
+			log.V(common.InfoLevel).Info("Synchronized Deletion annotation exists and is not complete, requeueing.")
+			return ctrl.Result{Requeue: true}, nil
+		}
+
+		log.V(common.InfoLevel).Info("Removing finalizer on local volume")
 		finalizerRemoved := controller.RemoveFinalizerIfExists(volume, controller.ReplicationFinalizer)
 		if finalizerRemoved {
 			return ctrl.Result{}, r.Update(ctx, volume)
@@ -154,12 +171,12 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	// Check for the finalizer; add, if doesn't exist
 	if finalizerAdded := controller.AddFinalizerIfNotExist(volumeCopy, controller.ReplicationFinalizer); finalizerAdded {
-		log.V(common.DebugLevel).Info("Finalizer not found adding it")
+		log.V(common.DebugLevel).Info("Finalizer not found, adding it")
 		return ctrl.Result{}, r.Update(ctx, volumeCopy)
 	}
-	// Check for deletion request annotation
+	// Check for deletion request annotation.
 	if _, ok := volumeCopy.Annotations[controller.DeletionRequested]; ok {
-		log.V(common.InfoLevel).Info("Deletion Requested, annotation found and deleting the remote volume")
+		log.V(common.InfoLevel).Info("Deletion Requested by remote's controller, annotation found")
 		return ctrl.Result{}, r.Delete(ctx, volumeCopy)
 	}
 
