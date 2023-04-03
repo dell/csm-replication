@@ -1,5 +1,5 @@
 /*
-Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -127,6 +127,13 @@ func (s *Replication) CreateStorageProtectionGroup(ctx context.Context, in *repl
 func (s *Replication) CreateRemoteVolume(ctx context.Context, in *replication.CreateRemoteVolumeRequest) (*replication.CreateRemoteVolumeResponse, error) {
 	out := &replication.CreateRemoteVolumeResponse{}
 	err := FindStub("Replication", "CreateRemoteVolume", in, out)
+	return out, err
+}
+
+// DeleteLocalVolume calls stub for DeleteLocalVolume
+func (s *Replication) DeleteLocalVolume(ctx context.Context, in *replication.DeleteLocalVolumeRequest) (*replication.DeleteLocalVolumeResponse, error) {
+	out := &replication.DeleteLocalVolumeResponse{}
+	err := FindStub("Replication", "DeleteLocalVolume", in, out)
 	return out, err
 }
 

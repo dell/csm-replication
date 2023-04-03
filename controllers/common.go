@@ -219,6 +219,10 @@ var (
 	ResourceRequest string
 	// DeletionRequested annotation which will be set to the PV on the object deletion
 	DeletionRequested string
+	// SynchronizedDeletionStatus indicates what state the PV's synchronized deletion process is in
+	// requested: PV has been issued a delete command by the remote controller and needs to run DeleteLocalVolume.
+	// complete: DeleteLocalVolume has completed. Placed on PV by replicator sidecar to inform controller that deletion is done.
+	SynchronizedDeletionStatus string
 	// RemotePVRetentionPolicy indicates whether to retain or delete the target PV
 	RemotePVRetentionPolicy string
 	// RemoteRGRetentionPolicy indicates whether to retain or delete the target RG
@@ -269,6 +273,7 @@ func InitLabelsAndAnnotations(domain string) {
 	CreatedBy = domain + createdBy
 	ResourceRequest = domain + resourceRequest
 	DeletionRequested = domain + deletionRequested
+	SynchronizedDeletionStatus = domain + synchronizedDeletionStatus
 	RemotePVRetentionPolicy = domain + remotePVRetentionPolicy
 	RemoteRGRetentionPolicy = domain + remoteRGRetentionPolicy
 	MigrationRequested = domain + migrateTo
