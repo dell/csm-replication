@@ -375,7 +375,12 @@ func getProtectionGroupID(object client.Object) []string {
 	return nil
 }
 
-// GetProtectionGroupIndexer provides access to local data for creating a client with an indexer for
-func GetProtectionGroupIndexer() (runtime.Object, string, client.IndexerFunc) {
-	return &repv1.DellCSIReplicationGroup{}, protectionIndexKey, getProtectionGroupID
+// GetProtectionGroupIndexer provides access to local data for creating a fake client and adding an
+// index for DellCSIReplicationGroup to the clients list of indexes. The index associated with DellCSIReplicationGroup GVK
+// will map the key to the indexerFunc that will be used to retreive the value.
+func GetProtectionGroupIndexer() (object runtime.Object, key string, indexerFunc client.IndexerFunc) {
+	object = &repv1.DellCSIReplicationGroup{}
+	key = protectionIndexKey
+	indexerFunc = getProtectionGroupID
+	return object, key, indexerFunc
 }
