@@ -51,9 +51,12 @@ func (suite *PersistentVolumeControllerTestSuite) SetupTest() {
 
 func (suite *PersistentVolumeControllerTestSuite) Init() {
 	suite.driver = utils.GetDefaultDriver()
-	//suite.client = utils.GetFakeClientWithObjects(suite.getFakeStorageClass())
 	utils.InitializeSchemes()
-	suite.client = fake.NewClientBuilder().WithScheme(utils.Scheme).WithIndex(GetProtectionGroupIndexer()).WithObjects(suite.getFakeStorageClass()).Build()
+	suite.client = fake.NewClientBuilder().
+		WithScheme(utils.Scheme).
+		WithIndex(GetProtectionGroupIndexer()).
+		WithObjects(suite.getFakeStorageClass()).
+		Build()
 	mockReplicationClient := csireplication.NewFakeReplicationClient(utils.ContextPrefix)
 	suite.repClient = &mockReplicationClient
 	var sc storagev1.StorageClass
