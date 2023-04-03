@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -50,7 +51,9 @@ func (suite *PersistentVolumeControllerTestSuite) SetupTest() {
 
 func (suite *PersistentVolumeControllerTestSuite) Init() {
 	suite.driver = utils.GetDefaultDriver()
-	suite.client = utils.GetFakeClientWithObjects(suite.getFakeStorageClass())
+	//suite.client = utils.GetFakeClientWithObjects(suite.getFakeStorageClass())
+	utils.InitializeSchemes()
+	suite.client = fake.NewClientBuilder().WithScheme(utils.Scheme).WithIndex(GetProtectionGroupIndexer()).WithObjects(suite.getFakeStorageClass()).Build()
 	mockReplicationClient := csireplication.NewFakeReplicationClient(utils.ContextPrefix)
 	suite.repClient = &mockReplicationClient
 	var sc storagev1.StorageClass
