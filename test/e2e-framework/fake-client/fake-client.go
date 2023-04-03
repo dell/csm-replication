@@ -319,26 +319,32 @@ func (f Client) RESTMapper() meta.RESTMapper {
 	panic("implement me")
 }
 
+// SubResourceClientConstructor returns a subresource client for the named subResource.
 // TODO: Implement
 func (f Client) SubResource(subResource string) client.SubResourceClient {
 	return f.SubResourceClient
 }
 
+// Create saves the subResource object in the Kubernetes cluster.
 // TODO: Implement
 func (f SubResourceClient) Create(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceCreateOption) error {
 	panic("implement me")
 }
 
+// Update updates the fields corresponding to the status subresource for the
+// given obj.
 // TODO: Implement
 func (f SubResourceClient) Update(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
 	panic("implement me")
 }
 
+// Patch patches the given object's subresource.
 // TODO: Implement
 func (f SubResourceClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
 	panic("implement me")
 }
 
+// Get retrieves a subResource for the given obj object from the Kubernetes Cluster.
 // TODO: Implement
 func (f SubResourceClient) Get(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceGetOption) error {
 	panic("implement me")
