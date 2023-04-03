@@ -319,7 +319,7 @@ func (f Client) RESTMapper() meta.RESTMapper {
 	panic("implement me")
 }
 
-// SubResourceClientConstructor returns a subresource client for the named subResource.
+// SubResource returns a subresource client for the named subResource.
 // TODO: Implement
 func (f Client) SubResource(subResource string) client.SubResourceClient {
 	return f.SubResourceClient
