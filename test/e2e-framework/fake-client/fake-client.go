@@ -52,6 +52,7 @@ type Client struct {
 	SubResourceClient
 }
 
+// SubResourceClient is a fake k8s subresource client
 type SubResourceClient struct {
 }
 
@@ -318,22 +319,27 @@ func (f Client) RESTMapper() meta.RESTMapper {
 	panic("implement me")
 }
 
+// TODO: Implement
 func (f Client) SubResource(subResource string) client.SubResourceClient {
 	return f.SubResourceClient
 }
 
+// TODO: Implement
 func (f SubResourceClient) Create(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceCreateOption) error {
 	panic("implement me")
 }
 
+// TODO: Implement
 func (f SubResourceClient) Update(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
 	panic("implement me")
 }
 
+// TODO: Implement
 func (f SubResourceClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
 	panic("implement me")
 }
 
+// TODO: Implement
 func (f SubResourceClient) Get(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceGetOption) error {
 	panic("implement me")
 }
