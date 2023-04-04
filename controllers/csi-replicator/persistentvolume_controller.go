@@ -351,13 +351,7 @@ func (r *PersistentVolumeReconciler) createReplicationGroup(ctx context.Context,
 
 // SetupWithManager start using reconciler by creating new controller managed by provided manager
 func (r *PersistentVolumeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, limiter ratelimiter.RateLimiter, maxReconcilers int) error {
-	if err := mgr.GetFieldIndexer().IndexField(ctx, &repv1.DellCSIReplicationGroup{}, protectionIndexKey, func(object client.Object) []string {
-		replicationGroup := object.(*repv1.DellCSIReplicationGroup)
-		if replicationGroup.Spec.ProtectionGroupID != "" {
-			return []string{replicationGroup.Spec.ProtectionGroupID}
-		}
-		return nil
-	}); err != nil {
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &repv1.DellCSIReplicationGroup{}, protectionIndexKey, getProtectionGroupID); err != nil {
 		return err
 	}
 	return ctrl.NewControllerManagedBy(mgr).
@@ -367,4 +361,26 @@ func (r *PersistentVolumeReconciler) SetupWithManager(ctx context.Context, mgr c
 			RateLimiter:             limiter,
 		}).
 		Complete(r)
+}
+
+// getProtectionGroupID take a DellCSIReplicationGroup instance and returns its protection group ID.
+// It satisfies the IndexerFunc type in controller-runtime/pkg/client/interfaces
+func getProtectionGroupID(object client.Object) []string {
+
+	replicationGroup := object.(*repv1.DellCSIReplicationGroup)
+	if replicationGroup.Spec.ProtectionGroupID != "" {
+		return []string{replicationGroup.Spec.ProtectionGroupID}
+	}
+
+	return nil
+}
+
+// GetProtectionGroupIndexer provides access to local data for creating a fake client and adding an
+// index for DellCSIReplicationGroup to the clients list of indexes. The index associated with DellCSIReplicationGroup GVK
+// will map the key to the indexerFunc that will be used to retreive the value.
+func GetProtectionGroupIndexer() (object runtime.Object, key string, indexerFunc client.IndexerFunc) {
+	object = &repv1.DellCSIReplicationGroup{}
+	key = protectionIndexKey
+	indexerFunc = getProtectionGroupID
+	return object, key, indexerFunc
 }

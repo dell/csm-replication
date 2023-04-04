@@ -49,6 +49,11 @@ type storageKey struct {
 type Client struct {
 	Objects       map[storageKey]runtime.Object
 	errorInjector errorInjector
+	SubResourceClient
+}
+
+// SubResourceClient is a fake k8s subresource client
+type SubResourceClient struct {
 }
 
 func getKey(obj runtime.Object) (storageKey, error) {
@@ -85,7 +90,7 @@ func NewFakeClient(initialObjects []runtime.Object, errorInjector errorInjector)
 }
 
 // Get finds object and puts it in client.Object obj argument
-func (f Client) Get(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+func (f Client) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 	if f.errorInjector != nil {
 		if err := f.errorInjector.shouldFail("Get", obj); err != nil {
 			return err
@@ -301,7 +306,7 @@ func (f Client) DeleteAllOf(ctx context.Context, obj client.Object, opts ...clie
 // Status knows how to create a client which can update status subresource
 // for kubernetes objects
 func (f Client) Status() client.StatusWriter {
-	return f
+	return f.SubResourceClient
 }
 
 // Scheme returns the scheme this client is using
@@ -311,5 +316,36 @@ func (f Client) Scheme() *runtime.Scheme {
 
 // RESTMapper returns the rest this client is using
 func (f Client) RESTMapper() meta.RESTMapper {
+	panic("implement me")
+}
+
+// SubResource returns a subresource client for the named subResource.
+// TODO: Implement
+func (f Client) SubResource(subResource string) client.SubResourceClient {
+	return f.SubResourceClient
+}
+
+// Create saves the subResource object in the Kubernetes cluster.
+// TODO: Implement
+func (f SubResourceClient) Create(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceCreateOption) error {
+	panic("implement me")
+}
+
+// Update updates the fields corresponding to the status subresource for the
+// given obj.
+// TODO: Implement
+func (f SubResourceClient) Update(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+	panic("implement me")
+}
+
+// Patch patches the given object's subresource.
+// TODO: Implement
+func (f SubResourceClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+	panic("implement me")
+}
+
+// Get retrieves a subResource for the given obj object from the Kubernetes Cluster.
+// TODO: Implement
+func (f SubResourceClient) Get(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceGetOption) error {
 	panic("implement me")
 }

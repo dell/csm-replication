@@ -42,6 +42,7 @@ import (
 	"testing"
 
 	"k8s.io/client-go/tools/record"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -82,7 +83,8 @@ func (suite *FakeReplicationTestSuite) Init() {
 		Namespace:       utils.FakeNamespaceName,
 		SourceClusterID: utils.SourceClusterID,
 	}
-	suite.client = utils.GetFakeClient()
+	utils.InitializeSchemes()
+	suite.client = fake.NewClientBuilder().WithScheme(utils.Scheme).WithIndex(controller.GetProtectionGroupIndexer()).Build()
 	controllers.InitLabelsAndAnnotations(constants.DefaultDomain)
 	suite.runCSIReplicator()
 }

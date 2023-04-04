@@ -732,7 +732,7 @@ type errorFakeCtrlRuntimeClient struct {
 	key    string
 }
 
-func (e errorFakeCtrlRuntimeClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+func (e errorFakeCtrlRuntimeClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 	if e.method == "get" && key.Name == e.key {
 		return fmt.Errorf("Get method error")
 	}

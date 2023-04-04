@@ -104,7 +104,7 @@ tools:
 
 # Generate code
 generate: tools
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt",year=$(shell date "+%Y") paths="./api/..."
 
 # Pre-requisite for the build/run targets
 pre: gen-semver fmt vet tools generate

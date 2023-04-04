@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bombsimon/logrusr/v3"
+	"github.com/bombsimon/logrusr/v4"
 	storagev1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
 	controller "github.com/dell/csm-replication/controllers/csi-node-rescanner"

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/bombsimon/logrusr/v3"
+	"github.com/bombsimon/logrusr/v4"
 	"github.com/dell/csm-replication/pkg/config"
 	"github.com/fsnotify/fsnotify"
 	"github.com/sirupsen/logrus"
