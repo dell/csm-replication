@@ -6,6 +6,13 @@ provisioner: csi-{{ .Driver }}.dellemc.com
 reclaimPolicy: {{ .ReclaimPolicy }}
 volumeBindingMode: Immediate
 parameters:
+  {{- if .Parameters.FsType }}
+  csi.storage.k8s.io/fstype: {{ .Parameters.FsType }}
+  {{- if eq .Parameters.FsType "nfs"}}
+  {{ .ReplicationPrefix }}/nasName: "{{ .Parameters.NasName }}"
+  {{ .ReplicationPrefix }}/allowRoot: "{{ .Parameters.AllowRoot }}"
+  {{- end }}
+  {{- end }}
   {{ .ReplicationPrefix }}/isReplicationEnabled: "true"
   {{- if eq .TargetClusterID .SourceClusterID }}
   {{ .ReplicationPrefix }}/remoteStorageClassName: {{ .Name }}-tgt
