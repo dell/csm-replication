@@ -48,10 +48,13 @@ type Mirrored struct {
 type GlobalParameters struct {
 	// PowerStore
 	ArrayID           Mirrored
+	FsType            string
 	RemoteSystem      Mirrored
 	Rpo               string
 	IgnoreNamespaces  bool
 	VolumeGroupPrefix string
+	NasName           string
+	AllowRoot         bool
 
 	// PowerMax
 	Srp          Mirrored

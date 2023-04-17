@@ -1,6 +1,6 @@
 sourceClusterID: "cluster-1"
 targetClusterID: "cluster-2"
-name: "powerstore-replication"
+name: "powerstore-replication-nfs"
 driver: "powerstore"
 reclaimPolicy: "Retain"
 replicationPrefix: "replication.storage.dell.com"
@@ -8,6 +8,7 @@ remoteRetentionPolicy:
   RG: "Retain"
   PV: "Retain"
 parameters:
+  fsType: nfs 
   arrayID: # populate with unique ids of storage arrays
     source: "PS000000000001"
     target: "PS000000000002"
@@ -17,3 +18,5 @@ parameters:
   rpo: "Five_Minutes"
   ignoreNamespaces: "false"
   volumeGroupPrefix: "csi"
+  NasName: "NAS-1" # populate with the name of the NAS server that the file system will be placed on
+  allowRoot: "false" 
