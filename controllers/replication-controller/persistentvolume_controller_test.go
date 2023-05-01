@@ -473,9 +473,19 @@ func TestPVReconcileSuite(t *testing.T) {
 	suite.Run(t, testSuite)
 }
 
+func (suite *PVReconcileSuite) TestPVNotFound() {
+	req := suite.getTypicalRequest("non-existent-pv")
+	_, err := suite.reconciler.Reconcile(context.Background(), req)
+	suite.NoError(err, "No error on PV reconcile")
+}
+
 func (suite *PVReconcileSuite) TestSetupWithManager() {
 	mgr := manager.Manager(nil)
 	expRateLimiter := workqueue.NewItemExponentialFailureRateLimiter(1*time.Second, 10*time.Second)
 	err := PVReconciler.SetupWithManager(mgr, expRateLimiter, 1)
 	assert.Error(suite.T(), err, "Setup should fail when there is no manager")
+}
+
+func (suite *PVReconcileSuite) TearDownTest() {
+	suite.T().Log("Cleaning up resources...")
 }

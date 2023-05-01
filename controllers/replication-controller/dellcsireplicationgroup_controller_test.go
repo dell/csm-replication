@@ -25,6 +25,7 @@ import (
 	constants "github.com/dell/csm-replication/pkg/common"
 	"github.com/dell/csm-replication/pkg/config"
 	"github.com/dell/csm-replication/pkg/connection"
+	csireplication "github.com/dell/csm-replication/pkg/csi-clients/replication"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
 	"github.com/stretchr/testify/suite"
 	storagev1 "k8s.io/api/storage/v1"
@@ -43,6 +44,7 @@ type RGControllerTestSuite struct {
 	driver     utils.Driver
 	config     connection.MultiClusterClient
 	reconciler *ReplicationGroupReconciler
+	repClient    *csireplication.MockReplication
 }
 
 func (suite *RGControllerTestSuite) SetupTest() {
@@ -422,6 +424,21 @@ func (suite *RGControllerTestSuite) TestRGSyncDeletion() {
 	resp, err = suite.reconciler.Reconcile(context.Background(), req)
 	suite.NoError(err)
 	suite.Equal(false, resp.Requeue)
+}
+
+func (suite *RGControllerTestSuite) TestNoDeletionTimeStamp() {
+
+	ctx := context.Background()
+	rg := suite.getLocalRG(suite.driver.RGName, suite.driver.RemoteClusterID)
+	
+	rg.Finalizers = append(rg.Finalizers, controllers.RGFinalizer)
+
+	err := suite.client.Create(ctx, rg)
+    suite.Nil(err)
+
+	req := suite.getTypicalRequest()
+	_, err = suite.reconciler.Reconcile(context.Background(), req)
+	suite.Nil(err, "This should reconcile successfully")
 }
 
 func TestRGControllerTestSuite(t *testing.T) {
