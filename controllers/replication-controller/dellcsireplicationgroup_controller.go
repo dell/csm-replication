@@ -24,7 +24,6 @@ import (
 
 	csireplicator "github.com/dell/csm-replication/controllers/csi-replicator"
 	"github.com/dell/csm-replication/pkg/common"
-	csireplication "github.com/dell/csm-replication/pkg/csi-clients/replication"
 	repv1 "github.com/dell/csm-replication/api/v1"
 	controller "github.com/dell/csm-replication/controllers"
 	"github.com/dell/csm-replication/pkg/connection"
@@ -56,7 +55,6 @@ type ReplicationGroupReconciler struct {
 	EventRecorder      record.EventRecorder
 	PVCRequeueInterval time.Duration
 	Config             connection.MultiClusterClient
-	ReplicationClient  *csireplication.Replication
 	Domain             string
 }
 

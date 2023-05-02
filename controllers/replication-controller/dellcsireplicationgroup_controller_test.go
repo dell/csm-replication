@@ -25,7 +25,6 @@ import (
 	constants "github.com/dell/csm-replication/pkg/common"
 	"github.com/dell/csm-replication/pkg/config"
 	"github.com/dell/csm-replication/pkg/connection"
-	csireplication "github.com/dell/csm-replication/pkg/csi-clients/replication"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
 	"github.com/stretchr/testify/suite"
 	storagev1 "k8s.io/api/storage/v1"
@@ -36,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type RGControllerTestSuite struct {
@@ -44,7 +44,6 @@ type RGControllerTestSuite struct {
 	driver     utils.Driver
 	config     connection.MultiClusterClient
 	reconciler *ReplicationGroupReconciler
-	repClient    *csireplication.MockReplication
 }
 
 func (suite *RGControllerTestSuite) SetupTest() {
@@ -426,19 +425,34 @@ func (suite *RGControllerTestSuite) TestRGSyncDeletion() {
 	suite.Equal(false, resp.Requeue)
 }
 
-func (suite *RGControllerTestSuite) TestNoDeletionTimeStamp() {
+func (suite *RGControllerTestSuite) TestRGSyncWithNoDeletionTimeStamp() {
 
-	ctx := context.Background()
-	rg := suite.getLocalRG(suite.driver.RGName, suite.driver.RemoteClusterID)
-	
-	rg.Finalizers = append(rg.Finalizers, controllers.RGFinalizer)
+	suite.createSCAndRG(suite.getTypicalSC(), suite.getRGWithoutSyncComplete(suite.driver.RGName, true, false))
+    rg := new(repv1.DellCSIReplicationGroup)
+    req := suite.getTypicalRequest()
+    err := suite.client.Get(context.Background(), req.NamespacedName, rg)
+    suite.NotContains(controllers.RGSyncComplete, rg.Finalizers,
+        "RG finalizer doesn't exist")
+    resp, err := suite.reconciler.Reconcile(context.Background(), req)
+    suite.NoError(err)
+    suite.Equal(false, resp.Requeue)
+    err = suite.client.Get(context.Background(), req.NamespacedName, rg)
+    suite.NoError(err)
+    rg.Finalizers = append(rg.Finalizers, controllers.RGFinalizer)
+	rg.DeletionTimestamp = &metav1.Time{
+		Time: time.Now(),
+	}
+    suite.T().Log(rg.Finalizers, "RG finalizer added")
+    // Check if remote RG got created
+    rClient, err := suite.config.GetConnection(suite.driver.RemoteClusterID)
+    suite.NoError(err)
+    _, err = rClient.GetReplicationGroup(context.Background(), rg.Name)
+    suite.NoError(err)
+    
+    //Delete rg
+    err = suite.client.Delete(context.Background(), rg)
+    suite.NoError(err)
 
-	err := suite.client.Create(ctx, rg)
-    suite.Nil(err)
-
-	req := suite.getTypicalRequest()
-	_, err = suite.reconciler.Reconcile(context.Background(), req)
-	suite.Nil(err, "This should reconcile successfully")
 }
 
 func TestRGControllerTestSuite(t *testing.T) {
