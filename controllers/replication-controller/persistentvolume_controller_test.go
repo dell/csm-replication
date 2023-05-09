@@ -476,7 +476,7 @@ func TestPVReconcileSuite(t *testing.T) {
 func (suite *PVReconcileSuite) TestPVNotFound() {
 	req := suite.getTypicalRequest("non-existent-pv")
 	_, err := suite.reconciler.Reconcile(context.Background(), req)
-	suite.NoError(err, "No on PV reconcile")
+	suite.Error(err, "No PV reconcile")
 }
 
 func (suite *PVReconcileSuite) TestSetupWithManager() {

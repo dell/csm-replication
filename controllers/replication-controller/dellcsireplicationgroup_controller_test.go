@@ -425,7 +425,7 @@ func (suite *RGControllerTestSuite) TestRGSyncDeletion() {
 	suite.Equal(false, resp.Requeue)
 }
 
-func (suite *RGControllerTestSuite) TestRGSyncWithNoDeletionTimeStamp() {
+func (suite *RGControllerTestSuite) TestRGSyncWithDeletionTimeStamp() {
 
 	suite.createSCAndRG(suite.getTypicalSC(), suite.getRGWithoutSyncComplete(suite.driver.RGName, true, false))
     rg := new(repv1.DellCSIReplicationGroup)
