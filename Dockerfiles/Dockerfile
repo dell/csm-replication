@@ -6,7 +6,7 @@ FROM golang:1.20 as builder
 
 RUN mkdir -p /workspace/dell-csi-replicator
 WORKDIR /workspace/dell-csi-replicator
-RUN  wget -v https://dl.k8s.io/release/v1.26.4/bin/linux/amd64/kubectl && \
+
 # Copy the Go Modules manifests
 COPY go.mod go.sum ./
 # cache deps before building and copying source so that we don't need to re-download as much
@@ -31,7 +31,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o dell-csi
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o dell-csi-node-rescanner node-rescanner.go
 
 # Base image
-FROM registry.access.redhat.com/ubi9/ubi-micro
+FROM $BASEIMAGE AS container-base
 
 # Controller
 FROM container-base AS controller
