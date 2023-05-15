@@ -11,9 +11,6 @@ RUN wget https://dl.k8s.io/release/v1.26.4/bin/linux/amd64/kubectl -O kubectl
 
 FROM $BASEIMAGE AS init
 WORKDIR /upgrade
-COPY scripts/upgrade ./
-RUN mkdir -p ./kubectl /usr/local/bin && \
-    chmod +x ./kubectl && \
-    chmod +x /upgrade/migrate_rg.sh
+RUN chmod +x /upgrade/migrate_rg.sh
 USER 1001    
 ENTRYPOINT ["/upgrade/migrate_rg.sh"]
