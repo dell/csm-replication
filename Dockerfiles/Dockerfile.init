@@ -3,17 +3,17 @@
 # some arguments that must be supplied
 ARG BASEIMAGE
 
-FROM golang:1.20 as builder
-WORKDIR /workspace
-COPY --from=builder  /workspace ./
+FROM amaas-eos-mw1.cec.lab.emc.com:5106/dcm/go-builder-image:latest as builder
+WORKDIR /upgrade
+COPY scripts/upgrade ./
 RUN wget https://dl.k8s.io/release/v1.26.4/bin/linux/amd64/kubectl -O kubectl
-ENTRYPOINT ["/dell-csi-replicator"]
+
 
 FROM $BASEIMAGE AS init
 WORKDIR /upgrade
 COPY scripts/upgrade ./
-RUN chmod +x ./kubectl && \
-    mkdir -p ./kubectl /usr/local/bin && \
+RUN mkdir -p ./kubectl /usr/local/bin && \
+    chmod +x ./kubectl && \
     chmod +x /upgrade/migrate_rg.sh
 USER 1001    
 ENTRYPOINT ["/upgrade/migrate_rg.sh"]
