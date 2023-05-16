@@ -4,13 +4,14 @@
 ARG BASEIMAGE
 
 FROM amaas-eos-mw1.cec.lab.emc.com:5106/dcm/go-builder-image:latest as builder
-WORKDIR /upgrade
-COPY scripts/upgrade ./
+WORKDIR /build
 RUN wget https://dl.k8s.io/release/v1.26.4/bin/linux/amd64/kubectl -O kubectl
-
 
 FROM $BASEIMAGE AS init
 WORKDIR /upgrade
-RUN chmod +x /upgrade/migrate_rg.sh
-USER 1001    
+COPY scripts/upgrade ./
+COPY --from=builder /build/kubectl /usr/local/bin/kubectl
+RUN chmod +x /upgrade/migrate_rg.sh && \
+    chmod +x /usr/local/bin/kubectl
+USER 1001
 ENTRYPOINT ["/upgrade/migrate_rg.sh"]
