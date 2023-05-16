@@ -4,13 +4,13 @@ include semver.mk
 ifneq (, $(shell which podman 2>/dev/null))
         CONTAINER_TOOL ?= podman
 else
-        CONTAINER_TOOL ?= docker
+        CONTAINER_TOOL ?= docker 
 endif
 
 # Base image
 # Requires: RHEL host with subscription
-# UBI Image: ubi8/ubi-minimal:8.7-1085
-BASEIMAGE="registry.access.redhat.com/ubi8/ubi-minimal@sha256:ab03679e683010d485ef0399e056b09a38d7843ba4a36ee7dec337dd0037f7a7"
+# UBI Image: ubi9/ubi-micro
+BASEIMAGE="registry.access.redhat.com/ubi9/ubi-micro"
 
 # Options for '--no-cache'
 NOCACHE ?= false

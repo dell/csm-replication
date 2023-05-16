@@ -3,15 +3,15 @@
 # some arguments that must be supplied
 ARG BASEIMAGE
 
+FROM golang:1.20 as builder
+WORKDIR /build
+RUN wget https://dl.k8s.io/release/v1.26.4/bin/linux/amd64/kubectl -O kubectl
+
 FROM $BASEIMAGE AS init
 WORKDIR /upgrade
 COPY scripts/upgrade ./
-RUN microdnf update -y && \
-    microdnf install -y shadow-utils wget && \
-    wget -v https://dl.k8s.io/release/v1.25.7/bin/linux/amd64/kubectl && \
-    microdnf -y remove shadow-utils wget && \
-    microdnf clean all && \
-    chmod +x ./kubectl && \
-    mv ./kubectl /usr/local/bin && \
-    chmod +x /upgrade/migrate_rg.sh
+COPY --from=builder /build/kubectl /usr/local/bin/kubectl
+RUN chmod +x /upgrade/migrate_rg.sh && \
+    chmod +x /usr/local/bin/kubectl
+USER 1001
 ENTRYPOINT ["/upgrade/migrate_rg.sh"]
