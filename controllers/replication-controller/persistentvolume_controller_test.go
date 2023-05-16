@@ -478,7 +478,7 @@ func (suite *PVReconcileSuite) TestPVNotFound() {
 	req := suite.getTypicalRequest("no-pv")
 	_, err := suite.reconciler.Reconcile(context.Background(), req)
 	if err == nil {
-		suite.T().Log("No pv found")
+		suite.NoError(err)
 	}
 }
 
