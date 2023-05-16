@@ -473,6 +473,15 @@ func TestPVReconcileSuite(t *testing.T) {
 	suite.Run(t, testSuite)
 }
 
+func (suite *PVReconcileSuite) TestPVNotFound() {
+
+	req := suite.getTypicalRequest("no-pv")
+	_, err := suite.reconciler.Reconcile(context.Background(), req)
+	if err == nil {
+		suite.T().Log("No pv found")
+	}
+}
+
 func (suite *PVReconcileSuite) TestSetupWithManager() {
 	mgr := manager.Manager(nil)
 	expRateLimiter := workqueue.NewItemExponentialFailureRateLimiter(1*time.Second, 10*time.Second)
