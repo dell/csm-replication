@@ -28,6 +28,7 @@ import (
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
 	"github.com/stretchr/testify/suite"
 	storagev1 "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -330,6 +331,34 @@ func (suite *RGControllerTestSuite) TestReconcileRGWithAnnotationsSingleCluster(
 	suite.T().Log(replicatedRG.Annotations)
 	suite.T().Log(replicatedRG.Labels)
 
+}
+
+func (suite *RGControllerTestSuite) TestRGSyncWithFinalizer() {
+	suite.createSCAndRG(suite.getTypicalSC(), suite.getRGWithoutSyncComplete(suite.driver.RGName, true, false))
+	rg := new(repv1.DellCSIReplicationGroup)
+	req := suite.getTypicalRequest()
+	err := suite.client.Get(context.Background(), req.NamespacedName, rg)
+	suite.NotContains(controllers.RGSyncComplete, rg.Finalizers,
+		"RG finalizer doesn't exist")
+	resp, err := suite.reconciler.Reconcile(context.Background(), req)
+	suite.NoError(err)
+	suite.Equal(false, resp.Requeue)
+	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
+	suite.NoError(err)
+	rg.Finalizers = append(rg.Finalizers, controllers.RGFinalizer)
+	rg.DeletionTimestamp = &metav1.Time{
+		Time: time.Now(),
+	}
+	suite.T().Log(rg.Finalizers, "RG finalizer added")
+	// Check if remote RG got created
+	rClient, err := suite.config.GetConnection(suite.driver.RemoteClusterID)
+	suite.NoError(err)
+	_, err = rClient.GetReplicationGroup(context.Background(), rg.Name)
+	suite.NoError(err)
+
+	//Delete rg
+	err = suite.client.Delete(context.Background(), rg)
+	suite.NoError(err)
 }
 
 func (suite *RGControllerTestSuite) TestReconcileRGWithContextPrefix() {
