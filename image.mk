@@ -4,7 +4,7 @@ include semver.mk
 ifneq (, $(shell which podman 2>/dev/null))
         CONTAINER_TOOL ?= podman
 else
-        CONTAINER_TOOL ?= docker 
+        CONTAINER_TOOL ?= docker
 endif
 
 # Base image
