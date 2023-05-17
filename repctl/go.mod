@@ -5,7 +5,7 @@ go 1.20
 replace github.com/dell/csm-replication => ../
 
 require (
-	github.com/dell/csm-replication v1.4.0
+	github.com/dell/csm-replication v1.5.0
 	github.com/rifflock/lfshook v0.0.0-20180920164130-b9218ef580f5
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.6.1

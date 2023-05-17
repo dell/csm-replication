@@ -263,7 +263,7 @@ spec:
       initContainers:
       - name: init-rg-migration
         imagePullPolicy: Always
-        image: dellemc/dell-replication-init:v1.0.0
+        image: dellemc/dell-replication-init:v1.1.0
         command:
         - /upgrade/migrate_rg.sh
       containers:
@@ -291,7 +291,7 @@ spec:
           value: /app/certs
         - name: X_CSI_REPLICATION_CONFIG_FILE_NAME
           value: config
-        image: dellemc/dell-replication-controller:v1.4.0
+        image: dellemc/dell-replication-controller:v1.5.0
         imagePullPolicy: Always
         name: manager
         resources:
