@@ -5,7 +5,7 @@ ARG BASEIMAGE
 
 FROM golang:1.20 AS builder
 WORKDIR /build
-RUN wget https://dl.k8s.io/release/v1.26.4/bin/linux/amd64/kubectl -O kubectl
+RUN wget https://dl.k8s.io/release/v1.26.5/bin/linux/amd64/kubectl -O kubectl
 
 FROM $BASEIMAGE AS init
 WORKDIR /upgrade
