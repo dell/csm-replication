@@ -1,6 +1,6 @@
 #!/bin/bash
 ######################################################################
-# Copyright © 2021 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ if [ -x "$(command -v kubectl)" ]; then
 elif [ -x "$(command -v oc)" ]; then
   cmd='oc'
 else
-  echo "Neither kubectl or oc are not installed. Verify setup"
+  echo "Neither kubectl nor oc are not installed. Verify setup."
   exit 1
 fi
 
