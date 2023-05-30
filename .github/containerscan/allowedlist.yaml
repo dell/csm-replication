@@ -1,3 +1,4 @@
 general:
   vulnerabilities:
     - CVE-2019-1010022 # "Will not fix", see https://access.redhat.com/security/cve/CVE-2019-1010022
+    - CVE-2023-2253
