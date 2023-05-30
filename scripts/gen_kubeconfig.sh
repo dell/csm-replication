@@ -19,7 +19,7 @@ if [ -x "$(command -v kubectl)" ]; then
 elif [ -x "$(command -v oc)" ]; then
   cmd='oc'
 else
-  echo "Neither kubectl nor oc are not installed. Verify setup."
+  echo "Neither kubectl nor oc is installed. Verify setup."
   exit 1
 fi
 
