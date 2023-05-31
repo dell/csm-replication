@@ -1,6 +1,6 @@
 #!/bin/bash
 ######################################################################
-# Copyright © 2021 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 ######################################################################
+
+# Determine the command to use.
+if [ -x "$(command -v kubectl)" ]; then
+  cmd='kubectl'
+elif [ -x "$(command -v oc)" ]; then
+  cmd='oc'
+else
+  echo "Neither kubectl nor oc is installed. Verify setup."
+  exit 1
+fi
 
 #######################################
 # Prints formatted command's action
@@ -69,15 +79,17 @@ function service_branch() {
   if [ -z "${o}" ]; then
     output="./configs/config-$s"
   fi
+  
   t_print_action "Compiling kubeconfig for \"$s\"" && t_print_status
+  echo "Namespace: $ns, cmd: "
   t_print_action "Extracting secret"
-  gnsecret=$(kubectl -n $ns describe sa $s 2>/dev/null | grep Mountable | awk '{print $3}') && t_print_status || finish_error
+  gnsecret=$($cmd -n $ns describe sa $s 2>/dev/null | grep Mountable | awk '{print $3}') && t_print_status || finish_error
   t_print_action "Extracting token"
-  gntoken=$(kubectl -n $ns describe secret $gnsecret | grep token: | awk '{print $2}') && t_print_status || finish_error
+  gntoken=$($cmd -n $ns describe secret $gnsecret | grep token: | awk '{print $2}') && t_print_status || finish_error
   t_print_action "Extracting CA"
-  gncert=$(kubectl config view --flatten --minify | grep certificate-authority-data: | awk '{print $2}') && t_print_status || finish_error
+  gncert=$($cmd config view --flatten --minify | grep certificate-authority-data: | awk '{print $2}') && t_print_status || finish_error
   t_print_action "Extracting server URL"
-  gnserver=$(kubectl config view --flatten --minify | grep server: | awk '{print $2}') && t_print_status || finish_error
+  gnserver=$($cmd config view --flatten --minify | grep server: | awk '{print $2}') && t_print_status || finish_error
 
   export gnsecret
   export gntoken
@@ -107,40 +119,42 @@ function user_branch() {
   if [ -z "${c}" ] || [ -z "${k}" ]; then
     usage
   fi
+
   if [ -z "${o}" ]; then
     output="./configs/config-$u"
   fi
+
   t_print_action "Encoding and applying CSR.. "
   export base64_csr=$(cat $c | base64 | tr -d '\n')
   export certname=$u
-  cat csr.yaml | envsubst | kubectl apply -f - &>/dev/null && t_print_status || finish_error
+  cat csr.yaml | envsubst | $cmd apply -f - &>/dev/null && t_print_status || finish_error
 
   t_print_action "Approving CSR.. "
-  kubectl certificate approve $u &>/dev/null && t_print_status || finish_error
+  $cmd certificate approve $u &>/dev/null && t_print_status || finish_error
 
   t_print_action "CSR Status: "
-  t_print_status "$(kubectl get csr | grep $u | awk '{print $5}')"
+  t_print_status "$($cmd get csr | grep $u | awk '{print $5}')"
 
   t_print_action "Saving cert.. "
-  kubectl get csr $u -o jsonpath='{.status.certificate}' | base64 --decode >./tmp/$u.crt && t_print_status || finish_error
+  $cmd get csr $u -o jsonpath='{.status.certificate}' | base64 --decode >./tmp/$u.crt && t_print_status || finish_error
 
   t_print_action "Using name \"$u\".. "
   t_print_status
 
   t_print_action "Saving temp CA cert.. "
-  kubectl config view -o jsonpath='{.clusters[0].cluster.certificate-authority-data}' --raw | base64 --decode - >./tmp/kubernetes-ca.crt && t_print_status || finish_error
+  $cmd config view -o jsonpath='{.clusters[0].cluster.certificate-authority-data}' --raw | base64 --decode - >./tmp/kubernetes-ca.crt && t_print_status || finish_error
 
   t_print_action "Creating kubeconfig for \"$u\".. "
-  kubectl config set-cluster $(kubectl config view -o jsonpath='{.clusters[0].name}') --server=$(kubectl config view -o jsonpath='{.clusters[0].cluster.server}') --certificate-authority=./tmp/kubernetes-ca.crt --kubeconfig=$output --embed-certs &>/dev/null && t_print_status || finish_error
+  $cmd config set-cluster $($cmd config view -o jsonpath='{.clusters[0].name}') --server=$($cmd config view -o jsonpath='{.clusters[0].cluster.server}') --certificate-authority=./tmp/kubernetes-ca.crt --kubeconfig=$output --embed-certs &>/dev/null && t_print_status || finish_error
 
   t_print_action "Setting credentials.. "
-  kubectl config set-credentials $u --client-certificate=./tmp/$u.crt --client-key=$k --embed-certs --kubeconfig=$output &>/dev/null && t_print_status || finish_error
+  $cmd config set-credentials $u --client-certificate=./tmp/$u.crt --client-key=$k --embed-certs --kubeconfig=$output &>/dev/null && t_print_status || finish_error
 
   t_print_action "Setting context.. "
-  kubectl config set-context $u --cluster=$(kubectl config view -o jsonpath='{.clusters[0].name}') --namespace=default --user=$u --kubeconfig=$output &>/dev/null && t_print_status || finish_error
+  $cmd config set-context $u --cluster=$($cmd config view -o jsonpath='{.clusters[0].name}') --namespace=default --user=$u --kubeconfig=$output &>/dev/null && t_print_status || finish_error
 
   t_print_action "Applying context.. "
-  kubectl config use-context $u --kubeconfig=$output &>/dev/null && t_print_status || finish_error
+  $cmd config use-context $u --kubeconfig=$output &>/dev/null && t_print_status || finish_error
   echo "DONE. Kubeconfig location: $output"
 }
 
