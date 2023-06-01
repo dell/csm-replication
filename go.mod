@@ -4,9 +4,9 @@ go 1.20
 
 require (
 	github.com/bombsimon/logrusr/v4 v4.0.0
-	github.com/dell/dell-csi-extensions/common v1.1.2-0.20230517135918-9920e636bff1
-	github.com/dell/dell-csi-extensions/migration v1.1.1-0.20230517135918-9920e636bff1
-	github.com/dell/dell-csi-extensions/replication v1.3.1-0.20230517135918-9920e636bff1
+	github.com/dell/dell-csi-extensions/common v1.1.2
+	github.com/dell/dell-csi-extensions/migration v1.1.1
+	github.com/dell/dell-csi-extensions/replication v1.4.0
 	github.com/dell/gobrick v1.7.0
 	github.com/fatih/color v1.15.0
 	github.com/fsnotify/fsnotify v1.6.0
