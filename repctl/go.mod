@@ -1,4 +1,4 @@
-module github.com/dell/repctl
+module github.com/dell/csm-replication/repctl
 
 go 1.20
 
