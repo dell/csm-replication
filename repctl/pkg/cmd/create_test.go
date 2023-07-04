@@ -17,9 +17,9 @@ package cmd
 import (
 	"testing"
 
-	"github.com/dell/repctl/mocks"
-	"github.com/dell/repctl/pkg/k8s"
-	"github.com/dell/repctl/pkg/types"
+	"github.com/dell/csm-replication/repctl/mocks"
+	"github.com/dell/csm-replication/repctl/pkg/k8s"
+	"github.com/dell/csm-replication/repctl/pkg/types"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	v1 "k8s.io/api/storage/v1"

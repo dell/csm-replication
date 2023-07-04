@@ -22,9 +22,9 @@ import (
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	fake_client "github.com/dell/csm-replication/test/e2e-framework/fake-client"
-	"github.com/dell/repctl/pkg/k8s"
-	"github.com/dell/repctl/pkg/metadata"
-	"github.com/dell/repctl/pkg/types"
+	"github.com/dell/csm-replication/repctl/pkg/k8s"
+	"github.com/dell/csm-replication/repctl/pkg/metadata"
+	"github.com/dell/csm-replication/repctl/pkg/types"
 	"github.com/stretchr/testify/suite"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"

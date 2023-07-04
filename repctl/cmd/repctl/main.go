@@ -21,9 +21,9 @@ import (
 	log "github.com/sirupsen/logrus"
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 
-	"github.com/dell/repctl/pkg/cmd"
-	"github.com/dell/repctl/pkg/config"
-	"github.com/dell/repctl/pkg/metadata"
+	"github.com/dell/csm-replication/repctl/pkg/cmd"
+	"github.com/dell/csm-replication/repctl/pkg/config"
+	"github.com/dell/csm-replication/repctl/pkg/metadata"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

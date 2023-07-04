@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/dell/repctl/pkg/display"
-	"github.com/dell/repctl/pkg/metadata"
+	"github.com/dell/csm-replication/repctl/pkg/display"
+	"github.com/dell/csm-replication/repctl/pkg/metadata"
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 )

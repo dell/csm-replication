@@ -17,9 +17,9 @@ package cmd
 import (
 	"context"
 
-	"github.com/dell/repctl/pkg/k8s"
+	"github.com/dell/csm-replication/repctl/pkg/k8s"
 
-	"github.com/dell/repctl/pkg/config"
+	"github.com/dell/csm-replication/repctl/pkg/config"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
