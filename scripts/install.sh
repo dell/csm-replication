@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 ######################################################################
-# Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,17 +15,29 @@
 ######################################################################
 
 SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-MODULEDIR="${SCRIPTDIR}/../helm"
+MODULEDIR="${SCRIPTDIR}/../"
 PROG="${0}"
 MODE="install"
 NS="dell-replication-controller"
 RELEASE="replication"
+MODULE="csm-replication"
 
 # export the name of the debug log, so child processes will see it
 export DEBUGLOG="${SCRIPTDIR}/install-debug.log"
-MODULE="csm-replication"
 
 source "$SCRIPTDIR"/common.sh
+
+if [ ! -d "$MODULEDIR/helm-charts" ]; then
+  if  [ ! -d "$SCRIPTDIR/helm-charts" ]; then
+    git clone --quiet -c advice.detachedHead=false -b csm-replication-1.5.0 https://github.com/dell/helm-charts
+  fi
+  mv helm-charts $MODULEDIR
+else
+  if [  -d "$SCRIPTDIR/helm-charts" ]; then
+    rm -rf $SCRIPTDIR/helm-charts
+  fi
+fi
+MODULEDIR="${SCRIPTDIR}/../helm-charts/charts"
 
 if [ -f "${DEBUGLOG}" ]; then
   rm -f "${DEBUGLOG}"
