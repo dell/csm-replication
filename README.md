@@ -1,5 +1,5 @@
 <!--
- Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -28,9 +28,9 @@ CSM Replication project includes the following components:
 * CSM Replication CRDs - [Custom Resource definitions](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/)
 * CSM Replication sidecar container for CSI drivers
 * CSM Replication Controller - Multi-Cluster Controller
-* repctl - helper utility for setups, queries
+* repctl - helper utility for setup and queries
 
-_*CSM Replication*_ sidecar is installed as part of the CSI driver controller plugin and utilizes custom Dell CSI extensions to communicate
+_*CSM Replication*_ sidecar is installed as part of the CSI driver controller pod and utilizes custom Dell CSI extensions to communicate
 with Dell CSI drivers. It includes a set of Kubernetes controllers which keep watch on requests related to Persistent Volumes (PVs)
  and Persistent Volume Claims(PVCs). It uses `dell-csi-extensions` APIs to perform replication related actions.
 You can read more about the extensions [here](https://github.com/dell/dell-csi-extensions).
@@ -72,7 +72,7 @@ The above tools can also be installed by running the command `make tools`.
 ### Custom Resource Definitions
 
 Run the command `make manifests` to build the CSM Replication CRDs. This command invokes `controller-gen` to generate the CRDs. 
-The API code is annotated with `kubebuilder` tags which are used by the`controller-gen` generators. The generated definitions are present in the form
+The API code is annotated with `kubebuilder` tags which are used by the `controller-gen` generators. The generated definitions are present in the form
 of a _kustomize_ recipe in the `config/crd` folder.
 
 ### Binaries
@@ -115,16 +115,13 @@ For building the RBAC rules for the controller, run `make controller-rbac`.
 
 ## Installation
 
+Please consult the [Installation Guide](https://dell.github.io/csm-docs/docs/replication/deployment/installation/) for instructions on installing the replication controller and sidecar.
+
+To build and install your own images using the provided Makefile targets, below information may be useful:
+
 ### Custom Resource Definitions
 
-Run the command `make install` to install the Custom Resource Definitions in your Kubernetes cluster. Alternatively, you can directly install
-the CRDs using the static manifest file `deploy/replicationcrds.all.yaml` by running the command -
-
-```
-kubectl create -f deploy/replicationcrds.all.yaml
-```
-
-**Note**: CRDs must be installed before installing either CSM Replication sidecar or CSM Replication Controller.  
+You can run the command `make install` to install the Custom Resource Definitions in your Kubernetes cluster.
 
 ### CSM Replication sidecar
 
@@ -140,30 +137,11 @@ Make sure that the kubernetes user has the desired RBAC permissions as described
 
 ### CSM Replication Controller
 
-#### Pre-requisites
-
-CSM Replication Controller is always installed in the namespace `dell-replication-controller`.
-You should also edit the file `deploy/config.yaml` with the required details before proceeding with the installation.
-
-#### Using Install script
-
-Use the script `scripts/install.sh` to install the CSM Replication Controller. This script will do the following:
-* Create namespace `dell-replication-controller`
-* Create/Update configmap using the contents of `deploy/config.yaml`
-* Install/Update the CRDs
-* Install/Update the `dell-replication-controller` Deployment
-
-**Note**: In case you want to install a specific version, make sure to update the `deploy/controller.yaml` to point to the desired image tag.
-
-#### Using Makefile target
-
-If you are building your own images using the provided Makefile targets, you can install the CSM Replication Controller
-by running the command `make deploy-controller`. The namespace `dell-replication-controller` must exist in the cluster before this installation.
+You can install the CSM Replication Controller by running the command `make deploy-controller`. The namespace `dell-replication-controller` must exist in the cluster before this installation.
 
 You can also run the `dell-replication-controller` process directly in your Kubernetes cluster by running the command `make run-controller`.
 Make sure that the kubernetes user has the desired RBAC permissions.
 
 ## Testing
 
-Click [here](/TESTING.md) for more details on how to test.
-
+Click [here](/TESTING.md) for details on how to test.
