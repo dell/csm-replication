@@ -9,8 +9,8 @@ endif
 
 # Base image
 # Requires: RHEL host with subscription
-# UBI Image: ubi9/ubi-micro
-BASEIMAGE="registry.access.redhat.com/ubi9/ubi-micro"
+# UBI Image: ubi9/ubi-micro 9.2-9
+BASEIMAGE="registry.access.redhat.com/ubi9/ubi-micro@sha256:57ac8525717f02853b992b0fab41752d4120e5d85163acd8ab696c8a94a715b5"
 
 # Options for '--no-cache'
 NOCACHE ?= false
@@ -25,8 +25,6 @@ VERSION ?="v$(MAJOR).$(MINOR).$(PATCH).$(BUILD)"
 
 REGISTRY ?= "localhost:5000"
 
-# Init container image name
-INIT_IMAGE_NAME ?= dell-replication-init
 # Default Sidecar image name
 SIDECAR_IMAGE_NAME ?= dell-csi-replicator
 SIDECAR_M_IMAGE_NAME ?= dell-csi-migrator
@@ -34,17 +32,16 @@ SIDECAR_NR_IMAGE_NAME ?= dell-csi-node-rescanner
 # Default Common controller image name
 CONTROLLER_IMAGE_NAME ?= dell-replication-controller
 
-INIT_IMAGE_TAG ?= "$(REGISTRY)/$(INIT_IMAGE_NAME):$(VERSION)"
 SIDECAR_IMAGE_NR_TAG ?= "$(REGISTRY)/$(SIDECAR_NR_IMAGE_NAME):$(VERSION)"
 SIDECAR_IMAGE_M_TAG ?= "$(REGISTRY)/$(SIDECAR_M_IMAGE_NAME):$(VERSION)"
 SIDECAR_IMAGE_TAG ?= "$(REGISTRY)/$(SIDECAR_IMAGE_NAME):$(VERSION)"
 CONTROLLER_IMAGE_TAG ?= "$(REGISTRY)/$(CONTROLLER_IMAGE_NAME):$(VERSION)"
 
-init:
-	$(CONTAINER_TOOL) build . -t ${INIT_IMAGE_TAG} -f Dockerfiles/Dockerfile.init --target init --build-arg BASEIMAGE=$(BASEIMAGE) ${NOCACHE_ARG}
-
 sidecar:
 	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_TAG} -f Dockerfiles/Dockerfile --target sidecar --build-arg BASEIMAGE=$(BASEIMAGE) ${NOCACHE_ARG}
+
+sidecar-push:
+	$(CONTAINER_TOOL) push ${SIDECAR_IMAGE_TAG}
 
 sidecar-node-rescanner:
 	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_NR_TAG} -f Dockerfiles/Dockerfile --target node-rescanner --build-arg BASEIMAGE=$(BASEIMAGE) ${NOCACHE_ARG}
@@ -55,14 +52,8 @@ sidecar-node-rescanner-push:
 sidecar-migrator:
 	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_M_TAG} -f Dockerfiles/Dockerfile --target migrator --build-arg BASEIMAGE=$(BASEIMAGE) ${NOCACHE_ARG}
 
-init-push:
-	$(CONTAINER_TOOL) push ${INIT_IMAGE_TAG}
-
 sidecar-migrator-push:
 	$(CONTAINER_TOOL) push ${SIDECAR_IMAGE_M_TAG}
-
-sidecar-push:
-	$(CONTAINER_TOOL) push ${SIDECAR_IMAGE_TAG}
 
 controller:
 	$(CONTAINER_TOOL) build . -t ${CONTROLLER_IMAGE_TAG} -f Dockerfiles/Dockerfile --target controller --build-arg BASEIMAGE=$(BASEIMAGE) ${NOCACHE_ARG}
@@ -71,8 +62,8 @@ controller-push:
 	$(CONTAINER_TOOL) push ${CONTROLLER_IMAGE_TAG}
 
 
-images: init sidecar controller sidecar-migrator sidecar-node-rescanner
-images-push: init-push sidecar-push controller-push sidecar-migrator-push sidecar-node-rescanner-push
+images: sidecar controller sidecar-migrator sidecar-node-rescanner
+images-push: sidecar-push controller-push sidecar-migrator-push sidecar-node-rescanner-push
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 deploy-controller:
