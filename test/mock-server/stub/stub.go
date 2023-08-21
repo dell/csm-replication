@@ -19,7 +19,7 @@ package stub
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -103,7 +103,7 @@ type Output struct {
 }
 
 func addStub(w http.ResponseWriter, r *http.Request) {
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		responseError(err, w)
 		return

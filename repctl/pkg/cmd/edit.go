@@ -17,7 +17,6 @@ package cmd
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -142,7 +141,7 @@ func editSecretCommand() *cobra.Command {
 			secret := &Secret{s}
 			data := objectYAML(secret.ToDecodedSecret())
 
-			tmpFile, err := ioutil.TempFile("", "temp")
+			tmpFile, err := os.CreateTemp("", "temp")
 			if err != nil {
 				log.Fatalf("edit secret: error in creating temp file with secret data: %s", err.Error())
 			}
@@ -212,7 +211,7 @@ func objectYAML(obj interface{}) string {
 
 // parseSecret parses *one* secret out of a YAML file and returns it
 func parseSecret(path string) (*v1.Secret, error) {
-	content, err := ioutil.ReadFile(filepath.Clean(path))
+	content, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
 		return nil, err
 	}

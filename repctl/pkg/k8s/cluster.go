@@ -17,7 +17,6 @@ package k8s
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -586,7 +585,7 @@ func (*MultiClusterConfigurator) GetAllClusters(clusterIDs []string, configDir s
 	strictCheck := len(clusterIDs) > 0
 
 	clusters := make([]ClusterInterface, 0)
-	items, err := ioutil.ReadDir(configDir)
+	items, err := os.ReadDir(configDir)
 	if err != nil {
 		return nil, err
 	}

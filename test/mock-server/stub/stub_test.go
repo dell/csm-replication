@@ -18,7 +18,7 @@ package stub
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -181,7 +181,7 @@ func TestStub(t *testing.T) {
 			wrt := httptest.NewRecorder()
 			req := v.mock()
 			v.handler(wrt, req)
-			_, err := ioutil.ReadAll(wrt.Result().Body)
+			_, err := io.ReadAll(wrt.Result().Body)
 
 			assert.NoError(t, err)
 		})
