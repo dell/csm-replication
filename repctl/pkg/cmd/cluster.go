@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -335,7 +334,7 @@ func injectConfigIntoCluster(srcCluster k8s.ClusterInterface, clusters *k8s.Clus
 			Data: map[string][]byte{},
 		}
 
-		data, err := ioutil.ReadFile(tgtCluster.GetKubeConfigFile())
+		data, err := os.ReadFile(tgtCluster.GetKubeConfigFile())
 		if err != nil {
 			return fmt.Errorf("error while trying to read config file: %s", err.Error())
 		}
@@ -498,7 +497,7 @@ func generateConfigsFromSA(mc *k8s.MultiClusterConfigurator, clusterIDs []string
 		return nil, fmt.Errorf("failed to read embedded script: %s", err.Error())
 	}
 
-	err = ioutil.WriteFile("/tmp/repctl/gen_kubeconfig.sh", fileData, 0600) // #nosec G303
+	err = os.WriteFile("/tmp/repctl/gen_kubeconfig.sh", fileData, 0600) // #nosec G303
 	if err != nil {
 		return nil, fmt.Errorf("failed to write embedded script: %s", err.Error())
 	}
@@ -509,7 +508,7 @@ func generateConfigsFromSA(mc *k8s.MultiClusterConfigurator, clusterIDs []string
 		return nil, fmt.Errorf("failed to read embedded config template: %s", err.Error())
 	}
 
-	err = ioutil.WriteFile("/tmp/repctl/config-placeholder", fileData, 0600) // #nosec G303
+	err = os.WriteFile("/tmp/repctl/config-placeholder", fileData, 0600) // #nosec G303
 	if err != nil {
 		return nil, fmt.Errorf("failed to write embedded config template: %s", err.Error())
 	}

@@ -16,7 +16,7 @@ package k8s_test
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"os"
 	"testing"
 
@@ -388,7 +388,7 @@ func (suite *ClusterTestSuite) TestCreateObject() {
 	suite.NoError(fileErr)
 	defer file.Close()
 
-	data, err := ioutil.ReadAll(file)
+	data, err := io.ReadAll(file)
 	suite.NoError(err)
 
 	_, err = suite.cluster.CreateObject(context.Background(), data)

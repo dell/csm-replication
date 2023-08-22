@@ -19,8 +19,8 @@ package stub
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
+	"os"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -240,7 +240,7 @@ func clearStorage() {
 }
 
 func readStubFromFile(path string) {
-	files, err := ioutil.ReadDir(path)
+	files, err := os.ReadDir(path)
 	if err != nil {
 		log.Printf("Can't read stub from %s. %v\n", path, err)
 		return
@@ -248,7 +248,7 @@ func readStubFromFile(path string) {
 
 	for _, file := range files {
 		p := fmt.Sprintf("%s/%s", path, file.Name())
-		byt, err := ioutil.ReadFile(filepath.Clean(p))
+		byt, err := os.ReadFile(filepath.Clean(p))
 		if err != nil {
 			log.Printf("Error when reading file %s. %v. skipping...", file.Name(), err)
 			continue
