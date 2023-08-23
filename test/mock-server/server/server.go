@@ -20,11 +20,11 @@ import (
 	"bytes"
 	context2 "context"
 	"encoding/json"
+	"io"
 
 	"github.com/dell/dell-csi-extensions/migration"
 
 	"fmt"
-	"io/ioutil"
 	"net/http"
 
 	commonext "github.com/dell/dell-csi-extensions/common"
@@ -188,7 +188,7 @@ func FindStub(service, method string, in, out interface{}) error {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf(string(body))
 	}
 
