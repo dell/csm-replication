@@ -9,8 +9,8 @@ endif
 
 # Base image
 # Requires: RHEL host with subscription
-# UBI Image: ubi9/ubi-micro 9.2-9
-BASEIMAGE="registry.access.redhat.com/ubi9/ubi-micro@sha256:57ac8525717f02853b992b0fab41752d4120e5d85163acd8ab696c8a94a715b5"
+# UBI Image: ubi9/ubi-micro 9.2-13
+BASEIMAGE="registry.access.redhat.com/ubi9/ubi-micro@sha256:630cf7bdef807f048cadfe7180d6c27eb3aaa99323ffc3628811da230ed3322a"
 
 # Options for '--no-cache'
 NOCACHE ?= false

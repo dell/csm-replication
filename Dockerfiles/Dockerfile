@@ -2,7 +2,7 @@
 ARG BASEIMAGE
 
 # Build the manager binary
-FROM golang:1.20 AS builder
+FROM golang:1.21 AS builder
 
 RUN mkdir -p /workspace/dell-csi-replicator
 WORKDIR /workspace/dell-csi-replicator
