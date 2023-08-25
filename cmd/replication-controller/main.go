@@ -90,7 +90,7 @@ func (mgr *ControllerManager) startSecretController() error {
 	if err != nil {
 		return err
 	}
-	err = secretController.Watch(source.Kind(mgr.Manager.GetCache(), &corev1.Secret{}), &handler.EnqueueRequestForObject{},
+	err = secretController.Watch(&source.Kind{Type: &corev1.Secret{}}, &handler.EnqueueRequestForObject{},
 		predicate.NewPredicateFuncs(func(object ctrlClient.Object) bool {
 			return object.GetNamespace() == mgr.Opts.WatchNamespace
 		}))

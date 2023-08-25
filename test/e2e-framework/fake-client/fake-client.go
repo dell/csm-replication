@@ -208,14 +208,6 @@ func (f *Client) listReplicationGroup(list *repv1.DellCSIReplicationGroupList, o
 	return nil
 }
 
-func (c *Client) GroupVersionKindFor(obj runtime.Object) (schema.GroupVersionKind, error) {
-	return schema.GroupVersionKind{}, nil
-}
-
-func (c *Client) IsObjectNamespaced(obj runtime.Object) (bool, error) {
-	return false, nil
-}
-
 // Create creates new object in fake cluster by putting it in map
 func (f Client) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
 	if f.errorInjector != nil {
