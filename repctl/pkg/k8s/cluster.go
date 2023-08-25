@@ -354,6 +354,7 @@ func (c *Cluster) CreatePersistentVolumeClaimsFromPVs(ctx context.Context, names
 				pvcAnnotations[key] = value
 			}
 		}
+		storageClassName := &pv.SCName
 		pvcObj := v1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:   namespace,
@@ -367,7 +368,7 @@ func (c *Cluster) CreatePersistentVolumeClaimsFromPVs(ctx context.Context, names
 					Requests: pv.Requests,
 				},
 				VolumeName:       pv.Name,
-				StorageClassName: &pv.SCName,
+				StorageClassName: storageClassName,
 				VolumeMode:       pv.VolumeMode,
 			},
 		}
