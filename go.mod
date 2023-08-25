@@ -1,27 +1,27 @@
 module github.com/dell/csm-replication
 
-go 1.20
+go 1.21
 
 require (
 	github.com/bombsimon/logrusr/v4 v4.0.0
-	github.com/dell/dell-csi-extensions/common v1.1.2
-	github.com/dell/dell-csi-extensions/migration v1.1.1
-	github.com/dell/dell-csi-extensions/replication v1.4.0
-	github.com/dell/gobrick v1.7.0
+	github.com/dell/dell-csi-extensions/common v1.1.3-0.20230821201344-ea25f89d957e
+	github.com/dell/dell-csi-extensions/migration v1.1.2-0.20230821201344-ea25f89d957e
+	github.com/dell/dell-csi-extensions/replication v1.4.1-0.20230821201344-ea25f89d957e
+	github.com/dell/gobrick v1.8.0
 	github.com/fatih/color v1.15.0
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/go-chi/chi v1.5.4
 	github.com/go-logr/logr v1.2.4
-	github.com/google/uuid v1.3.0
+	github.com/google/uuid v1.3.1
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.2.0
 	github.com/lithammer/fuzzysearch v1.1.8
-	github.com/sirupsen/logrus v1.9.1
-	github.com/spf13/viper v1.15.0
-	github.com/stretchr/testify v1.8.2
-	golang.org/x/net v0.10.0
-	golang.org/x/sync v0.2.0
-	golang.org/x/text v0.9.0 // indirect
-	google.golang.org/grpc v1.55.0
+	github.com/sirupsen/logrus v1.9.3
+	github.com/spf13/viper v1.16.0
+	github.com/stretchr/testify v1.8.3
+	golang.org/x/net v0.14.0
+	golang.org/x/sync v0.3.0
+	golang.org/x/text v0.12.0 // indirect
+	google.golang.org/grpc v1.57.0
 	k8s.io/api v0.26.4
 	k8s.io/apiextensions-apiserver v0.26.4
 	k8s.io/apimachinery v0.26.4
@@ -88,7 +88,7 @@ require (
 	github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/olekukonko/tablewriter v0.0.4 // indirect
-	github.com/pelletier/go-toml/v2 v2.0.7 // indirect
+	github.com/pelletier/go-toml/v2 v2.0.8 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.15.1 // indirect
@@ -112,14 +112,14 @@ require (
 	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/mod v0.9.0 // indirect
 	golang.org/x/oauth2 v0.8.0 // indirect
-	golang.org/x/sys v0.8.0 // indirect
-	golang.org/x/term v0.8.0 // indirect
+	golang.org/x/sys v0.11.0 // indirect
+	golang.org/x/term v0.11.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.7.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20230410155749-daa745c078e1 // indirect
-	google.golang.org/protobuf v1.30.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20230815205213-6bfd019c3878 // indirect
+	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

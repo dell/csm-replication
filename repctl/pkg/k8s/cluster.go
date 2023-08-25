@@ -366,7 +366,8 @@ func (c *Cluster) CreatePersistentVolumeClaimsFromPVs(ctx context.Context, names
 				Resources: v1.ResourceRequirements{
 					Requests: pv.Requests,
 				},
-				VolumeName:       pv.Name,
+				VolumeName: pv.Name,
+				//#nosec G601 -- PVs in a RG will all have same SCName
 				StorageClassName: &pv.SCName,
 				VolumeMode:       pv.VolumeMode,
 			},
