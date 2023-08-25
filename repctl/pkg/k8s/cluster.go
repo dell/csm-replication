@@ -354,7 +354,6 @@ func (c *Cluster) CreatePersistentVolumeClaimsFromPVs(ctx context.Context, names
 				pvcAnnotations[key] = value
 			}
 		}
-		storageClassName := &pv.SCName
 		pvcObj := v1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:   namespace,
@@ -367,8 +366,10 @@ func (c *Cluster) CreatePersistentVolumeClaimsFromPVs(ctx context.Context, names
 				Resources: v1.ResourceRequirements{
 					Requests: pv.Requests,
 				},
-				VolumeName:       pv.Name,
-				StorageClassName: storageClassName,
+				VolumeName: pv.Name,
+				// gosec: G601
+				// PVs in a RG will all have same SCName
+				StorageClassName: &pv.SCName,
 				VolumeMode:       pv.VolumeMode,
 			},
 		}
