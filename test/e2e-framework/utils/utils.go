@@ -125,7 +125,6 @@ const PVCName = "test-pvc"
 
 // InitializeSchemes inits client-go and replication v1 schemes
 func InitializeSchemes() {
-
 	utilruntime.Must(clientgoscheme.AddToScheme(Scheme))
 	utilruntime.Must(repv1.AddToScheme(Scheme))
 	// +kubebuilder:scaffold:scheme
@@ -329,7 +328,8 @@ func GetNonReplicationEnabledSC(provisionerName, scName string) *storagev1.Stora
 
 // GetRGObj returns DellCSIReplicationGroup testing object
 func GetRGObj(name, driverName, remoteClusterID, pgID, remotePGID string, params,
-	remoteParams map[string]string) *repv1.DellCSIReplicationGroup {
+	remoteParams map[string]string,
+) *repv1.DellCSIReplicationGroup {
 	replicationGroup := repv1.DellCSIReplicationGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,

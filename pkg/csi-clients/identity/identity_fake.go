@@ -56,7 +56,7 @@ type mockIdentity struct {
 }
 
 func (m *mockIdentity) GetMigrationCapabilities(ctx context.Context) (MigrationCapabilitySet, error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
@@ -119,7 +119,8 @@ func (m *mockIdentity) ProbeForever(ctx context.Context) (string, error) {
 }
 
 func (m *mockIdentity) GetReplicationCapabilities(ctx context.Context) (ReplicationCapabilitySet,
-	[]*replication.SupportedActions, error) {
+	[]*replication.SupportedActions, error,
+) {
 	if err := m.injectedError.getAndClearError(); err != nil {
 		return ReplicationCapabilitySet{}, []*replication.SupportedActions{}, err
 	}

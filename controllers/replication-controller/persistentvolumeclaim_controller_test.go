@@ -48,8 +48,10 @@ type PVControllerTestSuite struct {
 }
 
 // blank assignment to verify client.Client method implementations
-var _ client.Client = &fakeclient.Client{}
-var externalReconcile PersistentVolumeClaimReconciler
+var (
+	_                 client.Client = &fakeclient.Client{}
+	externalReconcile PersistentVolumeClaimReconciler
+)
 
 func (suite *PVControllerTestSuite) SetupSuite() {
 	suite.Init()
@@ -62,7 +64,7 @@ func (suite *PVControllerTestSuite) Init() {
 }
 
 func (suite *PVControllerTestSuite) getPV() corev1.PersistentVolume {
-	//creating fake PV to use with our fake PVC
+	// creating fake PV to use with our fake PVC
 	volumeAttributes := map[string]string{
 		"fake-CapacityGB":     "3.00",
 		"RemoteSYMID":         "000000000002",
@@ -208,7 +210,6 @@ func (suite *PVControllerTestSuite) runFakeRemoteReplicationManager(fakeConfig c
 	remotePVC1.Annotations[controllers.PVCSyncComplete] = "yes"
 	e = externalReconcile.processLocalPVC(context.WithValue(context.TODO(), constants.LoggerContextKey, logger), remotePVC1, "xyz", "xyz", "xyz", "xyz", true)
 	assert.NoError(suite.T(), e, "No Error while processing local PVC")
-
 }
 
 func (suite *PVControllerTestSuite) TestRemoteReplication() {
@@ -230,7 +231,7 @@ func (suite *PVControllerTestSuite) TestRemoteReplication() {
 	err = remoteClient.CreatePersistentVolume(context.Background(), &pvObj)
 	assert.Nil(suite.T(), err)
 
-	//creating fake storage-class with replication params
+	// creating fake storage-class with replication params
 	parameters := map[string]string{
 		"RdfGroup":           "2",
 		"RdfMode":            "ASYNC",
@@ -252,7 +253,7 @@ func (suite *PVControllerTestSuite) TestRemoteReplication() {
 	err = suite.client.Create(ctx, &scObj)
 	assert.Nil(suite.T(), err)
 
-	//creating fake PV to use with our fake PVC
+	// creating fake PV to use with our fake PVC
 	pvObj = suite.getPV()
 	err = suite.client.Create(ctx, &pvObj)
 	assert.NotNil(suite.T(), pvObj)
@@ -263,12 +264,12 @@ func (suite *PVControllerTestSuite) TestRemoteReplication() {
 	annotations[controllers.RemoteClusterID] = "remote-123"
 	annotations[controllers.ContextPrefix] = "csi-fake"
 
-	//creating fake resource group
+	// creating fake resource group
 	resourceGroup := repv1.DellCSIReplicationGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "fake-rg",
 			Annotations: annotations,
-			//Namespace: suite.mockUtils.Specs.Namespace,
+			// Namespace: suite.mockUtils.Specs.Namespace,
 		},
 		Spec: repv1.DellCSIReplicationGroupSpec{
 			DriverName:                suite.driver.DriverName,
@@ -294,7 +295,6 @@ func (suite *PVControllerTestSuite) TestRemoteReplication() {
 	err = suite.client.Create(ctx, &resourceGroup)
 
 	suite.runFakeRemoteReplicationManager(suite.fakeConfig, remoteClient)
-
 }
 
 func (suite *PVControllerTestSuite) TestSetupWithManagerRg() {

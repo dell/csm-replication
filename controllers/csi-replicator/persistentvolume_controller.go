@@ -110,9 +110,7 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 	}
 
-	var (
-		replicationGroupName string
-	)
+	var replicationGroupName string
 
 	log.V(common.InfoLevel).Info("Adding replication-group, remote storage class annotation and label to the PersistentVolume")
 
@@ -175,7 +173,8 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 func (r *PersistentVolumeReconciler) processVolumeForReplicationGroup(ctx context.Context, volume *v1.PersistentVolume,
 	replicationGroupName string,
-	scParams map[string]string) error {
+	scParams map[string]string,
+) error {
 	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Begin process volume for replication-group")
 
@@ -366,7 +365,6 @@ func (r *PersistentVolumeReconciler) SetupWithManager(ctx context.Context, mgr c
 // getProtectionGroupID take a DellCSIReplicationGroup instance and returns its protection group ID.
 // It satisfies the IndexerFunc type in controller-runtime/pkg/client/interfaces
 func getProtectionGroupID(object client.Object) []string {
-
 	replicationGroup := object.(*repv1.DellCSIReplicationGroup)
 	if replicationGroup.Spec.ProtectionGroupID != "" {
 		return []string{replicationGroup.Spec.ProtectionGroupID}

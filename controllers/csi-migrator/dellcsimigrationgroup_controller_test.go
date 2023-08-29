@@ -18,9 +18,10 @@ package csimigrator
 
 import (
 	"context"
-	csimigration "github.com/dell/csm-replication/pkg/csi-clients/migration"
 	"testing"
 	"time"
+
+	csimigration "github.com/dell/csm-replication/pkg/csi-clients/migration"
 
 	storagev1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
@@ -153,7 +154,6 @@ func (suite *MGControllerTestSuite) TestMGReconcileWithMigratedState() {
 	err = suite.client.Get(ctx, types.NamespacedName{Namespace: "", Name: mg1.Name}, mg)
 	suite.NoError(err, "No error on MG get")
 	suite.Equal(CommitReadyState, mg.Status.State, "State should be Ready")
-
 }
 
 // MG with CommitReadyState
@@ -185,7 +185,6 @@ func (suite *MGControllerTestSuite) TestMGReconcileWithCommitReadyState() {
 	suite.NoError(err, "No error on MG get")
 	suite.Equal(CommittedState, mg.Status.State, "State should be Ready")
 	suite.Equal(CommitReadyState, mg.Status.LastAction, "State should be Ready")
-
 }
 
 // MG with CommittedState
@@ -440,7 +439,6 @@ func (suite *MGControllerTestSuite) TestMGReconcileWithInvalidState() {
 	mg := new(storagev1.DellCSIMigrationGroup)
 	err = suite.client.Get(ctx, types.NamespacedName{Namespace: "", Name: mg1.Name}, mg)
 	suite.NoError(err, "No error on MG reconcile")
-
 }
 
 func (suite *MGControllerTestSuite) getTypicalReconcileRequest(name string) reconcile.Request {

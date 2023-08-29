@@ -400,11 +400,12 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 }
 
 func (r *PersistentVolumeReconciler) processRemotePV(ctx context.Context,
-	rClient connection.RemoteClusterClient, remotePV *v1.PersistentVolume, remoteRGName string) (bool, error) {
+	rClient connection.RemoteClusterClient, remotePV *v1.PersistentVolume, remoteRGName string,
+) (bool, error) {
 	log := common.GetLoggerFromContext(ctx)
 	if remoteRGName != "" {
 		// Update the annotation for the remote PV object
-		//controller.AddAnnotation(remotePV, controller.ReplicationGroup, remoteRGName)
+		// controller.AddAnnotation(remotePV, controller.ReplicationGroup, remoteRGName)
 		if remotePV.Annotations[controller.ReplicationGroup] == "" {
 			// Set the annotation
 			log.V(common.DebugLevel).Info(fmt.Sprintf("Setting the ReplicationGroup label & annotation %s on remotePV %s", remoteRGName, remotePV.Name))

@@ -91,7 +91,8 @@ func NewFakeReplicationClient(contextPrefix string) MockReplication {
 
 // GetStorageProtectionGroupStatus mocks call
 func (m *MockReplication) GetStorageProtectionGroupStatus(ctx context.Context,
-	protectionGroupID string, attributes map[string]string) (*csiext.GetStorageProtectionGroupStatusResponse, error) {
+	protectionGroupID string, attributes map[string]string,
+) (*csiext.GetStorageProtectionGroupStatusResponse, error) {
 	defer m.ClearErrorAndCondition(false)
 	if err := m.injectedError.getError(); err != nil {
 		return nil, err
@@ -114,7 +115,8 @@ func (m *MockReplication) GetStorageProtectionGroupStatus(ctx context.Context,
 // ExecuteAction mocks call
 func (m *MockReplication) ExecuteAction(ctx context.Context, protectionGroupID string,
 	actionType *csiext.ExecuteActionRequest_Action, attributes map[string]string,
-	remoteProtectionGroupID string, remoteAttributes map[string]string) (*csiext.ExecuteActionResponse, error) {
+	remoteProtectionGroupID string, remoteAttributes map[string]string,
+) (*csiext.ExecuteActionResponse, error) {
 	defer m.ClearErrorAndCondition(false)
 	if err := m.injectedError.getError(); err != nil {
 		return nil, err
@@ -143,7 +145,8 @@ func (m *MockReplication) ExecuteAction(ctx context.Context, protectionGroupID s
 
 // CreateRemoteVolume mocks call
 func (m *MockReplication) CreateRemoteVolume(ctx context.Context, volumeHandle string,
-	params map[string]string) (*csiext.CreateRemoteVolumeResponse, error) {
+	params map[string]string,
+) (*csiext.CreateRemoteVolumeResponse, error) {
 	defer m.ClearErrorAndCondition(false)
 	if err := m.injectedError.getError(); err != nil {
 		return nil, err
@@ -163,7 +166,8 @@ func (m *MockReplication) CreateRemoteVolume(ctx context.Context, volumeHandle s
 
 // DeleteLocalVolume mocks call
 func (m *MockReplication) DeleteLocalVolume(ctx context.Context, volumeHandle string,
-	params map[string]string) (*csiext.DeleteLocalVolumeResponse, error) {
+	params map[string]string,
+) (*csiext.DeleteLocalVolumeResponse, error) {
 	defer m.ClearErrorAndCondition(false)
 	if err := m.injectedError.getError(); err != nil {
 		return nil, err
@@ -174,7 +178,8 @@ func (m *MockReplication) DeleteLocalVolume(ctx context.Context, volumeHandle st
 
 // CreateStorageProtectionGroup mocks call
 func (m *MockReplication) CreateStorageProtectionGroup(ctx context.Context, volumeHandle string,
-	params map[string]string) (*csiext.CreateStorageProtectionGroupResponse, error) {
+	params map[string]string,
+) (*csiext.CreateStorageProtectionGroupResponse, error) {
 	defer m.ClearErrorAndCondition(false)
 	if err := m.injectedError.getError(); err != nil {
 		return nil, err
@@ -211,7 +216,8 @@ func (m *MockReplication) CreateStorageProtectionGroup(ctx context.Context, volu
 
 // DeleteStorageProtectionGroup mocks call
 func (m *MockReplication) DeleteStorageProtectionGroup(ctx context.Context, groupID string,
-	groupAttributes map[string]string) error {
+	groupAttributes map[string]string,
+) error {
 	defer m.ClearErrorAndCondition(false)
 	if err := m.injectedError.getError(); err != nil {
 		return err

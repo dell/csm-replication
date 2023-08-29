@@ -40,7 +40,7 @@ func New(source string, targets ...string) connection.MultiClusterClient {
 	}
 	for _, target := range targets {
 		obj := []runtime.Object{}
-		//creating fake storage-class with replication params
+		// creating fake storage-class with replication params
 		parameters := map[string]string{
 			"RdfGroup":           "2",
 			"RdfMode":            "ASYNC",

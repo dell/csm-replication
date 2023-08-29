@@ -19,16 +19,15 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
+	"strings"
+	"time"
 
 	"github.com/bombsimon/logrusr/v4"
 	"github.com/dell/csm-replication/pkg/config"
 	"github.com/fsnotify/fsnotify"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-
-	"os"
-	"strings"
-	"time"
 
 	"github.com/dell/csm-replication/controllers"
 	"github.com/dell/csm-replication/pkg/common"
@@ -92,7 +91,6 @@ func (mgr *ReplicatorManager) processConfigMapChanges(loggerConfig *logrus.Logge
 	}
 	log.Println("set level to", level)
 	loggerConfig.SetLevel(level)
-
 }
 
 func (mgr *ReplicatorManager) setupConfigMapWatcher(loggerConfig *logrus.Logger) {
@@ -311,7 +309,6 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
-
 }
 
 func getClusterUID(ctx context.Context) (*v1.Namespace, error) {

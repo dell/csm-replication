@@ -374,7 +374,7 @@ func (r *ReplicationGroupReconciler) getAction(actionType ActionType) (*csiext.E
 		}
 		actionT := supportedAction.GetType()
 		if actionT.String() == actionType.String() {
-			var action = &csiext.ExecuteActionRequest_Action{
+			action := &csiext.ExecuteActionRequest_Action{
 				Action: &csiext.Action{},
 			}
 			action.Action.ActionTypes = actionT
@@ -483,7 +483,8 @@ func resetRGSpecForInvalidAction(rg *repv1.DellCSIReplicationGroup) {
 }
 
 func (r *ReplicationGroupReconciler) processRGInActionInProgressState(ctx context.Context,
-	rg *repv1.DellCSIReplicationGroup) (ctrl.Result, error) {
+	rg *repv1.DellCSIReplicationGroup,
+) (ctrl.Result, error) {
 	log := common.GetLoggerFromContext(ctx)
 	// Get action in progress from annotation
 	inProgress, err := getActionInProgress(ctx, rg.Annotations)
@@ -609,7 +610,8 @@ func (r *ReplicationGroupReconciler) processRGInActionInProgressState(ctx contex
 }
 
 func (r *ReplicationGroupReconciler) executeAction(ctx context.Context, rg *repv1.DellCSIReplicationGroup,
-	actionType ActionType, action *csiext.ExecuteActionRequest_Action) *ActionResult {
+	actionType ActionType, action *csiext.ExecuteActionRequest_Action,
+) *ActionResult {
 	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Executing action", "actionType", actionType)
 

@@ -110,7 +110,8 @@ func (r *identity) ProbeForever(ctx context.Context) (string, error) {
 
 // GetReplicationCapabilities queries driver for supported replication capabilities
 func (r *identity) GetReplicationCapabilities(ctx context.Context) (ReplicationCapabilitySet,
-	[]*replication.SupportedActions, error) {
+	[]*replication.SupportedActions, error,
+) {
 	r.log.V(common.InfoLevel).Info("Requesting replication capabilities")
 	tctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()

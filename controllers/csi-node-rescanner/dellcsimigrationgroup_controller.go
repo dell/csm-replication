@@ -118,7 +118,6 @@ func (r *NodeRescanReconciler) processMGForRescan(ctx context.Context, mg *stora
 				return ctrl.Result{}, nil
 			}
 		}
-
 	}
 	if myNode.Name == "" {
 		return ctrl.Result{}, errors.NewBadRequest("no node name found")

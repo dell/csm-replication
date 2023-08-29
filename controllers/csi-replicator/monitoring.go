@@ -59,7 +59,6 @@ func (r *ReplicationGroupMonitoring) Monitor(ctx context.Context) error {
 }
 
 func (r *ReplicationGroupMonitoring) monitorReplicationGroups(ticker <-chan time.Time) {
-
 	r.Log.V(common.InfoLevel).Info("Start monitoring replication-group")
 
 	dellCSIReplicationGroupsList := new(repv1.DellCSIReplicationGroupList)
@@ -165,7 +164,8 @@ func updateRGLinkState(rg *repv1.DellCSIReplicationGroup, status string, isSourc
 }
 
 func updateRGLinkStatus(ctx context.Context, client client.Client, rg *repv1.DellCSIReplicationGroup, status string,
-	isSource bool, errMsg string) error {
+	isSource bool, errMsg string,
+) error {
 	log := common.GetLoggerFromContext(ctx)
 	updateRGLinkState(rg, status, isSource, errMsg)
 	if err := client.Status().Update(ctx, rg); err != nil {

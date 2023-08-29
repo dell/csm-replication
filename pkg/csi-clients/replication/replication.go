@@ -63,7 +63,7 @@ func (r *replication) GetStorageProtectionGroupStatus(ctx context.Context, prote
 		ProtectionGroupAttributes: attributes,
 	}
 
-	var rgID = connection.RgIDType(protectionGroupID)
+	rgID := connection.RgIDType(protectionGroupID)
 	err := r.updatePendingState(rgID)
 	if err != nil {
 		return nil, err
@@ -77,12 +77,13 @@ func (r *replication) GetStorageProtectionGroupStatus(ctx context.Context, prote
 
 // ExecuteAction queries client to execute on of supported replication actions
 func (r *replication) ExecuteAction(ctx context.Context, protectionGroupID string, actionType *csiext.ExecuteActionRequest_Action,
-	attributes map[string]string, remoteProtectionGroupID string, remoteAttributes map[string]string) (*csiext.ExecuteActionResponse, error) {
+	attributes map[string]string, remoteProtectionGroupID string, remoteAttributes map[string]string,
+) (*csiext.ExecuteActionResponse, error) {
 	tctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 	client := csiext.NewReplicationClient(r.conn)
 
-	var rgID = connection.RgIDType(protectionGroupID)
+	rgID := connection.RgIDType(protectionGroupID)
 	err := r.updatePendingState(rgID)
 	if err != nil {
 		return nil, err
@@ -150,7 +151,7 @@ func (r *replication) DeleteStorageProtectionGroup(ctx context.Context, groupID 
 	defer cancel()
 	client := csiext.NewReplicationClient(r.conn)
 
-	var rgID = connection.RgIDType(groupID)
+	rgID := connection.RgIDType(groupID)
 	err := r.updatePendingState(rgID)
 	if err != nil {
 		return err

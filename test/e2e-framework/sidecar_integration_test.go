@@ -143,9 +143,9 @@ func (suite *ReplicationTestSuite) runReplicationManager() {
 func (suite *ReplicationTestSuite) TestCreatePVC() {
 	pvc, err := suite.createPVC()
 	suite.T().Log("waiting for the reconciliation to complete")
-	time.Sleep(10 * time.Second) //wait for few seconds for the reconciliation to happen
+	time.Sleep(10 * time.Second) // wait for few seconds for the reconciliation to happen
 
-	//validate created PVC
+	// validate created PVC
 	assert.NoError(suite.T(), err, "PVC Created successfully")
 	assert.NotNil(suite.T(), pvc)
 
@@ -211,7 +211,7 @@ func (suite *ReplicationTestSuite) performAction(action string, expectedState st
 
 	time.Sleep(10 * time.Second)
 
-	//validate the RG for the updated action
+	// validate the RG for the updated action
 	rg = &repv1.DellCSIReplicationGroup{}
 	err = suite.realUtils.KubernetesClient.Get(context.Background(), types.NamespacedName{
 		Name: pvc.Annotations[controllers.ReplicationGroup],
@@ -237,11 +237,11 @@ func (suite *ReplicationTestSuite) TearDownTestSuite() {
 		pvc, err := suite.getLocalPVCFromCluster()
 		assert.NoError(suite.T(), err, "Fetched PVC successfully")
 
-		//Delete PVC
+		// Delete PVC
 		err = suite.realUtils.KubernetesClient.Delete(ctx, pvc)
 		assert.NoError(suite.T(), err, "PVC Deleted successfully")
 
-		//Delete RG
+		// Delete RG
 		rg := &repv1.DellCSIReplicationGroup{}
 		err = suite.realUtils.KubernetesClient.Get(context.Background(), types.NamespacedName{
 			Name: pvc.Annotations[controllers.ReplicationGroup],

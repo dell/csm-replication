@@ -56,7 +56,7 @@ const (
 	CommittedState = "Committed"
 	// DeletingState name deletion state of MigrationGroup
 	DeletingState = "Deleting"
-	//ArrayMigrationState key used to annotate MigrationGroup CR through ArrayMigration phases
+	// ArrayMigrationState key used to annotate MigrationGroup CR through ArrayMigration phases
 	ArrayMigrationState = "ArrayMigrate"
 	// MaxRetryDurationForActions maximum amount of time between retries of failed action
 	MaxRetryDurationForActions = 1 * time.Hour
@@ -121,7 +121,7 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return r.processMGForDeletion(ctx, mg.DeepCopy())
 	}
 	if !mg.DeletionTimestamp.IsZero() {
-		//If MG in migrating state; TODO - cancel migration state
+		// If MG in migrating state; TODO - cancel migration state
 		err := fmt.Errorf("MG is not ready for deletion; If you want to cancel migration, please follow manual steps")
 		return ctrl.Result{}, err
 	}
@@ -198,7 +198,7 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	} else if (NextAnnotationAction == "Migrate") || (NextAnnotationAction == "Commit") {
 
-		//Include format and config validation on the driver side
+		// Include format and config validation on the driver side
 		ArrayMigrateReqParams := map[string]string{
 			"DriverName":     mg.Spec.DriverName,
 			SymmetrixIDParam: mg.Spec.SourceID,
@@ -226,17 +226,17 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			log.V(common.InfoLevel).Info("Successfully executed action [%s]", CurrentAction.String())
 		}
 	} else if NextAnnotationAction == "Delete" {
-		//reset NodesToRescan
+		// reset NodesToRescan
 		NodesToRescan.AllSynced = false
 	}
-	//update lastAction to current state
+	// update lastAction to current state
 	mg.Status.LastAction = currentState
 
-	//update state field of the mg
+	// update state field of the mg
 	if err := r.updateMGSpecWithState(ctx, mg.DeepCopy(), NextState); err != nil {
 		return ctrl.Result{}, err
 	}
-	//update annotation
+	// update annotation
 	isSpecUpdated := r.updateMGSpecWithActionResult(ctx, mg, NextAnnotationAction)
 	if isSpecUpdated {
 		if err := r.Client.Update(ctx, mg.DeepCopy()); err != nil {
@@ -349,7 +349,7 @@ func (r *MigrationGroupReconciler) addFinalizer(ctx context.Context, mg *storage
 
 // processing for deletion
 func (r *MigrationGroupReconciler) processMGForDeletion(ctx context.Context, dellCSIMigrationGroup *storagev1.DellCSIMigrationGroup) (ctrl.Result, error) {
-	//log := common.GetLoggerFromContext(ctx)
+	// log := common.GetLoggerFromContext(ctx)
 	if dellCSIMigrationGroup.Status.State != DeletingState {
 		err := r.updateMGSpecWithState(ctx, dellCSIMigrationGroup.DeepCopy(), DeletingState)
 		return ctrl.Result{}, err
@@ -367,7 +367,7 @@ func (r *MigrationGroupReconciler) removeFinalizer(ctx context.Context, mg *stor
 	// Remove migration group finalizer
 	if ok := controllers.RemoveFinalizerIfExists(mg, controllers.MigrationFinalizer); ok {
 		// Adding annotation to mark the removal of protection-group
-		//controllers.AddAnnotation(mg, controllers.MigrationGroupRemovedAnnotation, "yes")
+		// controllers.AddAnnotation(mg, controllers.MigrationGroupRemovedAnnotation, "yes")
 		if err := r.Update(ctx, mg.DeepCopy()); err != nil {
 			log.Error(err, "Failed to remove finalizer", "mg", mg, "MigrationGroupRemovedAnnotation")
 			return err

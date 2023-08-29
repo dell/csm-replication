@@ -32,22 +32,26 @@ func TestPending(t *testing.T) {
 		differentIDs bool
 		errormsg     string
 	}{
-		{npending: 2,
+		{
+			npending:     2,
 			maxpending:   1,
 			differentIDs: true,
 			errormsg:     "overload",
 		},
-		{npending: 4,
+		{
+			npending:     4,
 			maxpending:   5,
 			differentIDs: true,
 			errormsg:     "none",
 		},
-		{npending: 2,
+		{
+			npending:     2,
 			maxpending:   5,
 			differentIDs: false,
 			errormsg:     "pending",
 		},
-		{npending: 0,
+		{
+			npending:     0,
 			maxpending:   1,
 			differentIDs: false,
 			errormsg:     "none",

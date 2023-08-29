@@ -54,7 +54,7 @@ type RealControllerUtils struct {
 
 func (suite *ReplicationControllerTestSuite) Init() {
 	utils.InitializeSchemes()
-	//Setting driver configurations, update here to run against any driver
+	// Setting driver configurations, update here to run against any driver
 	suite.driver = utils.Driver{
 		DriverName:   "hostpath.csi.k8s.io",
 		StorageClass: "hostpath-del",
@@ -170,7 +170,7 @@ func (suite *ReplicationControllerTestSuite) createLocalPVC() error {
 		annotations[controllers.ReplicationGroup] = LocalRg
 		pvcObj.SetAnnotations(annotations)
 
-		//Adding labels
+		// Adding labels
 		labels := make(map[string]string)
 		labels[controllers.RemoteClusterID] = "lglap066"
 		labels[controllers.DriverName] = suite.driver.DriverName
@@ -227,7 +227,6 @@ func (suite *ReplicationControllerTestSuite) createLocalRG() error {
 	err := suite.realUtils.KubernetesClient.Get(ctx, types.NamespacedName{
 		Name: LocalRg,
 	}, &newRG)
-
 	if err != nil {
 		err := suite.realUtils.KubernetesClient.Create(ctx, &newRG)
 		if err != nil {
@@ -284,7 +283,7 @@ func (suite *ReplicationControllerTestSuite) updateLocalPV(name string) error {
 	annotations[controllers.ReplicationGroup] = LocalRg
 	pv.SetAnnotations(annotations)
 
-	//Adding labels
+	// Adding labels
 	labels := make(map[string]string)
 	labels[controllers.RemoteClusterID] = "lglap066"
 	labels[controllers.DriverName] = suite.driver.DriverName

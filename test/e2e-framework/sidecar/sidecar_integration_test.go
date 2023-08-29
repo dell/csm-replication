@@ -358,7 +358,7 @@ func (ss *SidecarTestSuite) SetupSuite() {
 	ss.runManager()
 	utilruntime.Must(ss.createClient())
 	utilruntime.Must(ss.verifyStorageClass())
-	//utilruntime.Must(ss.createTestNamespaceIfNotExist())
+	// utilruntime.Must(ss.createTestNamespaceIfNotExist())
 }
 
 func (ss *SidecarTestSuite) waitForPVCProtectionComplete(ctx context.Context, claim *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {

@@ -473,7 +473,7 @@ func getClustersFolderPath(path string) (string, error) {
 		return "", fmt.Errorf("can't get User home group: %s", err.Error())
 	}
 
-	err = os.MkdirAll(curUserPath, 0750)
+	err = os.MkdirAll(curUserPath, 0o750)
 	if err != nil {
 		return "", fmt.Errorf("can't generate clusters folder: %s", err.Error())
 	}
@@ -486,7 +486,7 @@ func generateConfigsFromSA(mc *k8s.MultiClusterConfigurator, clusterIDs []string
 	log.Print("Generating config maps from existing service accounts")
 	namespace := "dell-replication-controller"
 
-	err := os.MkdirAll("/tmp/repctl", 0750)
+	err := os.MkdirAll("/tmp/repctl", 0o750)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tmp dir: %s", err.Error())
 	}
@@ -497,7 +497,7 @@ func generateConfigsFromSA(mc *k8s.MultiClusterConfigurator, clusterIDs []string
 		return nil, fmt.Errorf("failed to read embedded script: %s", err.Error())
 	}
 
-	err = os.WriteFile("/tmp/repctl/gen_kubeconfig.sh", fileData, 0600) // #nosec G303
+	err = os.WriteFile("/tmp/repctl/gen_kubeconfig.sh", fileData, 0o600) // #nosec G303
 	if err != nil {
 		return nil, fmt.Errorf("failed to write embedded script: %s", err.Error())
 	}
@@ -508,7 +508,7 @@ func generateConfigsFromSA(mc *k8s.MultiClusterConfigurator, clusterIDs []string
 		return nil, fmt.Errorf("failed to read embedded config template: %s", err.Error())
 	}
 
-	err = os.WriteFile("/tmp/repctl/config-placeholder", fileData, 0600) // #nosec G303
+	err = os.WriteFile("/tmp/repctl/config-placeholder", fileData, 0o600) // #nosec G303
 	if err != nil {
 		return nil, fmt.Errorf("failed to write embedded config template: %s", err.Error())
 	}

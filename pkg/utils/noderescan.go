@@ -3,10 +3,11 @@ package utils
 import (
 	"context"
 	"fmt"
-	"github.com/dell/gobrick/pkg/scsi"
-	log "github.com/sirupsen/logrus"
 	"os"
 	"strconv"
+
+	"github.com/dell/gobrick/pkg/scsi"
+	log "github.com/sirupsen/logrus"
 )
 
 // RescanNode is called to rescan the nodes
@@ -30,7 +31,8 @@ func rescanSCSIHostAll(ctx context.Context) error {
 			Host:    strconv.Itoa(host),
 			Lun:     "-",
 			Channel: "-",
-			Target:  "-"}
+			Target:  "-",
+		}
 		err := scsiHost.RescanSCSIHostByHCTL(ctx, hctl)
 		if err != nil {
 			log.Error(ctx, err.Error())

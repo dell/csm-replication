@@ -65,7 +65,6 @@ func (m *migration) VolumeMigrate(ctx context.Context, volumeHandle string, stor
 
 // ArrayMigrate
 func (m *migration) ArrayMigrate(ctx context.Context, migrateAction *csiext.ArrayMigrateRequest_Action, Params map[string]string) (*csiext.ArrayMigrateResponse, error) {
-
 	tc, cancel := context.WithTimeout(ctx, m.timeout)
 	defer cancel()
 	client := csiext.NewMigrationClient(m.conn)

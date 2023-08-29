@@ -185,7 +185,6 @@ associated with a ReplicationGroup or a single PersistentVolume
 If you don't encounter any issues in the dry-run, then you can
 re-run the command by removing the dry run flag.`,
 		Run: func(cmd *cobra.Command, args []string) {
-
 			tgtNamespace := viper.GetString("target-namespace")
 			dryRun := viper.GetBool("dry-run")
 			rgName := viper.GetString(config.ReplicationGroup)
@@ -215,7 +214,6 @@ re-run the command by removing the dry run flag.`,
 			if err != nil {
 				log.Fatalf("create pvc: %s", err.Error())
 			}
-
 		},
 	}
 

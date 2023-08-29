@@ -176,7 +176,8 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 }
 
 func (r *PersistentVolumeClaimReconciler) processClaimForRemoteVolume(ctx context.Context, claim *v1.PersistentVolumeClaim,
-	pv *v1.PersistentVolume, scParams map[string]string, buffer string) error {
+	pv *v1.PersistentVolume, scParams map[string]string, buffer string,
+) error {
 	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Begin process claim for remote-volume")
 

@@ -16,7 +16,6 @@ package controllers
 
 import (
 	"context"
-
 	"os"
 
 	repv1 "github.com/dell/csm-replication/api/v1"

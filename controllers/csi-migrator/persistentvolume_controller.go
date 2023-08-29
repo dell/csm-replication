@@ -165,7 +165,8 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				StorageClassName:              targetStorageClassName,
 				AccessModes:                   pv.Spec.AccessModes,
 				MountOptions:                  pv.Spec.MountOptions,
-				Capacity:                      v1.ResourceList{v1.ResourceStorage: bytesToQuantity(migrate.GetMigratedVolume().CapacityBytes)}},
+				Capacity:                      v1.ResourceList{v1.ResourceStorage: bytesToQuantity(migrate.GetMigratedVolume().CapacityBytes)},
+			},
 		}
 		log.V(common.InfoLevel).Info("trying to create migrated PV")
 		err = r.Create(ctx, pvT, &client.CreateOptions{})
@@ -187,7 +188,6 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	r.EventRecorder.Eventf(pv, "Normal", "Migrated", "This PV has been successfully migrated to SC %s,"+
 		" consider using new PV %s.", targetStorageClassName, pv.Name+"-to-"+targetStorageClassName)
 	return ctrl.Result{}, nil
-
 }
 
 func isMigrationRequested() predicate.Predicate {

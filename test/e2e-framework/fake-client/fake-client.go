@@ -53,8 +53,7 @@ type Client struct {
 }
 
 // SubResourceClient is a fake k8s subresource client
-type SubResourceClient struct {
-}
+type SubResourceClient struct{}
 
 func getKey(obj runtime.Object) (storageKey, error) {
 	accessor, err := meta.Accessor(obj)

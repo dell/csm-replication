@@ -196,7 +196,6 @@ func (suite *PersistentVolumeControllerTestSuite) TestRGAdd() {
 	newRGName := newUpdatedPV.Annotations[controllers.ReplicationGroup]
 	// Check if this is the same as old rg name
 	suite.Equal(rgName, newRGName, "PV should be added to same RG")
-
 }
 
 func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileDifferentDriver() {
@@ -308,7 +307,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVCExistsScenario() {
 	err := suite.client.Create(context.Background(), pvObj)
 	suite.NoError(err)
 
-	//creating fake PVC with bound state
+	// creating fake PVC with bound state
 	pvcObj := utils.GetPVCObj("fake-pvc12", suite.driver.Namespace, suite.driver.StorageClass)
 	pvcObj.Status.Phase = corev1.ClaimBound
 	pvcObj.Spec.VolumeName = pvName
@@ -341,7 +340,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVProtectionCompleteAnnota
 }
 
 func (suite *PersistentVolumeControllerTestSuite) getParams() map[string]string {
-	//creating fake PV to use with fake PVC
+	// creating fake PV to use with fake PVC
 	volumeAttributes := map[string]string{
 		"param1":                                 "val1",
 		"param2":                                 "val2",
@@ -355,7 +354,7 @@ func (suite *PersistentVolumeControllerTestSuite) getFakePV(name string) *corev1
 }
 
 func (suite *PersistentVolumeControllerTestSuite) getFakeStorageClass() *storagev1.StorageClass {
-	//creating fake storage-class with replication params
+	// creating fake storage-class with replication params
 	sc := utils.GetReplicationEnabledSC(suite.driver.DriverName, suite.driver.StorageClass, suite.driver.RemoteSCName,
 		suite.driver.RemoteClusterID)
 	return sc

@@ -20,12 +20,11 @@ import (
 	"bytes"
 	context2 "context"
 	"encoding/json"
+	"fmt"
 	"io"
+	"net/http"
 
 	"github.com/dell/dell-csi-extensions/migration"
-
-	"fmt"
-	"net/http"
 
 	commonext "github.com/dell/dell-csi-extensions/common"
 	"github.com/dell/dell-csi-extensions/replication"

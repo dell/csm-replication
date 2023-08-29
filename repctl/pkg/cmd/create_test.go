@@ -129,7 +129,6 @@ func (suite *CreateTestSuite) TestCreateSCs() {
 
 	err := createSCs(config, clusters, false)
 	suite.NoError(err)
-
 }
 
 func TestCreateTestSuite(t *testing.T) {
