@@ -29,7 +29,7 @@ source "$SCRIPTDIR"/common.sh
 
 if [ ! -d "$MODULEDIR/helm-charts" ]; then
   if  [ ! -d "$SCRIPTDIR/helm-charts" ]; then
-    git clone --quiet -c advice.detachedHead=false -b csm-replication-1.5.0 https://github.com/dell/helm-charts
+    git clone --quiet -c advice.detachedHead=false -b csm-replication-1.6.0 https://github.com/dell/helm-charts
   fi
   mv helm-charts $MODULEDIR
 else
