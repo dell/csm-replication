@@ -335,12 +335,10 @@ func (ss *SidecarTestSuite) createTestNamespaceIfNotExist() error {
 				},
 			}
 			return ss.client.Create(ss.ctx, ns)
-		} else {
-			return err
 		}
-	} else {
-		ss.namespace = ns.Name
+		return err
 	}
+	ss.namespace = ns.Name
 	return nil
 }
 
@@ -361,7 +359,7 @@ func (ss *SidecarTestSuite) SetupSuite() {
 	// utilruntime.Must(ss.createTestNamespaceIfNotExist())
 }
 
-func (ss *SidecarTestSuite) waitForPVCProtectionComplete(ctx context.Context, claim *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
+func (ss *SidecarTestSuite) waitForPVCProtectionComplete(ctx context.Context, _ *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
 	errorCh := make(chan error)
 	pvc := new(v1.PersistentVolumeClaim)
 	go func() {

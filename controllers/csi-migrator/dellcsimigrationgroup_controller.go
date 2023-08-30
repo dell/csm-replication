@@ -279,7 +279,7 @@ func (r *MigrationGroupReconciler) updateMGSpecWithState(ctx context.Context, mg
 }
 
 // Update mg on error
-func (r *MigrationGroupReconciler) updateMGOnError(ctx context.Context, mg *storagev1.DellCSIMigrationGroup, currentState string, CurrentAction string) error {
+func (r *MigrationGroupReconciler) updateMGOnError(ctx context.Context, mg *storagev1.DellCSIMigrationGroup, currentState string, _ string) error {
 	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Begin updating MG status with", "ErrorState", ErrorState)
 	mg.Status.LastAction = currentState
@@ -288,10 +288,7 @@ func (r *MigrationGroupReconciler) updateMGOnError(ctx context.Context, mg *stor
 			"Action [%s] on DellCSIMigrationGroup [%s] failed with error ",
 			CurrentAction, mg.Name)
 	*/
-	if err := r.updateMGSpecWithState(ctx, mg.DeepCopy(), ErrorState); err != nil {
-		return err
-	}
-	return nil
+	return r.updateMGSpecWithState(ctx, mg.DeepCopy(), ErrorState)
 }
 
 // Update mg with annotation

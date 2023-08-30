@@ -1,5 +1,5 @@
 /*
-Copyright © 2021 Dell Inc. or its subsidiaries. All Rights Reserved.
+Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -134,7 +134,7 @@ func addStub(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func listStub(w http.ResponseWriter, r *http.Request) {
+func listStub(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	err := json.NewEncoder(w).Encode(allStub())
 	if err != nil {
@@ -206,7 +206,7 @@ func handleFindStub(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handleClearStub(w http.ResponseWriter, r *http.Request) {
+func handleClearStub(w http.ResponseWriter, _ *http.Request) {
 	clearStorage()
 	_, err := w.Write([]byte("OK"))
 	if err != nil {

@@ -95,7 +95,7 @@ func (mgr *NodeRescanner) setupConfigMapWatcher(loggerConfig *logrus.Logger) {
 	})
 }
 
-func createNodeReScannerManager(ctx context.Context, mgr ctrl.Manager) (*NodeRescanner, error) {
+func createNodeReScannerManager(_ context.Context, mgr ctrl.Manager) (*NodeRescanner, error) {
 	opts := config.GetControllerManagerOpts()
 	opts.Mode = "sidecar"
 	//mgrLogger := mgr.GetLogger()

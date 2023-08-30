@@ -438,7 +438,7 @@ func (r *PersistentVolumeReconciler) processLocalPV(ctx context.Context, localPV
 	if remotePVNameFromLocalPVAnnotation == "" {
 		controller.AddAnnotation(localPV, controller.RemotePV, remotePVName)
 		updatePV = true
-	} else if remotePVNameFromLocalPVAnnotation != remotePVName {
+		// } else if remotePVNameFromLocalPVAnnotation != remotePVName {
 		// Conflict - ??
 	} else {
 		log.V(common.InfoLevel).Info(fmt.Sprintf("%s already set to %s for local PV: %s",
@@ -448,7 +448,7 @@ func (r *PersistentVolumeReconciler) processLocalPV(ctx context.Context, localPV
 	if remoteClusterIDFromLocalPVAnnotation == "" {
 		controller.AddAnnotation(localPV, controller.RemoteClusterID, remoteClusterID)
 		updatePV = true
-	} else if remoteClusterIDFromLocalPVAnnotation != remoteClusterID {
+		// } else if remoteClusterIDFromLocalPVAnnotation != remoteClusterID {
 		// Conflict - ??
 	} else {
 		log.V(common.InfoLevel).Info(fmt.Sprintf("%s already set to %s for local PV: %s",

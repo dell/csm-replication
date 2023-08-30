@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -55,7 +55,7 @@ type mockIdentity struct {
 	supportedActions []*replication.SupportedActions
 }
 
-func (m *mockIdentity) GetMigrationCapabilities(ctx context.Context) (MigrationCapabilitySet, error) {
+func (m *mockIdentity) GetMigrationCapabilities(_ context.Context) (MigrationCapabilitySet, error) {
 	// TODO implement me
 	panic("implement me")
 }
@@ -104,21 +104,21 @@ func NewFakeIdentityClient(name string) Identity {
 	}
 }
 
-func (m *mockIdentity) ProbeController(ctx context.Context) (string, bool, error) {
+func (m *mockIdentity) ProbeController(_ context.Context) (string, bool, error) {
 	if err := m.injectedError.getAndClearError(); err != nil {
 		return "", false, err
 	}
 	return m.name, true, nil
 }
 
-func (m *mockIdentity) ProbeForever(ctx context.Context) (string, error) {
+func (m *mockIdentity) ProbeForever(_ context.Context) (string, error) {
 	if err := m.injectedError.getAndClearError(); err != nil {
 		return "", err
 	}
 	return m.name, nil
 }
 
-func (m *mockIdentity) GetReplicationCapabilities(ctx context.Context) (ReplicationCapabilitySet,
+func (m *mockIdentity) GetReplicationCapabilities(_ context.Context) (ReplicationCapabilitySet,
 	[]*replication.SupportedActions, error,
 ) {
 	if err := m.injectedError.getAndClearError(); err != nil {

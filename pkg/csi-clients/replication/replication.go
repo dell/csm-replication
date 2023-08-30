@@ -167,8 +167,5 @@ func (r *replication) DeleteStorageProtectionGroup(ctx context.Context, groupID 
 }
 
 func (r *replication) updatePendingState(rgID connection.RgIDType) error {
-	if err := rgID.CheckAndUpdatePendingState(&r.rgPendingState); err != nil {
-		return err
-	}
-	return nil
+	return rgID.CheckAndUpdatePendingState(&r.rgPendingState)
 }

@@ -89,7 +89,7 @@ func NewFakeClient(initialObjects []runtime.Object, errorInjector errorInjector)
 }
 
 // Get finds object and puts it in client.Object obj argument
-func (f Client) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+func (f Client) Get(_ context.Context, key client.ObjectKey, obj client.Object, _ ...client.GetOption) error {
 	if f.errorInjector != nil {
 		if err := f.errorInjector.shouldFail("Get", obj); err != nil {
 			return err
@@ -124,7 +124,7 @@ func (f Client) Get(ctx context.Context, key client.ObjectKey, obj client.Object
 }
 
 // List list all requested items in fake cluster
-func (f Client) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+func (f Client) List(_ context.Context, list client.ObjectList, opts ...client.ListOption) error {
 	if f.errorInjector != nil {
 		if err := f.errorInjector.shouldFail("List", list); err != nil {
 			return err
@@ -208,7 +208,7 @@ func (f *Client) listReplicationGroup(list *repv1.DellCSIReplicationGroupList, o
 }
 
 // Create creates new object in fake cluster by putting it in map
-func (f Client) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+func (f Client) Create(_ context.Context, obj client.Object, _ ...client.CreateOption) error {
 	if f.errorInjector != nil {
 		if err := f.errorInjector.shouldFail("Create", obj); err != nil {
 			return err
@@ -235,7 +235,7 @@ func (f Client) Create(ctx context.Context, obj client.Object, opts ...client.Cr
 }
 
 // Delete deletes existing object in fake cluster by removing it from map
-func (f Client) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
+func (f Client) Delete(_ context.Context, obj client.Object, opts ...client.DeleteOption) error {
 	if len(opts) > 0 {
 		return fmt.Errorf("delete options are not supported")
 	}
@@ -266,7 +266,7 @@ func (f Client) Delete(ctx context.Context, obj client.Object, opts ...client.De
 }
 
 // Update updates object in fake k8s cluster
-func (f Client) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+func (f Client) Update(_ context.Context, obj client.Object, _ ...client.UpdateOption) error {
 	if f.errorInjector != nil {
 		if err := f.errorInjector.shouldFail("Update", obj); err != nil {
 			return err
@@ -293,12 +293,12 @@ func (f Client) Update(ctx context.Context, obj client.Object, opts ...client.Up
 }
 
 // Patch patches the given obj in the Kubernetes cluster
-func (f Client) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+func (f Client) Patch(_ context.Context, _ client.Object, _ client.Patch, _ ...client.PatchOption) error {
 	panic("implement me")
 }
 
 // DeleteAllOf deletes all objects of the given type matching the given options
-func (f Client) DeleteAllOf(ctx context.Context, obj client.Object, opts ...client.DeleteAllOfOption) error {
+func (f Client) DeleteAllOf(_ context.Context, _ client.Object, _ ...client.DeleteAllOfOption) error {
 	panic("implement me")
 }
 
@@ -320,31 +320,31 @@ func (f Client) RESTMapper() meta.RESTMapper {
 
 // SubResource returns a subresource client for the named subResource.
 // TODO: Implement
-func (f Client) SubResource(subResource string) client.SubResourceClient {
+func (f Client) SubResource(_ string) client.SubResourceClient {
 	return f.SubResourceClient
 }
 
 // Create saves the subResource object in the Kubernetes cluster.
 // TODO: Implement
-func (f SubResourceClient) Create(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceCreateOption) error {
+func (f SubResourceClient) Create(_ context.Context, _ client.Object, _ client.Object, _ ...client.SubResourceCreateOption) error {
 	panic("implement me")
 }
 
 // Update updates the fields corresponding to the status subresource for the
 // given obj.
 // TODO: Implement
-func (f SubResourceClient) Update(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+func (f SubResourceClient) Update(_ context.Context, _ client.Object, _ ...client.SubResourceUpdateOption) error {
 	panic("implement me")
 }
 
 // Patch patches the given object's subresource.
 // TODO: Implement
-func (f SubResourceClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+func (f SubResourceClient) Patch(_ context.Context, _ client.Object, _ client.Patch, _ ...client.SubResourcePatchOption) error {
 	panic("implement me")
 }
 
 // Get retrieves a subResource for the given obj object from the Kubernetes Cluster.
 // TODO: Implement
-func (f SubResourceClient) Get(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceGetOption) error {
+func (f SubResourceClient) Get(_ context.Context, _ client.Object, _ client.Object, _ ...client.SubResourceGetOption) error {
 	panic("implement me")
 }

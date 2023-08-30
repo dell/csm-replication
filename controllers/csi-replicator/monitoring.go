@@ -47,7 +47,7 @@ type ReplicationGroupMonitoring struct {
 // Monitor polls RGs over a defined interval and
 // updates the ReplicationLinkStatus depending on the response received
 // from the driver.
-func (r *ReplicationGroupMonitoring) Monitor(ctx context.Context) error {
+func (r *ReplicationGroupMonitoring) Monitor(_ context.Context) error {
 	ticker := time.NewTicker(r.MonitoringInterval).C
 	go func(<-chan time.Time) {
 		for {
