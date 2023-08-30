@@ -283,7 +283,6 @@ func failoverToCluster(configFolder, inputTargetCluster, rgName string, unplanne
 }
 
 func waitForStateToUpdate(rgName string, cluster k8s.ClusterInterface, repllinkstate repv1.ReplicationLinkState) bool {
-
 	ret := make(chan bool)
 	go func() {
 		log.Print("Waiting for action to complete ...")

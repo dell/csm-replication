@@ -1,5 +1,5 @@
 /*
- Copyright © 2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2022-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -165,7 +165,8 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				StorageClassName:              targetStorageClassName,
 				AccessModes:                   pv.Spec.AccessModes,
 				MountOptions:                  pv.Spec.MountOptions,
-				Capacity:                      v1.ResourceList{v1.ResourceStorage: bytesToQuantity(migrate.GetMigratedVolume().CapacityBytes)}},
+				Capacity:                      v1.ResourceList{v1.ResourceStorage: bytesToQuantity(migrate.GetMigratedVolume().CapacityBytes)},
+			},
 		}
 		log.V(common.InfoLevel).Info("trying to create migrated PV")
 		err = r.Create(ctx, pvT, &client.CreateOptions{})
@@ -187,7 +188,6 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	r.EventRecorder.Eventf(pv, "Normal", "Migrated", "This PV has been successfully migrated to SC %s,"+
 		" consider using new PV %s.", targetStorageClassName, pv.Name+"-to-"+targetStorageClassName)
 	return ctrl.Result{}, nil
-
 }
 
 func isMigrationRequested() predicate.Predicate {
@@ -204,7 +204,7 @@ func bytesToQuantity(bytes int64) resource.Quantity {
 }
 
 // SetupWithManager start using reconciler by creating new controller managed by provided manager
-func (r *PersistentVolumeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, limiter ratelimiter.RateLimiter, maxReconcilers int) error {
+func (r *PersistentVolumeReconciler) SetupWithManager(_ context.Context, mgr ctrl.Manager, limiter ratelimiter.RateLimiter, maxReconcilers int) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.PersistentVolume{}, builder.WithPredicates(
 			predicate.Or(

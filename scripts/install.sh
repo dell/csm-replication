@@ -21,23 +21,12 @@ MODE="install"
 NS="dell-replication-controller"
 RELEASE="replication"
 MODULE="csm-replication"
+HELMCHARTVERSION="csm-replication-1.6.0"
 
 # export the name of the debug log, so child processes will see it
 export DEBUGLOG="${SCRIPTDIR}/install-debug.log"
 
 source "$SCRIPTDIR"/common.sh
-
-if [ ! -d "$MODULEDIR/helm-charts" ]; then
-  if  [ ! -d "$SCRIPTDIR/helm-charts" ]; then
-    git clone --quiet -c advice.detachedHead=false -b csm-replication-1.5.0 https://github.com/dell/helm-charts
-  fi
-  mv helm-charts $MODULEDIR
-else
-  if [  -d "$SCRIPTDIR/helm-charts" ]; then
-    rm -rf $SCRIPTDIR/helm-charts
-  fi
-fi
-MODULEDIR="${SCRIPTDIR}/../helm-charts/charts"
 
 if [ -f "${DEBUGLOG}" ]; then
   rm -f "${DEBUGLOG}"
@@ -55,6 +44,7 @@ function usage() {
 
   decho "  Optional"
   decho "  --upgrade                                Perform an upgrade, default is false"
+  decho "  --helm-charts-version                    Pass the helm chart version"
   decho "  -h                                       Help"
   decho
 
@@ -168,11 +158,13 @@ function kubectl_safe() {
     exit $exitcode
   fi
 }
+
 function found_error() {
   for N in "$@"; do
     ERRORS+=("${N}")
   done
 }
+
 # verify namespace
 function verify_namespace() {
   log step "Verifying that required namespaces have been created"
@@ -188,7 +180,6 @@ function verify_namespace() {
     log passed
   done
 }
-
 
 # waitOnRunning
 # will wait, for a timeout period, for a number of pods to go into Running state within a namespace
@@ -231,7 +222,6 @@ function waitOnRunning() {
   return 0
 }
 
-#
 # verify_kubernetes
 # will run a module specific function to verify environmental requirements
 function verify_kubernetes() {
@@ -251,7 +241,11 @@ while getopts ":h-:" optchar; do
     upgrade)
       MODE="upgrade"
       ;;
-      # VALUES
+    helm-charts-version)
+      HELMCHARTVERSION="${!OPTIND}"
+      OPTIND=$((OPTIND + 1))
+      ;;
+    # VALUES
     values)
       VALUES="${!OPTIND}"
       OPTIND=$((OPTIND + 1))
@@ -276,6 +270,18 @@ while getopts ":h-:" optchar; do
     ;;
   esac
 done
+
+if [ ! -d "$MODULEDIR/helm-charts" ]; then
+  if  [ ! -d "$SCRIPTDIR/helm-charts" ]; then
+    git clone --quiet -c advice.detachedHead=false -b $HELMCHARTVERSION https://github.com/dell/helm-charts
+  fi
+  mv helm-charts $MODULEDIR
+else
+  if [  -d "$SCRIPTDIR/helm-charts" ]; then
+    rm -rf $SCRIPTDIR/helm-charts
+  fi
+fi
+MODULEDIR="${SCRIPTDIR}/../helm-charts/charts"
 
 # make sure kubectl is available
 kubectl --help >&/dev/null || {

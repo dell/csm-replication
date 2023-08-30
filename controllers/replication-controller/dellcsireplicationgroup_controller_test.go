@@ -49,6 +49,7 @@ type RGControllerTestSuite struct {
 func (suite *RGControllerTestSuite) SetupTest() {
 	suite.Init()
 }
+
 func (suite *RGControllerTestSuite) Init() {
 	controllers.InitLabelsAndAnnotations(constants.DefaultDomain)
 	suite.driver = utils.GetDefaultDriver()
@@ -89,14 +90,14 @@ func (suite *RGControllerTestSuite) getRemoteParams() map[string]string {
 }
 
 func (suite *RGControllerTestSuite) getLocalRG(name, clusterID string) *repv1.DellCSIReplicationGroup {
-	//creating fake resource group
+	// creating fake resource group
 	replicationGroup := utils.GetRGObj(name, suite.driver.DriverName, clusterID,
 		utils.LocalPGID, utils.RemotePGID, suite.getLocalParams(), suite.getRemoteParams())
 	return replicationGroup
 }
 
 func (suite *RGControllerTestSuite) getRemoteRG(name, clusterID string) *repv1.DellCSIReplicationGroup {
-	//creating fake resource group
+	// creating fake resource group
 	replicationGroup := utils.GetRGObj(name, suite.driver.DriverName, clusterID,
 		utils.RemotePGID, utils.LocalPGID, suite.getRemoteParams(), suite.getLocalParams())
 	return replicationGroup
@@ -330,7 +331,6 @@ func (suite *RGControllerTestSuite) TestReconcileRGWithAnnotationsSingleCluster(
 	suite.NoError(err)
 	suite.T().Log(replicatedRG.Annotations)
 	suite.T().Log(replicatedRG.Labels)
-
 }
 
 func (suite *RGControllerTestSuite) TestRGSyncWithFinalizer() {
@@ -356,7 +356,7 @@ func (suite *RGControllerTestSuite) TestRGSyncWithFinalizer() {
 	_, err = rClient.GetReplicationGroup(context.Background(), rg.Name)
 	suite.NoError(err)
 
-	//Delete rg
+	// Delete rg
 	err = suite.client.Delete(context.Background(), rg)
 	suite.NoError(err)
 }

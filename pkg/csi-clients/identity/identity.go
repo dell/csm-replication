@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -110,7 +110,8 @@ func (r *identity) ProbeForever(ctx context.Context) (string, error) {
 
 // GetReplicationCapabilities queries driver for supported replication capabilities
 func (r *identity) GetReplicationCapabilities(ctx context.Context) (ReplicationCapabilitySet,
-	[]*replication.SupportedActions, error) {
+	[]*replication.SupportedActions, error,
+) {
 	r.log.V(common.InfoLevel).Info("Requesting replication capabilities")
 	tctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()

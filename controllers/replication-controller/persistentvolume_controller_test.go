@@ -52,12 +52,15 @@ type PVReconcileSuite struct {
 }
 
 // blank assignment to verify client.Client method implementations
-var _ client.Client = &fakeclient.Client{}
-var PVReconciler PersistentVolumeReconciler
+var (
+	_            client.Client = &fakeclient.Client{}
+	PVReconciler PersistentVolumeReconciler
+)
 
 func (suite *PVReconcileSuite) SetupSuite() {
 	suite.Init()
 }
+
 func (suite *PVReconcileSuite) Init() {
 	_ = repv1.AddToScheme(scheme.Scheme)
 
@@ -80,7 +83,8 @@ func (suite *PVReconcileSuite) Init() {
 }
 
 func (suite *PVReconcileSuite) runRemoteReplicationManager(fakeConfig connection.MultiClusterClient,
-	remoteClient connection.RemoteClusterClient) {
+	remoteClient connection.RemoteClusterClient,
+) {
 	fakeRecorder := record.NewFakeRecorder(100)
 
 	PVReconciler = PersistentVolumeReconciler{
@@ -92,7 +96,7 @@ func (suite *PVReconcileSuite) runRemoteReplicationManager(fakeConfig connection
 		Config:        fakeConfig,
 	}
 
-	//scenario: Positive scenario
+	// scenario: Positive scenario
 	req := reconcile.Request{
 		NamespacedName: types.NamespacedName{
 			Name: "fake-pv",
@@ -102,7 +106,7 @@ func (suite *PVReconcileSuite) runRemoteReplicationManager(fakeConfig connection
 	assert.NoError(suite.T(), err, "No error on PV deletion reconcile")
 	assert.Equal(suite.T(), res.Requeue, false, "Requeue should be set to false")
 
-	//scenario: when there is no deletion time-stamp set
+	// scenario: when there is no deletion time-stamp set
 	objMap := suite.mockUtils.FakeClient.Objects
 	for k, v := range objMap {
 		if k.Name == "fake-pv" {
@@ -125,7 +129,7 @@ func (suite *PVReconcileSuite) runRemoteReplicationManager(fakeConfig connection
 		}
 	}
 
-	//scenario: processLocalPV should fail with an error
+	// scenario: processLocalPV should fail with an error
 	logger := PVReconciler.Log.WithValues("persistentvolumeclaim")
 	e := PVReconciler.processLocalPV(context.WithValue(context.TODO(), constants.LoggerContextKey, logger), &corev1.PersistentVolume{}, "", "")
 	assert.Error(suite.T(), e, "Process local PV failed with an error")
@@ -146,7 +150,7 @@ func (suite *PVReconcileSuite) runRemoteReplicationManager(fakeConfig connection
 	labels := make(map[string]string)
 	labels[controllers.DriverName] = "fake-provisioner"
 
-	//var finalizers []string
+	// var finalizers []string
 	finalizers := []string{controllers.ReplicationFinalizer}
 
 	objMap = suite.mockUtils.FakeClient.Objects
@@ -242,7 +246,6 @@ func (suite *PVReconcileSuite) runRemoteReplicationManager(fakeConfig connection
 	// scenario: Negative case volume_id missing from the remote volume annotation
 	res, err = PVReconciler.Reconcile(context.Background(), req)
 	assert.Error(suite.T(), err, "volume_id missing from the remote volume annotation")
-
 }
 
 func (suite *PVReconcileSuite) TestReconcilePV() {
@@ -250,7 +253,7 @@ func (suite *PVReconcileSuite) TestReconcilePV() {
 	remoteClient, err := fakeConfig.GetConnection("remote-123")
 
 	ctx := context.Background()
-	//creating fake PV to use with our fake PVC
+	// creating fake PV to use with our fake PVC
 	volumeAttributes := map[string]string{
 		"fake-CapacityGB":     "3.00",
 		"RemoteSYMID":         "000000000002",
@@ -304,7 +307,7 @@ func (suite *PVReconcileSuite) TestReconcilePV() {
 	err = remoteClient.CreatePersistentVolume(ctx, &pvObj)
 	assert.Nil(suite.T(), err)
 
-	//creating fake storage-class with replication params
+	// creating fake storage-class with replication params
 	parameters := map[string]string{
 		"RdfGroup":           "2",
 		"RdfMode":            "ASYNC",
@@ -325,12 +328,12 @@ func (suite *PVReconcileSuite) TestReconcilePV() {
 	annotations[controllers.RemoteClusterID] = "remote-123"
 	annotations[controllers.ContextPrefix] = "csi-fake"
 
-	//creating fake resource group
+	// creating fake resource group
 	resourceGroup := repv1.DellCSIReplicationGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "fake-rg",
 			Annotations: annotations,
-			//Namespace: suite.mockUtils.Specs.Namespace,
+			// Namespace: suite.mockUtils.Specs.Namespace,
 		},
 		Spec: repv1.DellCSIReplicationGroupSpec{
 			DriverName:                suite.driver.DriverName,
@@ -377,7 +380,6 @@ func (suite *PVReconcileSuite) TestRemoteClusterIDNotSet() {
 
 	_, err = suite.reconciler.Reconcile(context.Background(), req)
 	suite.Error(err, "remoteClusterId not set")
-
 }
 
 func (suite *PVReconcileSuite) TestRemoteClusterIDSelfNotFound() {
@@ -474,7 +476,6 @@ func TestPVReconcileSuite(t *testing.T) {
 }
 
 func (suite *PVReconcileSuite) TestPVNotFound() {
-
 	req := suite.getTypicalRequest("no-pv")
 	_, err := suite.reconciler.Reconcile(context.Background(), req)
 	if err == nil {

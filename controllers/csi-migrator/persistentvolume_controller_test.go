@@ -1,5 +1,5 @@
 /*
- Copyright © 2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2022-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -79,7 +79,7 @@ func (suite *PersistentVolumeControllerTestSuite) initReconciler() {
 }
 
 func (suite *PersistentVolumeControllerTestSuite) TestPVReconcile() {
-	//positive test
+	// positive test
 	sc1 := &storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
 		Provisioner: "provisionerName",
@@ -131,7 +131,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcile() {
 }
 
 func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileGetPV() {
-	//pv not added to client
+	// pv not added to client
 	pv := &corev1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pv",
@@ -162,7 +162,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileGetPV() {
 }
 
 func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileScNotFound() {
-	//specified in pv sc doesn't exist => not found
+	// specified in pv sc doesn't exist => not found
 	pv := &corev1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pv",
@@ -197,7 +197,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileScNotFound() {
 }
 
 func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileScFailedFetch() {
-	//specified in pv sc doesn't fetch
+	// specified in pv sc doesn't fetch
 	sc1 := &storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
 		Provisioner: "provisionerName",
@@ -243,7 +243,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileScFailedFetch()
 }
 
 func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileGetTargetSc() {
-	//target sc2 doesn't exist => not found
+	// target sc2 doesn't exist => not found
 	sc1 := &storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
 		Provisioner: "provisionerName",
@@ -285,7 +285,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileGetTargetSc() {
 }
 
 func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileTargetScFailedFetch() {
-	//target sc doesn't fetch
+	// target sc doesn't fetch
 	sc1 := &storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
 		Provisioner: "provisionerName",
@@ -337,7 +337,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileTargetScFailedF
 }
 
 func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileSameSc() {
-	//source sc = target sc
+	// source sc = target sc
 	sc1 := &storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
 		Provisioner: "provisionerName",
@@ -379,7 +379,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileSameSc() {
 }
 
 func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileNonReplToRepl() {
-	//migration type non repl to repl
+	// migration type non repl to repl
 	sc1 := &storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
 		Provisioner: "provisionerName",
@@ -432,7 +432,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileNonReplToRepl()
 }
 
 func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileReplToNonRepl() {
-	//migration type repl to non repl
+	// migration type repl to non repl
 	sc1 := &storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
 		Provisioner: "provisionerName",
@@ -486,7 +486,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileReplToNonRepl()
 }
 
 func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileVolumeMigrate() {
-	//volume migrate error
+	// volume migrate error
 	sc1 := &storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
 		Provisioner: "provisionerName",
@@ -536,7 +536,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileVolumeMigrate()
 }
 
 func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileNewPvFailedFetch() {
-	//new pv doesn't fetch
+	// new pv doesn't fetch
 
 	sc1 := &storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
@@ -589,7 +589,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileNewPvFailedFetc
 }
 
 func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileCreatePv() {
-	//new pv test
+	// new pv test
 	sc1 := &storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
 		Provisioner: "provisionerName",
@@ -642,7 +642,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileCreatePv() {
 }
 
 func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileUpdate() {
-	//update test
+	// update test
 	sc1 := &storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: "sc1"},
 		Provisioner: "provisionerName",
@@ -708,7 +708,7 @@ func (suite *PersistentVolumeControllerTestSuite) getTypicalReconcileRequest(nam
 }
 
 func (suite *PersistentVolumeControllerTestSuite) getParams() map[string]string {
-	//creating fake PV to use with fake PVC
+	// creating fake PV to use with fake PVC
 	volumeAttributes := map[string]string{
 		"param1":                                 "val1",
 		"param2":                                 "val2",
@@ -732,7 +732,7 @@ type errorFakeCtrlRuntimeClient struct {
 	key    string
 }
 
-func (e errorFakeCtrlRuntimeClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+func (e errorFakeCtrlRuntimeClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, _ ...client.GetOption) error {
 	if e.method == "get" && key.Name == e.key {
 		return fmt.Errorf("Get method error")
 	}

@@ -20,12 +20,11 @@ import (
 	"bytes"
 	context2 "context"
 	"encoding/json"
+	"fmt"
 	"io"
+	"net/http"
 
 	"github.com/dell/dell-csi-extensions/migration"
-
-	"fmt"
-	"net/http"
 
 	commonext "github.com/dell/dell-csi-extensions/common"
 	"github.com/dell/dell-csi-extensions/replication"
@@ -36,7 +35,7 @@ import (
 type Replication struct{}
 
 // VolumeMigrate - mocks Migrate function
-func (s *Replication) VolumeMigrate(ctx context2.Context, request *migration.VolumeMigrateRequest) (*migration.VolumeMigrateResponse, error) {
+func (s *Replication) VolumeMigrate(_ context2.Context, _ *migration.VolumeMigrateRequest) (*migration.VolumeMigrateResponse, error) {
 	rep := &migration.VolumeMigrateResponse{
 		MigratedVolume: &migration.Volume{
 			CapacityBytes: 3221225472,
@@ -57,7 +56,7 @@ func (s *Replication) VolumeMigrate(ctx context2.Context, request *migration.Vol
 }
 
 // GetMigrationCapabilities - mocks GetMigrationCapabilities func
-func (s *Replication) GetMigrationCapabilities(ctx context2.Context, request *migration.GetMigrationCapabilityRequest) (*migration.GetMigrationCapabilityResponse, error) {
+func (s *Replication) GetMigrationCapabilities(_ context2.Context, _ *migration.GetMigrationCapabilityRequest) (*migration.GetMigrationCapabilityResponse, error) {
 	return &migration.GetMigrationCapabilityResponse{
 		Capabilities: []*migration.MigrationCapability{
 			{
@@ -86,14 +85,14 @@ func (s *Replication) GetMigrationCapabilities(ctx context2.Context, request *mi
 }
 
 // ProbeController calls stub for ProbeController
-func (s *Replication) ProbeController(ctx context.Context, in *commonext.ProbeControllerRequest) (*commonext.ProbeControllerResponse, error) {
+func (s *Replication) ProbeController(_ context.Context, in *commonext.ProbeControllerRequest) (*commonext.ProbeControllerResponse, error) {
 	out := &commonext.ProbeControllerResponse{}
 	err := FindStub("Replication", "ProbeController", in, out)
 	return out, err
 }
 
 // GetReplicationCapabilities calls stub for GetReplicationCapabilities
-func (s *Replication) GetReplicationCapabilities(ctx context.Context, in *replication.GetReplicationCapabilityRequest) (*replication.GetReplicationCapabilityResponse, error) {
+func (s *Replication) GetReplicationCapabilities(_ context.Context, in *replication.GetReplicationCapabilityRequest) (*replication.GetReplicationCapabilityResponse, error) {
 	out := &replication.GetReplicationCapabilityResponse{}
 	outTemp := make(map[string][]int)
 	err := FindStub("Replication", "GetReplicationCapabilities", in, &outTemp)
@@ -117,42 +116,42 @@ func (s *Replication) GetReplicationCapabilities(ctx context.Context, in *replic
 }
 
 // CreateStorageProtectionGroup calls stub for CreateStorageProtectionGroup
-func (s *Replication) CreateStorageProtectionGroup(ctx context.Context, in *replication.CreateStorageProtectionGroupRequest) (*replication.CreateStorageProtectionGroupResponse, error) {
+func (s *Replication) CreateStorageProtectionGroup(_ context.Context, in *replication.CreateStorageProtectionGroupRequest) (*replication.CreateStorageProtectionGroupResponse, error) {
 	out := &replication.CreateStorageProtectionGroupResponse{}
 	err := FindStub("Replication", "CreateStorageProtectionGroup", in, out)
 	return out, err
 }
 
 // CreateRemoteVolume calls stub for CreateRemoteVolume
-func (s *Replication) CreateRemoteVolume(ctx context.Context, in *replication.CreateRemoteVolumeRequest) (*replication.CreateRemoteVolumeResponse, error) {
+func (s *Replication) CreateRemoteVolume(_ context.Context, in *replication.CreateRemoteVolumeRequest) (*replication.CreateRemoteVolumeResponse, error) {
 	out := &replication.CreateRemoteVolumeResponse{}
 	err := FindStub("Replication", "CreateRemoteVolume", in, out)
 	return out, err
 }
 
 // DeleteLocalVolume calls stub for DeleteLocalVolume
-func (s *Replication) DeleteLocalVolume(ctx context.Context, in *replication.DeleteLocalVolumeRequest) (*replication.DeleteLocalVolumeResponse, error) {
+func (s *Replication) DeleteLocalVolume(_ context.Context, in *replication.DeleteLocalVolumeRequest) (*replication.DeleteLocalVolumeResponse, error) {
 	out := &replication.DeleteLocalVolumeResponse{}
 	err := FindStub("Replication", "DeleteLocalVolume", in, out)
 	return out, err
 }
 
 // DeleteStorageProtectionGroup calls stub for DeleteStorageProtectionGroup
-func (s *Replication) DeleteStorageProtectionGroup(ctx context.Context, in *replication.DeleteStorageProtectionGroupRequest) (*replication.DeleteStorageProtectionGroupResponse, error) {
+func (s *Replication) DeleteStorageProtectionGroup(_ context.Context, in *replication.DeleteStorageProtectionGroupRequest) (*replication.DeleteStorageProtectionGroupResponse, error) {
 	out := &replication.DeleteStorageProtectionGroupResponse{}
 	err := FindStub("Replication", "DeleteStorageProtectionGroup", in, out)
 	return out, err
 }
 
 // GetStorageProtectionGroupStatus calls stub for GetStorageProtectionGroupStatus
-func (s *Replication) GetStorageProtectionGroupStatus(ctx context.Context, in *replication.GetStorageProtectionGroupStatusRequest) (*replication.GetStorageProtectionGroupStatusResponse, error) {
+func (s *Replication) GetStorageProtectionGroupStatus(_ context.Context, in *replication.GetStorageProtectionGroupStatusRequest) (*replication.GetStorageProtectionGroupStatusResponse, error) {
 	out := &replication.GetStorageProtectionGroupStatusResponse{}
 	err := FindStub("Replication", "GetStorageProtectionGroupStatus", in, out)
 	return out, err
 }
 
 // ExecuteAction calls stub for ExecuteAction
-func (s *Replication) ExecuteAction(ctx context.Context, in *replication.ExecuteActionRequest) (*replication.ExecuteActionResponse, error) {
+func (s *Replication) ExecuteAction(_ context.Context, in *replication.ExecuteActionRequest) (*replication.ExecuteActionResponse, error) {
 	out := &replication.ExecuteActionResponse{}
 	err := FindStub("Replication", "ExecuteAction", in, out)
 	return out, err

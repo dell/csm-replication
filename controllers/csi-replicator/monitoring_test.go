@@ -45,7 +45,6 @@ func (suite *MonitoringControllerTestSuite) SetupSuite() {
 }
 
 func (suite *MonitoringControllerTestSuite) SetupTest() {
-
 }
 
 func (suite *MonitoringControllerTestSuite) getRGs() []client.Object {

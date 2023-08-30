@@ -1,5 +1,5 @@
 /*
- Copyright © 2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2022-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -19,6 +19,9 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
+	"strings"
+	"time"
 
 	"github.com/dell/dell-csi-extensions/migration"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -29,10 +32,6 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-
-	"os"
-	"strings"
-	"time"
 
 	storagev1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
@@ -90,7 +89,6 @@ func (mgr *MigratorManager) processConfigMapChanges(loggerConfig *logrus.Logger)
 	}
 	log.Println("set level to", level)
 	loggerConfig.SetLevel(level)
-
 }
 
 func (mgr *MigratorManager) setupConfigMapWatcher(loggerConfig *logrus.Logger) {
@@ -260,5 +258,4 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
-
 }

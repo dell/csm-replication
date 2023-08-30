@@ -19,6 +19,7 @@ package e2e_framework_test
 import (
 	"context"
 	"sync"
+	"testing"
 	"time"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
@@ -38,8 +39,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
-
-	"testing"
 
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -228,7 +227,7 @@ func (suite *FakeReplicationTestSuite) getTypicalPVC() *corev1.PersistentVolumeC
 }
 
 func (suite *FakeReplicationTestSuite) getTypicalVolAttributes() map[string]string {
-	//creating fake PV to use with our fake PVC
+	// creating fake PV to use with our fake PVC
 	volumeAttributes := map[string]string{
 		"CapacityGB": "3.00",
 		"param1":     "val1",

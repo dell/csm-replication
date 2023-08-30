@@ -106,7 +106,7 @@ func (suite *RGControllerTestSuite) initReconciler() {
 func TestRGControllerTestSuite(t *testing.T) {
 	testSuite := new(RGControllerTestSuite)
 	suite.Run(t, testSuite)
-	//testSuite.TearDownTestSuite()
+	// testSuite.TearDownTestSuite()
 }
 
 func (suite *RGControllerTestSuite) TearDownTest() {
@@ -114,7 +114,7 @@ func (suite *RGControllerTestSuite) TearDownTest() {
 }
 
 func (suite *RGControllerTestSuite) getLocalRG(name string) repv1.DellCSIReplicationGroup {
-	//creating fake replication group
+	// creating fake replication group
 	if name == "" {
 		name = suite.driver.RGName
 	}
@@ -124,7 +124,7 @@ func (suite *RGControllerTestSuite) getLocalRG(name string) repv1.DellCSIReplica
 }
 
 func (suite *RGControllerTestSuite) getRemoteRG(name string) repv1.DellCSIReplicationGroup {
-	//creating fake replication group
+	// creating fake replication group
 	if name == "" {
 		name = suite.driver.RGName
 	}
@@ -134,8 +134,8 @@ func (suite *RGControllerTestSuite) getRemoteRG(name string) repv1.DellCSIReplic
 }
 
 func (suite *RGControllerTestSuite) createRGInActionInProgressState(name string, actionName string,
-	completed bool, deleteInProgress bool) (*repv1.DellCSIReplicationGroup, error) {
-
+	completed bool, deleteInProgress bool,
+) (*repv1.DellCSIReplicationGroup, error) {
 	rg := suite.getLocalRG(name)
 	actionType := ActionType(actionName)
 	rg.Spec.Action = actionName
@@ -192,14 +192,14 @@ func areAnnotationsEqual(expected, got ActionAnnotation) bool {
 }
 
 func (suite *RGControllerTestSuite) TestReconcileWithNoObject() {
-	//scenario: Reconcile for an object which doesn't exist (has been deleted)
+	// scenario: Reconcile for an object which doesn't exist (has been deleted)
 	req := suite.getTypicalReconcileRequest(suite.driver.RGName)
 	_, err := suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on RG reconcile")
 }
 
 func (suite *RGControllerTestSuite) TestReconcileWithNoState() {
-	//scenario: When there is no state
+	// scenario: When there is no state
 	ctx := context.Background()
 	replicationGroup := suite.getLocalRG("")
 	err := suite.client.Create(ctx, &replicationGroup)
@@ -209,7 +209,7 @@ func (suite *RGControllerTestSuite) TestReconcileWithNoState() {
 	suite.NoError(err, "No error on RG reconcile")
 	suite.Equal(true, resp.Requeue, "Requeue is set to true")
 
-	//Reconcile again
+	// Reconcile again
 	_, err = suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on RG reconcile")
 
@@ -218,11 +218,10 @@ func (suite *RGControllerTestSuite) TestReconcileWithNoState() {
 	suite.NoError(err, "No error on RG get")
 	suite.Equal(ReadyState, rg.Status.State, "State should be Ready")
 	suite.Contains(rg.Finalizers, controllers.ReplicationFinalizer, "Finalizer should be present")
-
 }
 
 func (suite *RGControllerTestSuite) TestReconcileWithEmptyPGID() {
-	//scenario: When there is no protection group ID and no valid state is set
+	// scenario: When there is no protection group ID and no valid state is set
 	ctx := context.Background()
 	replicationGroup := suite.getLocalRG("")
 	replicationGroup.Spec.ProtectionGroupID = ""
@@ -238,7 +237,7 @@ func (suite *RGControllerTestSuite) TestReconcileWithEmptyPGID() {
 }
 
 func (suite *RGControllerTestSuite) TestDeleteWithInvalidState() {
-	//scenario: When there is valid deletion time-stamp and invalid state
+	// scenario: When there is valid deletion time-stamp and invalid state
 	ctx := context.Background()
 	replicationGroup := suite.getLocalRG("")
 	replicationGroup.DeletionTimestamp = &metav1.Time{
@@ -255,7 +254,7 @@ func (suite *RGControllerTestSuite) TestDeleteWithInvalidState() {
 }
 
 func (suite *RGControllerTestSuite) TestReconcileWithInvalidStateRepeated() {
-	//scenario: When there is invalid state
+	// scenario: When there is invalid state
 	ctx := context.Background()
 	replicationGroup := suite.getLocalRG("")
 	replicationGroup.Spec.ProtectionGroupID = ""
@@ -273,7 +272,7 @@ func (suite *RGControllerTestSuite) TestReconcileWithInvalidStateRepeated() {
 }
 
 func (suite *RGControllerTestSuite) TestReconcileWithInvalidStateAfterFix() {
-	//scenario: When there is invalid state
+	// scenario: When there is invalid state
 	// and PGID has been added back
 	ctx := context.Background()
 	replicationGroup := suite.getLocalRG("")
@@ -292,7 +291,7 @@ func (suite *RGControllerTestSuite) TestReconcileWithInvalidStateAfterFix() {
 }
 
 func (suite *RGControllerTestSuite) TestDeleteWithInvalidStateAndNoPGID() {
-	//scenario: When there is valid deletion time-stamp and invalid state
+	// scenario: When there is valid deletion time-stamp and invalid state
 	ctx := context.Background()
 	replicationGroup := suite.getLocalRG("")
 	replicationGroup.DeletionTimestamp = &metav1.Time{
@@ -343,7 +342,7 @@ func (suite *RGControllerTestSuite) TestDeleteWithNoPGID() {
 }
 
 func (suite *RGControllerTestSuite) TestDeleteWithNoState() {
-	//scenario: When there is valid deletion time-stamp and no state
+	// scenario: When there is valid deletion time-stamp and no state
 	ctx := context.Background()
 	replicationGroup := suite.getLocalRG("")
 	replicationGroup.DeletionTimestamp = &metav1.Time{
@@ -359,7 +358,7 @@ func (suite *RGControllerTestSuite) TestDeleteWithNoState() {
 }
 
 func (suite *RGControllerTestSuite) TestDeleteWithReadyState() {
-	//scenario: When there is valid deletion time-stamp and Ready state
+	// scenario: When there is valid deletion time-stamp and Ready state
 	ctx := context.Background()
 	replicationGroup := suite.getLocalRG("")
 	// Set Finalizer
@@ -380,7 +379,7 @@ func (suite *RGControllerTestSuite) TestDeleteWithReadyState() {
 }
 
 func (suite *RGControllerTestSuite) TestDeleteWithErrors() {
-	//scenario: When there is valid deletion time-stamp and Ready state
+	// scenario: When there is valid deletion time-stamp and Ready state
 	ctx := context.Background()
 	replicationGroup := suite.getLocalRG("")
 	// Set Finalizer
@@ -482,12 +481,11 @@ func (suite *RGControllerTestSuite) TestDeleteWithFinalError() {
 	// Object should be deleted now
 	err = suite.client.Get(ctx, req.NamespacedName, rg)
 	suite.Error(err, "RG object not found")
-
 }
 
 func (suite *RGControllerTestSuite) TestDeleteWithActionInProgress() {
 	ctx := context.Background()
-	//scenario: When there is valid PG-ID and state is in ActionInProgress
+	// scenario: When there is valid PG-ID and state is in ActionInProgress
 	actionName := "Resume"
 	replicationGroup, err := suite.createRGInActionInProgressState("", actionName, false, true)
 	suite.Nil(err)
@@ -533,7 +531,7 @@ func (suite *RGControllerTestSuite) prettyPrint(rg repv1.DellCSIReplicationGroup
 }
 
 func (suite *RGControllerTestSuite) TestActionInReadyState() {
-	//scenario: When there is valid PG-ID and Suspend action
+	// scenario: When there is valid PG-ID and Suspend action
 	actionName := "Suspend"
 	actionType := ActionType(actionName)
 
@@ -571,7 +569,7 @@ func (suite *RGControllerTestSuite) TestActionInReadyState() {
 }
 
 func (suite *RGControllerTestSuite) TestActionInProgressState() {
-	//scenario: When there is valid PG-ID and state is in ActionInProgress
+	// scenario: When there is valid PG-ID and state is in ActionInProgress
 	actionName := "Failover_Local"
 	replicationGroup, err := suite.createRGInActionInProgressState("", actionName, false, false)
 	suite.Nil(err)
@@ -747,7 +745,7 @@ func (suite *RGControllerTestSuite) TestActionInProgressWithFinalError() {
 }
 
 func (suite *RGControllerTestSuite) TestActionInProgressStateWithPersistentError() {
-	//scenario: When there is valid PG-ID and state is in ActionInProgress
+	// scenario: When there is valid PG-ID and state is in ActionInProgress
 	// and driver returns errors
 	actionName := "Failback_Local"
 	actionType := ActionType(actionName)
@@ -792,7 +790,7 @@ func (suite *RGControllerTestSuite) TestActionInProgressStateWithPersistentError
 }
 
 func (suite *RGControllerTestSuite) TestActionInProgressStateWithTimeout() {
-	//scenario: When there is valid PG-ID and state is in ActionInProgress
+	// scenario: When there is valid PG-ID and state is in ActionInProgress
 	// and driver returns errors
 	actionName := "Failover_Remote"
 	actionType := ActionType(actionName)
@@ -1025,8 +1023,8 @@ func (suite *RGControllerTestSuite) TestActionInProgressWithIncorrectAnnotation(
 }
 
 func (suite *RGControllerTestSuite) TestActionInProgressWithMismatchingAction() {
-	//scenario: State is ActionInProgress, correct ActionInProgress annotation & user modifies the action field
-	//expectation: controller ignores this & finishes the current action
+	// scenario: State is ActionInProgress, correct ActionInProgress annotation & user modifies the action field
+	// expectation: controller ignores this & finishes the current action
 	actionName := "Sync"
 	replicationGroup, err := suite.createRGInActionInProgressState("", actionName, false, false)
 	suite.Nil(err)
@@ -1171,7 +1169,7 @@ func (suite *RGControllerTestSuite) TestInvalidAction() {
 }
 
 func (suite *RGControllerTestSuite) TestNoDeletionTimeStamp() {
-	//scenario: When there is no deletion time stamp
+	// scenario: When there is no deletion time stamp
 	replicationGroup := suite.getLocalRG("")
 	replicationGroup.Finalizers = append(replicationGroup.Finalizers, controllers.ReplicationFinalizer)
 

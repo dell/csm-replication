@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -45,8 +45,10 @@ type PVControllerTestSuite struct {
 }
 
 // blank assignment to verify client.Client method implementations
-var _ client.Client = &fakeclient.Client{}
-var PVCReconciler PersistentVolumeClaimReconciler
+var (
+	_             client.Client = &fakeclient.Client{}
+	PVCReconciler PersistentVolumeClaimReconciler
+)
 
 func (suite *PVControllerTestSuite) SetupTest() {
 	suite.Init()
@@ -88,7 +90,7 @@ func (suite *PVControllerTestSuite) runFakeReplicationManager() {
 }
 
 func (suite *PVControllerTestSuite) TestVolumeCreationFail() {
-	//scenario: CreateRemoteVolume should fail with an error
+	// scenario: CreateRemoteVolume should fail with an error
 	var dummyBuffer string
 	ctx := context.Background()
 	pvObj := suite.getFakePV()
@@ -97,7 +99,7 @@ func (suite *PVControllerTestSuite) TestVolumeCreationFail() {
 	err := suite.mockUtils.FakeControllerClient.Create(ctx, pvObj)
 	assert.NoError(suite.T(), err)
 
-	//creating fake PVC with bound state
+	// creating fake PVC with bound state
 	pvcObj := utils.GetPVCObj("fake-pvc1", suite.mockUtils.Specs.Namespace, suite.driver.StorageClass)
 	pvcObj.Status.Phase = corev1.ClaimBound
 	pvcObj.Spec.VolumeName = "fake-pv1"
@@ -118,7 +120,7 @@ func (suite *PVControllerTestSuite) TestVolumeCreationFail() {
 }
 
 func (suite *PVControllerTestSuite) TestPVProcessingFailure() {
-	//scenario: PV processing should fail with an error
+	// scenario: PV processing should fail with an error
 	ctx := context.Background()
 	pvObj := suite.getFakePV()
 	pvObj.Name = "fake-pv2"
@@ -126,7 +128,7 @@ func (suite *PVControllerTestSuite) TestPVProcessingFailure() {
 	err := suite.mockUtils.FakeControllerClient.Create(ctx, pvObj)
 	assert.NoError(suite.T(), err)
 
-	//creating fake PVC with bound state
+	// creating fake PVC with bound state
 	pvcObj := utils.GetPVCObj("fake-pvc2", suite.mockUtils.Specs.Namespace, suite.driver.StorageClass)
 	pvcObj.Status.Phase = corev1.ClaimBound
 	pvcObj.Spec.VolumeName = "fake-pv2"
@@ -148,7 +150,7 @@ func (suite *PVControllerTestSuite) TestPVProcessingFailure() {
 }
 
 func (suite *PVControllerTestSuite) TestRGCreationFailure() {
-	//scenario: CreateRG should fail with an error
+	// scenario: CreateRG should fail with an error
 	ctx := context.Background()
 	pvObj := suite.getFakePV()
 	pvObj.Name = "fake-pv3"
@@ -156,7 +158,7 @@ func (suite *PVControllerTestSuite) TestRGCreationFailure() {
 	err := suite.mockUtils.FakeControllerClient.Create(ctx, pvObj)
 	assert.NoError(suite.T(), err)
 
-	//creating fake PVC with bound state
+	// creating fake PVC with bound state
 	pvcObj := utils.GetPVCObj("fake-pvc3", suite.mockUtils.Specs.Namespace, suite.driver.StorageClass)
 	pvcObj.Status.Phase = corev1.ClaimBound
 	pvcObj.Spec.VolumeName = "fake-pv3"
@@ -178,7 +180,7 @@ func (suite *PVControllerTestSuite) TestRGCreationFailure() {
 }
 
 func (suite *PVControllerTestSuite) TestWithoutStorageClass() {
-	//scenario: When there is no storage class created
+	// scenario: When there is no storage class created
 	ctx := context.Background()
 	pvObj := suite.getFakePV()
 	pvObj.Name = "fake-pv4"
@@ -186,7 +188,7 @@ func (suite *PVControllerTestSuite) TestWithoutStorageClass() {
 	err := suite.mockUtils.FakeControllerClient.Create(ctx, pvObj)
 	assert.NoError(suite.T(), err)
 
-	//creating fake PVC with bound state
+	// creating fake PVC with bound state
 	sc := ""
 	pvcObj := utils.GetPVCObj("fake-pvc4", suite.mockUtils.Specs.Namespace, suite.driver.StorageClass)
 	pvcObj.Status.Phase = corev1.ClaimBound
@@ -208,7 +210,7 @@ func (suite *PVControllerTestSuite) TestWithoutStorageClass() {
 }
 
 func (suite *PVControllerTestSuite) TestWithReplicationDisabledSc() {
-	//scenario: When the storage class is not replication enabled
+	// scenario: When the storage class is not replication enabled
 	ctx := context.Background()
 	scObj := suite.getFakeStorageClass()
 	scObj.Name = "fake-sc-5"
@@ -224,7 +226,7 @@ func (suite *PVControllerTestSuite) TestWithReplicationDisabledSc() {
 	err = suite.mockUtils.FakeControllerClient.Create(ctx, pvObj)
 	assert.NoError(suite.T(), err)
 
-	//creating fake PVC with bound state
+	// creating fake PVC with bound state
 	pvcObj := utils.GetPVCObj("fake-pvc5", suite.mockUtils.Specs.Namespace, suite.driver.StorageClass)
 	scName := "fake-sc-5"
 	pvcObj.Status.Phase = corev1.ClaimBound
@@ -246,7 +248,7 @@ func (suite *PVControllerTestSuite) TestWithReplicationDisabledSc() {
 }
 
 func (suite *PVControllerTestSuite) TestWithInvalidStorageClass() {
-	//scenario: When there is no remote-storage class added in the storage class
+	// scenario: When there is no remote-storage class added in the storage class
 	ctx := context.Background()
 	scObj := suite.getFakeStorageClass()
 	scObj.Name = "fake-sc-6"
@@ -273,7 +275,7 @@ func (suite *PVControllerTestSuite) TestWithInvalidStorageClass() {
 	err = suite.mockUtils.FakeControllerClient.Create(ctx, pvObj)
 	assert.NoError(suite.T(), err)
 
-	//creating fake PVC with bound state
+	// creating fake PVC with bound state
 	pvcObj := utils.GetPVCObj("fake-pvc6", suite.mockUtils.Specs.Namespace, suite.driver.StorageClass)
 	pvcObj.Status.Phase = corev1.ClaimBound
 	pvcObj.Spec.VolumeName = "fake-pv6"
@@ -295,7 +297,7 @@ func (suite *PVControllerTestSuite) TestWithInvalidStorageClass() {
 }
 
 func (suite *PVControllerTestSuite) TestWithInvalidVolumeHandle() {
-	//scenario: CreateRemoteVolume should fail with invalid volumeHandle
+	// scenario: CreateRemoteVolume should fail with invalid volumeHandle
 	pvObj := suite.getFakePV()
 	pvObj.Name = "fake-pv7"
 	pvObj.Spec.CSI.VolumeHandle = ""
@@ -303,7 +305,7 @@ func (suite *PVControllerTestSuite) TestWithInvalidVolumeHandle() {
 	err := suite.mockUtils.FakeControllerClient.Create(context.Background(), pvObj)
 	assert.NoError(suite.T(), err)
 
-	//creating fake PVC with bound state
+	// creating fake PVC with bound state
 	pvcObj := utils.GetPVCObj("fake-pvc7", suite.mockUtils.Specs.Namespace, suite.driver.StorageClass)
 	pvcObj.Status.Phase = corev1.ClaimBound
 	pvcObj.Spec.VolumeName = "fake-pv7"
@@ -323,14 +325,14 @@ func (suite *PVControllerTestSuite) TestWithInvalidVolumeHandle() {
 }
 
 func (suite *PVControllerTestSuite) TestWhenPVCNotInBound() {
-	//scenario: When the PVC is not bound
+	// scenario: When the PVC is not bound
 	pvObj := suite.getFakePV()
 	pvObj.Name = "fake-pv8"
 
 	err := suite.mockUtils.FakeControllerClient.Create(context.Background(), pvObj)
 	assert.NoError(suite.T(), err)
 
-	//creating fake PVC with bound state
+	// creating fake PVC with bound state
 	pvcObj := utils.GetPVCObj("fake-pvc8", suite.mockUtils.Specs.Namespace, suite.driver.StorageClass)
 	pvcObj.Status.Phase = ""
 	pvcObj.Spec.VolumeName = "fake-pv8"
@@ -349,7 +351,7 @@ func (suite *PVControllerTestSuite) TestWhenPVCNotInBound() {
 }
 
 func (suite *PVControllerTestSuite) TestInvalidVolumeName() {
-	//scenario: When there is no volume name present in the PVC
+	// scenario: When there is no volume name present in the PVC
 	pvcObj := utils.GetPVCObj("fake-pvc9", suite.mockUtils.Specs.Namespace, suite.driver.StorageClass)
 	pvcObj.Status.Phase = ""
 	pvcObj.Spec.VolumeName = ""
@@ -369,7 +371,7 @@ func (suite *PVControllerTestSuite) TestInvalidVolumeName() {
 }
 
 func (suite *PVControllerTestSuite) TestReconcileWithInvalidObjects() {
-	//scenario: When the resource names are not valid
+	// scenario: When the resource names are not valid
 	req := reconcile.Request{
 		NamespacedName: types.NamespacedName{
 			Namespace: "",
@@ -381,7 +383,7 @@ func (suite *PVControllerTestSuite) TestReconcileWithInvalidObjects() {
 }
 
 func (suite *PVControllerTestSuite) TestWithInvalidDriver() {
-	//scenario: When the provisioner name and driver name doesn't match
+	// scenario: When the provisioner name and driver name doesn't match
 	req := reconcile.Request{
 		NamespacedName: types.NamespacedName{
 			Namespace: suite.mockUtils.Specs.Namespace,
@@ -394,7 +396,7 @@ func (suite *PVControllerTestSuite) TestWithInvalidDriver() {
 }
 
 func (suite *PVControllerTestSuite) TestPVCReconciliation() {
-	//scenario: Positive scenario
+	// scenario: Positive scenario
 	ctx := context.Background()
 	pvObj := suite.getFakePV()
 	pvObj.Name = "fake-pv10"
@@ -408,7 +410,7 @@ func (suite *PVControllerTestSuite) TestPVCReconciliation() {
 	err := suite.mockUtils.FakeControllerClient.Create(ctx, pvObj)
 	assert.NoError(suite.T(), err)
 
-	//creating fake PVC with bound state
+	// creating fake PVC with bound state
 	pvcObj := utils.GetPVCObj("fake-pvc10", suite.mockUtils.Specs.Namespace, suite.driver.StorageClass)
 	pvcObj.Status.Phase = corev1.ClaimBound
 	pvcObj.Spec.VolumeName = "fake-pv10"
@@ -432,11 +434,10 @@ func (suite *PVControllerTestSuite) TestPVCReconciliation() {
 
 	suite.Equal(updatedPVC.Namespace, suite.mockUtils.Specs.Namespace, "They should be equal")
 	utils.ValidateAnnotations(updatedPVC.ObjectMeta.Annotations, suite.T())
-
 }
 
 func (suite *PVControllerTestSuite) TestPVCReconciliationWithEmptyRG() {
-	//scenario: Negative scenario when RG annotation is empty
+	// scenario: Negative scenario when RG annotation is empty
 	ctx := context.Background()
 	pvObj := suite.getFakePV()
 	pvObj.Name = "fake-pv10"
@@ -450,7 +451,7 @@ func (suite *PVControllerTestSuite) TestPVCReconciliationWithEmptyRG() {
 	err := suite.mockUtils.FakeControllerClient.Create(ctx, pvObj)
 	assert.NoError(suite.T(), err)
 
-	//creating fake PVC with bound state
+	// creating fake PVC with bound state
 	pvcObj := utils.GetPVCObj("fake-pvc10", suite.mockUtils.Specs.Namespace, suite.driver.StorageClass)
 	pvcObj.Status.Phase = corev1.ClaimBound
 	pvcObj.Spec.VolumeName = "fake-pv10"
@@ -470,7 +471,7 @@ func (suite *PVControllerTestSuite) TestPVCReconciliationWithEmptyRG() {
 }
 
 func (suite *PVControllerTestSuite) TestPVCReconciliationWithMissingRGAnnotation() {
-	//scenario: Negative scenario when RG annotation is not set on PV
+	// scenario: Negative scenario when RG annotation is not set on PV
 	ctx := context.Background()
 	pvObj := suite.getFakePV()
 	pvObj.Name = "fake-pv10"
@@ -483,7 +484,7 @@ func (suite *PVControllerTestSuite) TestPVCReconciliationWithMissingRGAnnotation
 	err := suite.mockUtils.FakeControllerClient.Create(ctx, pvObj)
 	assert.NoError(suite.T(), err)
 
-	//creating fake PVC with bound state
+	// creating fake PVC with bound state
 	pvcObj := utils.GetPVCObj("fake-pvc10", suite.mockUtils.Specs.Namespace, suite.driver.StorageClass)
 	pvcObj.Status.Phase = corev1.ClaimBound
 	pvcObj.Spec.VolumeName = "fake-pv10"
@@ -503,7 +504,7 @@ func (suite *PVControllerTestSuite) TestPVCReconciliationWithMissingRGAnnotation
 }
 
 func (suite *PVControllerTestSuite) TestPVRetentionPolicyDelete() {
-	//scenario: When the PV Retention policy is set to delete
+	// scenario: When the PV Retention policy is set to delete
 	ctx := context.Background()
 	scObj := suite.getFakeStorageClass()
 	scObj.Name = "fake-sc-11"
@@ -519,7 +520,7 @@ func (suite *PVControllerTestSuite) TestPVRetentionPolicyDelete() {
 	err = suite.mockUtils.FakeControllerClient.Create(ctx, pvObj)
 	assert.NoError(suite.T(), err)
 
-	//creating fake PVC with bound state
+	// creating fake PVC with bound state
 	pvcObj := utils.GetPVCObj("fake-pvc11", suite.mockUtils.Specs.Namespace, suite.driver.StorageClass)
 	scName := "fake-sc-11"
 	pvcObj.Status.Phase = corev1.ClaimBound
@@ -541,7 +542,7 @@ func (suite *PVControllerTestSuite) TestPVRetentionPolicyDelete() {
 }
 
 func (suite *PVControllerTestSuite) TestUpdatingTerminatingObjects() {
-	//scenario: This should fail to update the PV which is in terminating state
+	// scenario: This should fail to update the PV which is in terminating state
 	ctx := context.Background()
 
 	pvObj := suite.getFakePV()
@@ -551,7 +552,7 @@ func (suite *PVControllerTestSuite) TestUpdatingTerminatingObjects() {
 	err := suite.mockUtils.FakeControllerClient.Create(ctx, pvObj)
 	assert.NoError(suite.T(), err)
 
-	//creating fake PVC with bound state
+	// creating fake PVC with bound state
 	pvcObj := utils.GetPVCObj("fake-pvc12", suite.mockUtils.Specs.Namespace, suite.driver.StorageClass)
 	pvcObj.Status.Phase = corev1.ClaimBound
 	pvcObj.Spec.VolumeName = "fake-pv12"
@@ -578,7 +579,7 @@ func (suite *PVControllerTestSuite) TestSetupWithManager() {
 }
 
 func (suite *PVControllerTestSuite) getFakePV() *corev1.PersistentVolume {
-	//creating fake PV to use with fake PVC
+	// creating fake PV to use with fake PVC
 	volumeAttributes := map[string]string{
 		"fake-CapacityGB":     "3.00",
 		"RemoteSYMID":         "000000000002",
@@ -626,7 +627,7 @@ func (suite *PVControllerTestSuite) getParams() map[string]string {
 }
 
 func (suite *PVControllerTestSuite) getFakeStorageClass() *storagev1.StorageClass {
-	//creating fake storage-class with replication params
+	// creating fake storage-class with replication params
 	parameters := suite.getParams()
 	scObj := storagev1.StorageClass{
 		ObjectMeta:  metav1.ObjectMeta{Name: suite.driver.StorageClass},

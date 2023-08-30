@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -163,7 +163,8 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 func (r *PersistentVolumeClaimReconciler) processRemotePVC(ctx context.Context,
 	rClient connection.RemoteClusterClient,
 	claim *v1.PersistentVolumeClaim,
-	remotePVCName, remotePVCNamespace, remotePVName string) (bool, error) {
+	remotePVCName, remotePVCNamespace, remotePVName string,
+) (bool, error) {
 	log := common.GetLoggerFromContext(ctx)
 	isUpdated := false
 	// Just apply the missing annotation
@@ -194,7 +195,8 @@ func (r *PersistentVolumeClaimReconciler) processRemotePVC(ctx context.Context,
 
 func (r *PersistentVolumeClaimReconciler) processLocalPVC(ctx context.Context,
 	claim *v1.PersistentVolumeClaim, remotePVName, remotePVCName, remotePVCNamespace,
-	remoteClusterID string, isRemotePVCUpdated bool) error {
+	remoteClusterID string, isRemotePVCUpdated bool,
+) error {
 	log := common.GetLoggerFromContext(ctx)
 	if claim.Annotations[controller.PVCSyncComplete] == "yes" {
 		log.V(common.InfoLevel).Info("PVC Sync already completed")

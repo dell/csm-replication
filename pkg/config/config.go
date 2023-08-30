@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -135,7 +135,6 @@ func (c *Config) UpdateConfigMap(ctx context.Context, client ctrlClient.Client, 
 }
 
 func (c *Config) updateConfig(ctx context.Context, client ctrlClient.Client, opts ControllerManagerOpts, recorder record.EventRecorder, log logr.Logger) error {
-
 	cmap, replicationConfig, err := getReplicationConfig(ctx, client, opts, recorder, log)
 	if err != nil {
 		return err
@@ -231,7 +230,6 @@ func readConfigFile(configFile, configPath string) (*replicationConfigMap, error
 }
 
 func getReplicationConfig(ctx context.Context, client ctrlClient.Client, opts ControllerManagerOpts, recorder record.EventRecorder, log logr.Logger) (*replicationConfigMap, *replicationConfig, error) {
-
 	configMap, err := readConfigFile(opts.ConfigFileName, opts.ConfigDir)
 	if err != nil {
 		return nil, nil, err
@@ -266,7 +264,6 @@ func getReplicationConfig(ctx context.Context, client ctrlClient.Client, opts Co
 		return configMap, repConfig, nil
 	}
 	return configMap, nil, nil
-
 }
 
 // Returns a connection handler for the remote clusters
@@ -284,7 +281,7 @@ func getConnHandler(ctx context.Context, targets []target, client ctrlClient.Cli
 			}
 		} else {
 			log.V(common.InfoLevel).Info("Expecting secret data to be in form of a service account token/custom format")
-			//restConfig, err = buildRestConfigFromCustomFormat(target.SecretRef, opts.WatchNamespace, client)
+			// restConfig, err = buildRestConfigFromCustomFormat(target.SecretRef, opts.WatchNamespace, client)
 			restConfig, err = buildRestConfigFromServiceAccountToken(ctx, target.SecretRef, opts.WatchNamespace, client, target.Address)
 			if err != nil {
 				return nil, err

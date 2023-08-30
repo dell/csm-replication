@@ -1,5 +1,5 @@
 /*
- Copyright © 2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2022-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -68,9 +68,9 @@ func NewFakeMigrationClient(contextPrefix string) MockMigration {
 }
 
 // VolumeMigrate migrates volume
-func (m *MockMigration) VolumeMigrate(ctx context.Context, volumeHandle string, storageClass string, migrateType *csiext.VolumeMigrateRequest_Type,
-	scParams map[string]string, sourcescParams map[string]string, toClone bool) (*csiext.VolumeMigrateResponse, error) {
-
+func (m *MockMigration) VolumeMigrate(_ context.Context, _ string, _ string, _ *csiext.VolumeMigrateRequest_Type,
+	_ map[string]string, _ map[string]string, _ bool,
+) (*csiext.VolumeMigrateResponse, error) {
 	defer m.ClearError(false)
 	if err := m.injectedError.getError(); err != nil {
 		return nil, err
@@ -84,7 +84,7 @@ func (m *MockMigration) VolumeMigrate(ctx context.Context, volumeHandle string, 
 }
 
 // ArrayMigrate migrates volume from source array to target
-func (m *MockMigration) ArrayMigrate(ctx context.Context, migrateAction *csiext.ArrayMigrateRequest_Action, Params map[string]string) (*csiext.ArrayMigrateResponse, error) {
+func (m *MockMigration) ArrayMigrate(_ context.Context, migrateAction *csiext.ArrayMigrateRequest_Action, _ map[string]string) (*csiext.ArrayMigrateResponse, error) {
 	defer m.ClearError(false)
 	if err := m.injectedError.getError(); err != nil {
 		return nil, err

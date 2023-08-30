@@ -34,10 +34,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var migrationPref = "migration.storage.dell.com"
-var migrationAnnotation = ""
-var migrationNS = ""
-var yes = false
+var (
+	migrationPref       = "migration.storage.dell.com"
+	migrationAnnotation = ""
+	migrationNS         = ""
+	yes                 = false
+)
 
 // GetMigrateCommand returns 'edit' cobra command
 func GetMigrateCommand() *cobra.Command {
@@ -407,7 +409,6 @@ func waitForPodToBeReady(podName string, podNS string, cluster k8s.ClusterInterf
 							return
 						}
 					}
-
 				}
 			}
 		}
@@ -492,7 +493,6 @@ func migrateMG(configFolder, resource string, resName string, targetNS string, w
 		go migrateArray(context.Background(), cluster, resName, targetNS, wg, wait)
 	}
 	wg.Wait()
-
 }
 
 func migrateArray(ctx context.Context, cluster k8s.ClusterInterface, mgName string, targetNS string, wg *sync.WaitGroup, wait bool) {
@@ -512,7 +512,7 @@ func migrateArray(ctx context.Context, cluster k8s.ClusterInterface, mgName stri
 		log.Error(err, "unable to update mg")
 		os.Exit(1)
 	}
-	//Command exit criteria
+	// Command exit criteria
 	if wait {
 		done := waitForArrayMigration(mgName, cluster)
 		if done {

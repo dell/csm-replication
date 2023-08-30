@@ -305,7 +305,8 @@ func (c *Cluster) GetPersistentVolumeClaim(ctx context.Context, nsName string, p
 
 // FilterPersistentVolumeClaims returns filtered list of all persistent volume claim objects that are currently in cluster
 func (c *Cluster) FilterPersistentVolumeClaims(ctx context.Context, namespace, remoteClusterID,
-	remoteNamespace, rgName string) (*types.PersistentVolumeClaimList, error) {
+	remoteNamespace, rgName string,
+) (*types.PersistentVolumeClaimList, error) {
 	matchingLabels := make(map[string]string)
 	if remoteClusterID != "" {
 		matchingLabels[metadata.RemoteClusterID] = remoteClusterID
@@ -332,7 +333,8 @@ func (c *Cluster) FilterPersistentVolumeClaims(ctx context.Context, namespace, r
 
 // CreatePersistentVolumeClaimsFromPVs uses list of persistent volume to create remote PVCs
 func (c *Cluster) CreatePersistentVolumeClaimsFromPVs(ctx context.Context, namespace string,
-	pvList []types.PersistentVolume, prefix string, dryRun bool) error {
+	pvList []types.PersistentVolume, prefix string, dryRun bool,
+) error {
 	// go through the PV list and create PVC objects
 	for _, pv := range pvList {
 		// First check if we have an existing PVC
@@ -690,7 +692,6 @@ func (c *Cluster) GetStatefulSet(ctx context.Context, nsName string, stsName str
 
 // FilterPods returns filtered list of pod, managed by given sts
 func (c *Cluster) FilterPods(ctx context.Context, namespace string, stsName string) (*v1.PodList, error) {
-
 	podList, err := c.ListPods(ctx, client.InNamespace(namespace))
 	if err != nil {
 		return nil, err

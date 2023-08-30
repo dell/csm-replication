@@ -1,5 +1,5 @@
 /*
- Copyright © 2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2022-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -65,7 +65,6 @@ func (m *migration) VolumeMigrate(ctx context.Context, volumeHandle string, stor
 
 // ArrayMigrate
 func (m *migration) ArrayMigrate(ctx context.Context, migrateAction *csiext.ArrayMigrateRequest_Action, Params map[string]string) (*csiext.ArrayMigrateResponse, error) {
-
 	tc, cancel := context.WithTimeout(ctx, m.timeout)
 	defer cancel()
 	client := csiext.NewMigrationClient(m.conn)

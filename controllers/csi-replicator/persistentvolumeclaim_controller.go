@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -176,7 +176,8 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 }
 
 func (r *PersistentVolumeClaimReconciler) processClaimForRemoteVolume(ctx context.Context, claim *v1.PersistentVolumeClaim,
-	pv *v1.PersistentVolume, scParams map[string]string, buffer string) error {
+	pv *v1.PersistentVolume, scParams map[string]string, buffer string,
+) error {
 	log := common.GetLoggerFromContext(ctx)
 	log.V(common.InfoLevel).Info("Begin process claim for remote-volume")
 

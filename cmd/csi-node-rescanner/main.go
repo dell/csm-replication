@@ -85,7 +85,6 @@ func (mgr *NodeRescanner) processConfigMapChanges(loggerConfig *logrus.Logger) {
 	}
 	log.Println("set level to", level)
 	loggerConfig.SetLevel(level)
-
 }
 
 func (mgr *NodeRescanner) setupConfigMapWatcher(loggerConfig *logrus.Logger) {
@@ -96,7 +95,7 @@ func (mgr *NodeRescanner) setupConfigMapWatcher(loggerConfig *logrus.Logger) {
 	})
 }
 
-func createNodeReScannerManager(ctx context.Context, mgr ctrl.Manager) (*NodeRescanner, error) {
+func createNodeReScannerManager(_ context.Context, mgr ctrl.Manager) (*NodeRescanner, error) {
 	opts := config.GetControllerManagerOpts()
 	opts.Mode = "sidecar"
 	//mgrLogger := mgr.GetLogger()
@@ -213,7 +212,7 @@ func main() {
 	}
 	log.Printf("Rescan manager configured: (+%v)", rescanMgr)
 	// Start the watch on configmap
-	//rescanMgr.setupConfigMapWatcher(logrusLog)
+	// rescanMgr.setupConfigMapWatcher(logrusLog)
 
 	// Process the config. Get initial log level
 	level, err := common.ParseLevel("debug")
@@ -243,5 +242,4 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
-
 }

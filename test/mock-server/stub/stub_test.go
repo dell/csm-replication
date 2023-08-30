@@ -1,5 +1,5 @@
 /*
-Copyright © 2021 Dell Inc. or its subsidiaries. All Rights Reserved.
+Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -114,7 +114,8 @@ func TestStub(t *testing.T) {
 			},
 			handler: handleFindStub,
 			expect:  "{\"data\":{\"hello\":\"world\"},\"error\":\"\"}\n",
-		}, {
+		},
+		{
 			name: "add stub matches regex",
 			mock: func() *http.Request {
 				payload := `{
@@ -135,7 +136,8 @@ func TestStub(t *testing.T) {
 			},
 			handler: addStub,
 			expect:  "Success add stub",
-		}, {
+		},
+		{
 			name: "find stub matches regex",
 			mock: func() *http.Request {
 				payload := `{
@@ -149,7 +151,8 @@ func TestStub(t *testing.T) {
 			},
 			handler: handleFindStub,
 			expect:  "{\"data\":{\"reply\":\"OK\"},\"error\":\"\"}\n",
-		}, {
+		},
+		{
 			name: "error find stub contains",
 			mock: func() *http.Request {
 				payload := `{
@@ -165,7 +168,8 @@ func TestStub(t *testing.T) {
 			},
 			handler: handleFindStub,
 			expect:  "Can't find stub \n\nService: Testing \n\nMethod: TestMethod \n\nInput\n\n{\n\tfield1: hello field1\n\tfield2: hello field2\n\tfield3: hello field4\n}\n\nClosest Match \n\ncontains:{\n\tfield1: hello field1\n\tfield3: hello field3\n}",
-		}, {
+		},
+		{
 			name: "error find stub equals",
 			mock: func() *http.Request {
 				payload := `{"service":"Testing","method":"TestMethod","data":{"Hello":"World"}}`
