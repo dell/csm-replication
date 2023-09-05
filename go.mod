@@ -4,10 +4,10 @@ go 1.21
 
 require (
 	github.com/bombsimon/logrusr/v4 v4.0.0
-	github.com/dell/dell-csi-extensions/common v1.1.3-0.20230821201344-ea25f89d957e
-	github.com/dell/dell-csi-extensions/migration v1.1.2-0.20230821201344-ea25f89d957e
-	github.com/dell/dell-csi-extensions/replication v1.4.1-0.20230821201344-ea25f89d957e
-	github.com/dell/gobrick v1.8.0
+	github.com/dell/dell-csi-extensions/common v1.2.0
+	github.com/dell/dell-csi-extensions/migration v1.2.0
+	github.com/dell/dell-csi-extensions/replication v1.5.0
+	github.com/dell/gobrick v1.9.0
 	github.com/fatih/color v1.15.0
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/go-chi/chi v1.5.4
@@ -37,8 +37,8 @@ require (
 	github.com/bgentry/go-netrc v0.0.0-20140422174119-9fd32a8b3d3d // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/dell/goiscsi v1.7.0 // indirect
-	github.com/dell/gonvme v1.4.0 // indirect
+	github.com/dell/goiscsi v1.8.0 // indirect
+	github.com/dell/gonvme v1.5.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.10.2 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
