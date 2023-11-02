@@ -48,12 +48,12 @@ type ReplicationGroupMonitoring struct {
 // updates the ReplicationLinkStatus depending on the response received
 // from the driver.
 func (r *ReplicationGroupMonitoring) Monitor(_ context.Context) error {
-	ticker := time.NewTicker(r.MonitoringInterval).C
-	go func(<-chan time.Time) {
+	go func() {
+		ticker := time.NewTicker(r.MonitoringInterval).C
 		for {
 			r.monitorReplicationGroups(ticker)
 		}
-	}(ticker)
+	}()
 
 	return nil
 }
