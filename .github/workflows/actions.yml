@@ -26,6 +26,7 @@ jobs:
         with:
           args: /github/workspace
   test:
+    permissions: write-all
     name: Run Go unit tests and check package coverage
     runs-on: ubuntu-latest
     steps:
@@ -38,6 +39,7 @@ jobs:
       - name: Run unit tests and check package coverage
         run: make gen-coverage
   go_security_scan:
+    permissions: write-all
     name: Go security - Main Folder
     runs-on: ubuntu-latest
     steps:
@@ -48,6 +50,7 @@ jobs:
         with:
           args: -exclude-dir=repctl ./...
   go_security_scan_repctl:
+    permissions: write-all
     name: Go security - Repctl
     runs-on: ubuntu-latest
     steps:
