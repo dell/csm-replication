@@ -374,7 +374,7 @@ func (r *ReplicationGroupReconciler) getAction(actionType ActionType) (*csiext.E
 		}
 		actionT := supportedAction.GetType()
 		if actionT.String() == actionType.String() {
-			var action = &csiext.ExecuteActionRequest_Action{
+			action := &csiext.ExecuteActionRequest_Action{
 				Action: &csiext.Action{},
 			}
 			action.Action.ActionTypes = actionT
