@@ -121,7 +121,7 @@ var MockServer *grpc.Server
 var Scheme = runtime.NewScheme()
 
 // Only initialize schemes once to prevent race condition during testing
-var schemesInitialized bool = false
+var schemesInitialized = false
 
 // PVCName name of testing PVC
 const PVCName = "test-pvc"
