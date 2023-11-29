@@ -120,13 +120,19 @@ var MockServer *grpc.Server
 // Scheme runtime Scheme
 var Scheme = runtime.NewScheme()
 
+// Only initialize schemes once to prevent race condition during testing
+var schemesInitialized bool = false
+
 // PVCName name of testing PVC
 const PVCName = "test-pvc"
 
 // InitializeSchemes inits client-go and replication v1 schemes
 func InitializeSchemes() {
-	utilruntime.Must(clientgoscheme.AddToScheme(Scheme))
-	utilruntime.Must(repv1.AddToScheme(Scheme))
+	if !schemesInitialized {
+		utilruntime.Must(clientgoscheme.AddToScheme(Scheme))
+		utilruntime.Must(repv1.AddToScheme(Scheme))
+		schemesInitialized = true
+	}
 	// +kubebuilder:scaffold:scheme
 }
 
