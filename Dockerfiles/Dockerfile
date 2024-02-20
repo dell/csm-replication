@@ -1,8 +1,8 @@
 # some arguments that must be supplied
 ARG BASEIMAGE
-
+ARG GOIMAGE
 # Build the manager binary
-FROM golang:1.21 AS builder
+FROM $GOIMAGE AS builder
 
 RUN mkdir -p /workspace/dell-csi-replicator
 WORKDIR /workspace/dell-csi-replicator
