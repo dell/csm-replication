@@ -279,8 +279,10 @@ func getCreateStorageClassCommand() *cobra.Command {
 
 	createSCCmd.Flags().String("from-config", "", "path to storage class config file")
 	_ = viper.BindPFlag("from-config", createSCCmd.Flags().Lookup("from-config"))
-	createSCCmd.MarkFlagRequired("from-config") // TODO: required because we don't have interactive option rn
-
+	err := createSCCmd.MarkFlagRequired("from-config") // TODO: required because we don't have interactive option rn
+	if err != nil {
+		log.Fatalf(" error in marking flag from-config required %s", err.Error())
+	}
 	createSCCmd.Flags().Bool("dry-run", false, "generate storage classes but don't create them")
 	_ = viper.BindPFlag("create-sc-dry-run", createSCCmd.Flags().Lookup("dry-run"))
 
