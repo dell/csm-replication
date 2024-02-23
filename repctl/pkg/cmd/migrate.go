@@ -99,7 +99,10 @@ This command will perform a migrate command to target StorageClass.`,
 	_ = viper.BindPFlag("pvtarget-ns", migrateCmd.Flags().Lookup("target-ns"))
 	migrateCmd.Flags().Bool("wait", true, "wait for action to complete")
 	_ = viper.BindPFlag("pvwait", migrateCmd.Flags().Lookup("wait"))
-	migrateCmd.MarkFlagRequired("to-sc")
+	err := migrateCmd.MarkFlagRequired("to-sc")
+	if err != nil {
+		log.Fatalf(" error in marking flag to-sc required %s", err.Error())
+	}
 	return migrateCmd
 }
 
@@ -140,8 +143,14 @@ This command will perform a migrate command to target StorageClass.`,
 	_ = viper.BindPFlag("pvctarget-ns", migrateCmd.Flags().Lookup("target-ns"))
 	migrateCmd.Flags().Bool("wait", true, "wait for action to complete")
 	_ = viper.BindPFlag("pvcwait", migrateCmd.Flags().Lookup("wait"))
-	migrateCmd.MarkFlagRequired("to-sc")
-	migrateCmd.MarkFlagRequired("namespace")
+	err := migrateCmd.MarkFlagRequired("to-sc")
+	if err != nil {
+		log.Fatalf(" error in marking flag to-sc required %s", err.Error())
+	}
+	err = migrateCmd.MarkFlagRequired("namespace")
+	if err != nil {
+		log.Fatalf(" error in marking flag namespace required %s", err.Error())
+	}
 	return migrateCmd
 }
 
@@ -188,8 +197,14 @@ This command will perform a migrate command to target StorageClass.`,
 	_ = viper.BindPFlag("ndu", migrateCmd.Flags().Lookup("ndu"))
 	migrateCmd.Flags().BoolP("yes", "y", false, "agree with prompts")
 	_ = viper.BindPFlag("yes", migrateCmd.Flags().Lookup("yes"))
-	migrateCmd.MarkFlagRequired("to-sc")
-	migrateCmd.MarkFlagRequired("namespace")
+	err := migrateCmd.MarkFlagRequired("to-sc")
+	if err != nil {
+		log.Fatalf(" error in marking flag to-sc required %s", err.Error())
+	}
+	err = migrateCmd.MarkFlagRequired("namespace")
+	if err != nil {
+		log.Fatalf(" error in marking flag namespace required %s", err.Error())
+	}
 	return migrateCmd
 }
 

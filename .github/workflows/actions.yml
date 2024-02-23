@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Run the formatter, linter, and vetter
         uses: dell/common-github-actions/go-code-formatter-linter-vetter@main
         with:
@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Run the forbidden words scan
         uses: dell/common-github-actions/code-sanitizer@main
         with:
@@ -31,10 +31,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the code
-        uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+        uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
-          go-version: ^1.21
+          go-version: ^1.22
       - run: cd repctl && make test
       - name: Run unit tests and check package coverage
         run: make gen-coverage
@@ -44,7 +44,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Run Go Security - Main Folder
         uses: securego/gosec@master
         with:
@@ -55,11 +55,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Download GoSec
-        run: cd ./repctl && wget https://github.com/securego/gosec/releases/download/v2.17.0/gosec_2.17.0_linux_amd64.tar.gz
+        run: cd ./repctl && wget https://github.com/securego/gosec/releases/download/v2.19.0/gosec_2.19.0_linux_amd64.tar.gz
       - name: Unpack GoSec
-        run:  cd ./repctl && tar xzf gosec_2.17.0_linux_amd64.tar.gz
+        run:  cd ./repctl && tar xzf gosec_2.19.0_linux_amd64.tar.gz
       - name: GoSec scan
         run: cd ./repctl && ./gosec  ./...
   malware_security_scan:
@@ -67,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Run malware scan
         uses: dell/common-github-actions/malware-scanner@main
         with:
@@ -83,13 +83,13 @@ jobs:
       PASSED_BUILD: false
     steps:
       - name: Checkout the code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: ^1.21
+          go-version: ^1.22
       - name: Build CSM Replication Docker Images
         run: |
           make images
