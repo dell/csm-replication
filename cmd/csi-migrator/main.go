@@ -94,7 +94,7 @@ func (mgr *MigratorManager) processConfigMapChanges(loggerConfig *logrus.Logger)
 func (mgr *MigratorManager) setupConfigMapWatcher(loggerConfig *logrus.Logger) {
 	log.Println("Started ConfigMap Watcher")
 	viper.WatchConfig()
-	viper.OnConfigChange(func(e fsnotify.Event) {
+	viper.OnConfigChange(func(_ fsnotify.Event) {
 		mgr.processConfigMapChanges(loggerConfig)
 	})
 }

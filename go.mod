@@ -2,12 +2,14 @@ module github.com/dell/csm-replication
 
 go 1.22
 
+toolchain go1.22.0
+
 require (
 	github.com/bombsimon/logrusr/v4 v4.0.0
-	github.com/dell/dell-csi-extensions/common v1.3.0
-	github.com/dell/dell-csi-extensions/migration v1.3.0
-	github.com/dell/dell-csi-extensions/replication v1.6.0
-	github.com/dell/gobrick v1.9.0
+	github.com/dell/dell-csi-extensions/common v1.4.0
+	github.com/dell/dell-csi-extensions/migration v1.4.0
+	github.com/dell/dell-csi-extensions/replication v1.7.0
+	github.com/dell/gobrick v1.10.0
 	github.com/fatih/color v1.15.0
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/go-chi/chi v1.5.4
@@ -37,8 +39,8 @@ require (
 	github.com/bgentry/go-netrc v0.0.0-20140422174119-9fd32a8b3d3d // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/dell/goiscsi v1.8.0 // indirect
-	github.com/dell/gonvme v1.5.0 // indirect
+	github.com/dell/goiscsi v1.9.0 // indirect
+	github.com/dell/gonvme v1.7.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.10.2 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
@@ -119,7 +121,7 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230815205213-6bfd019c3878 // indirect
-	google.golang.org/protobuf v1.31.0 // indirect
+	google.golang.org/protobuf v1.32.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
