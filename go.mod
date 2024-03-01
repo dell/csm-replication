@@ -2,6 +2,8 @@ module github.com/dell/csm-replication
 
 go 1.22
 
+toolchain go1.22.0
+
 require (
 	github.com/bombsimon/logrusr/v4 v4.0.0
 	github.com/dell/dell-csi-extensions/common v1.4.0
