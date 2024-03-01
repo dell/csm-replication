@@ -90,7 +90,7 @@ func (mgr *NodeRescanner) processConfigMapChanges(loggerConfig *logrus.Logger) {
 func (mgr *NodeRescanner) setupConfigMapWatcher(loggerConfig *logrus.Logger) {
 	log.Println("Started ConfigMap Watcher")
 	viper.WatchConfig()
-	viper.OnConfigChange(func(e fsnotify.Event) {
+	viper.OnConfigChange(func(_ fsnotify.Event) {
 		mgr.processConfigMapChanges(loggerConfig)
 	})
 }
