@@ -35,24 +35,28 @@ FROM $BASEIMAGE AS container-base
 
 # Controller
 FROM container-base AS controller
+COPY licenses licenses/
 WORKDIR /
 COPY --from=builder /workspace/dell-csi-replicator/dell-replication-controller ./
 ENTRYPOINT ["/dell-replication-controller"]
 
 # Sidecar
 FROM container-base AS sidecar
+COPY licenses licenses/
 WORKDIR /
 COPY --from=builder /workspace/dell-csi-replicator/dell-csi-replicator ./
 ENTRYPOINT ["/dell-csi-replicator"]
 
 # Sidecar migrator
 FROM container-base AS migrator
+COPY licenses licenses/
 WORKDIR /
 COPY --from=builder /workspace/dell-csi-replicator/dell-csi-migrator ./
 ENTRYPOINT ["/dell-csi-migrator"]
 
 # Sidecar node-rescanner
 FROM container-base AS node-rescanner
+COPY licenses licenses/
 WORKDIR /
 COPY --from=builder /workspace/dell-csi-replicator/dell-csi-node-rescanner ./
 ENTRYPOINT ["/dell-csi-node-rescanner"]
