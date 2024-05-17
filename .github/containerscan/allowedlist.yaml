@@ -2,3 +2,4 @@ general:
   vulnerabilities:
     - CVE-2019-1010022 # "Will not fix", see https://access.redhat.com/security/cve/CVE-2019-1010022
     - CVE-2024-2961 # do not have the fix , https://avd.aquasec.com/nvd/cve-2024-2961 
+    - CVE-2024-33599 # fix is not yet available , https://nvd.nist.gov/vuln/detail/CVE-2024-33599 
