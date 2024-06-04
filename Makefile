@@ -98,12 +98,25 @@ fmt: gen-semver
 vet: gen-semver
 	go vet ./...
 
-# Install Go tools to build the code
-tools:
-	go list -f '{{range .Imports}}{{.}} {{end}}' pkg/tools/tools.go | xargs go install
+## Tool Versions
+KUSTOMIZE_VERSION ?= v5.0.1
+CONTROLLER_TOOLS_VERSION ?= v0.15.0
+
+.PHONY: kustomize
+kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary. If wrong version is installed, it will be removed before downloading.
+	@if test -x $(KUSTOMIZE) && ! $(KUSTOMIZE) version | grep -q $(KUSTOMIZE_VERSION); then \
+		echo "$(KUSTOMIZE) version is not expected $(KUSTOMIZE_VERSION). Removing it before installing."; \
+		rm -rf $(KUSTOMIZE); \
+	fi
+	test -s $(KUSTOMIZE) || GO111MODULE=on go install sigs.k8s.io/kustomize/kustomize/v5@$(KUSTOMIZE_VERSION)
+
+.PHONY: controller-gen
+controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary. If wrong version is installed, it will be overwritten.
+	test -s $(CONTROLLER_GEN) && $(CONTROLLER_GEN) --version | grep -q $(CONTROLLER_TOOLS_VERSION) || \
+	go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
 
 # Generate code
-generate: tools
+generate: controller-gen kustomize
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt",year=$(shell date "+%Y") paths="./api/..."
 
 # Pre-requisite for the build/run targets
