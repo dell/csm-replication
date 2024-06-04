@@ -3,7 +3,7 @@ all: build
 build:
 	cp -f ../scripts/gen_kubeconfig.sh ./pkg/cmd/scripts/gen_kubeconfig.sh
 	cp -f ../scripts/config-placeholder ./pkg/cmd/scripts/config-placeholder
-	go build ./cmd/repctl
+	CGO_ENABLED=1 CGO_LDFLAGS="-static" go build ./cmd/repctl
 
 test:
 	cp ../scripts/gen_kubeconfig.sh ./pkg/cmd/scripts/gen_kubeconfig.sh
