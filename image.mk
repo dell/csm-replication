@@ -85,7 +85,7 @@ build-base-image: download-csm-common
 	@echo "Building base image from $(DEFAULT_BASEIMAGE) and loading dependencies..."
 	./scripts/build-ubi-micro.sh $(DEFAULT_BASEIMAGE)
 	@echo "Base image build: SUCCESS"
-	$(eval BASEIMAGE=localhost/rep-ubimicro:latest)
+	$(eval BASEIMAGE=rep-ubimicro:latest)
 
 download-csm-common:
 	curl -O -L https://raw.githubusercontent.com/dell/csm/main/config/csm-common.mk
