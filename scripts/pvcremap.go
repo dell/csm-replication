@@ -85,13 +85,13 @@ func swapPVC(ctx context.Context, clientset *kubernetes.Clientset, pvcName, name
 		return err
 	}
 	localPVPolicy := pv.Spec.PersistentVolumeReclaimPolicy
-	logf("Saving reclaim policy to of remote PV")
+	logf("Saving reclaim policy of remote PV")
 	pv, err = clientset.CoreV1().PersistentVolumes().Get(ctx, pvc.Annotations[replicationPrefix+"remotePV"], metav1.GetOptions{})
 	if err != nil {
 		logf("Error retrieving PV %s: %s", pvc.Spec.VolumeName, err.Error())
 		return err
 	}
-	RemotePVPolicy := pv.Spec.PersistentVolumeReclaimPolicy
+	remotePVPolicy := pv.Spec.PersistentVolumeReclaimPolicy
 
 	// Make the PVS reclaim policy Retain
 	if err = makePVReclaimPolicyRetain(ctx, clientset, pvc.Spec.VolumeName); err != nil {
