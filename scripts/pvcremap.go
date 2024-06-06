@@ -77,7 +77,7 @@ func swapPVC(ctx context.Context, clientset *kubernetes.Clientset, pvcName, name
 		logf("Error getting pv %s: %s:, pvcName, err)")
 	}
 
-	// Save the Reclaim Policy for both PVs
+	// Save the Reclaim Policy for both PVs - return reclaim policy to makepvcreclaimpolicyretain
 	var localPV 
 	var remotePV
 	logf("Saving reclaim policy to of local PV")
@@ -161,6 +161,8 @@ func swapPVC(ctx context.Context, clientset *kubernetes.Clientset, pvcName, name
 	}
 
 	// TODO: restore the PVs original volume reclaim policy
+	//make sure pvc is created and bound to new pv before doing
+	//log policy+verify it is same
 	setPVReclaimPolicy(ctx, clientset, localPV, localPVPolicy)
 	setPVReclaimPolicy(ctx, clientset, remotePV, remotePVPolicy)
 
