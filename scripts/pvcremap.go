@@ -78,15 +78,17 @@ func swapPVC(ctx context.Context, clientset *kubernetes.Clientset, pvcName, name
 	}
 
 	// Save the Reclaim Policy for both PVs
+	var localPV 
+	var remotePV
 	logf("Saving reclaim policy to of local PV")
-	pv, err := clientset.CoreV1().PersistentVolumes().Get(ctx, pvc.Spec.VolumeName, metav1.GetOptions{})
+	localPV, err = clientset.CoreV1().PersistentVolumes().Get(ctx, pvc.Spec.VolumeName, metav1.GetOptions{})
 	if err != nil {
 		logf("Error retrieving PV %s: %s", pvc.Spec.VolumeName, err.Error())
 		return err
 	}
 	localPVPolicy := pv.Spec.PersistentVolumeReclaimPolicy
 	logf("Saving reclaim policy of remote PV")
-	pv, err = clientset.CoreV1().PersistentVolumes().Get(ctx, pvc.Annotations[replicationPrefix+"remotePV"], metav1.GetOptions{})
+	remotePV, err = clientset.CoreV1().PersistentVolumes().Get(ctx, pvc.Annotations[replicationPrefix+"remotePV"], metav1.GetOptions{})
 	if err != nil {
 		logf("Error retrieving PV %s: %s", pvc.Spec.VolumeName, err.Error())
 		return err
@@ -159,13 +161,46 @@ func swapPVC(ctx context.Context, clientset *kubernetes.Clientset, pvcName, name
 	}
 
 	// TODO: restore the PVs original volume reclaim policy
+	setPVReclaimPolicy(ctx, clientset, localPV, localPVPolicy)
+	setPVReclaimPolicy(ctx, clientset, remotePV, remotePVPolicy)
 
 	fmt.Println("Operation completed successfully")
 	return nil
 }
 
+func setPVReclaimPolicy(ctx context.Context, clientset *kubernetes.Clientset, pvName string, prevPolicy string) error {
+	logf("Updating reclaim policy to previous policy on PV")
+	pv, err := clientset.CoreV1().PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
+	if err != nil {
+		logf("Error retrieving PV %s: %s", pvName, err.Error())
+		return err
+	}
+	pv.Spec.PersistentVolumeReclaimPolicy = prevPolicy
+	pv, err = clientset.CoreV1().PersistentVolumes().Update(ctx, pv, metav1.UpdateOptions{})
+	if err != nil {
+		logf("Error updating PV %s: %s", pvName, err.Error())
+	}
+	done := false
+	for iterations := 0; !done; iterations++ {
+		time.Sleep(2 * time.Second)
+		pv, err = clientset.CoreV1().PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
+		if err != nil {
+			logf("Error retrieving PV %s: %s", pvName, err.Error())
+			return err
+		}
+		if pv.Spec.PersistentVolumeReclaimPolicy == prevPolicy {
+			done = true
+		} else if iterations > 20 {
+			err := fmt.Errorf("Timed out waiting on PV VolumeReclaimPolicy to be set to previous policy")
+			return err
+		}
+	}
+	logf("Updating reclaim policy to previous completed on PV")
+	return err
+}
+
 func makePVReclaimPolicyRetain(ctx context.Context, clientset *kubernetes.Clientset, pvName string) error {
-	logf("Uppdating reclaim policy to Retain on PV")
+	logf("Updating reclaim policy to Retain on PV")
 	pv, err := clientset.CoreV1().PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
 	if err != nil {
 		logf("Error retrieving PV %s: %s", pvName, err.Error())
