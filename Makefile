@@ -114,7 +114,7 @@ image-sidecar: gen-semver
 	make -f image.mk sidecar
 
 image-migrator: gen-semver
-	make -f image.mk sidecar-migrator
+	make -f image.mk build-base-image sidecar-migrator
 
 image-migrator-push: gen-semver
 	make -f image.mk sidecar-migrator-push

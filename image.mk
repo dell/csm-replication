@@ -48,7 +48,7 @@ sidecar-node-rescanner-push:
 
 sidecar-migrator: download-csm-common
 	$(eval include csm-common.mk)
-	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_M_TAG} -f Dockerfiles/Dockerfile --target migrator --build-arg BASEIMAGE=$(DEFAULT_BASEIMAGE) --build-arg GOIMAGE=$(DEFAULT_GOIMAGE) ${NOCACHE_ARG}
+	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_M_TAG} -f Dockerfiles/Dockerfile --target migrator --build-arg BASEIMAGE=$(BASEIMAGE) --build-arg GOIMAGE=$(DEFAULT_GOIMAGE) ${NOCACHE_ARG}
 
 sidecar-migrator-push:
 	$(CONTAINER_TOOL) push ${SIDECAR_IMAGE_M_TAG}
@@ -86,6 +86,13 @@ sidecar-migrator-dev: download-csm-common
 
 sidecar-node-rescanner-dev: download-csm-common
 	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_NR_TAG} -f Dockerfiles/Dockerfile.dev --target node-rescanner --build-arg BASEIMAGE=$(DEFAULT_BASEIMAGE) --build-arg GOIMAGE=$(DEFAULT_GOIMAGE)
+
+build-base-image: download-csm-common
+        $(eval include csm-common.mk)
+        @echo "Building base image from $(DEFAULT_BASEIMAGE) and loading dependencies..."
+        ./scripts/build_ubi_micro.sh $(DEFAULT_BASEIMAGE)
+        @echo "Base image build: SUCCESS"
+        $(eval BASEIMAGE=localhost/rep-ubimicro:latest)
 
 download-csm-common:
 	curl -O -L https://raw.githubusercontent.com/dell/csm/main/config/csm-common.mk
