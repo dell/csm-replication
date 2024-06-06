@@ -83,7 +83,7 @@ sidecar-node-rescanner-dev: build-base-image
 build-base-image: download-csm-common
 	$(eval include csm-common.mk)
 	@echo "Building base image from $(DEFAULT_BASEIMAGE) and loading dependencies..."
-	./scripts/build_ubi_micro.sh $(DEFAULT_BASEIMAGE)
+	./scripts/build-ubi-micro.sh $(DEFAULT_BASEIMAGE)
 	@echo "Base image build: SUCCESS"
 	$(eval BASEIMAGE=localhost/rep-ubimicro:latest)
 
