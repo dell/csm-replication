@@ -1,4 +1,4 @@
-include semver.mk
+#include semver.mk
 
 # Figure out if podman or docker should be used (use podman if found)
 ifneq (, $(shell which podman 2>/dev/null))
