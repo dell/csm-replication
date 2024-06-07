@@ -93,7 +93,6 @@ jobs:
       - name: Build CSM Replication Docker Images
         run: |
          chmod +x ./scripts/build-ubi-micro.sh
-         make -o gen-semver
          make build-base-image
          : # dell-csi-replicator
          podman build -t docker.io/dell-csi-replicator:${{ env.VERSION }} -f Dockerfiles/Dockerfile --target sidecar --build-arg GOIMAGE=golang:latest --build-arg BASEIMAGE="localhost/rep-ubimicro"
