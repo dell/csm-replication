@@ -27,10 +27,14 @@ SIDECAR_NR_IMAGE_NAME ?= dell-csi-node-rescanner
 # Default Common controller image name
 CONTROLLER_IMAGE_NAME ?= dell-replication-controller
 
+# Default base image name
+BASE_IMAGE_NAME ?= rep-ubimicro
+
 SIDECAR_IMAGE_NR_TAG ?= "$(REGISTRY)/$(SIDECAR_NR_IMAGE_NAME):$(VERSION)"
 SIDECAR_IMAGE_M_TAG ?= "$(REGISTRY)/$(SIDECAR_M_IMAGE_NAME):$(VERSION)"
 SIDECAR_IMAGE_TAG ?= "$(REGISTRY)/$(SIDECAR_IMAGE_NAME):$(VERSION)"
 CONTROLLER_IMAGE_TAG ?= "$(REGISTRY)/$(CONTROLLER_IMAGE_NAME):$(VERSION)"
+BASE_IMAGE_TAG ?= "$(REGISTRY)/$(BASE_IMAGE_NAME):$(VERSION)"
 
 sidecar: build-base-image
 	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_TAG} -f Dockerfiles/Dockerfile --target sidecar --build-arg BASEIMAGE=$(BASEIMAGE) --build-arg GOIMAGE=$(DEFAULT_GOIMAGE) ${NOCACHE_ARG}
@@ -83,9 +87,9 @@ sidecar-node-rescanner-dev: build-base-image
 build-base-image: download-csm-common
 	$(eval include csm-common.mk)
 	@echo "Building base image from $(DEFAULT_BASEIMAGE) and loading dependencies..."
-	./scripts/build-ubi-micro.sh $(DEFAULT_BASEIMAGE)
+	./scripts/build-ubi-micro.sh $(DEFAULT_BASEIMAGE) ${BASE_IMAGE_TAG}
 	@echo "Base image build: SUCCESS"
-	$(eval BASEIMAGE=rep-ubimicro:latest)
+	$(eval BASEIMAGE=${BASE_IMAGE_TAG})
 
 download-csm-common:
 	curl -O -L https://raw.githubusercontent.com/dell/csm/main/config/csm-common.mk
