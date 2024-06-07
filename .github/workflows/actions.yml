@@ -77,7 +77,6 @@ jobs:
     name: Image Scanner
     runs-on: ubuntu-latest
     env:
-      REGISTRY: dell
       VERSION: ${{ github.sha }}
       CONTAINER_TOOL: docker
       PASSED_BUILD: false
@@ -115,27 +114,27 @@ jobs:
         if: always() && env.PASSED_BUILD
         uses: Azure/container-scan@v0
         with:
-          image-name: ${{ env.REGISTRY }}/dell-csi-replicator:${{ env.VERSION }}
+          image-name: dell-csi-replicator:${{ env.VERSION }}
           severity-threshold: HIGH
           run-quality-checks: false
       - name: Scan dell-replication-controller Docker Image
         if: always() && env.PASSED_BUILD
         uses: Azure/container-scan@v0
         with:
-          image-name: ${{ env.REGISTRY }}/dell-replication-controller:${{ env.VERSION }}
+          image-name: dell-replication-controller:${{ env.VERSION }}
           severity-threshold: HIGH
           run-quality-checks: false
       - name: Scan dell-csi-migrator Docker Image
         if: always() && env.PASSED_BUILD
         uses: Azure/container-scan@v0
         with:
-          image-name: ${{ env.REGISTRY }}/dell-csi-migrator:${{ env.VERSION }}
+          image-name: dell-csi-migrator:${{ env.VERSION }}
           severity-threshold: HIGH
           run-quality-checks: false
       - name: Scan dell-csi-node-rescanner Docker Image
         if: always() && env.PASSED_BUILD
         uses: Azure/container-scan@v0
         with:
-          image-name: ${{ env.REGISTRY }}/dell-csi-node-rescanner:${{ env.VERSION }}
+          image-name: dell-csi-node-rescanner:${{ env.VERSION }}
           severity-threshold: HIGH
           run-quality-checks: false
