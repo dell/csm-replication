@@ -134,11 +134,11 @@ image-sidecar-push: gen-semver
 image-controller-push: gen-semver
 	make -f image.mk controller-push
 
-build-base-image:
-    make -f image.mk build-base-image	
-
 images: gen-semver
 	make -f image.mk images
+
+build-base-image:
+	make -f image.mk build-base-image
 
 images-push: gen-semver
 	make -f image.mk images-push
