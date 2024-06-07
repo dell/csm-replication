@@ -176,12 +176,12 @@ func swapPVC(ctx context.Context, clientset *kubernetes.Clientset, pvcName, name
 	return nil
 }
 
-func verifyPVC(ctx context.Context, clientset *kubernetes.Clientset, localPVName string, remotePVName string, pvcName String, namespace String) error {
+func verifyPVC(ctx context.Context, clientset *kubernetes.Clientset, localPVName string, remotePVName string, pvcName string, namespace string) error {
 	done := false
 	for iteration := 0; !done; iteration++ {
 		time.Sleep(1 * time.Second)
 		pvc, err := clientset.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, pvcName, metav1.GetOptions{})
-		if err == nil & localPVName == pvc.Spec.VolumeName & remotePVName == pvc.Annotations[replicationPrefix+"remotePV"] {
+		if (err == nil) && (localPVName == pvc.Spec.VolumeName) && (remotePVName == pvc.Annotations[replicationPrefix+"remotePV"]) {
 			done = true
 			return err
 		}
@@ -190,9 +190,8 @@ func verifyPVC(ctx context.Context, clientset *kubernetes.Clientset, localPVName
 			return fmt.Errorf("timed out waiting on PVC %s/%s to be created and bound", namespace, pvcName)
 		}
 	}
+	return nil
 }
-
-
 
 func setPVReclaimPolicy(ctx context.Context, clientset *kubernetes.Clientset, pvName string, prevPolicy v1.PersistentVolumeReclaimPolicy) error {
 	logf("Updating reclaim policy to previous policy on PV %s: ", pvName)
