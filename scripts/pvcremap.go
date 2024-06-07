@@ -135,6 +135,7 @@ func swapPVC(ctx context.Context, clientset *kubernetes.Clientset, pvcName, name
 	}
 
 	// Swap some fields in the PVC.
+	localPV := pvc.Annotations[replicationPrefix+"remotePV"]
 	pvc.Annotations[replicationPrefix+"remotePV"] = pvc.Spec.VolumeName
 	pvc.Spec.VolumeName = remotePV
 
@@ -158,15 +159,40 @@ func swapPVC(ctx context.Context, clientset *kubernetes.Clientset, pvcName, name
 	if err != nil {
 		return err
 	}
-
-	// TODO: restore the PVs original volume reclaim policy
-	//make sure pvc is created and bound to new pv before doing
-	setPVReclaimPolicy(ctx, clientset, pvc.Spec.VolumeName, localPVPolicy)
-	setPVReclaimPolicy(ctx, clientset, pvc.Annotations[replicationPrefix+"remotePV"], remotePVPolicy)
+	
+	// Verify pvc is created and bound to new PVs
+	// remotePV is the current localPVName, localPV is the current remotePVName
+	err = verifyPVC(ctx, clientset, remotePV, localPV, pvcName, namespace)
+	
+	// Restore the PVs original volume reclaim policy
+	if err != nil {
+		setPVReclaimPolicy(ctx, clientset, pvc.Spec.VolumeName, localPVPolicy)
+		setPVReclaimPolicy(ctx, clientset, pvc.Annotations[replicationPrefix+"remotePV"], remotePVPolicy)
+	} else {
+		logf("Error creating and binding PVC to new PVs %s amd %s: %s", localPV, remotePV, err.Error())
+	}	
 
 	fmt.Println("Operation completed successfully")
 	return nil
 }
+
+func verifyPVC(ctx context.Context, clientset *kubernetes.Clientset, localPVName string, remotePVName string, pvcName String, namespace String) error {
+	done := false
+	for iteration := 0; !done; iteration++ {
+		time.Sleep(1 * time.Second)
+		pvc, err := clientset.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, pvcName, metav1.GetOptions{})
+		if err == nil & localPVName == pvc.Spec.VolumeName & remotePVName == pvc.Annotations[replicationPrefix+"remotePV"] {
+			done = true
+			return err
+		}
+
+		if iteration > 30 {
+			return fmt.Errorf("timed out waiting on PVC %s/%s to be created and bound", namespace, pvcName)
+		}
+	}
+}
+
+
 
 func setPVReclaimPolicy(ctx context.Context, clientset *kubernetes.Clientset, pvName string, prevPolicy v1.PersistentVolumeReclaimPolicy) error {
 	logf("Updating reclaim policy to previous policy on PV %s: ", pvName)
