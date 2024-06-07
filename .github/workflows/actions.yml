@@ -95,19 +95,19 @@ jobs:
          chmod +x ./scripts/build-ubi-micro.sh
          make build-base-image
          : # dell-csi-replicator
-         podman build -t docker.io/dell-csi-replicator:${{ env.VERSION }} -f Dockerfiles/Dockerfile --target sidecar --build-arg GOIMAGE=golang:latest --build-arg BASEIMAGE="localhost/rep-ubimicro"
+         podman build . -t docker.io/dell-csi-replicator:${{ env.VERSION }} -f ./Dockerfiles/Dockerfile --target sidecar --build-arg GOIMAGE=golang:latest --build-arg BASEIMAGE="localhost/rep-ubimicro"
          podman save docker.io/library/dell-csi-replicator:${{ env.VERSION }} -o /tmp/dell-csi-replicator.tar
          docker load -i /tmp/dell-csi-replicator.tar
          : # dell-replication-controller
-         podman build -t docker.io/dell-replication-controller:${{ env.VERSION }} -f Dockerfiles/Dockerfile --target controller --build-arg GOIMAGE=golang:latest --build-arg BASEIMAGE="localhost/rep-ubimicro"
+         podman build . -t docker.io/dell-replication-controller:${{ env.VERSION }} -f ./Dockerfiles/Dockerfile --target controller --build-arg GOIMAGE=golang:latest --build-arg BASEIMAGE="localhost/rep-ubimicro"
          podman save docker.io/library/dell-replication-controller:${{ env.VERSION }} -o /tmp/dell-replication-controller.tar
          docker load -i /tmp/dell-replication-controller.tar
          : # dell-csi-migrator
-         podman build -t docker.io/dell-csi-migrator:${{ env.VERSION }} -f Dockerfiles/Dockerfile --target migrator --build-arg GOIMAGE=golang:latest --build-arg BASEIMAGE="localhost/rep-ubimicro"
+         podman build . -t docker.io/dell-csi-migrator:${{ env.VERSION }} -f ./Dockerfiles/Dockerfile --target migrator --build-arg GOIMAGE=golang:latest --build-arg BASEIMAGE="localhost/rep-ubimicro"
          podman save docker.io/library/dell-csi-migrator:${{ env.VERSION }} -o /tmp/dell-csi-migrator.tar
          docker load -i /tmp/dell-csi-migrator.tar
          : # dell-csi-node-rescanner
-         podman build -t docker.io/dell-csi-node-rescanner:${{ env.VERSION }} -f Dockerfiles/Dockerfile --target node-rescanner --build-arg GOIMAGE=golang:latest --build-arg BASEIMAGE="localhost/rep-ubimicro"
+         podman build . -t docker.io/dell-csi-node-rescanner:${{ env.VERSION }} -f ./Dockerfiles/Dockerfile --target node-rescanner --build-arg GOIMAGE=golang:latest --build-arg BASEIMAGE="localhost/rep-ubimicro"
          podman save docker.io/library/dell-csi-node-rescanner:${{ env.VERSION }} -o /tmp/dell-csi-node-rescanner.tar
          docker load -i /tmp/dell-csi-node-rescanner.tar
           if [ $? -eq 0 ]; then { echo "PASSED_BUILD=true" >> $GITHUB_ENV; } fi
