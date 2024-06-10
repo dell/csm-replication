@@ -32,30 +32,26 @@ SIDECAR_IMAGE_M_TAG ?= "$(REGISTRY)/$(SIDECAR_M_IMAGE_NAME):$(VERSION)"
 SIDECAR_IMAGE_TAG ?= "$(REGISTRY)/$(SIDECAR_IMAGE_NAME):$(VERSION)"
 CONTROLLER_IMAGE_TAG ?= "$(REGISTRY)/$(CONTROLLER_IMAGE_NAME):$(VERSION)"
 
-sidecar: download-csm-common
-	$(eval include csm-common.mk)
-	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_TAG} -f Dockerfiles/Dockerfile --target sidecar --build-arg BASEIMAGE=$(DEFAULT_BASEIMAGE) --build-arg GOIMAGE=$(DEFAULT_GOIMAGE) ${NOCACHE_ARG}
+sidecar: build-base-image
+	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_TAG} -f Dockerfiles/Dockerfile --target sidecar --build-arg BASEIMAGE=$(BASEIMAGE) --build-arg GOIMAGE=$(DEFAULT_GOIMAGE) ${NOCACHE_ARG}
 
 sidecar-push:
 	$(CONTAINER_TOOL) push ${SIDECAR_IMAGE_TAG}
 
-sidecar-node-rescanner: download-csm-common
-	$(eval include csm-common.mk)
-	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_NR_TAG} -f Dockerfiles/Dockerfile --target node-rescanner --build-arg BASEIMAGE=$(DEFAULT_BASEIMAGE) --build-arg GOIMAGE=$(DEFAULT_GOIMAGE) ${NOCACHE_ARG}
+sidecar-node-rescanner: build-base-image
+	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_NR_TAG} -f Dockerfiles/Dockerfile --target node-rescanner --build-arg BASEIMAGE=$(BASEIMAGE) --build-arg GOIMAGE=$(DEFAULT_GOIMAGE) ${NOCACHE_ARG}
 
 sidecar-node-rescanner-push:
 	$(CONTAINER_TOOL) push ${SIDECAR_IMAGE_NR_TAG}
 
-sidecar-migrator: download-csm-common
-	$(eval include csm-common.mk)
-	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_M_TAG} -f Dockerfiles/Dockerfile --target migrator --build-arg BASEIMAGE=$(DEFAULT_BASEIMAGE) --build-arg GOIMAGE=$(DEFAULT_GOIMAGE) ${NOCACHE_ARG}
+sidecar-migrator: build-base-image
+	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_M_TAG} -f Dockerfiles/Dockerfile --target migrator --build-arg BASEIMAGE=$(BASEIMAGE) --build-arg GOIMAGE=$(DEFAULT_GOIMAGE) ${NOCACHE_ARG}
 
 sidecar-migrator-push:
 	$(CONTAINER_TOOL) push ${SIDECAR_IMAGE_M_TAG}
 
-controller: download-csm-common
-	$(eval include csm-common.mk)
-	$(CONTAINER_TOOL) build . -t ${CONTROLLER_IMAGE_TAG} -f Dockerfiles/Dockerfile --target controller --build-arg BASEIMAGE=$(DEFAULT_BASEIMAGE) --build-arg GOIMAGE=$(DEFAULT_GOIMAGE) ${NOCACHE_ARG}
+controller: build-base-image
+	$(CONTAINER_TOOL) build . -t ${CONTROLLER_IMAGE_TAG} -f Dockerfiles/Dockerfile --target controller --build-arg BASEIMAGE=$(BASEIMAGE) --build-arg GOIMAGE=$(DEFAULT_GOIMAGE) ${NOCACHE_ARG}
 
 controller-push:
 	$(CONTAINER_TOOL) push ${CONTROLLER_IMAGE_TAG}
@@ -71,21 +67,25 @@ deploy-controller:
 	kustomize build config/default | kubectl apply -f -
 
 # Build controller image in dev environment with Golang
-controller-dev: download-csm-common
-	$(eval include csm-common.mk)
-	$(CONTAINER_TOOL) build . -t ${CONTROLLER_IMAGE_TAG} -f Dockerfiles/Dockerfile.dev --target controller --build-arg BASEIMAGE=$(DEFAULT_BASEIMAGE) --build-arg GOIMAGE=$(DEFAULT_GOIMAGE)
+controller-dev: build-base-image
+	$(CONTAINER_TOOL) build . -t ${CONTROLLER_IMAGE_TAG} -f Dockerfiles/Dockerfile.dev --target controller --build-arg BASEIMAGE=$(BASEIMAGE) --build-arg GOIMAGE=$(DEFAULT_GOIMAGE)
 
 # Build sidecar image in dev environment with Golang
-sidecar-dev: download-csm-common
-	$(eval include csm-common.mk)
-	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_TAG} -f Dockerfiles/Dockerfile.dev --target sidecar --build-arg BASEIMAGE=$(DEFAULT_BASEIMAGE) --build-arg GOIMAGE=$(DEFAULT_GOIMAGE)
+sidecar-dev: build-base-image
+	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_TAG} -f Dockerfiles/Dockerfile.dev --target sidecar --build-arg BASEIMAGE=$(BASEIMAGE) --build-arg GOIMAGE=$(DEFAULT_GOIMAGE)
 
-sidecar-migrator-dev: download-csm-common
-	$(eval include csm-common.mk)
-	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_M_TAG} -f Dockerfiles/Dockerfile.dev --target migrator --build-arg BASEIMAGE=$(DEFAULT_BASEIMAGE) --build-arg GOIMAGE=$(DEFAULT_GOIMAGE)
+sidecar-migrator-dev: build-base-image
+	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_M_TAG} -f Dockerfiles/Dockerfile.dev --target migrator --build-arg BASEIMAGE=$(BASEIMAGE) --build-arg GOIMAGE=$(DEFAULT_GOIMAGE)
 
-sidecar-node-rescanner-dev: download-csm-common
-	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_NR_TAG} -f Dockerfiles/Dockerfile.dev --target node-rescanner --build-arg BASEIMAGE=$(DEFAULT_BASEIMAGE) --build-arg GOIMAGE=$(DEFAULT_GOIMAGE)
+sidecar-node-rescanner-dev: build-base-image
+	$(CONTAINER_TOOL) build . -t ${SIDECAR_IMAGE_NR_TAG} -f Dockerfiles/Dockerfile.dev --target node-rescanner --build-arg BASEIMAGE=$(BASEIMAGE) --build-arg GOIMAGE=$(DEFAULT_GOIMAGE)
+
+build-base-image: download-csm-common
+	$(eval include csm-common.mk)
+	@echo "Building base image from $(DEFAULT_BASEIMAGE) and loading dependencies..."
+	./scripts/build-ubi-micro.sh $(DEFAULT_BASEIMAGE)
+	@echo "Base image build: SUCCESS"
+	$(eval BASEIMAGE=rep-ubimicro:latest)
 
 download-csm-common:
 	curl -O -L https://raw.githubusercontent.com/dell/csm/main/config/csm-common.mk
