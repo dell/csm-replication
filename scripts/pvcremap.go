@@ -166,6 +166,9 @@ func swapPVC(ctx context.Context, clientset *kubernetes.Clientset, pvcName, name
 	logf("Verifying")
 	err = verifyPVC(ctx, clientset, remotePV, localPV, pvcName, namespace)
 
+	logf("Removing ClaimRef on LocalPV")
+	removePVClaimRef(ctx, clientset, localPV)
+
 	logf("Restoring")
 	// Restore the PVs original volume reclaim policy
 	if err != nil {
