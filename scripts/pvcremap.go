@@ -172,8 +172,8 @@ func swapPVC(ctx context.Context, clientset *kubernetes.Clientset, pvcName, name
 	logf("Restoring")
 	// Restore the PVs original volume reclaim policy
 	if err != nil {
-		setPVReclaimPolicy(ctx, clientset, pvc.Spec.VolumeName, localPVPolicy)
-		setPVReclaimPolicy(ctx, clientset, pvc.Annotations[replicationPrefix+"remotePV"], remotePVPolicy)
+		setPVReclaimPolicy(ctx, clientset, pvc.Spec.VolumeName, remotePVPolicy)
+		setPVReclaimPolicy(ctx, clientset, pvc.Annotations[replicationPrefix+"remotePV"], localPVPolicy)
 	} else {
 		logf("Error creating and binding PVC to new PVs %s amd %s: %s", localPV, remotePV, err.Error())
 	}
