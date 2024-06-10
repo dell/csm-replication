@@ -155,15 +155,17 @@ func swapPVC(ctx context.Context, clientset *kubernetes.Clientset, pvcName, name
 
 	// Update the target PV's claimref to point to our pvc.
 	pvcUid := pvc.ObjectMeta.UID
-	err = updatePVClaimRef(ctx, clientset, targetPV, pvc.Namespace, pvc.Name, pvcUid)
+	pvcResourceVersion := pvc.ObjectMeta.ResourceVersion
+	err = updatePVClaimRef(ctx, clientset, targetPV, pvc.Namespace, pvcResourceVersion, pvc.Name, pvcUid)
 	if err != nil {
 		return err
 	}
 	
 	// Verify pvc is created and bound to new PVs
 	// remotePV is the current localPVName, localPV is the current remotePVName
+	logf("Verifying")
 	err = verifyPVC(ctx, clientset, remotePV, localPV, pvcName, namespace)
-	
+	logf("Restoring")
 	// Restore the PVs original volume reclaim policy
 	if err != nil {
 		setPVReclaimPolicy(ctx, clientset, pvc.Spec.VolumeName, localPVPolicy)
@@ -200,11 +202,6 @@ func setPVReclaimPolicy(ctx context.Context, clientset *kubernetes.Clientset, pv
 		logf("Error retrieving PV %s: %s", pvName, err.Error())
 		return err
 	}
-	pv.Spec.PersistentVolumeReclaimPolicy = prevPolicy
-	pv, err = clientset.CoreV1().PersistentVolumes().Update(ctx, pv, metav1.UpdateOptions{})
-	if err != nil {
-		logf("Error updating PV %s: %s", pvName, err.Error())
-	}
 	done := false
 	for iterations := 0; !done; iterations++ {
 		time.Sleep(2 * time.Second)
@@ -212,6 +209,11 @@ func setPVReclaimPolicy(ctx context.Context, clientset *kubernetes.Clientset, pv
 		if err != nil {
 			logf("Error retrieving PV %s: %s", pvName, err.Error())
 			return err
+		}
+		pv.Spec.PersistentVolumeReclaimPolicy = prevPolicy
+		pv, err = clientset.CoreV1().PersistentVolumes().Update(ctx, pv, metav1.UpdateOptions{})
+		if err != nil {
+			logf("Error updating PV %s: %s", pvName, err.Error())
 		}
 		if pv.Spec.PersistentVolumeReclaimPolicy == prevPolicy {
 			done = true
@@ -256,7 +258,7 @@ func makePVReclaimPolicyRetain(ctx context.Context, clientset *kubernetes.Client
 }
 
 // updatePVCClaimRef updates the PV's ClaimRef.Uid to the specified value
-func updatePVClaimRef(ctx context.Context, clientset *kubernetes.Clientset, pvName, pvcNamespace, pvcName string, pvcUid types.UID) error {
+func updatePVClaimRef(ctx context.Context, clientset *kubernetes.Clientset, pvName, pvcNamespace, pvcResourceVersion, pvcName string, pvcUid types.UID) error {
 	pv, err := clientset.CoreV1().PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
 	if err != nil {
 		logf("Error retrieving PV %s: %s", pvName, err.Error())
@@ -269,7 +271,25 @@ func updatePVClaimRef(ctx context.Context, clientset *kubernetes.Clientset, pvNa
 	pv.Spec.ClaimRef.Namespace = pvcNamespace
 	pv.Spec.ClaimRef.Name = pvcName
 	pv.Spec.ClaimRef.UID = pvcUid
-	pv, err = clientset.CoreV1().PersistentVolumes().Update(ctx, pv, metav1.UpdateOptions{})
+	pv.Spec.ClaimRef.ResourceVersion = pvcResourceVersion
+	
+	done := false
+	for iterations := 0; !done; iterations++ {
+		time.Sleep(2 * time.Second)
+		pv, err = clientset.CoreV1().PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
+		if err != nil {
+			logf("Error retrieving PV %s: %s", pvName, err.Error())
+			return err
+		}
+		_, err = clientset.CoreV1().PersistentVolumes().Update(ctx, pv, metav1.UpdateOptions{})
+		if err == nil {
+			done = true
+		} else if iterations > 20 {
+			err := fmt.Errorf("Timed out waiting on PV VolumeReclaimPolicy to be set to Retain")
+			return err
+		}
+	}
+
 	if err != nil {
 		logf("Error updating PV %s: %s", pvName, err.Error())
 	}
