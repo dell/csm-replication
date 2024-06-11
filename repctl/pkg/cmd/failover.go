@@ -123,11 +123,31 @@ func failoverToRG(configFolder, rgName string, unplanned bool, verbose bool, wai
 	}
 	// fetch the target RG and the cluster info
 	cluster, rg, err := GetRGAndClusterFromRGID(configFolder, rgName, "tgt")
+	if rg.Status.Action == config.ActionFailoverLocalUnplanned && unplanned {
+		log.Print("Failover action is already set to unplanned failover.")
+		return
+	} else if rg.Status.Action == config.ActionFailoverRemote && !unplanned {
+		log.Print("Failover action is already set to planned failover.")
+		return
+	}
+
+	if len(rg.Spec.RemoteClusters) > 1 {
+		log.Fatalf("failover: PVC remapping is not allowed for replication groups associated with multiple clusters.")
+	}
+	
 	if err != nil {
 		log.Fatalf("failover to RG: error fetching target RG info: (%s)\n", err.Error())
 	}
 	if verbose {
 		log.Printf("found target RG (%s) on cluster (%s)...\n", rg.Name, cluster.GetID())
+	}
+
+	if viper.GetBool("no-pvcremap") {
+		log.Print("PVC remapping is disabled.")
+	} else {
+		if err := pvcremap.RemapPVCs(rg); err != nil {
+			log.Fatalf("failover: error remapping PVCs: %s\n", err.Error())
+		}
 	}
 	// check if the action is unplanned failover
 	if unplanned {
@@ -198,6 +218,18 @@ func failoverToCluster(configFolder, inputTargetCluster, rgName string, unplanne
 	}
 	mc := &k8s.MultiClusterConfigurator{}
 	clusters, err := mc.GetAllClusters([]string{inputTargetCluster}, configFolder)
+	if rg.Status.Action == config.ActionFailoverLocalUnplanned && unplanned {
+		log.Print("Failover action is already set to unplanned failover.")
+		return
+	} else if rg.Status.Action == config.ActionFailoverRemote && !unplanned {
+		log.Print("Failover action is already set to planned failover.")
+		return
+	}
+
+	if len(rg.Spec.RemoteClusters) > 1 {
+		log.Fatalf("failover: PVC remapping is not allowed for replication groups associated with multiple clusters.")
+	}
+
 	if err != nil {
 		log.Fatalf("failover: error in initializing cluster info: %s\n", err.Error())
 	}
@@ -215,6 +247,16 @@ func failoverToCluster(configFolder, inputTargetCluster, rgName string, unplanne
 	if rg.Status.ReplicationLinkState.IsSource {
 		log.Fatalf("failover: error executing failover to source site.")
 	}
+
+
+	if viper.GetBool("no-pvcremap") {
+		log.Print("PVC remapping is disabled.")
+	} else {
+		if err := pvcremap.RemapPVCs(rg); err != nil {
+			log.Fatalf("failover: error remapping PVCs: %s\n", err.Error())
+		}
+	}
+
 	// check if this is an unplanned failover
 	if unplanned {
 		rLinkState := rg.Status.ReplicationLinkState
@@ -306,3 +348,4 @@ func waitForStateToUpdate(rgName string, cluster k8s.ClusterInterface, repllinks
 	res := <-ret
 	return res
 }
+
