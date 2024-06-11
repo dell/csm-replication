@@ -96,6 +96,7 @@ func main() {
 	repctl.AddCommand(cmd.GetEditCommand())
 	repctl.AddCommand(cmd.GetMigrateCommand())
 	repctl.AddCommand(cmd.GetSnapshotCommand())
+	repctl.AddCommand(cmd.GetPvcRemapCommand())
 
 	err := repctl.Execute()
 	if err != nil {
