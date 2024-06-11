@@ -28,6 +28,8 @@ type DellCSIReplicationGroupSpec struct {
 	ProtectionGroupAttributes       map[string]string `json:"protectionGroupAttributes,omitempty"`
 	RemoteProtectionGroupID         string            `json:"remoteProtectionGroupId"`
 	RemoteProtectionGroupAttributes map[string]string `json:"remoteProtectionGroupAttributes,omitempty"`
+	RemoteClusters                  []string          `json:"remoteClusters,omitempty"` // Add this line
+
 }
 
 // DellCSIReplicationGroupStatus defines the observed state of DellCSIReplicationGroup
@@ -37,6 +39,8 @@ type DellCSIReplicationGroupStatus struct {
 	ReplicationLinkState ReplicationLinkState `json:"replicationLinkState,omitempty"`
 	LastAction           LastAction           `json:"lastAction,omitempty"`
 	Conditions           []LastAction         `json:"conditions,omitempty"`
+	Action               string               `json:"action,omitempty"` // Add this line
+
 }
 
 // LastAction - Stores the last updated action
