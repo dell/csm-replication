@@ -18,14 +18,15 @@ import (
 	"context"
 
 	"github.com/dell/repctl/pkg/k8s"
+
 	"github.com/dell/repctl/pkg/config"
-	"github.com/dell/repctl/pkg/pvcremap"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 // GetFailbackCommand returns 'failback' cobra command
+/* #nosec G104 */
 func GetFailbackCommand() *cobra.Command {
 	failbackCmd := &cobra.Command{
 		Use:   "failback",
@@ -41,7 +42,7 @@ For single cluster config:
 		Long: `
 This command will perform a planned failback to a cluster or to an RG.
 To perform failback to a cluster, use --target <clusterID> with --rg <rg-id1> and to do failback to RG, use --target <rg-id2> with --rg <rg-id1>. repctl will patch the CR at source site with action FAILBACK_LOCAL.
-With --discard, this command will perform a failback but discard any writes at target. repctl will patch the CR at source site with action ACTION_FAILBACK_DISCARD_CHANGES_LOCAL`,
+With --discard, this command will perform an failback but discard any writes at target. repctl will patch the CR at source site with action ACTION_FAILBACK_DISCARD_CHANGES_LOCAL`,
 		Run: func(cmd *cobra.Command, args []string) {
 			rgName := viper.GetString(config.ReplicationGroup)
 			inputSourceCluster := viper.GetString("src")
@@ -58,7 +59,7 @@ With --discard, this command will perform a failback but discard any writes at t
 			if input == "cluster" {
 				failbackToCluster(configFolder, inputSourceCluster, rgName, discard, verbose, wait)
 			} else if input == "rg" {
-				failbackToRG(configFolder, inputSourceCluster, rgName, discard, verbose, wait)
+				failbackToRG(configFolder, inputSourceCluster, discard, verbose, wait)
 			} else {
 				log.Fatal("Unexpected input received")
 			}
@@ -74,16 +75,14 @@ With --discard, this command will perform a failback but discard any writes at t
 	failbackCmd.Flags().Bool("wait", false, "wait for action to complete")
 	_ = viper.BindPFlag("failback-wait", failbackCmd.Flags().Lookup("wait"))
 
-	failbackCmd.Flags().Bool("no-pvcremap", false, "disable PVC remapping")
-	_ = viper.BindPFlag("no-pvcremap", failbackCmd.Flags().Lookup("no-pvcremap"))
-
 	return failbackCmd
 }
 
-func failbackToRG(configFolder, inputSourceCluster, rgName string, discard, verbose bool, wait bool) {
+func failbackToRG(configFolder, rgName string, discard, verbose bool, wait bool) {
 	if verbose {
 		log.Printf("fetching RG and cluster info...\n")
 	}
+	// fetch the source RG and the cluster info
 	cluster, rg, err := GetRGAndClusterFromRGID(configFolder, rgName, "src")
 	if err != nil {
 		log.Fatalf("failback to RG: error fetching source RG info: (%s)\n", err.Error())
@@ -91,27 +90,6 @@ func failbackToRG(configFolder, inputSourceCluster, rgName string, discard, verb
 	if verbose {
 		log.Printf("found RG (%s) on cluster (%s)...\n", rg.Name, cluster.GetID())
 	}
-
-	if rg.Status.Action == config.ActionFailbackLocal && !discard {
-		log.Print("Failback action is already set to planned failback.")
-		return
-	} else if rg.Status.Action == config.ActionFailbackLocalDiscard && discard {
-		log.Print("Failback action is already set to discard failback.")
-		return
-	}
-	if len(rg.Spec.RemoteClusters) > 1 {
-		log.Fatalf("failback: PVC remapping is not allowed for replication groups associated with multiple clusters.")
-	}
-
-    // failbackToRG function
-    if !viper.GetBool("no-pvcremap") {
-        if err := pvcremap.RemapPVCs(context.Background(), cluster.Clientset(), rgName); err != nil {
-            log.Fatalf("failback: error remapping PVCs: %s\n", err.Error())
-        }
-    } else {
-        log.Print("PVC remapping is disabled.")
-    }
-
 	rLinkState := rg.Status.ReplicationLinkState
 	if rLinkState.LastSuccessfulUpdate == nil {
 		log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
@@ -135,8 +113,9 @@ func failbackToRG(configFolder, inputSourceCluster, rgName string, discard, verb
 			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
 			return
 		}
-		log.Printf("RG (%s), timed out with action: failback\n", rg.Name)
+		log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
 		return
+
 	}
 	log.Printf("RG (%s), successfully updated with action: failback\n", rg.Name)
 }
@@ -156,36 +135,14 @@ func failbackToCluster(configFolder, inputSourceCluster, rgName string, discard,
 	}
 	rg, err := sourceCluster.GetReplicationGroups(context.Background(), rgName)
 	if err != nil {
-		log.Fatalf("failback: error fetching RG info: %s\n", err.Error())
+		log.Fatalf("failback: error in fecthing RG info: %s\n", err.Error())
 	}
 	if verbose {
 		log.Printf("found RG (%s) on cluster (%s)...\n", rg.Name, sourceCluster.GetID())
 	}
-
-	if rg.Status.Action == config.ActionFailbackLocal && !discard {
-		log.Print("Failback action is already set to planned failback.")
-		return
-	} else if rg.Status.Action == config.ActionFailbackLocalDiscard && discard {
-		log.Print("Failback action is already set to discard failback.")
-		return
-	}
-	if len(rg.Spec.RemoteClusters) > 1 {
-		log.Fatalf("failback: PVC remapping is not allowed for replication groups associated with multiple clusters.")
-	}
-
-    // failbackToCluster function
-    if !viper.GetBool("no-pvcremap") {
-        if err := pvcremap.RemapPVCs(context.Background(), clusters.Clusters[0].Clientset(), rgName); err != nil {
-            log.Fatalf("failback: error remapping PVCs: %s\n", err.Error())
-        }
-    } else {
-        log.Print("PVC remapping is disabled.")
-    }
-
 	if !rg.Status.ReplicationLinkState.IsSource {
 		log.Fatalf("failback: error executing failback to target site.")
 	}
-
 	rLinkState := rg.Status.ReplicationLinkState
 	if rLinkState.LastSuccessfulUpdate == nil {
 		log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
@@ -209,8 +166,9 @@ func failbackToCluster(configFolder, inputSourceCluster, rgName string, discard,
 			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
 			return
 		}
-		log.Printf("RG (%s), timed out with action: failback\n", rg.Name)
+		log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
 		return
+
 	}
 	log.Printf("RG (%s), successfully updated with action: failback\n", rg.Name)
 }
