@@ -1,52 +1,71 @@
-package pvcremap
+package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
+	"os"
 	"strings"
 	"time"
+
+	"path/filepath"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
 )
 
 const replicationPrefix = "replication.storage.dell.com/"
 
-// RemapPVCs remaps all PVCs associated with the specified replication group.
-func RemapPVCs(ctx context.Context, clientset *kubernetes.Clientset, rgName string) error {
-	pvcList, err := clientset.CoreV1().PersistentVolumeClaims("").List(ctx, metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("replication-group=%s", rgName),
-	})
+func main() {
+	fmt.Printf("version 21\n")
+
+	var kubeconfig *string
+	if home := homedir.HomeDir(); home != "" {
+		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+	} else {
+		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
+	}
+	pvcNamePtr := flag.String("v", "", "PVC to be rebound")
+	namespacePtr := flag.String("n", "", "namespace for the PVC to be rebound")
+	targetPtr := flag.String("t", "", "original or replicated indicating the desired target for the PVC")
+	flag.Parse()
+
+	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
-		return fmt.Errorf("failed to list PVCs: %w", err)
+		fmt.Printf("Error building kubeconfig: %s\n", err.Error())
+		os.Exit(1)
 	}
 
-	for _, pvc := range pvcList.Items {
-		fmt.Printf("Remapping PVC: %s\n", pvc.Name)
-		if err := remapPVC(ctx, clientset, &pvc); err != nil {
-			return fmt.Errorf("failed to remap PVC %s: %w", pvc.Name, err)
-		}
-	}
-	return nil
-}
-
-func remapPVC(ctx context.Context, clientset *kubernetes.Clientset, pvc *v1.PersistentVolumeClaim) error {
-	// Get the replication target PV from annotations
-	targetPV := pvc.Annotations[replicationPrefix+"remotePV"]
-	// Get the namespace of the PVC
-	namespace := pvc.Namespace
-	// Get the name of the PVC
-	pvcName := pvc.Name
-
-	// Call swapPVC to perform the remapping
-	err := swapPVC(ctx, clientset, pvcName, namespace, targetPV)
+	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return err
+		fmt.Printf("Error creating clientset: %s\n", err.Error())
+		os.Exit(1)
 	}
 
-	return nil
+	if pvcNamePtr == nil {
+		fmt.Printf("PVC name is required")
+		os.Exit(1)
+	}
+	if namespacePtr == nil {
+		fmt.Printf("namespace is required")
+		os.Exit(1)
+	}
+	if targetPtr == nil {
+		fmt.Printf("target (original or replicated) PV is required")
+		os.Exit(1)
+	}
+
+	pvcName := *pvcNamePtr
+	namespace := *namespacePtr
+	targetPV := *targetPtr
+
+	ctx := context.TODO()
+
+	err = swapPVC(ctx, clientset, pvcName, namespace, targetPV)
 }
 
 func swapPVC(ctx context.Context, clientset *kubernetes.Clientset, pvcName, namespace, targetPV string) error {
@@ -118,8 +137,6 @@ func swapPVC(ctx context.Context, clientset *kubernetes.Clientset, pvcName, name
 	// Swap some fields in the PVC.
 	//localPV := pvc.Annotations[replicationPrefix+"remotePV"]
 	localPV := pvc.Spec.VolumeName
-	logf("Local PV name: %s", localPV)
-	logf("Remote PV name: %s", remotePV)
 	pvc.Annotations[replicationPrefix+"remotePV"] = pvc.Spec.VolumeName
 	pvc.Spec.VolumeName = remotePV
 
@@ -147,14 +164,12 @@ func swapPVC(ctx context.Context, clientset *kubernetes.Clientset, pvcName, name
 
 	// Verify pvc is created and bound to new PVs
 	// remotePV is the current localPVName arg, localPV is the current remotePVName arg
-	logf("Verifying")
 	err = verifyPVC(ctx, clientset, remotePV, localPV, pvcName, namespace)
 
-	// Restore the PVs original volume reclaim policy
 	if err == nil {
-		logf("Removing ClaimRef on LocalPV")
+		// Remove the PVC reclaim of local PV
 		removePVClaimRef(ctx, clientset, localPV)
-
+		// Restore the PVs original volume reclaim policy
 		setPVReclaimPolicy(ctx, clientset, pvc.Spec.VolumeName, remotePVPolicy)
 		setPVReclaimPolicy(ctx, clientset, pvc.Annotations[replicationPrefix+"remotePV"], localPVPolicy)
 	} else {
@@ -166,14 +181,13 @@ func swapPVC(ctx context.Context, clientset *kubernetes.Clientset, pvcName, name
 }
 
 func verifyPVC(ctx context.Context, clientset *kubernetes.Clientset, localPVName string, remotePVName string, pvcName string, namespace string) error {
-	logf("verify: local %s, remote %s", localPVName, remotePVName)
+	logf("Verifying")
 	done := false
 	for iteration := 0; !done; iteration++ {
 		time.Sleep(1 * time.Second)
 		pvc, err := clientset.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, pvcName, metav1.GetOptions{})
 		if (err == nil) && (localPVName == pvc.Spec.VolumeName) && (remotePVName == pvc.Annotations[replicationPrefix+"remotePV"]) {
 			done = true
-			logf("pvc annotations: local %s, remote %s", pvc.Spec.VolumeName, pvc.Annotations[replicationPrefix+"remotePV"])
 			return err
 		}
 
@@ -328,7 +342,7 @@ func makePVClaimRefUid(ctx context.Context, clientset *kubernetes.Clientset, pvN
 
 }
 
-func logf(format string, vars ...interface{}) {
-	fmt.Printf(format, vars...)
+func logf(format string, vars ...string) {
+	fmt.Printf(format, vars)
 	fmt.Printf("\n")
 }
