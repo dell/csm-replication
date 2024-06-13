@@ -70,6 +70,19 @@ func main() {
 }
 
 func getPVList(ctx context.Context, clientset *kubernetes.Clientset, rgName string) error {
+	fmt.Printf("calling getPVList\n")
+	pvcs, err := clientset.CoreV1().PersistentVolumeClaims("").List(ctx, metav1.ListOptions{
+	// 	LabelSelector: "replication.storage.dell.com/replicationGroupName: rg-f712dd5e-e9d2-4d36-850b-e79fc7e577b2",
+	})
+
+	if err != nil {
+		return fmt.Errorf("Failed to list PVCs: %w", err)
+	}
+	for _, pvc := range pvcs.Items {
+		fmt.Printf("reaching inside\n")
+		tmp:=pvc.Annotations["replication.storage.dell.com/replicationGroupName"]
+		fmt.Printf("%s\n",tmp)
+	}
 	return nil
 }
 
