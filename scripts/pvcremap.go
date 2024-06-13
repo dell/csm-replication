@@ -66,12 +66,12 @@ func main() {
 
 	ctx := context.TODO()
 
-	err =(ctx, clientset, rgName)
+	err = swapAllPVC(ctx, clientset, rgName)
 	// err = swapPVC(ctx, clientset, pvcName, namespace, targetPV)
 }
 
 // https://stackoverflow.com/questions/51106923/labelselector-for-secrets-list-in-k8s
-func getPVCList(ctx context.Context, clientset *kubernetes.Clientset, rgName string) error {
+func swapAllPVC(ctx context.Context, clientset *kubernetes.Clientset, rgName string) error {
 	fmt.Printf("calling getPVList from %s\n", rgName)
 
 	// 	LabelSelector: "replication.storage.dell.com/replicationGroupName: rg-f712dd5e-e9d2-4d36-850b-e79fc7e577b2",
@@ -93,7 +93,7 @@ func getPVCList(ctx context.Context, clientset *kubernetes.Clientset, rgName str
 	for _, pvc := range pvcs.Items {
 		pvcName := pvc.Name
 		namespace := pvc.Namespace
-		targetPV :=  pvc.Annotations[replicationPrefix+"remotePV"]
+		targetPV := pvc.Annotations[replicationPrefix+"remotePV"]
 		err = swapPVC(ctx, clientset, pvcName, namespace, targetPV)
 	}
 	return err
