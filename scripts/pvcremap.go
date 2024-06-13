@@ -29,9 +29,9 @@ func main() {
 	} else {
 		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 	}
-	pvcNamePtr := flag.String("v", "", "PVC to be rebound")
-	namespacePtr := flag.String("n", "", "namespace for the PVC to be rebound")
-	targetPtr := flag.String("t", "", "original or replicated indicating the desired target for the PVC")
+	rgNamePtr := flag.String("rg", "", "id for the RG")
+	// namespacePtr := flag.String("n", "", "namespace for the PVC to be rebound")
+	// targetPtr := flag.String("t", "", "original or replicated indicating the desired target for the PVC")
 	flag.Parse()
 
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
@@ -46,26 +46,31 @@ func main() {
 		os.Exit(1)
 	}
 
-	if pvcNamePtr == nil {
+	if rgNamePtr == nil {
 		fmt.Printf("PVC name is required")
 		os.Exit(1)
 	}
-	if namespacePtr == nil {
-		fmt.Printf("namespace is required")
-		os.Exit(1)
-	}
-	if targetPtr == nil {
-		fmt.Printf("target (original or replicated) PV is required")
-		os.Exit(1)
-	}
+	// if namespacePtr == nil {
+	// 	fmt.Printf("namespace is required")
+	// 	os.Exit(1)
+	// }
+	// if targetPtr == nil {
+	// 	fmt.Printf("target (original or replicated) PV is required")
+	// 	os.Exit(1)
+	// }
 
-	pvcName := *pvcNamePtr
-	namespace := *namespacePtr
-	targetPV := *targetPtr
+	rgName := *rgNamePtr
+	// namespace := *namespacePtr
+	// targetPV := *targetPtr
 
 	ctx := context.TODO()
+	
+	err = getPVList(ctx, clientset, rgName)
+	// err = swapPVC(ctx, clientset, pvcName, namespace, targetPV)
+}
 
-	err = swapPVC(ctx, clientset, pvcName, namespace, targetPV)
+func getPVList(ctx context.Context, clientset *kubernetes.Clientset, rgName string) error {
+	return nil
 }
 
 func swapPVC(ctx context.Context, clientset *kubernetes.Clientset, pvcName, namespace, targetPV string) error {
