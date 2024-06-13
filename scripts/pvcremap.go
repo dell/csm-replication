@@ -12,11 +12,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
-	"k8s.io/apimachinery/pkg/labels"
 )
 
 const replicationPrefix = "replication.storage.dell.com/"
@@ -65,37 +65,38 @@ func main() {
 	// targetPV := *targetPtr
 
 	ctx := context.TODO()
-	
+
 	err = getPVCList(ctx, clientset, rgName)
 	// err = swapPVC(ctx, clientset, pvcName, namespace, targetPV)
 }
 
-//https://stackoverflow.com/questions/51106923/labelselector-for-secrets-list-in-k8s
+// https://stackoverflow.com/questions/51106923/labelselector-for-secrets-list-in-k8s
 func getPVCList(ctx context.Context, clientset *kubernetes.Clientset, rgName string) error {
 	fmt.Printf("calling getPVList from %s\n", rgName)
-	
+
 	// 	LabelSelector: "replication.storage.dell.com/replicationGroupName: rg-f712dd5e-e9d2-4d36-850b-e79fc7e577b2",
-		// LabelSelector: {
-		// 	"replication.storage.dell.com/replicationGroupName": "rg-f712dd5e-e9d2-4d36-850b-e79fc7e577b2",
-		// },
-	
-	labelSelector := metav1.LabelSelector{MatchLabels: map[string]string{"replication.storage.dell.com/replicationGroupName":rgName}}
+	// LabelSelector: {
+	// 	"replication.storage.dell.com/replicationGroupName": "rg-f712dd5e-e9d2-4d36-850b-e79fc7e577b2",
+	// },
+
+	labelSelector := metav1.LabelSelector{MatchLabels: map[string]string{"replication.storage.dell.com/replicationGroupName": rgName}}
 	listOptions := metav1.ListOptions{
 		LabelSelector: labels.Set(labelSelector.MatchLabels).String(),
 	}
-	
+
 	pvcs, err := clientset.CoreV1().PersistentVolumeClaims("").List(ctx, listOptions)
 	// pvcs, err = clientset.CoreV1().PersistentVolumeClaims("").List(ctx, metav1.ListOptions{})
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to list PVCs: %w", err)
 	}
 	for _, pvc := range pvcs.Items {
-		fmt.Printf("reaching inside\n")
-		tmp:=pvc.Annotations["replication.storage.dell.com/replicationGroupName"]
-		fmt.Printf("%s\n",tmp)
+		pvcName := pvc.Name
+		namespace := pvc.Namespace
+		targetPV :=  pvc.Annotations[replicationPrefix+"remotePV"]
+		err = swapPVC(ctx, clientset, pvcName, namespace, targetPV)
 	}
-	return nil
+	return err
 }
 
 func swapPVC(ctx context.Context, clientset *kubernetes.Clientset, pvcName, namespace, targetPV string) error {
