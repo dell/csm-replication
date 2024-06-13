@@ -31,8 +31,6 @@ func main() {
 		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 	}
 	rgNamePtr := flag.String("rg", "", "id for the RG")
-	// namespacePtr := flag.String("n", "", "namespace for the PVC to be rebound")
-	// targetPtr := flag.String("t", "", "original or replicated indicating the desired target for the PVC")
 	flag.Parse()
 
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
@@ -51,33 +49,15 @@ func main() {
 		fmt.Printf("PVC name is required")
 		os.Exit(1)
 	}
-	// if namespacePtr == nil {
-	// 	fmt.Printf("namespace is required")
-	// 	os.Exit(1)
-	// }
-	// if targetPtr == nil {
-	// 	fmt.Printf("target (original or replicated) PV is required")
-	// 	os.Exit(1)
-	// }
 
 	rgName := *rgNamePtr
-	// namespace := *namespacePtr
-	// targetPV := *targetPtr
-
 	ctx := context.TODO()
-
 	err = swapAllPVC(ctx, clientset, rgName)
-	// err = swapPVC(ctx, clientset, pvcName, namespace, targetPV)
+
 }
 
-// https://stackoverflow.com/questions/51106923/labelselector-for-secrets-list-in-k8s
 func swapAllPVC(ctx context.Context, clientset *kubernetes.Clientset, rgName string) error {
 	fmt.Printf("calling getPVList from %s\n", rgName)
-
-	// 	LabelSelector: "replication.storage.dell.com/replicationGroupName: rg-f712dd5e-e9d2-4d36-850b-e79fc7e577b2",
-	// LabelSelector: {
-	// 	"replication.storage.dell.com/replicationGroupName": "rg-f712dd5e-e9d2-4d36-850b-e79fc7e577b2",
-	// },
 
 	labelSelector := metav1.LabelSelector{MatchLabels: map[string]string{"replication.storage.dell.com/replicationGroupName": rgName}}
 	listOptions := metav1.ListOptions{
@@ -85,7 +65,6 @@ func swapAllPVC(ctx context.Context, clientset *kubernetes.Clientset, rgName str
 	}
 
 	pvcs, err := clientset.CoreV1().PersistentVolumeClaims("").List(ctx, listOptions)
-	// pvcs, err = clientset.CoreV1().PersistentVolumeClaims("").List(ctx, metav1.ListOptions{})
 
 	if err != nil {
 		return fmt.Errorf("failed to list PVCs: %w", err)
