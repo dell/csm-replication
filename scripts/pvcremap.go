@@ -66,7 +66,7 @@ func main() {
 
 	ctx := context.TODO()
 
-	err = getPVCList(ctx, clientset, rgName)
+	err =(ctx, clientset, rgName)
 	// err = swapPVC(ctx, clientset, pvcName, namespace, targetPV)
 }
 
