@@ -12,6 +12,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -29,9 +30,7 @@ func main() {
 	} else {
 		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 	}
-	pvcNamePtr := flag.String("v", "", "PVC to be rebound")
-	namespacePtr := flag.String("n", "", "namespace for the PVC to be rebound")
-	targetPtr := flag.String("t", "", "original or replicated indicating the desired target for the PVC")
+	rgNamePtr := flag.String("rg", "", "id for the RG")
 	flag.Parse()
 
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
@@ -46,26 +45,37 @@ func main() {
 		os.Exit(1)
 	}
 
-	if pvcNamePtr == nil {
+	if rgNamePtr == nil {
 		fmt.Printf("PVC name is required")
 		os.Exit(1)
 	}
-	if namespacePtr == nil {
-		fmt.Printf("namespace is required")
-		os.Exit(1)
-	}
-	if targetPtr == nil {
-		fmt.Printf("target (original or replicated) PV is required")
-		os.Exit(1)
-	}
 
-	pvcName := *pvcNamePtr
-	namespace := *namespacePtr
-	targetPV := *targetPtr
-
+	rgName := *rgNamePtr
 	ctx := context.TODO()
+	err = swapAllPVC(ctx, clientset, rgName)
 
-	err = swapPVC(ctx, clientset, pvcName, namespace, targetPV)
+}
+
+func swapAllPVC(ctx context.Context, clientset *kubernetes.Clientset, rgName string) error {
+	fmt.Printf("calling getPVList from %s\n", rgName)
+
+	labelSelector := metav1.LabelSelector{MatchLabels: map[string]string{"replication.storage.dell.com/replicationGroupName": rgName}}
+	listOptions := metav1.ListOptions{
+		LabelSelector: labels.Set(labelSelector.MatchLabels).String(),
+	}
+
+	pvcs, err := clientset.CoreV1().PersistentVolumeClaims("").List(ctx, listOptions)
+
+	if err != nil {
+		return fmt.Errorf("failed to list PVCs: %w", err)
+	}
+	for _, pvc := range pvcs.Items {
+		pvcName := pvc.Name
+		namespace := pvc.Namespace
+		targetPV := pvc.Annotations[replicationPrefix+"remotePV"]
+		err = swapPVC(ctx, clientset, pvcName, namespace, targetPV)
+	}
+	return err
 }
 
 func swapPVC(ctx context.Context, clientset *kubernetes.Clientset, pvcName, namespace, targetPV string) error {
