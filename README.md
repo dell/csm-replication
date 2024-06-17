@@ -144,7 +144,7 @@ Make sure that the kubernetes user has the desired RBAC permissions.
 
 #### Installation using repctl
 
-If you wish to install CSM Replication Controller with repctl on your OpenSUSE VM, when referring to this [section](https://dell.github.io/csm-docs/docs/deployment/helm/modules/installation/replication/install-repctl/), you need to install `glibc-devel-static` devel package before running `make build`.
+If you wish to install CSM Replication Controller with repctl on your OpenSUSE server, when referring to this [section](https://dell.github.io/csm-docs/docs/deployment/helm/modules/installation/replication/install-repctl/), you need to install `glibc-devel-static` devel package before running `make build`.
 
 ## Testing
 
