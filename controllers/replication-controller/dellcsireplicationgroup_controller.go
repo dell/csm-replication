@@ -344,7 +344,7 @@ func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context
 	}
 
 	if strings.Contains(group.Status.LastAction.Condition, "FAILOVER_REMOTE") {
-		if err := r.processFailoverEvent(ctx, group, log); err != nil {
+		if err := r.processFailoverEvent(ctx, group, remoteClient, log); err != nil {
 			return err
 		}
 	}
@@ -355,7 +355,7 @@ func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context
 	return r.Update(ctx, group)
 }
 
-func (r *ReplicationGroupReconciler) processFailoverEvent(ctx context.Context, group *repv1.DellCSIReplicationGroup, log logr.Logger) error {
+func (r *ReplicationGroupReconciler) processFailoverEvent(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
 	replicationPrefix := "replication.storage.dell.com/"
 
 	// val, ok := group.Annotations[csireplicator.Action]
