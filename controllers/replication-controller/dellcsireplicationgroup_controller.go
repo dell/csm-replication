@@ -343,10 +343,36 @@ func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context
 		}
 	}
 
+	if strings.Contains(group.Status.LastAction.Condition, "FAILOVER_REMOTE") {
+		if err := r.processFailoverEvent(ctx, group, log); err != nil {
+			return err
+		}
+	}
+
 	// Informing the RG that the last action has been processed.
 	controller.AddAnnotation(group, controller.ActionProcessedTime, group.Status.LastAction.Time.GoString())
 
 	return r.Update(ctx, group)
+}
+
+func (r *ReplicationGroupReconciler) processFailoverEvent(ctx context.Context, group *repv1.DellCSIReplicationGroup, log logr.Logger) error {
+	replicationPrefix := "replication.storage.dell.com/"
+
+	// val, ok := group.Annotations[csireplicator.Action]
+	// if !ok {
+	// 	log.V(common.InfoLevel).Info("No action", "val", val)
+	// 	return nil
+	// }
+
+	remoteClusterID := group.Annotations[replicationPrefix+"remoteClusterID"]
+	if remoteClusterID == "self" {
+		log.V(common.InfoLevel).Info("The replication group is associated with the same cluster.")
+		//pvcremap
+	} else {
+		log.V(common.InfoLevel).Info("The replication group is associated with multiple clusters.")
+	}
+	return nil
+
 }
 
 func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
