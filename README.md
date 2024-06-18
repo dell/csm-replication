@@ -115,7 +115,7 @@ For building the RBAC rules for the controller, run `make controller-rbac`.
 
 ## Installation
 
-Please consult the [Installation Guide](https://dell.github.io/csm-docs/docs/replication/deployment/installation/) for instructions on installing the replication controller and sidecar.
+Please consult the [Installation Guide](https://dell.github.io/csm-docs/docs/deployment/helm/modules/installation/replication/installation/) for instructions on installing the replication controller and sidecar.
 
 To build and install your own images using the provided Makefile targets, below information may be useful:
 
@@ -141,6 +141,10 @@ You can install the CSM Replication Controller by running the command `make depl
 
 You can also run the `dell-replication-controller` process directly in your Kubernetes cluster by running the command `make run-controller`.
 Make sure that the kubernetes user has the desired RBAC permissions.
+
+#### Platform Notes
+
+If you wish to install CSM Replication Controller with repctl on your openSUSE server, when referring to this [section](https://dell.github.io/csm-docs/docs/deployment/helm/modules/installation/replication/install-repctl/), you need to install `glibc-devel-static` devel package before running `make build`.
 
 ## Testing
 
