@@ -41,7 +41,9 @@ type RemoteClusterClient interface {
 	CreatePersistentVolumeClaim(ctx context.Context, claim *corev1.PersistentVolumeClaim) error
 	UpdatePersistentVolumeClaim(ctx context.Context, claim *corev1.PersistentVolumeClaim) error
 	DeletePersistentVolumeClaim(ctx context.Context, claim *corev1.PersistentVolumeClaim) error
-	// ListPersistentVolumeClaim(ctx context.Context, )
+	//ListPersistentVolumeClaims(ctx context.Context, opts ...ctrlClient.ListOption) (*corev1.PersistentVolumeClaimList, error)
+	ListPersistentVolumeClaims(ctx context.Context, rgName string) (*corev1.PersistentVolumeClaimList, error)
+ 
 	
 	GetReplicationGroup(ctx context.Context, replicationGroupName string) (*repv1.DellCSIReplicationGroup, error)
 	UpdateReplicationGroup(ctx context.Context, group *repv1.DellCSIReplicationGroup) error
