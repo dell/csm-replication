@@ -36,7 +36,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/ratelimiter"
 
 	"github.com/go-logr/logr"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -367,7 +366,7 @@ func (r *ReplicationGroupReconciler) processFailoverEvent(ctx context.Context, g
 		rgName := group.Name
 		rgTarget := group.Annotations[replicationPrefix+"targetRGName"]
 
-		err = swapAllPVC(ctx, client, rgName, rgTarget)
+		err := swapAllPVC(ctx, client, rgName, rgTarget)
 		if err != nil {
 			log.Error(err, "Error swapping all PVCs")
 			return err
@@ -508,17 +507,19 @@ func (r *ReplicationGroupReconciler) SetupWithManager(mgr ctrl.Manager, limiter 
 		Complete(r)
 }
 
-func swapAllPVC(ctx context.Context, client connection.RemoteClusterClient, rgName, rgTarget string) error {
+func swapAllPVC(ctx context.Context, client connection.RemoteClusterClient, rgName string, rgTarget string) error {
 	fmt.Printf("calling getPVList from %s\n", rgName)
 
-	labelSelector := metav1.LabelSelector{MatchLabels: map[string]string{"replication.storage.dell.com/replicationGroupName": rgName}}
+/* 	labelSelector := metav1.LabelSelector{MatchLabels: map[string]string{"replication.storage.dell.com/replicationGroupName": rgName}}
 	listOptions := metav1.ListOptions{
 		LabelSelector: labels.Set(labelSelector.MatchLabels).String(),
-	}
-	customListOption := CustomListOption{ListOptions: listOptions}
+	} */
+	// customListOption := CustomListOption{ListOptions: listOptions}
 
 
-	pvcs, err := client.ListPersistentVolumeClaims(ctx, listOptions)
+	// pvcs, err := client.ListPersistentVolumeClaims(ctx, listOptions)
+	pvcs, err := client.ListPersistentVolumeClaims(ctx, rgName)
+
 
 	if err != nil {
 		return fmt.Errorf("failed to list PVCs: %w", err)
