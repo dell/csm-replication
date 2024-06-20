@@ -332,7 +332,7 @@ func (c *RemoteK8sControllerClient) DeletePersistentVolumeClaim(ctx context.Cont
 }
 
 // ListPersistentVolumes returns list of all persistent volume objects that are currently in cluster
-func (c *RemoteK8sControllerClient) ListPersistentVolumes(ctx context.Context, opts ...client.ListOption) (*corev1.PersistentVolumeList, error) {
+func (c *RemoteK8sControllerClient) ListPersistentVolumes(ctx context.Context, opts ...ctrlClient.ListOption) (*corev1.PersistentVolumeClaimList, error) {
 	found := &corev1.PersistentVolumeClaimList{}
 	err := c.Client.List(ctx, found, opts...)
 	if err != nil {
