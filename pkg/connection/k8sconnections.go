@@ -35,7 +35,6 @@ import (
 	"k8s.io/client-go/rest"
 	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // RemoteK8sConnHandler handler of remote Kubernetes cluster connection
@@ -338,34 +337,32 @@ func (c *RemoteK8sControllerClient) DeletePersistentVolumeClaim(ctx context.Cont
 }
 
 
-
-// ListPersistentVolumes returns list of all persistent volume objects that are currently in cluster
-// func (c *RemoteK8sControllerClient) ListPersistentVolume(ctx context.Context, opts ...ctrlClient.ListOption) (*corev1.PersistentVolumeClaimList, error) {
-// 	list := &corev1.PersistentVolumeList{}
-// 	lo := &ctrlClient.ListOptions{}
-// 	for _, option := range opts {
-// 		option.ApplyToList(lo)
-// 	}
-
-// 	for k, v := range c.Client.Objects {
-// 		if k.Kind == "PersistentVolumeClaim" {
-// 			pvc := *v.(*core_v1.PersistentVolumeClaim)
-// 			if lo.LabelSelector != nil && !lo.LabelSelector.Matches(labels.Set(pvc.Labels)) {
-// 				continue
-// 			}
-// 			list.Items = append(list.Items, *v.(*core_v1.PersistentVolumeClaim))
-// 		}
-// 	}
-
-// }
-
-func (c *RemoteK8sControllerClient) ListPersistentVolumeClaims(ctx context.Context, opts ...client.ListOption) (*corev1.PersistentVolumeClaimList, error) {
-	found := &corev1.PersistentVolumeClaimList{}
-	err := c.Client.List(ctx, found, opts...)
+/* func (c *RemoteK8sControllerClient) ListPersistentVolumeClaims(ctx context.Context, rgName string) (*corev1.PersistentVolumeClaimList, error) {
+	labelSelector := metav1.LabelSelector{MatchLabels: map[string]string{"replication.storage.dell.com/replicationGroupName": rgName}}
+	listOptions := metav1.ListOptions{
+		LabelSelector: labels.Set(labelSelector.MatchLabels).String(),
+	}
+	pvcs, err := c.Client.CoreV1()
+	
+	
+	// found := &corev1.PersistentVolumeClaimList{}
+	// err := c.Client.List(ctx, found, opts...)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// return found, nil
+}
+ */
+func (c *RemoteK8sControllerClient) ListPersistentVolumeClaims(ctx context.Context, rgName string) (*corev1.PersistentVolumeClaimList, error) {
+	list := &corev1.PersistentVolumeClaimList{}
+	opts := []ctrlClient.ListOption{
+		ctrlClient.MatchingLabels{"replication.storage.dell.com/replicationGroup": rgName},
+	}
+	err := c.Client.List(ctx, list, opts...)
 	if err != nil {
 		return nil, err
 	}
-	return found, nil
+	return list, nil
 }
 
 
