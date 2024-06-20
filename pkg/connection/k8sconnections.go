@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/rest"
 	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // RemoteK8sConnHandler handler of remote Kubernetes cluster connection
@@ -71,6 +72,9 @@ func (k8sConnHandler *RemoteK8sConnHandler) AddOrUpdateConfig(clusterID string, 
 	}
 	k8sConnHandler.configs[clusterID] = config
 }
+
+
+
 
 // GetConnection returns client from the map of managed clusters
 func (k8sConnHandler *RemoteK8sConnHandler) GetConnection(clusterID string) (RemoteClusterClient, error) {
@@ -148,6 +152,8 @@ func (k8sConnHandler *RemoteK8sConnHandler) verifyControllerClients(ctx context.
 	}
 	return nil
 }
+
+
 
 // RemoteK8sControllerClient - Represents a single controller split client
 type RemoteK8sControllerClient struct {
@@ -331,8 +337,29 @@ func (c *RemoteK8sControllerClient) DeletePersistentVolumeClaim(ctx context.Cont
 	return c.Client.Delete(ctx, claim)
 }
 
+
+
 // ListPersistentVolumes returns list of all persistent volume objects that are currently in cluster
-func (c *RemoteK8sControllerClient) ListPersistentVolumes(ctx context.Context, opts ...ctrlClient.ListOption) (*corev1.PersistentVolumeClaimList, error) {
+// func (c *RemoteK8sControllerClient) ListPersistentVolume(ctx context.Context, opts ...ctrlClient.ListOption) (*corev1.PersistentVolumeClaimList, error) {
+// 	list := &corev1.PersistentVolumeList{}
+// 	lo := &ctrlClient.ListOptions{}
+// 	for _, option := range opts {
+// 		option.ApplyToList(lo)
+// 	}
+
+// 	for k, v := range c.Client.Objects {
+// 		if k.Kind == "PersistentVolumeClaim" {
+// 			pvc := *v.(*core_v1.PersistentVolumeClaim)
+// 			if lo.LabelSelector != nil && !lo.LabelSelector.Matches(labels.Set(pvc.Labels)) {
+// 				continue
+// 			}
+// 			list.Items = append(list.Items, *v.(*core_v1.PersistentVolumeClaim))
+// 		}
+// 	}
+
+// }
+
+func (c *RemoteK8sControllerClient) ListPersistentVolumeClaims(ctx context.Context, opts ...client.ListOption) (*corev1.PersistentVolumeClaimList, error) {
 	found := &corev1.PersistentVolumeClaimList{}
 	err := c.Client.List(ctx, found, opts...)
 	if err != nil {
@@ -340,3 +367,10 @@ func (c *RemoteK8sControllerClient) ListPersistentVolumes(ctx context.Context, o
 	}
 	return found, nil
 }
+
+
+
+
+
+
+
