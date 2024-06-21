@@ -17,6 +17,8 @@ package connection
 import (
 	"context"
 
+	"github.com/go-logr/logr"
+
 	repv1 "github.com/dell/csm-replication/api/v1"
 	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -29,31 +31,29 @@ type RemoteClusterClient interface {
 	GetStorageClass(ctx context.Context, storageClassName string) (*storageV1.StorageClass, error)
 	ListStorageClass(ctx context.Context) (*storageV1.StorageClassList, error)
 	CreateStorageClass(ctx context.Context, storageClass *storageV1.StorageClass) error
-	
+
 	ListCustomResourceDefinitions(ctx context.Context) (*apiExtensionsv1.CustomResourceDefinitionList, error)
 	GetCustomResourceDefinitions(ctx context.Context, crdName string) (*apiExtensionsv1.CustomResourceDefinition, error)
-	
+
 	GetPersistentVolume(ctx context.Context, persistentVolumeName string) (*corev1.PersistentVolume, error)
 	CreatePersistentVolume(ctx context.Context, volume *corev1.PersistentVolume) error
 	UpdatePersistentVolume(ctx context.Context, volume *corev1.PersistentVolume) error
-	
+
 	GetPersistentVolumeClaim(ctx context.Context, namespace, claimName string) (*corev1.PersistentVolumeClaim, error)
 	CreatePersistentVolumeClaim(ctx context.Context, claim *corev1.PersistentVolumeClaim) error
 	UpdatePersistentVolumeClaim(ctx context.Context, claim *corev1.PersistentVolumeClaim) error
 	DeletePersistentVolumeClaim(ctx context.Context, claim *corev1.PersistentVolumeClaim) error
-	//ListPersistentVolumeClaims(ctx context.Context, opts ...ctrlClient.ListOption) (*corev1.PersistentVolumeClaimList, error)
-	ListPersistentVolumeClaims(ctx context.Context, rgName string) (*corev1.PersistentVolumeClaimList, error)
- 
-	
+	ListPersistentVolumeClaims(ctx context.Context, rgName string, log logr.Logger) (*corev1.PersistentVolumeClaimList, error)
+
 	GetReplicationGroup(ctx context.Context, replicationGroupName string) (*repv1.DellCSIReplicationGroup, error)
 	UpdateReplicationGroup(ctx context.Context, group *repv1.DellCSIReplicationGroup) error
 	ListReplicationGroup(ctx context.Context) (*repv1.DellCSIReplicationGroupList, error)
 	CreateReplicationGroup(ctx context.Context, group *repv1.DellCSIReplicationGroup) error
-	
+
 	CreateSnapshotContent(ctx context.Context, content *s1.VolumeSnapshotContent) error
 	CreateSnapshotObject(ctx context.Context, content *s1.VolumeSnapshot) error
 	GetSnapshotClass(ctx context.Context, snapClassName string) (*s1.VolumeSnapshotClass, error)
-	
+
 	CreateNamespace(ctx context.Context, content *corev1.Namespace) error
 	GetNamespace(ctx context.Context, namespace string) (*corev1.Namespace, error)
 }
