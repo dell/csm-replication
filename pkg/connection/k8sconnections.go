@@ -42,6 +42,7 @@ type RemoteK8sConnHandler struct {
 	configs       map[string]*rest.Config
 	lock          sync.Mutex
 	cachedClients map[string]*RemoteK8sControllerClient
+	Log                logr.Logger
 }
 
 func (k8sConnHandler *RemoteK8sConnHandler) init() {
@@ -336,35 +337,21 @@ func (c *RemoteK8sControllerClient) DeletePersistentVolumeClaim(ctx context.Cont
 	return c.Client.Delete(ctx, claim)
 }
 
-
-/* func (c *RemoteK8sControllerClient) ListPersistentVolumeClaims(ctx context.Context, rgName string) (*corev1.PersistentVolumeClaimList, error) {
-	labelSelector := metav1.LabelSelector{MatchLabels: map[string]string{"replication.storage.dell.com/replicationGroupName": rgName}}
-	listOptions := metav1.ListOptions{
-		LabelSelector: labels.Set(labelSelector.MatchLabels).String(),
-	}
-	pvcs, err := c.Client.CoreV1()
-	
-	
-	// found := &corev1.PersistentVolumeClaimList{}
-	// err := c.Client.List(ctx, found, opts...)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// return found, nil
+func (c *RemoteK8sControllerClient) ListPersistentVolumeClaims(ctx context.Context, rgName string, log logr.Logger) (*corev1.PersistentVolumeClaimList, error) {
+    log.V(common.InfoLevel).Info("ListPersistentVolumeClaims: getting rgName", "rgName", rgName)
+	//replication.storage.dell.com/replicationGroupName
+    list := &corev1.PersistentVolumeClaimList{}
+    opts := []ctrlClient.ListOption{
+        ctrlClient.MatchingLabels{"replication.storage.dell.com/replicationGroupName": rgName},
+    }
+    err := c.Client.List(ctx, list, opts...)
+    if err != nil {
+        log.V(common.InfoLevel).Info("ListPersistentVolumeClaims: error occurred", "error", err)
+        return nil, err
+    }
+    log.V(common.InfoLevel).Info("ListPersistentVolumeClaims: successfully retrieved PVCs", "count", len(list.Items))
+    return list, nil
 }
- */
-func (c *RemoteK8sControllerClient) ListPersistentVolumeClaims(ctx context.Context, rgName string) (*corev1.PersistentVolumeClaimList, error) {
-	list := &corev1.PersistentVolumeClaimList{}
-	opts := []ctrlClient.ListOption{
-		ctrlClient.MatchingLabels{"replication.storage.dell.com/replicationGroup": rgName},
-	}
-	err := c.Client.List(ctx, list, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return list, nil
-}
-
 
 
 
