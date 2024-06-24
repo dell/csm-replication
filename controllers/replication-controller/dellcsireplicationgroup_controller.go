@@ -580,6 +580,21 @@ func swapPVC(ctx context.Context, client connection.RemoteClusterClient, pvcName
 		log.V(common.InfoLevel).Info(fmt.Sprintf("error deleting PVC %s: %s", pvcName, err.Error()))
 		return err
 	}
+	/* 	done := false
+	for iteration := 0; !done; iteration++ {
+	    time.Sleep(1 * time.Second)
+	    _, err := client.GetPersistentVolumeClaim(ctx, namespace, pvcName)
+	    if err != nil {
+	        log.V(common.InfoLevel).Info(fmt.Sprintf("error deleting PVC %s: %s", pvcName, err.Error()))
+	        //this error could be different!
+	        if strings.Contains(err.Error(), "not found") {
+	            done = true
+	        }
+	    }
+	    if iteration > 30 {
+	        return fmt.Errorf("timed out waiting on PVC %s/%s to be deleted", namespace, pvcName)
+	    }
+	} */
 
 	// Wait until PVC is deleted
 	done := false
@@ -587,13 +602,14 @@ func swapPVC(ctx context.Context, client connection.RemoteClusterClient, pvcName
 		time.Sleep(1 * time.Second)
 		_, err := client.GetPersistentVolumeClaim(ctx, namespace, pvcName)
 		if err != nil {
-			log.V(common.InfoLevel).Info(fmt.Sprintf("error deleting PVC %s: %s", pvcName, err.Error()))
-			//this error could be different!
-			if strings.Contains(err.Error(), "not found") {
+			if errors.IsNotFound(err) {
+				log.V(common.InfoLevel).Info(fmt.Sprintf("PVC %s/%s deleted successfully", namespace, pvcName))
 				done = true
+			} else {
+				log.V(common.InfoLevel).Info(fmt.Sprintf("Error checking PVC %s/%s: %s", namespace, pvcName, err.Error()))
 			}
 		}
-		if iteration > 30 {
+		if iteration > 60 {
 			return fmt.Errorf("timed out waiting on PVC %s/%s to be deleted", namespace, pvcName)
 		}
 	}
