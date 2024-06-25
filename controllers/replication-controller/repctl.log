@@ -1,0 +1,68 @@
+[2024-06-24 18:50:24]  INFO listing replication groups
+[2024-06-24 18:50:24]  INFO Cluster: lglw2211
+[2024-06-24 18:50:24]  INFO 
+[2024-06-24 18:50:24]  INFO Cluster: lglw2212
+[2024-06-24 18:50:24]  INFO 
+[2024-06-24 19:05:21]  INFO listing replication groups
+[2024-06-24 19:05:21]  INFO Cluster: lglw2211
+[2024-06-24 19:05:21]  INFO 
+[2024-06-24 19:05:21]  INFO Cluster: lglw2212
+[2024-06-24 19:05:21]  INFO 
+[2024-06-24 19:07:04]  INFO RG (rg-83861dfd-a630-4a84-a9bf-fead0393aea7), successfully updated with action: failover
+
+[2024-06-24 19:07:07]  INFO listing replication groups
+[2024-06-24 19:07:07]  INFO Cluster: lglw2211
+[2024-06-24 19:07:07]  INFO 
+[2024-06-24 19:07:07]  INFO Cluster: lglw2212
+[2024-06-24 19:07:07]  INFO 
+[2024-06-24 19:07:21]  INFO listing replication groups
+[2024-06-24 19:07:21]  INFO Cluster: lglw2211
+[2024-06-24 19:07:21]  INFO 
+[2024-06-24 19:07:21]  INFO Cluster: lglw2212
+[2024-06-24 19:07:21]  INFO 
+[2024-06-24 19:08:37]  INFO RG (replicated-rg-83861dfd-a630-4a84-a9bf-fead0393aea7), successfully updated with action: reprotect
+
+[2024-06-24 19:08:41]  INFO listing replication groups
+[2024-06-24 19:08:41]  INFO Cluster: lglw2211
+[2024-06-24 19:08:41]  INFO 
+[2024-06-24 19:08:41]  INFO Cluster: lglw2212
+[2024-06-24 19:08:41]  INFO 
+[2024-06-24 19:08:51]  INFO listing replication groups
+[2024-06-24 19:08:51]  INFO Cluster: lglw2211
+[2024-06-24 19:08:51]  INFO 
+[2024-06-24 19:08:51]  INFO Cluster: lglw2212
+[2024-06-24 19:08:51]  INFO 
+[2024-06-24 19:09:08]  INFO listing replication groups
+[2024-06-24 19:09:08]  INFO Cluster: lglw2211
+[2024-06-24 19:09:08]  INFO 
+[2024-06-24 19:09:08]  INFO Cluster: lglw2212
+[2024-06-24 19:09:08]  INFO 
+[2024-06-24 19:09:25]  INFO listing replication groups
+[2024-06-24 19:09:25]  INFO Cluster: lglw2211
+[2024-06-24 19:09:25]  INFO 
+[2024-06-24 19:09:25]  INFO Cluster: lglw2212
+[2024-06-24 19:09:25]  INFO 
+[2024-06-24 19:10:00]  INFO RG (replicated-rg-83861dfd-a630-4a84-a9bf-fead0393aea7), successfully updated with action: failover
+
+[2024-06-24 19:10:03]  INFO listing replication groups
+[2024-06-24 19:10:04]  INFO Cluster: lglw2211
+[2024-06-24 19:10:04]  INFO 
+[2024-06-24 19:10:04]  INFO Cluster: lglw2212
+[2024-06-24 19:10:04]  INFO 
+[2024-06-24 19:10:10]  INFO listing replication groups
+[2024-06-24 19:10:10]  INFO Cluster: lglw2211
+[2024-06-24 19:10:10]  INFO 
+[2024-06-24 19:10:10]  INFO Cluster: lglw2212
+[2024-06-24 19:10:10]  INFO 
+[2024-06-24 19:10:22]  INFO listing replication groups
+[2024-06-24 19:10:22]  INFO Cluster: lglw2211
+[2024-06-24 19:10:22]  INFO 
+[2024-06-24 19:10:22]  INFO Cluster: lglw2212
+[2024-06-24 19:10:22]  INFO 
+[2024-06-24 19:10:45]  INFO RG (rg-83861dfd-a630-4a84-a9bf-fead0393aea7), successfully updated with action: reprotect
+
+[2024-06-24 19:11:20]  INFO listing replication groups
+[2024-06-24 19:11:20]  INFO Cluster: lglw2211
+[2024-06-24 19:11:20]  INFO 
+[2024-06-24 19:11:20]  INFO Cluster: lglw2212
+[2024-06-24 19:11:20]  INFO 
