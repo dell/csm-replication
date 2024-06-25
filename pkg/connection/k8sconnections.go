@@ -259,9 +259,32 @@ func (c *RemoteK8sControllerClient) GetPersistentVolumeClaim(ctx context.Context
 	return claim, nil
 }
 
+// CreatePersistentVolumeClaim returns persistent volume claim object in current cluster
+func (c *RemoteK8sControllerClient) CreatePersistentVolumeClaim(ctx context.Context, claim *corev1.PersistentVolumeClaim) error {
+	return c.Client.Create(ctx, claim)
+}
+
+// DeletePersistentVolumeClaim deletes the persistent volume claim object in current cluster
+func (c *RemoteK8sControllerClient) DeletePersistentVolumeClaim(ctx context.Context, claim *corev1.PersistentVolumeClaim) error {
+	return c.Client.Delete(ctx, claim)
+}
+
 // UpdatePersistentVolumeClaim updates persistent volume claim object in current cluster
 func (c *RemoteK8sControllerClient) UpdatePersistentVolumeClaim(ctx context.Context, claim *corev1.PersistentVolumeClaim) error {
 	return c.Client.Update(ctx, claim)
+}
+
+// ListPersistentVolumeClaims gets the list of persistent volume claim objects under the replication group given the replication group name
+func (c *RemoteK8sControllerClient) ListPersistentVolumeClaims(ctx context.Context, rgName string) (*corev1.PersistentVolumeClaimList, error) {
+    list := &corev1.PersistentVolumeClaimList{}
+    opts := []ctrlClient.ListOption{
+        ctrlClient.MatchingLabels{"replication.storage.dell.com/replicationGroupName": rgName},
+    }
+    err := c.Client.List(ctx, list, opts...)
+    if err != nil {
+        return nil, err
+    }
+    return list, nil
 }
 
 // CreateSnapshotContent creates the snapshot content on the remote cluster

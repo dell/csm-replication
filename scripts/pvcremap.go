@@ -31,6 +31,7 @@ func main() {
 		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 	}
 	rgNamePtr := flag.String("rg", "", "id for the RG")
+	rgTargetPtr := flag.String("t", "", "id for the RG")
 	flag.Parse()
 
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
@@ -46,17 +47,23 @@ func main() {
 	}
 
 	if rgNamePtr == nil {
-		fmt.Printf("PVC name is required")
+		// fmt.Printf("PVC name is required")
+		os.Exit(1)
+	}
+
+	if rgTargetPtr == nil {
+		// fmt.Printf("PVC name is required")
 		os.Exit(1)
 	}
 
 	rgName := *rgNamePtr
+	rgTarget := *rgTargetPtr
 	ctx := context.TODO()
-	err = swapAllPVC(ctx, clientset, rgName)
+	err = swapAllPVC(ctx, clientset, rgName, rgTarget)
 
 }
 
-func swapAllPVC(ctx context.Context, clientset *kubernetes.Clientset, rgName string) error {
+func swapAllPVC(ctx context.Context, clientset *kubernetes.Clientset, rgName, rgTarget string) error {
 	fmt.Printf("calling getPVList from %s\n", rgName)
 
 	labelSelector := metav1.LabelSelector{MatchLabels: map[string]string{"replication.storage.dell.com/replicationGroupName": rgName}}
@@ -73,12 +80,12 @@ func swapAllPVC(ctx context.Context, clientset *kubernetes.Clientset, rgName str
 		pvcName := pvc.Name
 		namespace := pvc.Namespace
 		targetPV := pvc.Annotations[replicationPrefix+"remotePV"]
-		err = swapPVC(ctx, clientset, pvcName, namespace, targetPV)
+		err = swapPVC(ctx, clientset, pvcName, namespace, targetPV, rgTarget)
 	}
 	return err
 }
 
-func swapPVC(ctx context.Context, clientset *kubernetes.Clientset, pvcName, namespace, targetPV string) error {
+func swapPVC(ctx context.Context, clientset *kubernetes.Clientset, pvcName, namespace, targetPV, rgTarget string) error {
 	fmt.Printf("pvc %s/%s targetPV %s\n", namespace, pvcName, targetPV)
 
 	// Read the PVC
@@ -152,6 +159,8 @@ func swapPVC(ctx context.Context, clientset *kubernetes.Clientset, pvcName, name
 
 	remoteStorageClassName := pvc.Annotations[replicationPrefix+"remoteStorageClassName"]
 	pvc.Annotations[replicationPrefix+"remoteStorageClassName"] = *pvc.Spec.StorageClassName
+	pvc.Annotations[replicationPrefix+"replicationGroupName"] = rgTarget
+	pvc.Labels[replicationPrefix+"replicationGroupName"] = rgTarget
 	pvc.Spec.StorageClassName = &remoteStorageClassName
 	pvc.ObjectMeta.ResourceVersion = ""
 
