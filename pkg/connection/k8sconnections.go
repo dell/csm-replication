@@ -72,9 +72,6 @@ func (k8sConnHandler *RemoteK8sConnHandler) AddOrUpdateConfig(clusterID string, 
 	k8sConnHandler.configs[clusterID] = config
 }
 
-
-
-
 // GetConnection returns client from the map of managed clusters
 func (k8sConnHandler *RemoteK8sConnHandler) GetConnection(clusterID string) (RemoteClusterClient, error) {
 	k8sConnHandler.lock.Lock()
@@ -151,8 +148,6 @@ func (k8sConnHandler *RemoteK8sConnHandler) verifyControllerClients(ctx context.
 	}
 	return nil
 }
-
-
 
 // RemoteK8sControllerClient - Represents a single controller split client
 type RemoteK8sControllerClient struct {
