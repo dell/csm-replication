@@ -42,7 +42,6 @@ type RemoteK8sConnHandler struct {
 	configs       map[string]*rest.Config
 	lock          sync.Mutex
 	cachedClients map[string]*RemoteK8sControllerClient
-	Log                logr.Logger
 }
 
 func (k8sConnHandler *RemoteK8sConnHandler) init() {
