@@ -84,9 +84,6 @@ func main() {
 	repctl.PersistentFlags().BoolP("verbose", "l", false, "enables verbosity and debug output")
 	_ = viper.BindPFlag(config.Verbose, repctl.PersistentFlags().Lookup("verbose"))
 
-	repctl.PersistentFlags().Bool("disable-pvc-remap", false, "disables PVC remapping functionality")
-	_ = viper.BindPFlag(config.DisablePVCRemap, repctl.PersistentFlags().Lookup("disable-pvc-remap"))
-
 	// Add highest level commands
 	repctl.AddCommand(cmd.GetListCommand())
 	repctl.AddCommand(cmd.GetClusterCommand())
