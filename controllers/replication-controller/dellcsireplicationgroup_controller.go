@@ -59,6 +59,7 @@ type ReplicationGroupReconciler struct {
 	PVCRequeueInterval time.Duration
 	Config             connection.MultiClusterClient
 	Domain             string
+	DisablePVCRemap    bool
 }
 
 // +kubebuilder:rbac:groups=replication.storage.dell.com,resources=dellcsireplicationgroups,verbs=get;list;watch;update;patch;delete;create
@@ -358,6 +359,10 @@ func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context
 }
 
 func (r *ReplicationGroupReconciler) processFailoverEvent(ctx context.Context, group *repv1.DellCSIReplicationGroup, client connection.RemoteClusterClient, log logr.Logger) error {
+	if r.DisablePVCRemap {
+		log.V(common.InfoLevel).Info("PVC remapping is disabled. Skipping PVC swap.")
+		return nil
+	}
 	remoteClusterID := group.Annotations[replicationPrefix+"remoteClusterID"]
 	if remoteClusterID == "self" {
 		log.V(common.InfoLevel).Info("The replication group is associated with the same cluster.")
@@ -495,7 +500,8 @@ func makeVolSnapContent(snapName, volumeName string, snapRef v1.ObjectReference,
 }
 
 // SetupWithManager start using reconciler by creating new controller managed by provided manager
-func (r *ReplicationGroupReconciler) SetupWithManager(mgr ctrl.Manager, limiter ratelimiter.RateLimiter, maxReconcilers int) error {
+func (r *ReplicationGroupReconciler) SetupWithManager(mgr ctrl.Manager, limiter ratelimiter.RateLimiter, maxReconcilers int, disablePVCRemap bool) error {
+	r.DisablePVCRemap = disablePVCRemap
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&repv1.DellCSIReplicationGroup{}).
 		WithOptions(reconcile.Options{
