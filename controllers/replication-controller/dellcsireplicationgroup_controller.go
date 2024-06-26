@@ -511,7 +511,7 @@ func (r *ReplicationGroupReconciler) SetupWithManager(mgr ctrl.Manager, limiter 
 		Complete(r)
 }
 
-// Give a replication group name and target, swapAllPVC reassigns the PVC from local volume to remote volume.
+// Give a replication group name and target, swapAllPVC reassigns the PVC from local volume to remote volume. 
 // It also retains the original reclaimPolicy and operates within a single cluster.
 func swapAllPVC(ctx context.Context, client connection.RemoteClusterClient, rgName string, rgTarget string, log logr.Logger) error {
 	pvcs, err := client.ListPersistentVolumeClaims(ctx, rgName)

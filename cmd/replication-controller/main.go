@@ -245,7 +245,7 @@ func main() {
 		EventRecorder:   mgr.GetEventRecorderFor(common.DellReplicationController),
 		Config:          controllerMgr.config,
 		Domain:          domain,
-		DisablePVCRemap: disablePVCRemap, // Add this line
+		DisablePVCRemap: disablePVCRemap,
 	}).SetupWithManager(mgr, expRateLimiter, workerThreads, disablePVCRemap); err != nil {
 		setupLog.Error(err, "unable to create controller", common.DellReplicationController, "DellCSIReplicationGroup")
 		os.Exit(1)
