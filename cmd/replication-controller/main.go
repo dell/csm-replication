@@ -161,6 +161,7 @@ func main() {
 		retryIntervalMax   time.Duration
 		workerThreads      int
 		domain             string
+		disablePVCRemap    bool
 	)
 
 	var metricsAddr string
@@ -172,6 +173,7 @@ func main() {
 			"Enabling this will ensure there is only one active dell-replication-controller manager.")
 	flag.DurationVar(&retryIntervalStart, "retry-interval-start", time.Second, "Initial retry interval of failed reconcile request. It doubles with each failure, upto retry-interval-max")
 	flag.DurationVar(&retryIntervalMax, "retry-interval-max", 5*time.Minute, "Maximum retry interval of failed reconcile request")
+	flag.BoolVar(&disablePVCRemap, "disable-pvc-remap", false, "disables PVC remapping functionality")
 	flag.Parse()
 	setupLog.V(common.InfoLevel).Info("Prefix", "Domain", domain)
 	controllers.InitLabelsAndAnnotations(domain)
@@ -240,13 +242,14 @@ func main() {
 	}
 
 	if err = (&repController.ReplicationGroupReconciler{
-		Client:        mgr.GetClient(),
-		Log:           ctrl.Log.WithName("controllers").WithName("DellCSIReplicationGroup"),
-		Scheme:        mgr.GetScheme(),
-		EventRecorder: mgr.GetEventRecorderFor(common.DellReplicationController),
-		Config:        controllerMgr.config,
-		Domain:        domain,
-	}).SetupWithManager(mgr, expRateLimiter, workerThreads); err != nil {
+		Client:          mgr.GetClient(),
+		Log:             ctrl.Log.WithName("controllers").WithName("DellCSIReplicationGroup"),
+		Scheme:          mgr.GetScheme(),
+		EventRecorder:   mgr.GetEventRecorderFor(common.DellReplicationController),
+		Config:          controllerMgr.config,
+		Domain:          domain,
+		DisablePVCRemap: disablePVCRemap,
+	}).SetupWithManager(mgr, expRateLimiter, workerThreads, disablePVCRemap); err != nil {
 		setupLog.Error(err, "unable to create controller", common.DellReplicationController, "DellCSIReplicationGroup")
 		os.Exit(1)
 	}

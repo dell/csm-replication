@@ -475,7 +475,7 @@ func (suite *RGControllerTestSuite) TestSetupWithManagerRg() {
 	suite.Init()
 	mgr := manager.Manager(nil)
 	expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second)
-	err := suite.reconciler.SetupWithManager(mgr, expRateLimiter, 1)
+	err := suite.reconciler.SetupWithManager(mgr, expRateLimiter, 1, false)
 	suite.Error(err, "Setup should fail when there is no manager")
 }
 

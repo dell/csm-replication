@@ -33,13 +33,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	reconciler "sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/ratelimiter"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -60,6 +59,7 @@ type ReplicationGroupReconciler struct {
 	PVCRequeueInterval time.Duration
 	Config             connection.MultiClusterClient
 	Domain             string
+	DisablePVCRemap    bool
 }
 
 // +kubebuilder:rbac:groups=replication.storage.dell.com,resources=dellcsireplicationgroups,verbs=get;list;watch;update;patch;delete;create
@@ -359,6 +359,10 @@ func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context
 }
 
 func (r *ReplicationGroupReconciler) processFailoverEvent(ctx context.Context, group *repv1.DellCSIReplicationGroup, client connection.RemoteClusterClient, log logr.Logger) error {
+	if r.DisablePVCRemap {
+		log.V(common.InfoLevel).Info("PVC remapping is disabled. Skipping PVC swap.")
+		return nil
+	}
 	remoteClusterID := group.Annotations[replicationPrefix+"remoteClusterID"]
 	if remoteClusterID == "self" {
 		log.V(common.InfoLevel).Info("The replication group is associated with the same cluster.")
@@ -496,7 +500,8 @@ func makeVolSnapContent(snapName, volumeName string, snapRef v1.ObjectReference,
 }
 
 // SetupWithManager start using reconciler by creating new controller managed by provided manager
-func (r *ReplicationGroupReconciler) SetupWithManager(mgr ctrl.Manager, limiter workqueue.TypedRateLimiter[reconcile.Request], maxReconcilers int) error {
+func (r *ReplicationGroupReconciler) SetupWithManager(mgr ctrl.Manager, limiter ratelimiter.RateLimiter, maxReconcilers int, disablePVCRemap bool) error {
+	r.DisablePVCRemap = disablePVCRemap
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&repv1.DellCSIReplicationGroup{}).
 		WithOptions(reconciler.Options{
@@ -506,7 +511,7 @@ func (r *ReplicationGroupReconciler) SetupWithManager(mgr ctrl.Manager, limiter 
 		Complete(r)
 }
 
-// Give a replication group name and target, swapAllPVC reassigns the PVC from local volume to remote volume. 
+// Give a replication group name and target, swapAllPVC reassigns the PVC from local volume to remote volume.
 // It also retains the original reclaimPolicy and operates within a single cluster.
 func swapAllPVC(ctx context.Context, client connection.RemoteClusterClient, rgName string, rgTarget string, log logr.Logger) error {
 	pvcs, err := client.ListPersistentVolumeClaims(ctx, rgName)
