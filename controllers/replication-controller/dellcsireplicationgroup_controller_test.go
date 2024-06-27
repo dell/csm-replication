@@ -27,16 +27,26 @@ import (
 	"github.com/dell/csm-replication/pkg/connection"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
 	"github.com/stretchr/testify/suite"
+	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
+
+type PVCRemapTestSuite struct {
+	suite.Suite
+	client client.Client
+	driver utils.Driver
+	config connection.MultiClusterClient
+}
 
 type RGControllerTestSuite struct {
 	suite.Suite
@@ -468,4 +478,118 @@ func (suite *RGControllerTestSuite) TestSetupWithManagerRg() {
 	expRateLimiter := workqueue.NewItemExponentialFailureRateLimiter(1*time.Second, 10*time.Second)
 	err := suite.reconciler.SetupWithManager(mgr, expRateLimiter, 1, false)
 	suite.Error(err, "Setup should fail when there is no manager")
+}
+
+func (suite *PVCRemapTestSuite) TestSwapPVC() {
+	ctx := context.Background()
+
+	// Create initial PVC
+	pvcName := "test-pvc"
+	namespace := "default"
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      pvcName,
+			Namespace: namespace,
+			Annotations: map[string]string{
+				controllers.RemoteReplicationGroup + "remotePV": "remote-pv",
+				controllers.RemoteClusterID:                     suite.driver.RemoteClusterID,
+			},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: resource.MustParse("1Gi"),
+				},
+			},
+			StorageClassName: &suite.driver.StorageClass,
+			VolumeName:       "local-pv",
+		},
+	}
+	err := suite.client.Create(ctx, pvc)
+	suite.NoError(err)
+
+	// Create local PV
+	localPV := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "local-pv",
+		},
+		Spec: corev1.PersistentVolumeSpec{
+			PersistentVolumeReclaimPolicy: corev1.PersistentVolumeReclaimRetain,
+			StorageClassName:              suite.driver.StorageClass,
+			Capacity: corev1.ResourceList{
+				corev1.ResourceStorage: resource.MustParse("1Gi"),
+			},
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				Local: &corev1.LocalVolumeSource{
+					Path: "/mnt/data",
+				},
+			},
+			ClaimRef: &corev1.ObjectReference{
+				Kind:      "PersistentVolumeClaim",
+				Namespace: namespace,
+				Name:      pvcName,
+			},
+		},
+	}
+	err = suite.client.Create(ctx, localPV)
+	suite.NoError(err)
+
+	// Create remote PV
+	remotePV := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "remote-pv",
+		},
+		Spec: corev1.PersistentVolumeSpec{
+			PersistentVolumeReclaimPolicy: corev1.PersistentVolumeReclaimRetain,
+			StorageClassName:              suite.driver.RemoteSCName,
+			Capacity: corev1.ResourceList{
+				corev1.ResourceStorage: resource.MustParse("1Gi"),
+			},
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				Local: &corev1.LocalVolumeSource{
+					Path: "/mnt/data",
+				},
+			},
+		},
+	}
+	err = suite.client.Create(ctx, remotePV)
+	suite.NoError(err)
+
+	// Verify PVC is created
+	createdPVC := &corev1.PersistentVolumeClaim{}
+	err = suite.client.Get(ctx, types.NamespacedName{Name: pvcName, Namespace: namespace}, createdPVC)
+	suite.NoError(err)
+	suite.NotNil(createdPVC)
+
+	// Perform PVC swap
+	rClient, err := suite.config.GetConnection(suite.driver.RemoteClusterID)
+	suite.NoError(err)
+
+	logger := zap.New(zap.UseDevMode(true))
+	err = swapPVC(ctx, rClient, pvcName, namespace, "remote-pv", "remote-rg", logger)
+	suite.NoError(err)
+
+	// Verify the swapped PVC
+	var swappedPVC corev1.PersistentVolumeClaim
+	err = suite.client.Get(ctx, types.NamespacedName{Name: pvcName, Namespace: namespace}, &swappedPVC)
+	suite.NoError(err)
+
+	suite.Equal("remote-pv", swappedPVC.Spec.VolumeName)
+	suite.Equal(suite.driver.RemoteSCName, *swappedPVC.Spec.StorageClassName)
+	suite.Equal("local-pv", swappedPVC.Annotations[controllers.RemoteReplicationGroup+"remotePV"])
+	suite.Equal("remote-rg", swappedPVC.Annotations[controllers.RemoteReplicationGroup+"replicationGroupName"])
+
+	// Verify the remote PV's claim reference
+	var updatedRemotePV corev1.PersistentVolume
+	err = suite.client.Get(ctx, types.NamespacedName{Name: "remote-pv"}, &updatedRemotePV)
+	suite.NoError(err)
+	suite.Equal(pvcName, updatedRemotePV.Spec.ClaimRef.Name)
+	suite.Equal(namespace, updatedRemotePV.Spec.ClaimRef.Namespace)
+
+	// Verify the local PV's claim reference is removed
+	var updatedLocalPV corev1.PersistentVolume
+	err = suite.client.Get(ctx, types.NamespacedName{Name: "local-pv"}, &updatedLocalPV)
+	suite.NoError(err)
+	suite.Nil(updatedLocalPV.Spec.ClaimRef)
 }
