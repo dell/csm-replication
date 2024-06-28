@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	csireplicator "github.com/dell/csm-replication/controllers/csi-replicator"
@@ -511,25 +512,49 @@ func (r *ReplicationGroupReconciler) SetupWithManager(mgr ctrl.Manager, limiter 
 		Complete(r)
 }
 
-// Give a replication group name and target, swapAllPVC reassigns the PVC from local volume to remote volume. 
+// Give a replication group name and target, swapAllPVC reassigns the PVC from local volume to remote volume.
 // It also retains the original reclaimPolicy and operates within a single cluster.
 func swapAllPVC(ctx context.Context, client connection.RemoteClusterClient, rgName string, rgTarget string, log logr.Logger) error {
+	log.V(common.InfoLevel).Info(fmt.Sprintf("calling getPVList from %s\n", rgName))
 	pvcs, err := client.ListPersistentVolumeClaims(ctx, rgName)
 
 	if err != nil {
 		return fmt.Errorf("failed to list PVCs: %w", err)
 	}
 
+	var wg sync.WaitGroup
+	errChan := make(chan error, len(pvcs.Items))
+
 	for _, pvc := range pvcs.Items {
-		pvcName := pvc.Name
-		namespace := pvc.Namespace
-		targetPV := pvc.Annotations[replicationPrefix+"remotePV"]
-		err = swapPVC(ctx, client, pvcName, namespace, targetPV, rgTarget, log)
+		wg.Add(1)
+		go func(pvc v1.PersistentVolumeClaim) {
+			defer wg.Done()
+			pvcName := pvc.Name
+			namespace := pvc.Namespace
+			targetPV := pvc.Annotations[replicationPrefix+"remotePV"]
+			err := swapPVC(ctx, client, pvcName, namespace, targetPV, rgTarget, log)
+			if err != nil {
+				errChan <- fmt.Errorf("error swapping PVC %s/%s: %w", namespace, pvcName, err)
+			}
+		}(pvc)
 	}
 
-	return err
-}
+	go func() {
+		wg.Wait()
+		close(errChan)
+	}()
 
+	var errs []error
+	for err := range errChan {
+		errs = append(errs, err)
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("errors occurred while swapping PVCs: %v", errs)
+	}
+
+	return nil
+}
 func swapPVC(ctx context.Context, client connection.RemoteClusterClient, pvcName, namespace, targetPV, rgTarget string, log logr.Logger) error {
 	// Read the PVC
 	pvc, err := client.GetPersistentVolumeClaim(ctx, namespace, pvcName)
