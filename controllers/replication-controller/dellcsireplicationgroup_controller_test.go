@@ -27,6 +27,7 @@ import (
 	"github.com/dell/csm-replication/pkg/connection"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
 	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -54,6 +55,7 @@ type RGControllerTestSuite struct {
 	driver     utils.Driver
 	config     connection.MultiClusterClient
 	reconciler *ReplicationGroupReconciler
+	mockUtils  *utils.MockUtils
 }
 
 func (suite *RGControllerTestSuite) SetupTest() {
@@ -478,6 +480,73 @@ func (suite *RGControllerTestSuite) TestSetupWithManagerRg() {
 	expRateLimiter := workqueue.NewItemExponentialFailureRateLimiter(1*time.Second, 10*time.Second)
 	err := suite.reconciler.SetupWithManager(mgr, expRateLimiter, 1, false)
 	suite.Error(err, "Setup should fail when there is no manager")
+}
+
+func (suite *RGControllerTestSuite) TestPVC() {
+    //sanity test
+    suite.Equal(1,1)
+	ctx := context.Background()
+	volumeAttributes := map[string]string{
+		"fake-CapacityGB":     "3.00",
+		"RemoteSYMID":         "000000000002",
+		"SRP":                 "SRP_1",
+		"ServiceLevel":        "Bronze",
+		"StorageGroup":        "csi-UDI-Bronze-SRP_1-SG-test-2-ASYNC",
+		"VolumeContentSource": "",
+		"storage.kubernetes.io/csiProvisionerIdentity": "1611934095007-8081-csi-fake",
+	}
+	//create local PV
+	localPV := corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "local-pv",
+		},
+		Spec: corev1.PersistentVolumeSpec{
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CSI: &corev1.CSIPersistentVolumeSource{
+					Driver:           suite.driver.DriverName,
+					VolumeHandle:     "csivol-",
+					FSType:           "ext4",
+					VolumeAttributes: volumeAttributes,
+				},
+			},
+			StorageClassName: "local-swap-pvc",
+		},
+		Status: corev1.PersistentVolumeStatus{Phase: corev1.VolumeBound},
+	}
+	err := suite.client.Create(ctx, &localPV)
+	assert.Nil(suite.T(), err)
+	assert.NotNil(suite.T(), localPV)
+	//create remote PV
+	remotePV := corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "remote-pv",
+		},
+		Spec: corev1.PersistentVolumeSpec{
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CSI: &corev1.CSIPersistentVolumeSource{
+					Driver:           suite.driver.DriverName,
+					VolumeHandle:     "csivol-",
+					FSType:           "ext4",
+					VolumeAttributes: volumeAttributes,
+				},
+			},
+			StorageClassName: "remote-swap-pvc",
+		},
+		Status: corev1.PersistentVolumeStatus{Phase: corev1.VolumeBound},
+	}
+	err = suite.client.Create(ctx, &remotePV)
+	assert.Nil(suite.T(), err)
+	assert.NotNil(suite.T(), remotePV)
+	// creating fake PVC with bound state
+	// pvcObj := utils.GetPVCObj("fake-pvc", suite.mockUtils.Specs.Namespace, suite.driver.StorageClass)
+	// scName := "fake-sc-1"
+	// pvcObj.Status.Phase = corev1.ClaimBound
+	// pvcObj.Spec.VolumeName = "local-pv"
+	// pvcObj.Spec.StorageClassName = &scName
+
+	// err = suite.client.Create(ctx, pvcObj)
+	// assert.NotNil(suite.T(), pvcObj)
+	
 }
 
 func (suite *PVCRemapTestSuite) TestSwapPVC() {
