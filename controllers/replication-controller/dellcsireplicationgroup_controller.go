@@ -651,9 +651,9 @@ func swapPVC(ctx context.Context, client connection.RemoteClusterClient, pvcName
 	}
 
 	// Update the target PV's claimref to point to our pvc.
-	pvcUid := pvc.ObjectMeta.UID
+	pvcUID := pvc.ObjectMeta.UID
 	pvcResourceVersion := pvc.ObjectMeta.ResourceVersion
-	err = updatePVClaimRef(ctx, client, targetPV, pvc.Namespace, pvcResourceVersion, pvc.Name, pvcUid, log)
+	err = updatePVClaimRef(ctx, client, targetPV, pvc.Namespace, pvcResourceVersion, pvc.Name, pvcUID, log)
 	if err != nil {
 		return err
 	}
@@ -808,7 +808,7 @@ func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 }
 
 // updatePVClaimRef updates the PV's ClaimRef.Uid to the specified value
-func updatePVClaimRef(ctx context.Context, client connection.RemoteClusterClient, pvName, pvcNamespace, pvcResourceVersion, pvcName string, pvcUid types.UID, log logr.Logger) error {
+func updatePVClaimRef(ctx context.Context, client connection.RemoteClusterClient, pvName, pvcNamespace, pvcResourceVersion, pvcName string, pvcUID types.UID, log logr.Logger) error {
 	pv, err := client.GetPersistentVolume(ctx, pvName)
 	if err != nil {
 		log.V(common.InfoLevel).Info(fmt.Sprintf("Error retrieving PV %s: %s", pvName, err.Error()))
@@ -820,7 +820,7 @@ func updatePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 	pv.Spec.ClaimRef.Kind = "PersistentVolumeClaim"
 	pv.Spec.ClaimRef.Namespace = pvcNamespace
 	pv.Spec.ClaimRef.Name = pvcName
-	pv.Spec.ClaimRef.UID = pvcUid
+	pv.Spec.ClaimRef.UID = pvcUID
 	pv.Spec.ClaimRef.ResourceVersion = pvcResourceVersion
 
 	done := false
