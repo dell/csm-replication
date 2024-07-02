@@ -661,15 +661,24 @@ func swapPVC(ctx context.Context, client connection.RemoteClusterClient, pvcName
 	// Verify pvc is created and bound to new PVs
 	// remotePV is the current localPVName arg, localPV is the current remotePVName arg
 	err = verifyPVC(ctx, client, remotePV, localPV, pvcName, namespace, log)
+	if err != nil {
+		return err
+	}
 
-	if err == nil {
-		// Remove the PVC reclaim of local PV
-		removePVClaimRef(ctx, client, localPV, log)
-		// Restore the PVs original volume reclaim policy
-		setPVReclaimPolicy(ctx, client, pvc.Spec.VolumeName, remotePVPolicy, log)
-		setPVReclaimPolicy(ctx, client, pvc.Annotations[replicationPrefix+"remotePV"], localPVPolicy, log)
-	} else {
-		log.V(common.InfoLevel).Info(fmt.Sprintf("Error creating and binding PVC to new PVs %s and %s", localPV, remotePV))
+	// Remove the PVC reclaim of local PV
+	err = removePVClaimRef(ctx, client, localPV, log)
+	if err != nil {
+		return err
+	}
+
+	// Restore the PVs original volume reclaim policy
+	err = setPVReclaimPolicy(ctx, client, pvc.Spec.VolumeName, remotePVPolicy, log)
+	if err != nil {
+		return err
+	}
+	err = setPVReclaimPolicy(ctx, client, pvc.Annotations[replicationPrefix+"remotePV"], localPVPolicy, log)
+	if err != nil {
+		return err
 	}
 
 	log.V(common.InfoLevel).Info("Operation completed successfully")
