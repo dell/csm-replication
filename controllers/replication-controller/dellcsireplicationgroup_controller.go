@@ -353,6 +353,7 @@ func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context
 		}
 	}
 
+	// testing push
 	if strings.Contains(remoteGroup.Status.LastAction.Condition, "UNPLANNED_FAILOVER_LOCAL") {
 		if err := r.processFailoverEvent(ctx, group, client, log); err != nil {
 			return err
