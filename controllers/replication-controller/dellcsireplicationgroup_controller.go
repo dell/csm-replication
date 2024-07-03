@@ -321,6 +321,16 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 }
 
 func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteGroup *repv1.DellCSIReplicationGroup, client connection.RemoteClusterClient, log logr.Logger) error {
+	if strings.Contains(remoteGroup.Status.LastAction.Condition, "UNPLANNED_FAILOVER_LOCAL") {
+		log.V(common.InfoLevel).Info("Detecting unplanned failover")
+	}
+	if group.Annotations[replicationPrefix+"remoteClusterID"]=="self" {
+		log.V(common.InfoLevel).Info("This is a single cluster")
+	}
+	if len(remoteGroup.Status.Conditions) == 0 || remoteGroup.Status.LastAction.Time == nil {
+		log.V(common.InfoLevel).Info("RemoteRG no action")
+	}
+
 	if group.Annotations[replicationPrefix+"remoteClusterID"]=="self" && strings.Contains(remoteGroup.Status.LastAction.Condition, "UNPLANNED_FAILOVER_LOCAL") {
 		log.V(common.InfoLevel).Info("Detecting unplanned failover")
 		if len(remoteGroup.Status.Conditions) != 0 && remoteGroup.Status.LastAction.Time != nil {
