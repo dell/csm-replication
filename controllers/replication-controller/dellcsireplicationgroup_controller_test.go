@@ -483,9 +483,73 @@ func (suite *RGControllerTestSuite) TestSetupWithManagerRg() {
 }
 
 func (suite *RGControllerTestSuite) TestPVC() {
-    //sanity test
-    suite.Equal(1,1)
+    // scenario: RG without sync complete
+	newConfig := config.NewFakeConfigForSingleCluster(suite.client,
+		suite.driver.SourceClusterID, suite.driver.RemoteClusterID)
+	suite.config = newConfig
+	suite.reconciler.Config = newConfig
+	sc1 := utils.GetReplicationEnabledSC(suite.driver.DriverName, "sc-1",
+		"sc-2", utils.Self)
+	// create sc-1 and corresponding RG
+	rg1 := suite.getRGWithoutSyncComplete(suite.driver.RGName, true, true)
+	labels := make(map[string]string)
+	labels[controllers.DriverName] = suite.driver.DriverName
+	rg1.Labels = labels
+	suite.createSCAndRG(sc1, rg1)
+	// create sc-2
+	sc2 := utils.GetReplicationEnabledSC(suite.driver.DriverName, "sc-2",
+		"sc-1", utils.Self)
+	err := suite.client.Create(context.Background(), sc2)
+	suite.NoError(err)
+
+	rg := new(repv1.DellCSIReplicationGroup)
+	req := suite.getTypicalRequest()
+
+	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
+	suite.NotContains(controllers.RemoteReplicationGroup, rg.Annotations,
+		"Remote RG annotation doesn't exist")
+	suite.NotContains(controllers.RGSyncComplete, rg.Annotations,
+		"RG Sync annotation doesn't exist")
+
+	resp, err := suite.reconciler.Reconcile(context.Background(), req)
+	suite.NoError(err)
+	suite.Equal(false, resp.Requeue)
+	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
+	suite.NoError(err)
+	suite.Equal("yes", rg.Annotations[controllers.RGSyncComplete],
+		"RG Sync annotation applied")
+	replicatedRGName := fmt.Sprintf("%s-%s", replicated, rg.Name)
+	suite.Equal(replicatedRGName, rg.Annotations[controllers.RemoteReplicationGroup],
+		"Remote RG annotation applied")
+
+	// Check if remote RG got created
+	rClient, err := suite.config.GetConnection("self")
+	suite.NoError(err)
+	_, err = rClient.GetReplicationGroup(context.Background(), replicatedRGName)
+	suite.NoError(err)
+
+	// Another reconcile
+	_, err = suite.reconciler.Reconcile(context.Background(), req)
+	suite.NoError(err)
+
+	// Reconcile the other RG
+	req.NamespacedName.Name = replicatedRGName
+	_, err = suite.reconciler.Reconcile(context.Background(), req)
+	suite.NoError(err)
+	replicatedRG, err := rClient.GetReplicationGroup(context.Background(), replicatedRGName)
+	suite.NoError(err)
+	suite.T().Log(replicatedRG.Annotations)
+	suite.T().Log(replicatedRG.Labels)
+
+	RGName := rg.Name
+	// RGName, replicatedRGName,
 	ctx := context.Background()
+	err = swapAllPVC(ctx, rClient, RGName, replicatedRGName, suite.reconciler.Log)
+	suite.NoError(err)
+	
+	
+	//create PV - not connected
+	
 	volumeAttributes := map[string]string{
 		"fake-CapacityGB":     "3.00",
 		"RemoteSYMID":         "000000000002",
@@ -509,11 +573,11 @@ func (suite *RGControllerTestSuite) TestPVC() {
 					VolumeAttributes: volumeAttributes,
 				},
 			},
-			StorageClassName: "local-swap-pvc",
+			StorageClassName: suite.driver.StorageClass,
 		},
 		Status: corev1.PersistentVolumeStatus{Phase: corev1.VolumeBound},
 	}
-	err := suite.client.Create(ctx, &localPV)
+	err = suite.client.Create(ctx, &localPV)
 	assert.Nil(suite.T(), err)
 	assert.NotNil(suite.T(), localPV)
 	//create remote PV
@@ -530,13 +594,14 @@ func (suite *RGControllerTestSuite) TestPVC() {
 					VolumeAttributes: volumeAttributes,
 				},
 			},
-			StorageClassName: "remote-swap-pvc",
+			StorageClassName: suite.driver.StorageClass,
 		},
 		Status: corev1.PersistentVolumeStatus{Phase: corev1.VolumeBound},
 	}
 	err = suite.client.Create(ctx, &remotePV)
 	assert.Nil(suite.T(), err)
 	assert.NotNil(suite.T(), remotePV)
+
 	// creating fake PVC with bound state
 	// pvcObj := utils.GetPVCObj("fake-pvc", suite.mockUtils.Specs.Namespace, suite.driver.StorageClass)
 	// scName := "fake-sc-1"
