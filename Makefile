@@ -81,13 +81,13 @@ deploy-controller: manifests
 	make -f image.mk deploy-controller
 
 # Generate CRD manifests
-manifests: tools
+manifests:
 	$(CONTROLLER_GEN) paths="./..." crd output:crd:artifacts:config=config/crd/bases
 
-controller-rbac: tools
+controller-rbac:
 	$(CONTROLLER_GEN) rbac:roleName=manager-role paths="./cmd/replication-controller" paths="./controllers/replication-controller"
 
-sidecar-rbac: tools
+sidecar-rbac:
 	$(CONTROLLER_GEN) rbac:roleName=sidecar-manager-role paths="./controllers/csi-replicator" paths="./cmd/csi-replicator" output:rbac:artifacts:config=config/sidecar-rbac
 
 # Run go fmt against code
@@ -120,7 +120,7 @@ generate: controller-gen kustomize
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt",year=$(shell date "+%Y") paths="./api/..."
 
 # Pre-requisite for the build/run targets
-pre: gen-semver fmt vet tools generate
+pre: gen-semver fmt vet generate
 
 # Build the container image
 image-sidecar: gen-semver
