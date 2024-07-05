@@ -321,30 +321,7 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 }
 
 func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteGroup *repv1.DellCSIReplicationGroup, client connection.RemoteClusterClient, log logr.Logger) error {
-	if strings.Contains(remoteGroup.Status.LastAction.Condition, "UNPLANNED_FAILOVER_LOCAL") {
-		log.V(common.InfoLevel).Info("Detecting unplanned failover")
-	}
-	if group.Annotations[replicationPrefix+"remoteClusterID"]=="self" {
-		log.V(common.InfoLevel).Info("This is a single cluster")
-	}
-	if len(remoteGroup.Status.Conditions) == 0 || remoteGroup.Status.LastAction.Time == nil {
-		log.V(common.InfoLevel).Info("RemoteRG no action")
-	}
 
-	if group.Annotations[replicationPrefix+"remoteClusterID"]=="self" && strings.Contains(remoteGroup.Status.LastAction.Condition, "UNPLANNED_FAILOVER_LOCAL") {
-		log.V(common.InfoLevel).Info("Detecting unplanned failover")
-		if len(remoteGroup.Status.Conditions) != 0 && remoteGroup.Status.LastAction.Time != nil {
-			log.V(common.InfoLevel).Info("Last action not nil for remote rg")
-			if err := r.processFailoverEvent(ctx, group, client, log); err != nil {
-				return err
-			}
-		}
-		
-		// Informing the remoteRG that the last action has been processed.
-		controller.AddAnnotation(remoteGroup, controller.ActionProcessedTime, remoteGroup.Status.LastAction.Time.GoString())
-		r.Update(ctx, remoteGroup)
-	}
-	
 	if len(group.Status.Conditions) == 0 || group.Status.LastAction.Time == nil {
 		log.V(common.InfoLevel).Info("No action to process")
 		return nil
@@ -376,6 +353,14 @@ func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context
 			return err
 		}
 	}
+
+	if strings.Contains(group.Status.LastAction.Condition, "UNPLANNED_FAILOVER_LOCAL") {
+        if group.Annotations[replicationPrefix+"remoteClusterID"] == "self" {
+            if err := r.processFailoverEvent(ctx, remoteGroup, client, log); err != nil {
+                return err
+            }
+        }
+    }
 
 	// Informing the RG that the last action has been processed.
 	controller.AddAnnotation(group, controller.ActionProcessedTime, group.Status.LastAction.Time.GoString())
