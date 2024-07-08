@@ -321,7 +321,6 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 }
 
 func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteGroup *repv1.DellCSIReplicationGroup, client connection.RemoteClusterClient, log logr.Logger) error {
-
 	if len(group.Status.Conditions) == 0 || group.Status.LastAction.Time == nil {
 		log.V(common.InfoLevel).Info("No action to process")
 		return nil
@@ -355,12 +354,10 @@ func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context
 	}
 
 	if strings.Contains(group.Status.LastAction.Condition, "UNPLANNED_FAILOVER_LOCAL") {
-        if group.Annotations[replicationPrefix+"remoteClusterID"] == "self" {
-            if err := r.processFailoverEvent(ctx, remoteGroup, client, log); err != nil {
-                return err
-            }
-        }
-    }
+		if err := r.processFailoverEvent(ctx, remoteGroup, client, log); err != nil {
+			return err
+		}
+	}
 
 	// Informing the RG that the last action has been processed.
 	controller.AddAnnotation(group, controller.ActionProcessedTime, group.Status.LastAction.Time.GoString())
