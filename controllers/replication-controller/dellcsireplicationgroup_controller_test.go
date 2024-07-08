@@ -576,6 +576,7 @@ func (suite *RGControllerTestSuite) TestRemapPVC() {
 	localPV := utils.GetPVObj("local-pv", "vol-handle", suite.driver.DriverName, "sc-1", nil)
 	localPV.Labels = localLabels
 	localPV.Annotations = localAnnotations
+	localPV.Spec.PersistentVolumeReclaimPolicy = controllers.RemoteRetentionValueDelete
 
 	localClaimRef := &corev1.ObjectReference{
 		Kind:            "PersistentVolumeClaim",
@@ -592,6 +593,7 @@ func (suite *RGControllerTestSuite) TestRemapPVC() {
 	remotePV := utils.GetPVObj("remote-pv", "vol-handle", suite.driver.DriverName, "sc-2", nil)
 	localPV.Labels = remoteLabels
 	remotePV.Annotations = remoteAnnotations
+	remotePV.Spec.PersistentVolumeReclaimPolicy = controllers.RemoteRetentionValueDelete
 	err = suite.client.Create(ctx, remotePV)
 	suite.NoError(err)
 
@@ -627,6 +629,52 @@ func (suite *RGControllerTestSuite) TestRemapPVC() {
 	_, err = suite.reconciler.Reconcile(context.Background(), req)
 	suite.NoError(err)
 
+	/*
+			// Retrieve the original local PV
+		    originalLocalPV := &corev1.PersistentVolume{}
+		    err := suite.client.Get(ctx, types.NamespacedName{Name: "local-pv"}, originalLocalPV)
+		    suite.NoError(err)
+
+		    // Retrieve the original remote PV
+		    originalRemotePV := &corev1.PersistentVolume{}
+		    err = suite.client.Get(ctx, types.NamespacedName{Name: "remote-pv"}, originalRemotePV)
+		    suite.NoError(err)
+
+		    // Store the original reclaim policies
+		    originalLocalReclaimPolicy := originalLocalPV.Spec.PersistentVolumeReclaimPolicy
+		    originalRemoteReclaimPolicy := originalRemotePV.Spec.PersistentVolumeReclaimPolicy */
+
 	err = swapAllPVC(ctx, rClient, rgName, replicatedRGName, suite.reconciler.Log)
 	suite.NoError(err)
+
+	/*
+	 // Fetch the updated PVs
+	 updatedLocalPV := &corev1.PersistentVolume{}
+	 updatedRemotePV := &corev1.PersistentVolume{}
+	 err = suite.client.Get(ctx, types.NamespacedName{Name: "local-pv"}, updatedLocalPV)
+	 suite.NoError(err)
+	 err = suite.client.Get(ctx, types.NamespacedName{Name: "remote-pv"}, updatedRemotePV)
+	 suite.NoError(err)
+
+	 // Check if the reclaim policies are unchanged
+	 updatedLocalReclaimPolicy := updatedLocalPV.Spec.PersistentVolumeReclaimPolicy
+	 updatedRemoteReclaimPolicy := updatedRemotePV.Spec.PersistentVolumeReclaimPolicy
+
+	 assert.Equal(suite.T(), originalLocalReclaimPolicy, updatedLocalReclaimPolicy, "Local PV reclaim policy should remain unchanged after swapAllPVC")
+	 assert.Equal(suite.T(), originalRemoteReclaimPolicy, updatedRemoteReclaimPolicy, "Remote PV reclaim policy should remain unchanged after swapAllPVC") */
+
+	// Fetch the updated local PV
+	updatedLocalPV := &corev1.PersistentVolume{}
+	err = suite.client.Get(ctx, types.NamespacedName{Name: "local-pv"}, updatedLocalPV)
+	suite.NoError(err)
+
+	// Fetch the updated remote PV
+	updatedRemotePV := &corev1.PersistentVolume{}
+	err = suite.client.Get(ctx, types.NamespacedName{Name: "remote-pv"}, updatedRemotePV)
+	suite.NoError(err)
+
+	// Check that the reclaim policies are both set to "Delete" after swapAllPVC
+	assert.Equal(suite.T(), controllers.RemoteRetentionValueDelete, string(updatedLocalPV.Spec.PersistentVolumeReclaimPolicy), "Local PV reclaim policy should be 'Delete' after swapAllPVC")
+	assert.Equal(suite.T(), controllers.RemoteRetentionValueDelete, string(updatedRemotePV.Spec.PersistentVolumeReclaimPolicy), "Remote PV reclaim policy should be 'Delete' after swapAllPVC")
+
 }
