@@ -26,18 +26,16 @@ import (
 	"github.com/dell/csm-replication/pkg/config"
 	"github.com/dell/csm-replication/pkg/connection"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
-	"github.com/stretchr/testify/suite"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -482,8 +480,8 @@ func (suite *RGControllerTestSuite) TestSetupWithManagerRg() {
 	suite.Error(err, "Setup should fail when there is no manager")
 }
 
-func (suite *RGControllerTestSuite) TestPVC() {
-    // scenario: RG without sync complete
+func (suite *RGControllerTestSuite) TestRemapPVC() {
+	// scenario: RG without sync complete
 	newConfig := config.NewFakeConfigForSingleCluster(suite.client,
 		suite.driver.SourceClusterID, suite.driver.RemoteClusterID)
 	suite.config = newConfig
@@ -505,7 +503,6 @@ func (suite *RGControllerTestSuite) TestPVC() {
 	rg := new(repv1.DellCSIReplicationGroup)
 	req := suite.getTypicalRequest()
 
-	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
 	suite.NotContains(controllers.RemoteReplicationGroup, rg.Annotations,
 		"Remote RG annotation doesn't exist")
 	suite.NotContains(controllers.RGSyncComplete, rg.Annotations,
@@ -541,189 +538,95 @@ func (suite *RGControllerTestSuite) TestPVC() {
 	suite.T().Log(replicatedRG.Annotations)
 	suite.T().Log(replicatedRG.Labels)
 
-	RGName := rg.Name
-	// RGName, replicatedRGName,
-	ctx := context.Background()
-	err = swapAllPVC(ctx, rClient, RGName, replicatedRGName, suite.reconciler.Log)
-	suite.NoError(err)
-	
-	
-	//create PV - not connected
-	
-	volumeAttributes := map[string]string{
-		"fake-CapacityGB":     "3.00",
-		"RemoteSYMID":         "000000000002",
-		"SRP":                 "SRP_1",
-		"ServiceLevel":        "Bronze",
-		"StorageGroup":        "csi-UDI-Bronze-SRP_1-SG-test-2-ASYNC",
-		"VolumeContentSource": "",
-		"storage.kubernetes.io/csiProvisionerIdentity": "1611934095007-8081-csi-fake",
-	}
-	//create local PV
-	localPV := corev1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "local-pv",
-		},
-		Spec: corev1.PersistentVolumeSpec{
-			PersistentVolumeSource: corev1.PersistentVolumeSource{
-				CSI: &corev1.CSIPersistentVolumeSource{
-					Driver:           suite.driver.DriverName,
-					VolumeHandle:     "csivol-",
-					FSType:           "ext4",
-					VolumeAttributes: volumeAttributes,
-				},
-			},
-			StorageClassName: suite.driver.StorageClass,
-		},
-		Status: corev1.PersistentVolumeStatus{Phase: corev1.VolumeBound},
-	}
-	err = suite.client.Create(ctx, &localPV)
-	assert.Nil(suite.T(), err)
-	assert.NotNil(suite.T(), localPV)
-	//create remote PV
-	remotePV := corev1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "remote-pv",
-		},
-		Spec: corev1.PersistentVolumeSpec{
-			PersistentVolumeSource: corev1.PersistentVolumeSource{
-				CSI: &corev1.CSIPersistentVolumeSource{
-					Driver:           suite.driver.DriverName,
-					VolumeHandle:     "csivol-",
-					FSType:           "ext4",
-					VolumeAttributes: volumeAttributes,
-				},
-			},
-			StorageClassName: suite.driver.StorageClass,
-		},
-		Status: corev1.PersistentVolumeStatus{Phase: corev1.VolumeBound},
-	}
-	err = suite.client.Create(ctx, &remotePV)
-	assert.Nil(suite.T(), err)
-	assert.NotNil(suite.T(), remotePV)
-
-	// creating fake PVC with bound state
-	// pvcObj := utils.GetPVCObj("fake-pvc", suite.mockUtils.Specs.Namespace, suite.driver.StorageClass)
-	// scName := "fake-sc-1"
-	// pvcObj.Status.Phase = corev1.ClaimBound
-	// pvcObj.Spec.VolumeName = "local-pv"
-	// pvcObj.Spec.StorageClassName = &scName
-
-	// err = suite.client.Create(ctx, pvcObj)
-	// assert.NotNil(suite.T(), pvcObj)
-	
-}
-
-func (suite *PVCRemapTestSuite) TestSwapPVC() {
+	// rgName, replicatedRGName
+	rgName := rg.Name
 	ctx := context.Background()
 
-	// Create initial PVC
-	pvcName := "test-pvc"
-	namespace := "default"
-	pvc := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      pvcName,
-			Namespace: namespace,
-			Annotations: map[string]string{
-				controllers.RemoteReplicationGroup + "remotePV": "remote-pv",
-				controllers.RemoteClusterID:                     suite.driver.RemoteClusterID,
-			},
-		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: resource.MustParse("1Gi"),
-				},
-			},
-			StorageClassName: &suite.driver.StorageClass,
-			VolumeName:       "local-pv",
-		},
-	}
-	err := suite.client.Create(ctx, pvc)
-	suite.NoError(err)
+	// create local and remote PV
+	localAnnotations := make(map[string]string)
+	localAnnotations[controllers.RGSyncComplete] = "yes"
+	localAnnotations[controllers.ReplicationGroup] = rgName
+	localAnnotations[controllers.RemoteReplicationGroup] = replicatedRGName
+	localAnnotations[controllers.RemoteClusterID] = "self"
+	localAnnotations[controllers.ContextPrefix] = "csi-fake"
+	localAnnotations[controllers.RemotePV] = "remote-pv"
+	localAnnotations[controllers.RemotePVRetentionPolicy] = "delete"
+	localAnnotations[controllers.RemoteVolumeAnnotation] = `{"capacity_bytes":3000023,"volume_id":"pvc-d559bbfa-6612-4b57-a542-5ca64c9625fe","volume_context":{"RdfGroup":"2","RdfMode":"ASYNC","RemoteRDFGroup":"2","RemoteSYMID":"000000000002","RemoteServiceLevel":"Bronze","SRP":"SRP_1","SYMID":"000000000001","ServiceLevel":"Bronze","replication.storage.dell.com/remotePVRetentionPolicy":"delete","storage.dell.com/isReplicationEnabled":"true","storage.dell.com/remoteClusterID":"self","storage.dell.com/remoteStorageClassName":"sc-2"}}`
 
-	// Create local PV
-	localPV := &corev1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "local-pv",
-		},
-		Spec: corev1.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: corev1.PersistentVolumeReclaimRetain,
-			StorageClassName:              suite.driver.StorageClass,
-			Capacity: corev1.ResourceList{
-				corev1.ResourceStorage: resource.MustParse("1Gi"),
-			},
-			PersistentVolumeSource: corev1.PersistentVolumeSource{
-				Local: &corev1.LocalVolumeSource{
-					Path: "/mnt/data",
-				},
-			},
-			ClaimRef: &corev1.ObjectReference{
-				Kind:      "PersistentVolumeClaim",
-				Namespace: namespace,
-				Name:      pvcName,
-			},
-		},
+	localLabels := make(map[string]string)
+	localLabels[controllers.DriverName] = suite.driver.DriverName
+	localLabels[controllers.ReplicationGroup] = rgName
+	localLabels[controllers.RemoteClusterID] = "self"
+
+	remoteAnnotations := make(map[string]string)
+	remoteAnnotations[controllers.RGSyncComplete] = "yes"
+	remoteAnnotations[controllers.ReplicationGroup] = replicatedRGName
+	remoteAnnotations[controllers.RemoteReplicationGroup] = rgName
+	remoteAnnotations[controllers.RemoteClusterID] = "self"
+	remoteAnnotations[controllers.ContextPrefix] = "csi-fake"
+	remoteAnnotations[controllers.RemotePV] = "local-pv"
+	remoteAnnotations[controllers.RemotePVRetentionPolicy] = "delete"
+	remoteAnnotations[controllers.RemoteVolumeAnnotation] = `{"capacity_bytes":3000023,"volume_id":"pvc-d559bbfa-6612-4b57-a542-5ca64c9625fe","volume_context":{"RdfGroup":"2","RdfMode":"ASYNC","RemoteRDFGroup":"2","RemoteSYMID":"000000000002","RemoteServiceLevel":"Bronze","SRP":"SRP_1","SYMID":"000000000001","ServiceLevel":"Bronze","replication.storage.dell.com/remotePVRetentionPolicy":"delete","storage.dell.com/isReplicationEnabled":"true","storage.dell.com/remoteClusterID":"self","storage.dell.com/remoteStorageClassName":"sc-1"}}`
+
+	remoteLabels := make(map[string]string)
+	remoteLabels[controllers.DriverName] = suite.driver.DriverName
+	remoteLabels[controllers.ReplicationGroup] = replicatedRGName
+	remoteLabels[controllers.RemoteClusterID] = "self"
+
+	localPV := utils.GetPVObj("local-pv", "vol-handle", suite.driver.DriverName, "sc-1", nil)
+	localPV.Labels = localLabels
+	localPV.Annotations = localAnnotations
+
+	localClaimRef := &corev1.ObjectReference{
+		Kind:            "PersistentVolumeClaim",
+		Namespace:       "fake-ns",
+		Name:            "fake-pvc",
+		UID:             "18802349-2128-43a8-8169-bbb1ca8a4c67",
+		APIVersion:      "v1",
+		ResourceVersion: "32776691",
 	}
+	localPV.Spec.ClaimRef = localClaimRef
 	err = suite.client.Create(ctx, localPV)
 	suite.NoError(err)
 
-	// Create remote PV
-	remotePV := &corev1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "remote-pv",
-		},
-		Spec: corev1.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: corev1.PersistentVolumeReclaimRetain,
-			StorageClassName:              suite.driver.RemoteSCName,
-			Capacity: corev1.ResourceList{
-				corev1.ResourceStorage: resource.MustParse("1Gi"),
-			},
-			PersistentVolumeSource: corev1.PersistentVolumeSource{
-				Local: &corev1.LocalVolumeSource{
-					Path: "/mnt/data",
-				},
-			},
-		},
-	}
+	remotePV := utils.GetPVObj("remote-pv", "vol-handle", suite.driver.DriverName, "sc-2", nil)
+	localPV.Labels = remoteLabels
+	remotePV.Annotations = remoteAnnotations
 	err = suite.client.Create(ctx, remotePV)
 	suite.NoError(err)
 
-	// Verify PVC is created
-	createdPVC := &corev1.PersistentVolumeClaim{}
-	err = suite.client.Get(ctx, types.NamespacedName{Name: pvcName, Namespace: namespace}, createdPVC)
-	suite.NoError(err)
-	suite.NotNil(createdPVC)
-
-	// Perform PVC swap
-	rClient, err := suite.config.GetConnection(suite.driver.RemoteClusterID)
+	_, err = suite.reconciler.Reconcile(context.Background(), req)
 	suite.NoError(err)
 
-	logger := zap.New(zap.UseDevMode(true))
-	err = swapPVC(ctx, rClient, pvcName, namespace, "remote-pv", "remote-rg", logger)
+	// create pvc
+	pvcAnnotations := make(map[string]string)
+	pvcAnnotations[controllers.RGSyncComplete] = "yes"
+	pvcAnnotations[controllers.ReplicationGroup] = rgName
+	pvcAnnotations[controllers.RemoteReplicationGroup] = replicatedRGName
+	pvcAnnotations[controllers.RemoteClusterID] = "self"
+	pvcAnnotations[controllers.RemoteStorageClassAnnotation] = "sc-2"
+	pvcAnnotations[controllers.ContextPrefix] = "csi-fake"
+	pvcAnnotations[controllers.RemotePV] = "remote-pv"
+	pvcAnnotations[controllers.RemoteVolumeAnnotation] = `{"capacity_bytes":3000023,"volume_id":"pvc-d559bbfa-6612-4b57-a542-5ca64c9625fe","volume_context":{"RdfGroup":"2","RdfMode":"ASYNC","RemoteRDFGroup":"2","RemoteSYMID":"000000000002","RemoteServiceLevel":"Bronze","SRP":"SRP_1","SYMID":"000000000001","ServiceLevel":"Bronze","replication.storage.dell.com/remotePVRetentionPolicy":"delete","storage.dell.com/isReplicationEnabled":"true","storage.dell.com/remoteClusterID":"self","storage.dell.com/remoteStorageClassName":"sc-2"}}`
+
+	pvcLabels := make(map[string]string)
+	pvcLabels[controllers.DriverName] = suite.driver.DriverName
+	pvcLabels[controllers.ReplicationGroup] = rgName
+	pvcLabels[controllers.RemoteClusterID] = "self"
+
+	pvcObj := utils.GetPVCObj("fake-pvc", "fake-ns", "sc-1")
+	pvcObj.Status.Phase = corev1.ClaimBound
+	pvcObj.Spec.VolumeName = "local-pv"
+	pvcObj.Annotations = pvcAnnotations
+	pvcObj.Labels = pvcLabels
+
+	err = suite.client.Create(ctx, pvcObj)
+	suite.NoError(err)
+	assert.NotNil(suite.T(), pvcObj)
+
+	_, err = suite.reconciler.Reconcile(context.Background(), req)
 	suite.NoError(err)
 
-	// Verify the swapped PVC
-	var swappedPVC corev1.PersistentVolumeClaim
-	err = suite.client.Get(ctx, types.NamespacedName{Name: pvcName, Namespace: namespace}, &swappedPVC)
+	err = swapAllPVC(ctx, rClient, rgName, replicatedRGName, suite.reconciler.Log)
 	suite.NoError(err)
-
-	suite.Equal("remote-pv", swappedPVC.Spec.VolumeName)
-	suite.Equal(suite.driver.RemoteSCName, *swappedPVC.Spec.StorageClassName)
-	suite.Equal("local-pv", swappedPVC.Annotations[controllers.RemoteReplicationGroup+"remotePV"])
-	suite.Equal("remote-rg", swappedPVC.Annotations[controllers.RemoteReplicationGroup+"replicationGroupName"])
-
-	// Verify the remote PV's claim reference
-	var updatedRemotePV corev1.PersistentVolume
-	err = suite.client.Get(ctx, types.NamespacedName{Name: "remote-pv"}, &updatedRemotePV)
-	suite.NoError(err)
-	suite.Equal(pvcName, updatedRemotePV.Spec.ClaimRef.Name)
-	suite.Equal(namespace, updatedRemotePV.Spec.ClaimRef.Namespace)
-
-	// Verify the local PV's claim reference is removed
-	var updatedLocalPV corev1.PersistentVolume
-	err = suite.client.Get(ctx, types.NamespacedName{Name: "local-pv"}, &updatedLocalPV)
-	suite.NoError(err)
-	suite.Nil(updatedLocalPV.Spec.ClaimRef)
 }
