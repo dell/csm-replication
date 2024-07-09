@@ -629,6 +629,36 @@ func (suite *RGControllerTestSuite) TestRemapPVC() {
 	_, err = suite.reconciler.Reconcile(context.Background(), req)
 	suite.NoError(err)
 
+	time := metav1.Now()
+	lastAction := repv1.LastAction{
+		Time:      &time,
+		Condition: "Action FAILOVER_REMOTE succeeded",
+	}
+	rg.Status = repv1.DellCSIReplicationGroupStatus{
+		LastAction: lastAction,
+		Conditions: []repv1.LastAction{lastAction},
+	}
+	rg.Annotations[controllers.ActionProcessedTime] = time.String()
+
+	err = suite.client.Update(context.Background(), rg)
+	suite.NoError(err)
+
+	// Reconcile to trigger processFailoverAction
+	resp, err = suite.reconciler.Reconcile(context.Background(), req)
+	suite.NoError(err)
+	suite.Equal(false, resp.Requeue)
+
+	// Verify that the FAILOVER action was processed
+	updatedRG := new(repv1.DellCSIReplicationGroup)
+	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
+	suite.NoError(err)
+	processedTime, ok := updatedRG.Annotations[controllers.ActionProcessedTime]
+    if !ok {
+        suite.FailNow("ActionProcessedTime annotation is missing")
+    }
+	// suite.Equal(time.String(), rg.Annotations[controllers.ActionProcessedTime], "Action should be marked as processed")
+	suite.Equal(time.String(), processedTime, "Action should be marked as processed with the correct time")
+
 	/*
 			// Retrieve the original local PV
 		    originalLocalPV := &corev1.PersistentVolume{}
