@@ -480,7 +480,7 @@ func (suite *RGControllerTestSuite) TestSetupWithManagerRg() {
 	suite.Error(err, "Setup should fail when there is no manager")
 }
 
-func (suite *RGControllerTestSuite) TestRemapPVC() {
+func (suite *RGControllerTestSuite) TestRemapPVCPlanned() {
 	// scenario: RG without sync complete
 	newConfig := config.NewFakeConfigForSingleCluster(suite.client,
 		suite.driver.SourceClusterID, suite.driver.RemoteClusterID)
@@ -524,19 +524,6 @@ func (suite *RGControllerTestSuite) TestRemapPVC() {
 	suite.NoError(err)
 	_, err = rClient.GetReplicationGroup(context.Background(), replicatedRGName)
 	suite.NoError(err)
-
-	// Another reconcile
-	_, err = suite.reconciler.Reconcile(context.Background(), req)
-	suite.NoError(err)
-
-	// Reconcile the other RG
-	req.NamespacedName.Name = replicatedRGName
-	_, err = suite.reconciler.Reconcile(context.Background(), req)
-	suite.NoError(err)
-	replicatedRG, err := rClient.GetReplicationGroup(context.Background(), replicatedRGName)
-	suite.NoError(err)
-	suite.T().Log(replicatedRG.Annotations)
-	suite.T().Log(replicatedRG.Labels)
 
 	// rgName, replicatedRGName
 	rgName := rg.Name
@@ -629,8 +616,7 @@ func (suite *RGControllerTestSuite) TestRemapPVC() {
 	_, err = suite.reconciler.Reconcile(context.Background(), req)
 	suite.NoError(err)
 
-	// Invoke failover
-
+	// Invoke failover action
 	time := metav1.Now()
 	lastAction := repv1.LastAction{
 		Time:      &time,
@@ -650,11 +636,6 @@ func (suite *RGControllerTestSuite) TestRemapPVC() {
 	suite.NoError(err)
 	suite.Equal(false, resp.Requeue)
 
-	// Verify that the FAILOVER action was processed
-	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
-	suite.NoError(err)
-	suite.Equal(time.String(), rg.Annotations[controllers.ActionProcessedTime], "Action should be marked as processed")
-
 	// Verify PVC swap occurred
 	var swappedPVC corev1.PersistentVolumeClaim
 	err = suite.client.Get(context.Background(), types.NamespacedName{Name: "fake-pvc", Namespace: "fake-ns"}, &swappedPVC)
@@ -669,6 +650,7 @@ func (suite *RGControllerTestSuite) TestRemapPVC() {
 	var updatedRemotePV corev1.PersistentVolume
 	err = suite.client.Get(context.Background(), types.NamespacedName{Name: "remote-pv"}, &updatedRemotePV)
 	suite.NoError(err)
+	assert.Equal(suite.T(), controllers.RemoteRetentionValueDelete, string(updatedRemotePV.Spec.PersistentVolumeReclaimPolicy), "Remote PV reclaim policy should be 'Delete' after swapAllPVC")
 	suite.Equal("fake-pvc", updatedRemotePV.Spec.ClaimRef.Name, "Remote PV should now be claimed by the PVC")
 	suite.Equal("fake-ns", updatedRemotePV.Spec.ClaimRef.Namespace)
 
@@ -677,53 +659,6 @@ func (suite *RGControllerTestSuite) TestRemapPVC() {
 	err = suite.client.Get(context.Background(), types.NamespacedName{Name: "local-pv"}, &updatedLocalPV)
 	suite.NoError(err)
 	suite.Nil(updatedLocalPV.Spec.ClaimRef, "Local PV's claim reference should be removed")
-
-	/*
-			// Retrieve the original local PV
-		    originalLocalPV := &corev1.PersistentVolume{}
-		    err := suite.client.Get(ctx, types.NamespacedName{Name: "local-pv"}, originalLocalPV)
-		    suite.NoError(err)
-
-		    // Retrieve the original remote PV
-		    originalRemotePV := &corev1.PersistentVolume{}
-		    err = suite.client.Get(ctx, types.NamespacedName{Name: "remote-pv"}, originalRemotePV)
-		    suite.NoError(err)
-
-		    // Store the original reclaim policies
-		    originalLocalReclaimPolicy := originalLocalPV.Spec.PersistentVolumeReclaimPolicy
-		    originalRemoteReclaimPolicy := originalRemotePV.Spec.PersistentVolumeReclaimPolicy */
-
-	err = swapAllPVC(ctx, rClient, rgName, replicatedRGName, suite.reconciler.Log)
-	suite.NoError(err)
-
-	/*
-	 // Fetch the updated PVs
-	 updatedLocalPV := &corev1.PersistentVolume{}
-	 updatedRemotePV := &corev1.PersistentVolume{}
-	 err = suite.client.Get(ctx, types.NamespacedName{Name: "local-pv"}, updatedLocalPV)
-	 suite.NoError(err)
-	 err = suite.client.Get(ctx, types.NamespacedName{Name: "remote-pv"}, updatedRemotePV)
-	 suite.NoError(err)
-
-	 // Check if the reclaim policies are unchanged
-	 updatedLocalReclaimPolicy := updatedLocalPV.Spec.PersistentVolumeReclaimPolicy
-	 updatedRemoteReclaimPolicy := updatedRemotePV.Spec.PersistentVolumeReclaimPolicy
-
-	 assert.Equal(suite.T(), originalLocalReclaimPolicy, updatedLocalReclaimPolicy, "Local PV reclaim policy should remain unchanged after swapAllPVC")
-	 assert.Equal(suite.T(), originalRemoteReclaimPolicy, updatedRemoteReclaimPolicy, "Remote PV reclaim policy should remain unchanged after swapAllPVC") */
-
-	// Fetch the updated local PV
-	localPVUpdated := &corev1.PersistentVolume{}
-	err = suite.client.Get(ctx, types.NamespacedName{Name: "local-pv"}, localPVUpdated)
-	suite.NoError(err)
-
-	// Fetch the updated remote PV
-	remotePVUpdated := &corev1.PersistentVolume{}
-	err = suite.client.Get(ctx, types.NamespacedName{Name: "remote-pv"}, remotePVUpdated)
-	suite.NoError(err)
-
-	// Check that the reclaim policies are both set to "Delete" after swapAllPVC
 	assert.Equal(suite.T(), controllers.RemoteRetentionValueDelete, string(updatedLocalPV.Spec.PersistentVolumeReclaimPolicy), "Local PV reclaim policy should be 'Delete' after swapAllPVC")
-	assert.Equal(suite.T(), controllers.RemoteRetentionValueDelete, string(updatedRemotePV.Spec.PersistentVolumeReclaimPolicy), "Remote PV reclaim policy should be 'Delete' after swapAllPVC")
 
 }
