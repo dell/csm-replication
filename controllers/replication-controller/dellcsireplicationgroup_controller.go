@@ -783,12 +783,12 @@ func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 	done := false
 	for iterations := 0; !done; iterations++ {
 		time.Sleep(2 * time.Second)
-		err = client.UpdatePersistentVolume(ctx, pv)
+		/*err = client.UpdatePersistentVolume(ctx, pv)
 		pv, err := client.GetPersistentVolume(ctx, pvName)
 		if err != nil {
 			log.V(common.InfoLevel).Info(fmt.Sprintf("Error retrieving PV %s: %s", pvName, err.Error()))
 			return err
-		}
+		}*/
 		err = client.UpdatePersistentVolume(ctx, pv)
 		if err == nil {
 			done = true
@@ -826,16 +826,16 @@ func updatePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 	done := false
 	for iterations := 0; !done; iterations++ {
 		time.Sleep(2 * time.Second)
-		pv, err := client.GetPersistentVolume(ctx, pvName)
+		/*pv, err := client.GetPersistentVolume(ctx, pvName)
 		if err != nil {
 			log.V(common.InfoLevel).Info(fmt.Sprintf("Error retrieving PV %s: %s", pvName, err.Error()))
 			return err
-		}
+		}*/
 		err = client.UpdatePersistentVolume(ctx, pv)
 		if err == nil {
 			done = true
 		} else if iterations > 20 {
-			err := fmt.Errorf("Timed out waiting on PV VolumeReclaimPolicy to be set to Retain")
+			err := fmt.Errorf("Timed out updating the claim ref.")
 			return err
 		}
 	}
