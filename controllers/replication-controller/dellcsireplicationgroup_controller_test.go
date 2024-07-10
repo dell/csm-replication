@@ -480,7 +480,7 @@ func (suite *RGControllerTestSuite) TestSetupWithManagerRg() {
 	suite.Error(err, "Setup should fail when there is no manager")
 }
 
-func (suite *RGControllerTestSuite) setUpPVCRemap() (*repv1.DellCSIReplicationGroup, *repv1.DellCSIReplicationGroup, *corev1.PersistentVolume, *corev1.PersistentVolume, *corev1.PersistentVolumeClaim) {
+func (suite *RGControllerTestSuite) getPVCRemapSetup() (*repv1.DellCSIReplicationGroup, *repv1.DellCSIReplicationGroup, *corev1.PersistentVolume, *corev1.PersistentVolume, *corev1.PersistentVolumeClaim) {
 	// scenario: RG without sync complete
 	newConfig := config.NewFakeConfigForSingleCluster(suite.client,
 		suite.driver.SourceClusterID, suite.driver.RemoteClusterID)
@@ -619,8 +619,8 @@ func (suite *RGControllerTestSuite) setUpPVCRemap() (*repv1.DellCSIReplicationGr
 	return rg, replicatedRG, localPV, remotePV, pvcObj
 }
 
-func (suite *RGControllerTestSuite) TestRemapPVCPlanned() {
-	rg, replicatedRG, _, _, _ := suite.setUpPVCRemap()
+func (suite *RGControllerTestSuite) TestPVCRemapPlanned() {
+	rg, replicatedRG, _, _, _ := suite.getPVCRemapSetup()
 	replicatedRGName := replicatedRG.Name
 
 	// Invoke failover action
@@ -668,11 +668,65 @@ func (suite *RGControllerTestSuite) TestRemapPVCPlanned() {
 	suite.NoError(err)
 	suite.Nil(updatedLocalPV.Spec.ClaimRef, "Local PV's claim reference should be removed")
 	assert.Equal(suite.T(), controllers.RemoteRetentionValueDelete, string(updatedLocalPV.Spec.PersistentVolumeReclaimPolicy), "Local PV reclaim policy should be 'Delete' after swapAllPVC")
-
 }
 
-func (suite *RGControllerTestSuite) TestRemapPVCPlannedWithDisabledRemap() {
-	rg, _, _, _, _ := suite.setUpPVCRemap()
+func (suite *RGControllerTestSuite) TestPVCRemapUnplanned() {
+	_, replicatedRG, _, _, _ := suite.getPVCRemapSetup()
+	replicatedRGName := replicatedRG.Name
+
+	// Invoke failover action
+	time := metav1.Now()
+	lastAction := repv1.LastAction{
+		Time:      &time,
+		Condition: "Action UNPLANNED_FAILOVER_LOCAL succeeded",
+	}
+	replicatedRG.Status = repv1.DellCSIReplicationGroupStatus{
+		LastAction: lastAction,
+		Conditions: []repv1.LastAction{lastAction},
+	}
+	replicatedRG.Annotations[controllers.ActionProcessedTime] = time.String()
+	replicatedRG.Annotations[controllers.RGSyncComplete] = "yes"
+	replicatedRG.Finalizers = append(replicatedRG.Finalizers, controllers.RGFinalizer)
+	err := suite.client.Update(context.Background(), replicatedRG)
+	suite.NoError(err)
+
+	rgReq := reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Name: replicatedRGName,
+		},
+	}
+	resp, err := suite.reconciler.Reconcile(context.Background(), rgReq)
+	suite.NoError(err)
+	suite.Equal(false, resp.Requeue)
+
+	// Verify PVC swap occurred
+	var swappedPVC corev1.PersistentVolumeClaim
+	err = suite.client.Get(context.Background(), types.NamespacedName{Name: "fake-pvc", Namespace: "fake-ns"}, &swappedPVC)
+	suite.NoError(err)
+
+	suite.Equal("remote-pv", swappedPVC.Spec.VolumeName, "PVC should now be bound to the remote PV")
+	suite.Equal("sc-2", *swappedPVC.Spec.StorageClassName, "PVC should now use the remote storage class")
+	suite.Equal("local-pv", swappedPVC.Annotations[controllers.RemotePV], "Remote PV annotation should be updated")
+	suite.Equal(replicatedRGName, swappedPVC.Annotations[controllers.ReplicationGroup], "Replication group annotation should be updated")
+
+	// Verify remote PV's claim reference
+	var updatedRemotePV corev1.PersistentVolume
+	err = suite.client.Get(context.Background(), types.NamespacedName{Name: "remote-pv"}, &updatedRemotePV)
+	suite.NoError(err)
+	assert.Equal(suite.T(), controllers.RemoteRetentionValueDelete, string(updatedRemotePV.Spec.PersistentVolumeReclaimPolicy), "Remote PV reclaim policy should be 'Delete' after swapAllPVC")
+	suite.Equal("fake-pvc", updatedRemotePV.Spec.ClaimRef.Name, "Remote PV should now be claimed by the PVC")
+	suite.Equal("fake-ns", updatedRemotePV.Spec.ClaimRef.Namespace)
+
+	// Verify local PV's claim reference is removed
+	var updatedLocalPV corev1.PersistentVolume
+	err = suite.client.Get(context.Background(), types.NamespacedName{Name: "local-pv"}, &updatedLocalPV)
+	suite.NoError(err)
+	suite.Nil(updatedLocalPV.Spec.ClaimRef, "Local PV's claim reference should be removed")
+	assert.Equal(suite.T(), controllers.RemoteRetentionValueDelete, string(updatedLocalPV.Spec.PersistentVolumeReclaimPolicy), "Local PV reclaim policy should be 'Delete' after swapAllPVC")
+}
+
+func (suite *RGControllerTestSuite) TestPVCRemapDisabled() {
+	rg, _, _, _, _ := suite.getPVCRemapSetup()
 	rgName := rg.Name
 	suite.reconciler.DisablePVCRemap = true // Disable PVC remapping
 
@@ -722,8 +776,8 @@ func (suite *RGControllerTestSuite) TestRemapPVCPlannedWithDisabledRemap() {
 	suite.Nil(unchangedRemotePV.Spec.ClaimRef, "Remote PV's claim reference should remain nil")
 }
 
-func (suite *RGControllerTestSuite) TestRemapPVCPlannedWithMismatchedTarget() {
-	rg, _, localPV, remotePV, pvcObj := suite.setUpPVCRemap()
+func (suite *RGControllerTestSuite) TestPVCRemapWithMismatchedRemotePV() {
+	rg, _, localPV, remotePV, pvcObj := suite.getPVCRemapSetup()
 	rgName := rg.Name
 	ctx := context.Background()
 	// Modify the remotePV annotation to create a mismatch
@@ -778,60 +832,4 @@ func (suite *RGControllerTestSuite) TestRemapPVCPlannedWithMismatchedTarget() {
 	err = suite.client.Get(context.Background(), types.NamespacedName{Name: remotePV.Name}, &unchangedRemotePV)
 	suite.NoError(err)
 	suite.Nil(unchangedRemotePV.Spec.ClaimRef, "Remote PV's claim reference should remain nil")
-}
-
-func (suite *RGControllerTestSuite) TestRemapPVCUnplanned() {
-    _, replicatedRG, _, _, _ := suite.setUpPVCRemap()
-	replicatedRGName := replicatedRG.Name
- 
-    // Invoke failover action
-    time := metav1.Now()
-    lastAction := repv1.LastAction{
-        Time:      &time,
-        Condition: "Action UNPLANNED_FAILOVER_LOCAL succeeded",
-    }
-    replicatedRG.Status = repv1.DellCSIReplicationGroupStatus{
-        LastAction: lastAction,
-        Conditions: []repv1.LastAction{lastAction},
-    }
-    replicatedRG.Annotations[controllers.ActionProcessedTime] = time.String()
-    replicatedRG.Annotations[controllers.RGSyncComplete] = "yes"
-    replicatedRG.Finalizers = append(replicatedRG.Finalizers, controllers.RGFinalizer)
-    err := suite.client.Update(context.Background(), replicatedRG)
-    suite.NoError(err)
- 
-    rgReq := reconcile.Request{
-        NamespacedName: types.NamespacedName{
-            Name: replicatedRGName,
-        },
-    }
-    resp, err := suite.reconciler.Reconcile(context.Background(), rgReq)
-    suite.NoError(err)
-    suite.Equal(false, resp.Requeue)
- 
-    // Verify PVC swap occurred
-    var swappedPVC corev1.PersistentVolumeClaim
-    err = suite.client.Get(context.Background(), types.NamespacedName{Name: "fake-pvc", Namespace: "fake-ns"}, &swappedPVC)
-    suite.NoError(err)
- 
-    suite.Equal("remote-pv", swappedPVC.Spec.VolumeName, "PVC should now be bound to the remote PV")
-    suite.Equal("sc-2", *swappedPVC.Spec.StorageClassName, "PVC should now use the remote storage class")
-    suite.Equal("local-pv", swappedPVC.Annotations[controllers.RemotePV], "Remote PV annotation should be updated")
-    suite.Equal(replicatedRGName, swappedPVC.Annotations[controllers.ReplicationGroup], "Replication group annotation should be updated")
- 
-    // Verify remote PV's claim reference
-    var updatedRemotePV corev1.PersistentVolume
-    err = suite.client.Get(context.Background(), types.NamespacedName{Name: "remote-pv"}, &updatedRemotePV)
-    suite.NoError(err)
-    assert.Equal(suite.T(), controllers.RemoteRetentionValueDelete, string(updatedRemotePV.Spec.PersistentVolumeReclaimPolicy), "Remote PV reclaim policy should be 'Delete' after swapAllPVC")
-    suite.Equal("fake-pvc", updatedRemotePV.Spec.ClaimRef.Name, "Remote PV should now be claimed by the PVC")
-    suite.Equal("fake-ns", updatedRemotePV.Spec.ClaimRef.Namespace)
- 
-    // Verify local PV's claim reference is removed
-    var updatedLocalPV corev1.PersistentVolume
-    err = suite.client.Get(context.Background(), types.NamespacedName{Name: "local-pv"}, &updatedLocalPV)
-    suite.NoError(err)
-    suite.Nil(updatedLocalPV.Spec.ClaimRef, "Local PV's claim reference should be removed")
-    assert.Equal(suite.T(), controllers.RemoteRetentionValueDelete, string(updatedLocalPV.Spec.PersistentVolumeReclaimPolicy), "Local PV reclaim policy should be 'Delete' after swapAllPVC")
- 
 }
