@@ -776,19 +776,18 @@ func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 		log.V(common.InfoLevel).Info(fmt.Sprintf("Error retrieving PV %s: %s", pvName, err.Error()))
 		return err
 	}
-	if pv.Spec.ClaimRef != nil {
-		log.V(common.InfoLevel).Info(fmt.Sprintf("finding claimref under pvc: %s", pv.Spec.ClaimRef.Name))
-	}
-	pv.Spec.ClaimRef = nil
 	done := false
 	for iterations := 0; !done; iterations++ {
 		time.Sleep(2 * time.Second)
-		err = client.UpdatePersistentVolume(ctx, pv)
 		pv, err := client.GetPersistentVolume(ctx, pvName)
 		if err != nil {
 			log.V(common.InfoLevel).Info(fmt.Sprintf("Error retrieving PV %s: %s", pvName, err.Error()))
 			return err
 		}
+		if pv.Spec.ClaimRef != nil {
+			log.V(common.InfoLevel).Info(fmt.Sprintf("finding claimref under pvc: %s", pv.Spec.ClaimRef.Name))
+		}
+		pv.Spec.ClaimRef = nil
 		err = client.UpdatePersistentVolume(ctx, pv)
 		if err == nil {
 			done = true
@@ -807,22 +806,12 @@ func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 	return err
 }
 
-// updatePVClaimRef updates the PV's ClaimRef.Uid to the specified value
 func updatePVClaimRef(ctx context.Context, client connection.RemoteClusterClient, pvName, pvcNamespace, pvcResourceVersion, pvcName string, pvcUID types.UID, log logr.Logger) error {
-	pv, err := client.GetPersistentVolume(ctx, pvName)
+	_, err := client.GetPersistentVolume(ctx, pvName)
 	if err != nil {
 		log.V(common.InfoLevel).Info(fmt.Sprintf("Error retrieving PV %s: %s", pvName, err.Error()))
 		return err
 	}
-	if pv.Spec.ClaimRef == nil {
-		pv.Spec.ClaimRef = &v1.ObjectReference{}
-	}
-	pv.Spec.ClaimRef.Kind = "PersistentVolumeClaim"
-	pv.Spec.ClaimRef.Namespace = pvcNamespace
-	pv.Spec.ClaimRef.Name = pvcName
-	pv.Spec.ClaimRef.UID = pvcUID
-	pv.Spec.ClaimRef.ResourceVersion = pvcResourceVersion
-
 	done := false
 	for iterations := 0; !done; iterations++ {
 		time.Sleep(2 * time.Second)
@@ -831,11 +820,20 @@ func updatePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 			log.V(common.InfoLevel).Info(fmt.Sprintf("Error retrieving PV %s: %s", pvName, err.Error()))
 			return err
 		}
+		if pv.Spec.ClaimRef == nil {
+			pv.Spec.ClaimRef = &v1.ObjectReference{}
+		}
+		pv.Spec.ClaimRef.Kind = "PersistentVolumeClaim"
+		pv.Spec.ClaimRef.Namespace = pvcNamespace
+		pv.Spec.ClaimRef.Name = pvcName
+		pv.Spec.ClaimRef.UID = pvcUID
+		pv.Spec.ClaimRef.ResourceVersion = pvcResourceVersion
+
 		err = client.UpdatePersistentVolume(ctx, pv)
 		if err == nil {
 			done = true
 		} else if iterations > 20 {
-			err := fmt.Errorf("Timed out waiting on PV VolumeReclaimPolicy to be set to Retain")
+			err := fmt.Errorf("Timed out updating the claim ref.")
 			return err
 		}
 	}
