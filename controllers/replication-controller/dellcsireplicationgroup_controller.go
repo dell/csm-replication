@@ -833,7 +833,7 @@ func updatePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 		if err == nil {
 			done = true
 		} else if iterations > 20 {
-			err := fmt.Errorf("Timed out updating the claim ref.")
+			err := fmt.Errorf("Timed out updating the claim ref")
 			return err
 		}
 	}
