@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 )
 
 // Clusters represents all clusters currently managed by `repctl`
@@ -386,6 +387,65 @@ func (c *Cluster) CreatePersistentVolumeClaimsFromPVs(ctx context.Context, names
 		}
 		log.Printf("Dry-Run: %v. Successfully created PVC with name: %s using PV: %s in the namespace: %s\n",
 			dryRun, pv.RemotePVCName, pv.Name, namespace)
+	}
+	return nil
+}
+
+// CreatePersistentVolumeClaimsFromSnapshots uses
+func (c *Cluster) CreatePersistentVolumeClaimsFromSnapshots(ctx context.Context, snList []*s1.VolumeSnapshot,
+) error {
+	// go through the PV list and create PVC objects
+	for _, sn := range snList {
+		// if pv.PVCName != "" {
+		// 	continue
+		// }
+		// pvcLabels := make(map[string]string, 0)
+		// pvcAnnotations := make(map[string]string, 0)
+		// Iterate through PV labels and apply all replication specific labels
+		// for key, value := range pv.Labels {
+		// 	if strings.Contains(key, prefix) {
+		// 		pvcLabels[key] = value
+		// 	}
+		// }
+		// // Iterate through PV annotations and apply all replication specific annotations
+		// for key, value := range pv.Annotations {
+		// 	if strings.Contains(key, prefix) {
+		// 		pvcAnnotations[key] = value
+		// 	}
+		// }
+		path := "snapshot.storage.k8s.io/v1"
+		pvcObj := v1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:   namespace,
+				Name:        pv.RemotePVCName,
+				Labels:      pvcLabels,
+				Annotations: pvcAnnotations,
+			},
+			Spec: v1.PersistentVolumeClaimSpec{
+				AccessModes: pv.AccessMode,
+				Resources: v1.ResourceRequirements{
+					Requests: pv.Requests,
+				},
+				VolumeName: pv.Name,
+				//#nosec G601 -- PVs in a RG will all have same SCName
+				StorageClassName: &pv.SCName,
+				VolumeMode:       pv.VolumeMode,
+				DataSource: &v1.TypedLocalObjectReference{
+					Name: "test",
+					Kind: "VolumeSnapshot",
+					APIGroup: &path,
+                },
+			},
+		}
+		var err error
+		err = c.client.Create(ctx, &pvcObj)
+		
+		if err != nil {
+			log.Printf("Failed to create PVC for Snapshot: %s. Error: %s\n", sn.Name, err.Error())
+			return err
+		}
+		log.Printf("Successfully created PVC with name: %s using PV: %s in the namespace: %s\n",
+			pv.RemotePVCName, sn.Name, namespace)
 	}
 	return nil
 }
