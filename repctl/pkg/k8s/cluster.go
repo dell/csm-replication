@@ -42,7 +42,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-//	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	s1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 )
 
 // Clusters represents all clusters currently managed by `repctl`
@@ -119,6 +119,9 @@ type ClusterInterface interface {
 
 	GetMigrationGroup(context.Context, string) (*repv1.DellCSIMigrationGroup, error)
 	UpdateMigrationGroup(context.Context, *repv1.DellCSIMigrationGroup) error
+
+	ListVolumeSnapshots(ctx context.Context, opts ...client.ListOption) (*s1.VolumeSnapshotList, error) 
+	GetVolumeSnapshotContent(ctx context.Context, volumeName string) (*s1.VolumeSnapshotContent, error)
 }
 
 // Cluster is implementation of ClusterInterface that represents some cluster
@@ -175,6 +178,16 @@ func (c *Cluster) UpdateReplicationGroup(ctx context.Context, rg *repv1.DellCSIR
 func (c *Cluster) GetPersistentVolume(ctx context.Context, pvName string) (*v1.PersistentVolume, error) {
 	found := &v1.PersistentVolume{}
 	err := c.client.Get(ctx, apiTypes.NamespacedName{Name: pvName}, found)
+	if err != nil {
+		return nil, err
+	}
+	return found, nil
+}
+
+
+func (c *Cluster) GetVolumeSnapshotContent(ctx context.Context, volumeName string) (*s1.VolumeSnapshotContent, error) {
+	found := &s1.VolumeSnapshotContent{}
+	err := c.client.Get(ctx, apiTypes.NamespacedName{Name: volumeName}, found)
 	if err != nil {
 		return nil, err
 	}
@@ -298,6 +311,15 @@ func (c *Cluster) ListPersistentVolumeClaims(ctx context.Context, opts ...client
 func (c *Cluster) GetPersistentVolumeClaim(ctx context.Context, nsName string, pvcName string) (*v1.PersistentVolumeClaim, error) {
 	found := &v1.PersistentVolumeClaim{}
 	err := c.client.Get(ctx, apiTypes.NamespacedName{Namespace: nsName, Name: pvcName}, found)
+	if err != nil {
+		return nil, err
+	}
+	return found, nil
+}
+
+func (c *Cluster) ListVolumeSnapshots(ctx context.Context, opts ...client.ListOption) (*s1.VolumeSnapshotList, error) {
+	found := &s1.VolumeSnapshotList{}
+	err := c.client.List(ctx, found, opts...)
 	if err != nil {
 		return nil, err
 	}

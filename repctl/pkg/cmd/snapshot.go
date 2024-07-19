@@ -22,13 +22,15 @@ import (
 	"github.com/dell/repctl/pkg/config"
 	"github.com/dell/repctl/pkg/k8s"
 	"github.com/dell/repctl/pkg/metadata"
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	s1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 // GetSnapshotCommand returns 'snapshot' cobra command
@@ -247,39 +249,38 @@ func getDefaultsnClass(rg *repv1.DellCSIReplicationGroup) string {
 // 	return nil
 // }
 
+
 func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIReplicationGroup, snNamespace, snClass string) error {
 	ctx := context.Background()
-	newNamespace := "test-pg1" // Hard-coded namespace
-
-	// Use the namespace from the ReplicationGroup for the original PVCs
-	originalNamespace := rg.Namespace
-
-	pvcList, err := cluster.FilterPersistentVolumeClaims(ctx, originalNamespace, "", "", rg.Name)
+	newNamespace := "test-pg1" // hard coded for now
+	
+	//retrieve snapshots under the user defined namespace -> done
+	snList, err := cluster.ListVolumeSnapshots(ctx, client.InNamespace(snNamespace))
 	if err != nil {
-		return fmt.Errorf("error getting PVCs: %v", err)
+		return fmt.Errorf("error getting Snapshots: %v", err)
 	}
 
-	for _, pvc := range pvcList.PVCList {
-		origPVC, err := cluster.GetPersistentVolumeClaim(ctx, originalNamespace, pvc.Name)
-		if err != nil {
-			return fmt.Errorf("error getting original PVC %s in namespace %s: %v", pvc.Name, originalNamespace, err)
-		}
 
-		// Step 1: Create cloned SnapshotContent
-		clonedSnapshotContentName := fmt.Sprintf("cloned-volume-%s", pvc.Name)
-		clonedSnapshotContent := &snapshotv1.VolumeSnapshotContent{
+	for _, sn := range snList.Items {
+		volumeName := *sn.Status.BoundVolumeSnapshotContentName
+		
+		// step 1: create cloned snapshot content -> done
+		clonedSnapshotContentName := fmt.Sprintf("cloned-%s", volumeName)
+		snContent, _ := cluster.GetVolumeSnapshotContent(ctx, volumeName)
+
+		clonedSnapshotContent := &s1.VolumeSnapshotContent{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: clonedSnapshotContentName,
 			},
-			Spec: snapshotv1.VolumeSnapshotContentSpec{
-				DeletionPolicy: snapshotv1.VolumeSnapshotContentDelete,
-				Driver:         "csi-vxflexos.dellemc.com",
-				Source: snapshotv1.VolumeSnapshotContentSource{
-					SnapshotHandle: pointer.String("snapshot-handle"), // This should be retrieved from the original snapshot
+			Spec: s1.VolumeSnapshotContentSpec{
+				DeletionPolicy: snContent.Spec.DeletionPolicy,
+				Driver:         snContent.Spec.Driver,
+				Source: s1.VolumeSnapshotContentSource{
+					SnapshotHandle: snContent.Spec.Source.SnapshotHandle,
 				},
 				VolumeSnapshotRef: v1.ObjectReference{
 					Namespace: newNamespace,
-					Name:      fmt.Sprintf("snapshot-%s", pvc.Name),
+					Name:      sn.Name,
 				},
 				VolumeSnapshotClassName: &snClass,
 			},
@@ -290,40 +291,44 @@ func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIRepl
 			return fmt.Errorf("error creating cloned SnapshotContent %s: %v", clonedSnapshotContentName, err)
 		}
 
-		// Step 2: Create new Snapshot
-		newSnapshotName := fmt.Sprintf("snapshot-%s", pvc.Name)
-		newSnapshot := &snapshotv1.VolumeSnapshot{
+		// step 2: create new snapshot -> done
+		newSnapshot := &s1.VolumeSnapshot{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      newSnapshotName,
+				Name:      sn.Name,
 				Namespace: newNamespace,
 			},
-			Spec: snapshotv1.VolumeSnapshotSpec{
-				Source: snapshotv1.VolumeSnapshotSource{
+			Spec: s1.VolumeSnapshotSpec{
+				Source: s1.VolumeSnapshotSource{
 					VolumeSnapshotContentName: &clonedSnapshotContentName,
 				},
 				VolumeSnapshotClassName: &snClass,
 			},
 		}
 
-		err = cluster.GetClient().Create(ctx, newSnapshot)
+		err = cluster.GetClient().Create(ctx, newSnapshot) 
 		if err != nil {
-			return fmt.Errorf("error creating new Snapshot %s in namespace %s: %v", newSnapshotName, newNamespace, err)
+			return fmt.Errorf("error creating new Snapshot %s in namespace %s: %v", sn.Name, newNamespace, err)
 		}
 
-		// Step 3: Create PVC from Snapshot
+		// step 3: create pvc from snapshot -> done
+		pvcName := *sn.Spec.Source.PersistentVolumeClaimName
 		newPVC := &v1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      pvc.Name,
+				Name:      pvcName,
 				Namespace: newNamespace,
 			},
 			Spec: v1.PersistentVolumeClaimSpec{
-				StorageClassName: origPVC.Spec.StorageClassName,
-				AccessModes:      origPVC.Spec.AccessModes,
-				Resources:        origPVC.Spec.Resources,
+				StorageClassName: &snClass,
+				AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, //hard coded
+				Resources:        v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceStorage: resource.MustParse("32Gi"), //hard coded 
+					},
+				},
 				DataSource: &v1.TypedLocalObjectReference{
 					APIGroup: pointer.String("snapshot.storage.k8s.io"),
 					Kind:     "VolumeSnapshot",
-					Name:     newSnapshotName,
+					Name:     sn.Name,
 				},
 			},
 		}
