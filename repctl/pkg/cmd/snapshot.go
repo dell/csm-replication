@@ -22,6 +22,7 @@ import (
 	"github.com/dell/repctl/pkg/config"
 	"github.com/dell/repctl/pkg/k8s"
 	"github.com/dell/repctl/pkg/metadata"
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -125,21 +126,6 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass string, v
 		log.Fatalf("snapshot to RG: error fetching RG info: (%s)\n", err.Error())
 		return
 	}
-	// Explicitly set the original namespace
-	originalNamespace := rg.Namespace
-	if originalNamespace == "" {
-		// If rg.Namespace is empty, try to find the namespace from the PVCs
-		pvcList, err := cluster.FilterPersistentVolumeClaims(context.Background(), "", "", "", rg.Name)
-		if err != nil {
-			log.Fatalf("Error getting PVCs: %v", err)
-		}
-		if len(pvcList.PVCList) > 0 {
-			originalNamespace = pvcList.PVCList[0].Namespace
-		}
-		if originalNamespace == "" {
-			log.Fatal("Unable to determine the original namespace")
-		}
-	}
 
 	// Check if snNamespace is specified and different from the original namespace
 	if snNamespace == "" || snNamespace == rg.Namespace {
@@ -182,11 +168,17 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass string, v
 	log.Printf("Successfully created snapshots for RG (%s)\n", rg.Name)
 
 	if createPVCs {
-		if err := createPVCsFromSnapshots(cluster, rg, snNamespace, snClass); err != nil {
+		if err := createPVCsFromSnapshots(cluster, rg, snClass); err != nil {
 			log.Fatalf("Error creating PVCs from snapshots: %v", err)
 		}
-		log.Printf("Successfully created PVCs from snapshots in namespace %s", snNamespace)
+		log.Printf("Successfully created PVCs from snapshots in namespace test-pg1")
 	}
+	// if createPVCs {
+	// 	if err := createClonedSnapshotsAndPVCs(cluster, rg, snNamespace, snClass); err != nil {
+	// 		log.Fatalf("Error creating cloned snapshots and PVCs: %v", err)
+	// 	}
+	// 	log.Printf("Successfully created cloned snapshots and PVCs in namespace %s", snNamespace)
+	// }
 }
 
 func getDefaultSnapshotClass(rg *repv1.DellCSIReplicationGroup) string {
@@ -208,29 +200,64 @@ func getDefaultSnapshotClass(rg *repv1.DellCSIReplicationGroup) string {
 	}
 }
 
-func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIReplicationGroup, newNamespace, snapshotClass string) error {
-	ctx := context.Background()
+// func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIReplicationGroup, newNamespace, snapshotClass string) error {
+// 	ctx := context.Background()
 
+// 	// Use the namespace from the ReplicationGroup for the original PVCs
+// 	originalNamespace := rg.Namespace
+
+// 	pvcList, err := cluster.FilterPersistentVolumeClaims(ctx, originalNamespace, "", "", rg.Name)
+// 	if err != nil {
+// 		return fmt.Errorf("error getting PVCs: %v", err)
+// 	}
+
+// 	for _, pvc := range pvcList.PVCList {
+// 		origPVC, err := cluster.GetPersistentVolumeClaim(ctx, originalNamespace, pvc.Name)
+// 		if err != nil {
+// 			return fmt.Errorf("error getting original PVC %s in namespace %s: %v", pvc.Name, originalNamespace, err)
+// 		}
+
+// 		snapshotName := fmt.Sprintf("%s-snapshot", pvc.Name)
+
+// 		newPVC := &v1.PersistentVolumeClaim{
+// 			ObjectMeta: metav1.ObjectMeta{
+// 				Name:      pvc.Name,
+// 				Namespace: newNamespace,
+// 			},
+// 			Spec: v1.PersistentVolumeClaimSpec{
+// 				StorageClassName: origPVC.Spec.StorageClassName,
+// 				AccessModes:      origPVC.Spec.AccessModes,
+// 				Resources:        origPVC.Spec.Resources,
+// 				DataSource: &v1.TypedLocalObjectReference{
+// 					APIGroup: pointer.String("snapshot.storage.k8s.io"),
+// 					Kind:     "VolumeSnapshot",
+// 					Name:     snapshotName,
+// 				},
+// 			},
+// 		}
+
+// 		err = cluster.GetClient().Create(ctx, newPVC)
+// 		if err != nil {
+// 			return fmt.Errorf("error creating PVC %s in namespace %s: %v", newPVC.Name, newNamespace, err)
+// 		}
+
+// 		log.Printf("Created PVC %s in namespace %s from snapshot", newPVC.Name, newNamespace)
+// 	}
+
+// 	return nil
+// }
+
+func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIReplicationGroup, snapshotClass string) error {
+	ctx := context.Background()
+	newNamespace := "test-pg1" // Hard-coded namespace
+
+	// Use the namespace from the ReplicationGroup for the original PVCs
 	originalNamespace := rg.Namespace
-	if originalNamespace == "" {
-		// Try to find the namespace from the PVCs
-		pvcList, err := cluster.FilterPersistentVolumeClaims(ctx, "", "", "", rg.Name)
-		if err != nil {
-			return fmt.Errorf("error getting PVCs: %v", err)
-		}
-		if len(pvcList.PVCList) > 0 {
-			originalNamespace = pvcList.PVCList[0].Namespace
-		}
-		if originalNamespace == "" {
-			return fmt.Errorf("unable to determine the original namespace")
-		}
-	}
 
 	pvcList, err := cluster.FilterPersistentVolumeClaims(ctx, originalNamespace, "", "", rg.Name)
 	if err != nil {
 		return fmt.Errorf("error getting PVCs: %v", err)
 	}
-	log.Printf("Found %d PVCs to replicate", len(pvcList.PVCList))
 
 	for _, pvc := range pvcList.PVCList {
 		origPVC, err := cluster.GetPersistentVolumeClaim(ctx, originalNamespace, pvc.Name)
@@ -238,8 +265,52 @@ func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIRepl
 			return fmt.Errorf("error getting original PVC %s in namespace %s: %v", pvc.Name, originalNamespace, err)
 		}
 
-		snapshotName := fmt.Sprintf("%s-snapshot", pvc.Name)
+		// Step 1: Create cloned SnapshotContent
+		clonedSnapshotContentName := fmt.Sprintf("cloned-volume-%s", pvc.Name)
+		clonedSnapshotContent := &snapshotv1.VolumeSnapshotContent{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: clonedSnapshotContentName,
+			},
+			Spec: snapshotv1.VolumeSnapshotContentSpec{
+				DeletionPolicy: snapshotv1.VolumeSnapshotContentDelete,
+				Driver:         "csi-vxflexos.dellemc.com",
+				Source: snapshotv1.VolumeSnapshotContentSource{
+					SnapshotHandle: pointer.String("snapshot-handle"), // This should be retrieved from the original snapshot
+				},
+				VolumeSnapshotRef: v1.ObjectReference{
+					Namespace: newNamespace,
+					Name:      fmt.Sprintf("snapshot-%s", pvc.Name),
+				},
+				VolumeSnapshotClassName: &snapshotClass,
+			},
+		}
 
+		err = cluster.GetClient().Create(ctx, clonedSnapshotContent)
+		if err != nil {
+			return fmt.Errorf("error creating cloned SnapshotContent %s: %v", clonedSnapshotContentName, err)
+		}
+
+		// Step 2: Create new Snapshot
+		newSnapshotName := fmt.Sprintf("snapshot-%s", pvc.Name)
+		newSnapshot := &snapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      newSnapshotName,
+				Namespace: newNamespace,
+			},
+			Spec: snapshotv1.VolumeSnapshotSpec{
+				Source: snapshotv1.VolumeSnapshotSource{
+					VolumeSnapshotContentName: &clonedSnapshotContentName,
+				},
+				VolumeSnapshotClassName: &snapshotClass,
+			},
+		}
+
+		err = cluster.GetClient().Create(ctx, newSnapshot)
+		if err != nil {
+			return fmt.Errorf("error creating new Snapshot %s in namespace %s: %v", newSnapshotName, newNamespace, err)
+		}
+
+		// Step 3: Create PVC from Snapshot
 		newPVC := &v1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pvc.Name,
@@ -252,7 +323,7 @@ func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIRepl
 				DataSource: &v1.TypedLocalObjectReference{
 					APIGroup: pointer.String("snapshot.storage.k8s.io"),
 					Kind:     "VolumeSnapshot",
-					Name:     snapshotName,
+					Name:     newSnapshotName,
 				},
 			},
 		}
@@ -267,4 +338,3 @@ func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIRepl
 
 	return nil
 }
-
