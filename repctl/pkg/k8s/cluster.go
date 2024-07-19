@@ -42,7 +42,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	s1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 )
 
 // Clusters represents all clusters currently managed by `repctl`
@@ -480,6 +480,7 @@ func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(repv1.AddToScheme(scheme))
 	utilruntime.Must(apiExtensionsv1.AddToScheme(scheme))
+	utilruntime.Must(s1.AddToScheme(scheme))
 
 	runtimeObj, _, err := serializer.NewCodecFactory(scheme).UniversalDeserializer().Decode(data, nil, nil)
 	if err != nil {

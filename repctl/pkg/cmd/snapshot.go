@@ -22,7 +22,7 @@ import (
 	"github.com/dell/repctl/pkg/config"
 	"github.com/dell/repctl/pkg/k8s"
 	"github.com/dell/repctl/pkg/metadata"
-	s1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -254,7 +254,7 @@ func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIRepl
 	ctx := context.Background()
 	newNamespace := "test-pg1" // hard coded for now
 	
-	//retrieve snapshots under the user defined namespace -> done
+	//retrieve snapshots under the user defined namespace -> error
 	snList, err := cluster.ListVolumeSnapshots(ctx, client.InNamespace(snNamespace))
 	if err != nil {
 		return fmt.Errorf("error getting Snapshots: %v", err)
