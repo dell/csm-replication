@@ -132,9 +132,9 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass string, v
 		log.Fatal("Error: --sn-namespace must be specified and different from the original application's namespace")
 	}
 
-	// Use default volumesnapshotclass if not specified
+	// Use default volumesnClass if not specified
 	if snClass == "" {
-		snClass = getDefaultSnapshotClass(rg)
+		snClass = getDefaultsnClass(rg)
 	}
 
 	if verbose {
@@ -150,7 +150,7 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass string, v
 
 	rg.Spec.Action = config.ActionCreateSnapshot
 	rg.Annotations[prefix+"/snapshotNamespace"] = snNamespace
-	rg.Annotations[prefix+"/snapshotClass"] = snClass
+	rg.Annotations[prefix+"/snClass"] = snClass
 
 	if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
 		log.Fatalf("snapshot: error executing UpdateAction %s\n", err.Error())
@@ -168,7 +168,7 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass string, v
 	log.Printf("Successfully created snapshots for RG (%s)\n", rg.Name)
 
 	if createPVCs {
-		if err := createPVCsFromSnapshots(cluster, rg, snClass); err != nil {
+		if err := createPVCsFromSnapshots(cluster, rg, snNamespace, snClass); err != nil {
 			log.Fatalf("Error creating PVCs from snapshots: %v", err)
 		}
 		log.Printf("Successfully created PVCs from snapshots in namespace test-pg1")
@@ -181,7 +181,7 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass string, v
 	// }
 }
 
-func getDefaultSnapshotClass(rg *repv1.DellCSIReplicationGroup) string {
+func getDefaultsnClass(rg *repv1.DellCSIReplicationGroup) string {
 	driver, ok := rg.Labels[metadata.Driver]
 	if !ok {
 		driver, ok = rg.Annotations[metadata.Driver]
@@ -200,7 +200,7 @@ func getDefaultSnapshotClass(rg *repv1.DellCSIReplicationGroup) string {
 	}
 }
 
-// func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIReplicationGroup, newNamespace, snapshotClass string) error {
+// func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIReplicationGroup, newNamespace, snClass string) error {
 // 	ctx := context.Background()
 
 // 	// Use the namespace from the ReplicationGroup for the original PVCs
@@ -247,7 +247,7 @@ func getDefaultSnapshotClass(rg *repv1.DellCSIReplicationGroup) string {
 // 	return nil
 // }
 
-func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIReplicationGroup, snapshotClass string) error {
+func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIReplicationGroup, snNamespace, snClass string) error {
 	ctx := context.Background()
 	newNamespace := "test-pg1" // Hard-coded namespace
 
@@ -281,7 +281,7 @@ func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIRepl
 					Namespace: newNamespace,
 					Name:      fmt.Sprintf("snapshot-%s", pvc.Name),
 				},
-				VolumeSnapshotClassName: &snapshotClass,
+				VolumeSnapshotClassName: &snClass,
 			},
 		}
 
@@ -301,7 +301,7 @@ func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIRepl
 				Source: snapshotv1.VolumeSnapshotSource{
 					VolumeSnapshotContentName: &clonedSnapshotContentName,
 				},
-				VolumeSnapshotClassName: &snapshotClass,
+				VolumeSnapshotClassName: &snClass,
 			},
 		}
 
