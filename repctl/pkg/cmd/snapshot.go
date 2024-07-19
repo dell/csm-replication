@@ -135,13 +135,6 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass string, v
 
 	}
 
-
-
-	testing := rg.Annotations[prefix+"/snapshotNamespace"]
-	if testing != "testing-rn" {
-
-	}
-
 	rLinkState := rg.Status.ReplicationLinkState
 	if rLinkState.LastSuccessfulUpdate == nil {
 		log.Fatal("Aborted. One of your RGs is in an error state. Please verify RGs logs/events and try again.")
@@ -259,14 +252,14 @@ func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIRepl
 		}
 
 		// step 3: create pvc from snapshot -> done
-		pvcName := *sn.Spec.Source.PersistentVolumeClaimName //panic
+		pvcName := "data-postgres-postgresql-0" //hard codedwa
 		newPVC := &v1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pvcName,
 				Namespace: newNamespace,
 			},
 			Spec: v1.PersistentVolumeClaimSpec{
-				StorageClassName: &snClass,
+				StorageClassName: pointer.String("vxflexos-217"), //hard coded
 				AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, // hard coded
 				Resources: v1.ResourceRequirements{
 					Requests: v1.ResourceList{
