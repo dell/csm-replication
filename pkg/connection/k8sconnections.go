@@ -270,6 +270,11 @@ func (c *RemoteK8sControllerClient) CreateSnapshotContent(ctx context.Context, c
 	return c.Client.Create(ctx, content)
 }
 
+// UpdateSnapshotContent creates the snapshot content on the remote cluster
+func (c *RemoteK8sControllerClient) UpdateSnapshotContent(ctx context.Context, content *s1.VolumeSnapshotContent) error {
+	return c.Client.Create(ctx, content)
+}
+
 // CreateSnapshotObject creates the snapshot on the remote cluster
 func (c *RemoteK8sControllerClient) CreateSnapshotObject(ctx context.Context, content *s1.VolumeSnapshot) error {
 	return c.Client.Create(ctx, content)
