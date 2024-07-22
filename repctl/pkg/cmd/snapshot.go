@@ -25,7 +25,7 @@ import (
 	"github.com/spf13/viper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	repv1 "github.com/dell/csm-replication/api/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	//"sigs.k8s.io/controller-runtime/pkg/client"
 	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -194,18 +194,32 @@ func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIRepl
 	ctx := context.Background()
 	newNamespace := "test-pg1" // hard coded for now
 
-	// retrieve snapshots under the user defined namespace
-	snList, err := cluster.ListVolumeSnapshots(ctx, client.InNamespace(snNamespace))
+	// retrieve all pvcs under the rg
+	pvcList, err := cluster.ListPersistentVolumeClaims(ctx)
 	if err != nil {
-		return fmt.Errorf("error getting Snapshots: %v", err)
+		return fmt.Errorf("error getting pvcs: %v", err)
 	}
 
-	log.Printf("Found %d snapshots", len(snList.Items))
-	for _, sn := range snList.Items {
-		volumeName := *sn.Status.BoundVolumeSnapshotContentName
-		log.Printf(volumeName)
+	//DEPRECATE:
+	//snList, err := cluster.ListVolumeSnapshots(ctx, client.InNamespace(snNamespace))
+	//volumeName := *sn.Status.BoundVolumeSnapshotContentName
+	//log.Printf(volumeName)
+	log.Printf("Found %d pvcs", len(pvcList.Items))
+	for _, pvc := range pvcList.Items {
+		// step 1: retrieve the latest snapshot content from pvc
+		pvName := pvc.Spec.VolumeName
+		pv, err := cluster.GetPersistentVolume(ctx, pvName)
+		if err != nil {
+			return fmt.Errorf("error getting pv: %v", err)
+		}
+		pvHandle := pv.Spec.CSI.VolumeHandle
+		// pvhandle -> snapshotcontent
+		matchingLabels := make(map[string]string)
+		matchingLabels[spec.Source.VolumeHandle] = remoteClusterID
 
-		// step 1: create cloned snapshot content -> done
+		
+
+		// step 2: create cloned snapshot content -> done
 		clonedSnapshotContentName := fmt.Sprintf("cloned-%s", volumeName)
 		snContent, _ := cluster.GetVolumeSnapshotContent(ctx, volumeName)
 
@@ -232,7 +246,7 @@ func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIRepl
 			return fmt.Errorf("error creating cloned SnapshotContent %s: %v", clonedSnapshotContentName, err)
 		}
 
-		// step 2: create new snapshot -> done
+		// step 3: create new snapshot -> done
 		newSnapshot := &s1.VolumeSnapshot{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      sn.Name,
@@ -251,7 +265,7 @@ func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIRepl
 			return fmt.Errorf("error creating new Snapshot %s in namespace %s: %v", sn.Name, newNamespace, err)
 		}
 
-		// step 3: create pvc from snapshot -> done
+		// step 4: create pvc from snapshot -> done
 		pvcName := "data-postgres-postgresql-0" //hard codedwa
 		newPVC := &v1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{

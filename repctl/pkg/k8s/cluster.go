@@ -121,6 +121,7 @@ type ClusterInterface interface {
 	UpdateMigrationGroup(context.Context, *repv1.DellCSIMigrationGroup) error
 
 	ListVolumeSnapshots(ctx context.Context, opts ...client.ListOption) (*s1.VolumeSnapshotList, error) 
+	ListVolumeSnapshotContents(ctx context.Context, opts ...client.ListOption) (*s1.VolumeSnapshotContentList, error)
 	GetVolumeSnapshotContent(ctx context.Context, volumeName string) (*s1.VolumeSnapshotContent, error)
 }
 
@@ -319,6 +320,15 @@ func (c *Cluster) GetPersistentVolumeClaim(ctx context.Context, nsName string, p
 
 func (c *Cluster) ListVolumeSnapshots(ctx context.Context, opts ...client.ListOption) (*s1.VolumeSnapshotList, error) {
 	found := &s1.VolumeSnapshotList{}
+	err := c.client.List(ctx, found, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return found, nil
+}
+
+func (c *Cluster) ListVolumeSnapshotContents(ctx context.Context, opts ...client.ListOption) (*s1.VolumeSnapshotContentList, error) {
+	found := &s1.VolumeSnapshotContentList{}
 	err := c.client.List(ctx, found, opts...)
 	if err != nil {
 		return nil, err
