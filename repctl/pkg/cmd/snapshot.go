@@ -30,7 +30,8 @@ import (
 	//"sigs.k8s.io/controller-runtime/pkg/client"
 	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
+
+	//"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/pointer"
 )
 
@@ -53,6 +54,7 @@ This command will create a snapshot for the specified RG on the target cluster.\
 			createPVCtrue := viper.GetBool("create-pvcs")
 			snClass := viper.GetString("sn-class")
 			verbose := viper.GetBool(config.Verbose)
+			storageClass := viper.GetString("storage-class")
 			wait := viper.GetBool("snapshot-wait")
 			input, res := verifyInputForSnapshotAction(inputCluster, rgName)
 
@@ -62,7 +64,7 @@ This command will create a snapshot for the specified RG on the target cluster.\
 			}
 
 			if input == "rg" {
-				createSnapshot(configFolder, res, prefix, snNamespace, snClass, verbose, wait, createPVCtrue)
+				createSnapshot(configFolder, res, prefix, snNamespace, snClass, storageClass, verbose, wait, createPVCtrue)
 			} else {
 				log.Fatal("Unexpected input received")
 			}
@@ -80,6 +82,9 @@ This command will create a snapshot for the specified RG on the target cluster.\
 	_ = viper.BindPFlag("snapshot-wait", snapshotCmd.Flags().Lookup("wait"))
 	snapshotCmd.Flags().Bool("create-pvcs", false, "create PVCs from snapshots")
 	_ = viper.BindPFlag("create-pvcs", snapshotCmd.Flags().Lookup("create-pvcs"))
+
+	snapshotCmd.Flags().String("storage-class", "", "storage class to use when creating PVCs from snapshots")
+	_ = viper.BindPFlag("storage-class", snapshotCmd.Flags().Lookup("storage-class"))
 	return snapshotCmd
 }
 
@@ -119,7 +124,7 @@ func verifyInputForSnapshotAction(input string, rg string) (res string, tgt stri
 	return "", ""
 }
 
-func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass string, verbose, wait, createPVCtrue bool) {
+func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass, storageClass string, verbose, wait, createPVCtrue bool) {
 	if verbose {
 		log.Printf("fetching RG and cluster info...\n")
 	}
@@ -180,27 +185,21 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass string, v
 	//todo: wait for it to finish -> confirm that snapshots are created
 	time.Sleep(5 * time.Second)
 
-	if createPVCtrue {
-		if err := createPVCsFromSnapshots(cluster, rg, snNamespace, snClass); err != nil {
+	if createPVCtrue && storageClass != "" {
+		if err := createPVCsFromSnapshots(cluster, rg, snNamespace, snClass, storageClass); err != nil {
 			log.Fatalf("Error creating PVCs from snapshots: %v", err)
 		}
-		log.Printf("Successfully created PVCs from snapshots in namespace test-pg1")
+		log.Printf("Successfully created test PVCs from snapshots under namespaces: test-<original pvc namespace>")
 	}
 }
 
-func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIReplicationGroup, snNamespace, snClass string) error {
+func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIReplicationGroup, snNamespace, snClass, storageClass string) error {
 	ctx := context.Background()
-
-	// retrieve all pvcs under the rg
 	pvcList, err := cluster.ListPersistentVolumeClaims(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting pvcs: %v", err)
 	}
 
-	//DEPRECATE:
-	//snList, err := cluster.ListVolumeSnapshots(ctx, client.InNamespace(snNamespace))
-	//volumeName := *sn.Status.BoundVolumeSnapshotContentName
-	//log.Printf(volumeName)
 	log.Printf("Found %d pvcs", len(pvcList.Items))
 	for _, pvc := range pvcList.Items {
 		// step 1: retrieve the latest snapshot content from pvc
@@ -232,7 +231,7 @@ func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIRepl
 		}
 
 		// step 2: create cloned snapshot content -> done
-		newNamespace := "test-" + pvc.Name
+		newNamespace := "test-" + pvc.Namespace
 		clonedSnapshotContentName := fmt.Sprintf("cloned-%s", snContentLatestName)
 		snContent, _ := cluster.GetVolumeSnapshotContent(ctx, snContentLatestName)
 		snName := snContent.Spec.VolumeSnapshotRef.Name
@@ -280,20 +279,16 @@ func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIRepl
 		}
 
 		// step 4: create pvc from snapshot -> done
-		pvcName := "data-postgres-postgresql-0" //hard codedwa
+		pvcName := pvc.Name
 		newPVC := &v1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pvcName,
 				Namespace: newNamespace,
 			},
 			Spec: v1.PersistentVolumeClaimSpec{
-				StorageClassName: pointer.String("vxflexos-217"),                    //hard coded
-				AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, // hard coded
-				Resources: v1.ResourceRequirements{
-					Requests: v1.ResourceList{
-						v1.ResourceStorage: resource.MustParse("32Gi"), // hard coded
-					},
-				},
+				StorageClassName: pointer.String(storageClass),
+				AccessModes:      pvc.Spec.AccessModes,
+				Resources:        pvc.Spec.Resources,
 				DataSource: &v1.TypedLocalObjectReference{
 					APIGroup: pointer.String("snapshot.storage.k8s.io"),
 					Kind:     "VolumeSnapshot",
