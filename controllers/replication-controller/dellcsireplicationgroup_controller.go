@@ -389,14 +389,17 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 		snapRef := makeSnapReference(snapshotHandle, actionAnnotation.SnapshotNamespace)
 		sc := makeStorageClassContent(group.Labels[controller.DriverName], actionAnnotation.SnapshotClass)
 		snapContent := makeVolSnapContent(snapshotHandle, volumeHandle, *snapRef, sc)
-		snapContent.Annotations["snapshot.storage.kubernetes.io/snapshotPVHandle"] = volumeHandle
-
 		err = remoteClient.CreateSnapshotContent(ctx, snapContent)
 		if err != nil {
 			log.Error(err, "unable to create snapshot content")
 			return err
 		}
-
+		snapContent.Annotations["snapshot.storage.kubernetes.io/snapshotPVHandle"] = volumeHandle
+		err = remoteClient.UpdateSnapshotContent(ctx, snapContent)
+		if err != nil {
+			log.Error(err, "unable to update snapshot content")
+			return err
+		}
 		snapshot := makeSnapshotObject(snapRef.Name, snapContent.Name, sc.ObjectMeta.Name, actionAnnotation.SnapshotNamespace)
 		err = remoteClient.CreateSnapshotObject(ctx, snapshot)
 		if err != nil {
