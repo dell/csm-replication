@@ -18,19 +18,20 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/repctl/pkg/config"
 	"github.com/dell/repctl/pkg/k8s"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	repv1 "github.com/dell/csm-replication/api/v1"
+
 	//"sigs.k8s.io/controller-runtime/pkg/client"
 	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/pointer"
-
 )
 
 // GetSnapshotCommand returns 'snapshot' cobra command
@@ -179,7 +180,6 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass string, v
 	//todo: wait for it to finish -> confirm that snapshots are created
 	time.Sleep(5 * time.Second)
 
-
 	if createPVCtrue {
 		if err := createPVCsFromSnapshots(cluster, rg, snNamespace, snClass); err != nil {
 			log.Fatalf("Error creating PVCs from snapshots: %v", err)
@@ -188,11 +188,8 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass string, v
 	}
 }
 
-
-
 func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIReplicationGroup, snNamespace, snClass string) error {
 	ctx := context.Background()
-	newNamespace := "test-pg1" // hard coded for now
 
 	// retrieve all pvcs under the rg
 	pvcList, err := cluster.ListPersistentVolumeClaims(ctx)
@@ -213,15 +210,32 @@ func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIRepl
 			return fmt.Errorf("error getting pv: %v", err)
 		}
 		pvHandle := pv.Spec.CSI.VolumeHandle
-		// pvhandle -> snapshotcontent
-		matchingLabels := make(map[string]string)
-		matchingLabels[spec.Source.VolumeHandle] = remoteClusterID
+		snContentList, err := cluster.FilterVolumeSnapshotContents(ctx, pvHandle)
+		if err != nil {
+			return fmt.Errorf("error getting snapshot contents: %v", err)
+		}
 
-		
+		//return error if list is empty
+		if len(snContentList.Items) == 0 {
+			return fmt.Errorf("no snapshot contents found for volume %s", pvName)
+		}
+
+		// get the latest snapshot content by timestamp
+		timeStampLatest := pvc.CreationTimestamp
+		snContentLatestName := ""
+
+		for _, snContent := range snContentList.Items {
+			if snContent.CreationTimestamp.After(timeStampLatest.Time) {
+				timeStampLatest = snContent.CreationTimestamp
+				snContentLatestName = snContent.Name
+			}
+		}
 
 		// step 2: create cloned snapshot content -> done
-		clonedSnapshotContentName := fmt.Sprintf("cloned-%s", volumeName)
-		snContent, _ := cluster.GetVolumeSnapshotContent(ctx, volumeName)
+		newNamespace := "test-" + pvc.Name
+		clonedSnapshotContentName := fmt.Sprintf("cloned-%s", snContentLatestName)
+		snContent, _ := cluster.GetVolumeSnapshotContent(ctx, snContentLatestName)
+		snName := snContent.Spec.VolumeSnapshotRef.Name
 
 		clonedSnapshotContent := &s1.VolumeSnapshotContent{
 			ObjectMeta: metav1.ObjectMeta{
@@ -235,7 +249,7 @@ func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIRepl
 				},
 				VolumeSnapshotRef: v1.ObjectReference{
 					Namespace: newNamespace,
-					Name:      sn.Name,
+					Name:      snName,
 				},
 				VolumeSnapshotClassName: &snClass,
 			},
@@ -249,7 +263,7 @@ func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIRepl
 		// step 3: create new snapshot -> done
 		newSnapshot := &s1.VolumeSnapshot{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      sn.Name,
+				Name:      snName,
 				Namespace: newNamespace,
 			},
 			Spec: s1.VolumeSnapshotSpec{
@@ -262,7 +276,7 @@ func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIRepl
 
 		err = cluster.GetClient().Create(ctx, newSnapshot)
 		if err != nil {
-			return fmt.Errorf("error creating new Snapshot %s in namespace %s: %v", sn.Name, newNamespace, err)
+			return fmt.Errorf("error creating new Snapshot %s in namespace %s: %v", snName, newNamespace, err)
 		}
 
 		// step 4: create pvc from snapshot -> done
@@ -273,7 +287,7 @@ func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIRepl
 				Namespace: newNamespace,
 			},
 			Spec: v1.PersistentVolumeClaimSpec{
-				StorageClassName: pointer.String("vxflexos-217"), //hard coded
+				StorageClassName: pointer.String("vxflexos-217"),                    //hard coded
 				AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, // hard coded
 				Resources: v1.ResourceRequirements{
 					Requests: v1.ResourceList{
@@ -283,7 +297,7 @@ func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIRepl
 				DataSource: &v1.TypedLocalObjectReference{
 					APIGroup: pointer.String("snapshot.storage.k8s.io"),
 					Kind:     "VolumeSnapshot",
-					Name:     sn.Name,
+					Name:     snName,
 				},
 			},
 		}
