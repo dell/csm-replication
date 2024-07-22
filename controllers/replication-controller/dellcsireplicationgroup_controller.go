@@ -389,20 +389,13 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 		snapRef := makeSnapReference(snapshotHandle, actionAnnotation.SnapshotNamespace)
 		sc := makeStorageClassContent(group.Labels[controller.DriverName], actionAnnotation.SnapshotClass)
 		snapContent := makeVolSnapContent(snapshotHandle, volumeHandle, *snapRef, sc)
+
 		err = remoteClient.CreateSnapshotContent(ctx, snapContent)
 		if err != nil {
 			log.Error(err, "unable to create snapshot content")
 			return err
 		}
-		snapContent.ObjectMeta.Labels = map[string]string{
-			"snapshot.storage.kubernetes.io/snapshotPVHandle": volumeHandle,
-		}
 
-		err = remoteClient.UpdateSnapshotContent(ctx, snapContent)
-		if err != nil {
-			log.Error(err, "unable to update snapshot content")
-			return err
-		}
 		snapshot := makeSnapshotObject(snapRef.Name, snapContent.Name, sc.ObjectMeta.Name, actionAnnotation.SnapshotNamespace)
 		err = remoteClient.CreateSnapshotObject(ctx, snapshot)
 		if err != nil {
@@ -458,9 +451,12 @@ func makeStorageClassContent(driver, snapClass string) *s1.VolumeSnapshotClass {
 }
 
 func makeVolSnapContent(snapName, volumeName string, snapRef v1.ObjectReference, sc *s1.VolumeSnapshotClass) *s1.VolumeSnapshotContent {
+	matchingLabels := make(map[string]string)
+	matchingLabels["pv-handle"] = volumeName
 	volsnapcontent := &s1.VolumeSnapshotContent{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "volume-" + volumeName + "-" + strconv.FormatInt(time.Now().Unix(), 10),
+			Labels: matchingLabels,
 		},
 		Spec: s1.VolumeSnapshotContentSpec{
 			VolumeSnapshotRef: snapRef,
