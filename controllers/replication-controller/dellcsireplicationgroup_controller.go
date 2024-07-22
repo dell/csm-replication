@@ -394,7 +394,10 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 			log.Error(err, "unable to create snapshot content")
 			return err
 		}
-		snapContent.Annotations["snapshot.storage.kubernetes.io/snapshotPVHandle"] = volumeHandle
+		snapContent.ObjectMeta.Labels = map[string]string{
+			"snapshot.storage.kubernetes.io/snapshotPVHandle": volumeHandle,
+		}
+
 		err = remoteClient.UpdateSnapshotContent(ctx, snapContent)
 		if err != nil {
 			log.Error(err, "unable to update snapshot content")
