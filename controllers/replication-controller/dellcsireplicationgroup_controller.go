@@ -389,6 +389,7 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 		snapRef := makeSnapReference(snapshotHandle, actionAnnotation.SnapshotNamespace)
 		sc := makeStorageClassContent(group.Labels[controller.DriverName], actionAnnotation.SnapshotClass)
 		snapContent := makeVolSnapContent(snapshotHandle, volumeHandle, *snapRef, sc)
+		snapContent.Annotations["snapshot.storage.kubernetes.io/snapshotPVHandle"] = volumeHandle
 
 		err = remoteClient.CreateSnapshotContent(ctx, snapContent)
 		if err != nil {
