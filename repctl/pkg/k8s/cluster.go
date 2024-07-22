@@ -122,6 +122,7 @@ type ClusterInterface interface {
 
 	ListVolumeSnapshots(ctx context.Context, opts ...client.ListOption) (*s1.VolumeSnapshotList, error) 
 	ListVolumeSnapshotContents(ctx context.Context, opts ...client.ListOption) (*s1.VolumeSnapshotContentList, error)
+	FilterVolumeSnapshotContents(ctx context.Context, pvHandle string) (*s1.VolumeSnapshotContentList, error)
 	GetVolumeSnapshotContent(ctx context.Context, volumeName string) (*s1.VolumeSnapshotContent, error)
 }
 
@@ -334,6 +335,17 @@ func (c *Cluster) ListVolumeSnapshotContents(ctx context.Context, opts ...client
 		return nil, err
 	}
 	return found, nil
+}
+
+func (c *Cluster) FilterVolumeSnapshotContents(ctx context.Context, pvHandle string) (*s1.VolumeSnapshotContentList, error) {
+	matchingLabels := make(map[string]string)
+	matchingLabels["pv-handle"] = pvHandle
+	
+	pvcList, err := c.ListVolumeSnapshotContents(ctx, client.MatchingLabels(matchingLabels))
+	if err != nil {
+		return nil, err
+	}
+	return pvcList, nil
 }
 
 // FilterPersistentVolumeClaims returns filtered list of all persistent volume claim objects that are currently in cluster
