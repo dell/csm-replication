@@ -26,13 +26,12 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	controller "github.com/dell/csm-replication/controllers"
-
 
 	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	v1 "k8s.io/api/core/v1"
 
 	"k8s.io/utils/pointer"
+	
 )
 
 // GetSnapshotCommand returns 'snapshot' cobra command
@@ -186,31 +185,35 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass, storageC
 	log.Printf("Waiting for snapshot creation to complete...")
 	complete := false
 	maxRetries := 10
-	retryInterval := 2*time.Second
+	retryInterval := 2 * time.Second
 
 	for i := 0; i < maxRetries; i++ {
 		rg, err := cluster.GetReplicationGroups(context.Background(), rgName)
 		if err != nil {
-			log.Fatalf("snapshot: error in fecthing RG info: %s\n", err.Error())
-		}
-		if len(rg.Status.Conditions) == 0 || rg.Status.LastAction.Time == nil {
-			log.Printf("no action to process...")
-			complete = true
-		}
-		if rg.Status.LastAction.ErrorMessage != "" {
-			log.Errorf("last action failed: %s", rg.Status.LastAction.Condition)
-			complete = true
-		}
-		val, ok := rg.Annotations[controller.ActionProcessedTime]
-		if !ok {
-			log.Printf("Action Processed does not exist.")
-			complete = true
-		}
-		if val == rg.Status.LastAction.Time.GoString() {
-			log.Printf("Last action has already been processed")
+			log.Errorf("snapshot: error in fecthing RG info: %s\n", err.Error())
 			return
 		}
-		
+		// if len(rg.Status.Conditions) == 0 || rg.Status.LastAction.Time == nil {
+		// 	log.Printf("no action to process...")
+		// 	complete = true //definitely correct
+		// }
+		if rg.Status.LastAction.ErrorMessage != "" {
+			log.Errorf("last action failed: %s", rg.Status.LastAction.Condition)
+			return
+		}
+		val := rg.Annotations[prefix+"/actionProcessedTime"]
+
+		// if !ok {
+		// 	log.Printf("Action Processed does not exist.")
+		// 	complete = true
+		// }
+		log.Printf("action processed time: %s", val)
+		log.Printf("status last action time: %s", rg.Status.LastAction.Time.GoString())
+		if val == rg.Status.LastAction.Time.GoString() {
+			log.Printf("Last action has already been processed")
+			complete = true
+		}
+
 		if complete {
 			log.Printf("Snapshot creation completed successfully")
 			break
@@ -242,7 +245,7 @@ func isSnapshotCreationComplete(cluster k8s.ClusterInterface, rgName string) (bo
 	if err != nil {
 		log.Fatalf("failover: error in fecthing RG info: %s\n", err.Error())
 	}
-	
+
 	if len(rg.Status.Conditions) == 0 || rg.Status.LastAction.Time == nil {
 		return true, nil
 	}
