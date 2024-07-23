@@ -182,7 +182,7 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass, storageC
 
 	log.Printf("RG (%s), successfully updated with action: snapshot\n", rg.Name)
 
-	//todo: wait for it to finish -> confirm that snapshots are created
+	// todo: wait for it to finish -> confirm that snapshots are created
 	time.Sleep(5 * time.Second)
 
 	if createPVCtrue && storageClass != "" {
@@ -214,7 +214,7 @@ func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIRepl
 			return fmt.Errorf("error getting snapshot contents: %v", err)
 		}
 
-		//return error if list is empty
+		// return error if list is empty
 		if len(snContentList.Items) == 0 {
 			return fmt.Errorf("no snapshot contents found for volume %s", pvName)
 		}
