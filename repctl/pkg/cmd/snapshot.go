@@ -26,12 +26,12 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	controller "github.com/dell/csm-replication/controllers"
 
-	//"sigs.k8s.io/controller-runtime/pkg/client"
+
 	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	v1 "k8s.io/api/core/v1"
 
-	//"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/pointer"
 )
 
@@ -183,7 +183,48 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass, storageC
 	log.Printf("RG (%s), successfully updated with action: snapshot\n", rg.Name)
 
 	// todo: wait for it to finish -> confirm that snapshots are created
-	time.Sleep(5 * time.Second)
+	log.Printf("Waiting for snapshot creation to complete...")
+	complete := false
+	maxRetries := 10
+	retryInterval := 2*time.Second
+
+	for i := 0; i < maxRetries; i++ {
+		rg, err := cluster.GetReplicationGroups(context.Background(), rgName)
+		if err != nil {
+			log.Fatalf("snapshot: error in fecthing RG info: %s\n", err.Error())
+		}
+		if len(rg.Status.Conditions) == 0 || rg.Status.LastAction.Time == nil {
+			log.Printf("no action to process...")
+			complete = true
+		}
+		if rg.Status.LastAction.ErrorMessage != "" {
+			log.Errorf("last action failed: %s", rg.Status.LastAction.Condition)
+			complete = true
+		}
+		val, ok := rg.Annotations[controller.ActionProcessedTime]
+		if !ok {
+			log.Printf("Action Processed does not exist.")
+			complete = true
+		}
+		if val == rg.Status.LastAction.Time.GoString() {
+			log.Printf("Last action has already been processed")
+			return
+		}
+		
+		if complete {
+			log.Printf("Snapshot creation completed successfully")
+			break
+		}
+		if verbose {
+			log.Printf("Snapshot creation in progress. Retrying in %v...", retryInterval)
+		}
+		time.Sleep(retryInterval)
+	}
+
+	if !complete {
+		log.Printf("Timed out waiting for snapshot creation to complete")
+		return
+	}
 
 	if createPVCtrue && storageClass != "" {
 		if err := createPVCsFromSnapshots(cluster, rg, snNamespace, snClass, storageClass); err != nil {
@@ -191,6 +232,26 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass, storageC
 		}
 		log.Printf("Successfully created test PVCs from snapshots under namespaces: test-<original pvc namespace>")
 	}
+}
+
+func isSnapshotCreationComplete(cluster k8s.ClusterInterface, rgName string) (bool, error) {
+	ctx := context.Background()
+
+	// Use ListReplicationGroups instead of GetReplicationGroup
+	rg, err := cluster.GetReplicationGroups(ctx, rgName)
+	if err != nil {
+		log.Fatalf("failover: error in fecthing RG info: %s\n", err.Error())
+	}
+	
+	if len(rg.Status.Conditions) == 0 || rg.Status.LastAction.Time == nil {
+		return true, nil
+	}
+
+	if rg.Status.LastAction.ErrorMessage != "" {
+		return true, fmt.Errorf("last action failed: %s", rg.Status.LastAction.Condition)
+	}
+
+	return false, nil
 }
 
 func createPVCsFromSnapshots(cluster k8s.ClusterInterface, rg *repv1.DellCSIReplicationGroup, snNamespace, snClass, storageClass string) error {
