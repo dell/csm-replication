@@ -43,6 +43,8 @@ This command will create a snapshot for the specified RG on the target cluster.\
 			snClass := viper.GetString("sn-class")
 			verbose := viper.GetBool(config.Verbose)
 			wait := viper.GetBool("snapshot-wait")
+			createPVCtrue := viper.GetBool("create-pvcs")
+			storageClass := viper.GetString("storage-class")
 			input, res := verifyInputForSnapshotAction(inputCluster, rgName)
 
 			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
@@ -51,7 +53,7 @@ This command will create a snapshot for the specified RG on the target cluster.\
 			}
 
 			if input == "rg" {
-				createSnapshot(configFolder, res, prefix, snNamespace, snClass, verbose, wait)
+				createSnapshot(configFolder, res, prefix, snNamespace, snClass, storageClass, verbose, wait, createPVCtrue)
 			} else {
 				log.Fatal("Unexpected input received")
 			}
@@ -64,9 +66,13 @@ This command will create a snapshot for the specified RG on the target cluster.\
 	_ = viper.BindPFlag("sn-namespace", snapshotCmd.Flags().Lookup("sn-namespace"))
 	snapshotCmd.Flags().String("sn-class", "", "target snapshot class to use")
 	_ = viper.BindPFlag("sn-class", snapshotCmd.Flags().Lookup("sn-class"))
-
+	snapshotCmd.Flags().String("storage-class", "", "storage class to use when creating PVCs from snapshots")
+	_ = viper.BindPFlag("storage-class", snapshotCmd.Flags().Lookup("storage-class"))
+	
 	snapshotCmd.Flags().Bool("wait", false, "wait for action to complete")
 	_ = viper.BindPFlag("snapshot-wait", snapshotCmd.Flags().Lookup("wait"))
+	snapshotCmd.Flags().Bool("create-pvcs", false, "create PVCs from snapshots")
+	_ = viper.BindPFlag("create-pvcs", snapshotCmd.Flags().Lookup("create-pvcs"))
 	return snapshotCmd
 }
 
@@ -106,7 +112,7 @@ func verifyInputForSnapshotAction(input string, rg string) (res string, tgt stri
 	return "", ""
 }
 
-func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass string, verbose bool, wait bool) {
+func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass, storageClass string, verbose, wait, createPVCtrue bool) {
 	if verbose {
 		log.Printf("fetching RG and cluster info...\n")
 	}
@@ -134,6 +140,11 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass string, v
 		return
 	}
 
+	if createPVCtrue && (storageClass == "") {
+		log.Fatal("Aborted. Storage class not provided when create pvc is enabled.")
+		return
+	}
+
 	rg.Spec.Action = config.ActionCreateSnapshot
 
 	namespace := "default"
@@ -145,6 +156,13 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass string, v
 
 	rg.Annotations[prefix+"/snapshotNamespace"] = namespace
 	rg.Annotations[prefix+"/snapshotClass"] = snClass
+	rg.Annotations[prefix+"/snapshotStorageClass"] = storageClass
+	if createPVCtrue {
+		rg.Annotations[prefix+"/snapshotCreatePVC"] = "true"
+	} else {
+		rg.Annotations[prefix+"/snapshotCreatePVC"] = "false"
+	}
+	
 
 	if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
 		log.Fatalf("snapshot: error executing UpdateAction %s\n", err.Error())

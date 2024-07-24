@@ -32,6 +32,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 	reconcile "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/ratelimiter"
 
@@ -402,6 +403,138 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 			log.Error(err, "unable to create snapshot object")
 			return err
 		}
+	}
+
+	storageClass := group.Annotations[r.Domain+"/snapshotStorageClass"] 
+	createPVC := group.Annotations[r.Domain+"/snapshotCreatePVC"]
+	snClass := group.Annotations[r.Domain+"/snapshotClass"]
+	if createPVC =="true" && storageClass != "" && snClass != "" {
+		err := r.createPVCsFromSnapshots(ctx, group, remoteClient, log, snClass, storageClass)
+		if err != nil {
+			log.Error(err, "unable to create pvc from snapshot")
+			return err
+		}
+	}
+
+	return nil
+}
+
+
+
+func (r *ReplicationGroupReconciler) createPVCsFromSnapshots(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger, snClass, storageClass string) error {
+	rgName := group.Name
+
+	pvcList, err := remoteClient.ListPersistentVolumeClaims(ctx, client.MatchingLabels{r.Domain+"/replicationGroupName": rgName})
+	if err != nil {
+		log.Error(err, "error getting pvcs: %v")
+		return err
+	}
+
+	log.V(common.InfoLevel).Info("Found %d pvcs", len(pvcList.Items))
+	for _, pvc := range pvcList.Items {
+		// step 1: retrieve the latest snapshot content from pvc
+		pvName := pvc.Spec.VolumeName
+		pv, err := remoteClient.GetPersistentVolume(ctx, pvName)
+		if err != nil {
+			log.Error(err, "error getting pv: %v")
+		}
+		pvHandle := pv.Spec.CSI.VolumeHandle
+		snContentList, err := remoteClient.ListVolumeSnapshotContents(ctx, client.MatchingLabels{"pv-handle": pvHandle})
+		if err != nil {
+			log.Error(err, "error getting snapshot contents: %v")
+		}
+		// return error if list is empty
+		if len(snContentList.Items) == 0 {
+			return fmt.Errorf("no snapshot contents found for volume %s", pvName) //cannot be changed
+		}
+
+		// get the latest snapshot content by timestamp
+		timeStampLatest := pvc.CreationTimestamp
+		snContentLatestName := ""
+
+		for _, snContent := range snContentList.Items {
+			if snContent.CreationTimestamp.After(timeStampLatest.Time) {
+				timeStampLatest = snContent.CreationTimestamp
+				snContentLatestName = snContent.Name
+			}
+		}
+
+		// step 2: create cloned snapshot content -> done
+		newNamespace := "test-" + pvc.Namespace
+		clonedSnapshotContentName := fmt.Sprintf("cloned-%s", snContentLatestName)
+		snContent, _ := remoteClient.GetSnapshotContent(ctx, snContentLatestName)
+		snName := snContent.Spec.VolumeSnapshotRef.Name
+
+		clonedSnapshotContent := &s1.VolumeSnapshotContent{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: clonedSnapshotContentName,
+			},
+			Spec: s1.VolumeSnapshotContentSpec{
+				DeletionPolicy: snContent.Spec.DeletionPolicy,
+				Driver:         snContent.Spec.Driver,
+				Source: s1.VolumeSnapshotContentSource{
+					SnapshotHandle: snContent.Spec.Source.SnapshotHandle,
+				},
+				VolumeSnapshotRef: v1.ObjectReference{
+					Namespace: newNamespace,
+					Name:      snName,
+				},
+				VolumeSnapshotClassName: &snClass,
+			},
+		}
+
+		err = remoteClient.CreateSnapshotContent(ctx, clonedSnapshotContent)
+		if err != nil {
+			log.Error(err, "error creating cloned SnapshotContent %s: %v", clonedSnapshotContentName)
+			return err
+		}
+
+		// step 3: create new snapshot -> done
+		newSnapshot := &s1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      snName,
+				Namespace: newNamespace,
+			},
+			Spec: s1.VolumeSnapshotSpec{
+				Source: s1.VolumeSnapshotSource{
+					VolumeSnapshotContentName: &clonedSnapshotContentName,
+				},
+				VolumeSnapshotClassName: &snClass,
+			},
+		}
+
+		err = remoteClient.CreateSnapshotObject(ctx, newSnapshot)
+		if err != nil {
+			log.Error(err,"error creating new Snapshot in namespace %s: %v", newNamespace)
+			return err
+		}
+
+		// step 4: create pvc from snapshot -> done
+		pvcName := pvc.Name
+		newPVC := &v1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      pvcName,
+				Namespace: newNamespace,
+			},
+			Spec: v1.PersistentVolumeClaimSpec{
+				StorageClassName: pointer.String(storageClass),
+				AccessModes:      pvc.Spec.AccessModes,
+				Resources:        pvc.Spec.Resources,
+				DataSource: &v1.TypedLocalObjectReference{
+					APIGroup: pointer.String("snapshot.storage.k8s.io"),
+					Kind:     "VolumeSnapshot",
+					Name:     snName,
+				},
+			},
+		}
+
+		err = remoteClient.CreatePersistentVolumeClaim(ctx, newPVC)
+		if err != nil {
+			log.Error(err, "error creating PVC in namespace", newNamespace)
+			return err
+		}
+
+		log.V(common.InfoLevel).Info("Created PVC %s in namespace %s from snapshot", newPVC.Name, newNamespace)
 	}
 
 	return nil
