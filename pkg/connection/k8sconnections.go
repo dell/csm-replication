@@ -260,6 +260,10 @@ func (c *RemoteK8sControllerClient) GetPersistentVolumeClaim(ctx context.Context
 	return claim, nil
 }
 
+func (c *RemoteK8sControllerClient) CreatePersistentVolumeClaim(ctx context.Context, claim *corev1.PersistentVolumeClaim) error {
+	return c.Client.Create(ctx, claim)
+}
+
 // UpdatePersistentVolumeClaim updates persistent volume claim object in current cluster
 func (c *RemoteK8sControllerClient) UpdatePersistentVolumeClaim(ctx context.Context, claim *corev1.PersistentVolumeClaim) error {
 	return c.Client.Update(ctx, claim)
@@ -300,6 +304,40 @@ func (c *RemoteK8sControllerClient) GetNamespace(ctx context.Context, namespace 
 		return nil, err
 	}
 
+	return found, nil
+}
+
+// ListPersistentVolumeClaims gets the list of persistent volume claim objects under the replication group given the replication group name
+func (c *RemoteK8sControllerClient) ListPersistentVolumeClaims(ctx context.Context, opts ...ctrlClient.ListOption) (*corev1.PersistentVolumeClaimList, error) {
+	list := &corev1.PersistentVolumeClaimList{}
+
+	err := c.Client.List(ctx, list, opts...)
+	if err != nil {
+		return nil, err
+	}
+	
+	return list, nil
+}
+
+func (c *RemoteK8sControllerClient) ListVolumeSnapshotContents(ctx context.Context, opts ...ctrlClient.ListOption) (*s1.VolumeSnapshotContentList, error) {
+	list := &s1.VolumeSnapshotContentList{}
+
+	err := c.Client.List(ctx, list, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	return list, nil
+}
+
+func (c *RemoteK8sControllerClient) GetSnapshotContent(ctx context.Context, snapshotContentName string) (*s1.VolumeSnapshotContent, error) {
+	found := &s1.VolumeSnapshotContent{}
+	
+	err := c.Client.Get(ctx, types.NamespacedName{Name: snapshotContentName}, found)
+	if err != nil {
+		return nil, err
+	}
+	
 	return found, nil
 }
 
