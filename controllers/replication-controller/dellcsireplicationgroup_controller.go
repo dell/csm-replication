@@ -576,10 +576,9 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	localPVPolicy := pv.Spec.PersistentVolumeReclaimPolicy
 	log.V(common.InfoLevel).Info(fmt.Sprintf("Saving reclaim policy of local PV: %s\n", string(localPVPolicy)))
 
-	// pv, err = clientset.CoreV1().PersistentVolumes().Get(ctx, pvc.Annotations[r.Domain+"remotePV"], metav1.GetOptions{})
-	pv, err = client.GetPersistentVolume(ctx, pvc.Annotations[r.Domain+"remotePV"])
+	pv, err = client.GetPersistentVolume(ctx, pvc.Annotations[r.Domain+"/remotePV"])
 	if err != nil {
-		log.V(common.InfoLevel).Info(fmt.Sprintf("Error retrieving remote PV %s: %s", pvc.Annotations[r.Domain+"remotePV"], err.Error()))
+		log.V(common.InfoLevel).Info(fmt.Sprintf("Error retrieving remote PV %s: %s", pvc.Annotations[r.Domain+"/remotePV"], err.Error()))
 		return err
 	}
 	remotePVPolicy := pv.Spec.PersistentVolumeReclaimPolicy
@@ -590,12 +589,12 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 		return err
 	}
 
-	if err = makePVReclaimPolicyRetain(ctx, client, pvc.Annotations[r.Domain+"remotePV"], log); err != nil {
+	if err = makePVReclaimPolicyRetain(ctx, client, pvc.Annotations[r.Domain+"/remotePV"], log); err != nil {
 		return err
 	}
 
 	// Check that the request targetPV volume is our replia (remotePV)
-	remotePV := pvc.Annotations[r.Domain+"remotePV"]
+	remotePV := pvc.Annotations[r.Domain+"/remotePV"]
 	if targetPV != remotePV {
 		err := fmt.Errorf("requested target %s doesn't match available replica %s", targetPV, remotePV)
 		log.V(common.InfoLevel).Info(err.Error())
@@ -630,13 +629,13 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 
 	// Swap some fields in the PVC.
 	localPV := pvc.Spec.VolumeName
-	pvc.Annotations[r.Domain+"remotePV"] = pvc.Spec.VolumeName
+	pvc.Annotations[r.Domain+"/remotePV"] = pvc.Spec.VolumeName
 	pvc.Spec.VolumeName = remotePV
 
-	remoteStorageClassName := pvc.Annotations[r.Domain+"remoteStorageClassName"]
-	pvc.Annotations[r.Domain+"remoteStorageClassName"] = *pvc.Spec.StorageClassName
-	pvc.Annotations[r.Domain+"replicationGroupName"] = rgTarget
-	pvc.Labels[r.Domain+"replicationGroupName"] = rgTarget
+	remoteStorageClassName := pvc.Annotations[r.Domain+"/remoteStorageClassName"]
+	pvc.Annotations[r.Domain+"/remoteStorageClassName"] = *pvc.Spec.StorageClassName
+	pvc.Annotations[r.Domain+"/replicationGroupName"] = rgTarget
+	pvc.Labels[r.Domain+"/replicationGroupName"] = rgTarget
 	pvc.Spec.StorageClassName = &remoteStorageClassName
 	pvc.ObjectMeta.ResourceVersion = ""
 
@@ -675,7 +674,7 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	if err != nil {
 		return err
 	}
-	err = setPVReclaimPolicy(ctx, client, pvc.Annotations[r.Domain+"remotePV"], localPVPolicy, log)
+	err = setPVReclaimPolicy(ctx, client, pvc.Annotations[r.Domain+"/remotePV"], localPVPolicy, log)
 	if err != nil {
 		return err
 	}
@@ -691,7 +690,7 @@ func (r *ReplicationGroupReconciler) verifyPVC(ctx context.Context, client conne
 		time.Sleep(1 * time.Second)
 		pvc, err := client.GetPersistentVolumeClaim(ctx, namespace, pvcName)
 
-		if (err == nil) && (localPVName == pvc.Spec.VolumeName) && (remotePVName == pvc.Annotations[r.Domain+"remotePV"]) {
+		if (err == nil) && (localPVName == pvc.Spec.VolumeName) && (remotePVName == pvc.Annotations[r.Domain+"/remotePV"]) {
 			done = true
 			return err
 		}
