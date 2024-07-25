@@ -584,9 +584,12 @@ func makeStorageClassContent(driver, snapClass string) *s1.VolumeSnapshotClass {
 }
 
 func makeVolSnapContent(snapName, volumeName string, snapRef v1.ObjectReference, sc *s1.VolumeSnapshotClass) *s1.VolumeSnapshotContent {
+	matchingLabels := make(map[string]string)
+	matchingLabels["pv-handle"] = volumeName
 	volsnapcontent := &s1.VolumeSnapshotContent{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "volume-" + volumeName + "-" + strconv.FormatInt(time.Now().Unix(), 10),
+			Labels: matchingLabels,
 		},
 		Spec: s1.VolumeSnapshotContentSpec{
 			VolumeSnapshotRef: snapRef,
