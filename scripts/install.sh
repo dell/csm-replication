@@ -21,7 +21,7 @@ MODE="install"
 NS="dell-replication-controller"
 RELEASE="replication"
 MODULE="csm-replication"
-HELMCHARTVERSION="csm-replication-1.8.1"
+HELMCHARTVERSION="csm-replication-1.9.0"
 
 # export the name of the debug log, so child processes will see it
 export DEBUGLOG="${SCRIPTDIR}/install-debug.log"
