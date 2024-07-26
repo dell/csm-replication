@@ -392,6 +392,10 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 			return fmt.Errorf("unable to determine default snapshot class")
 		}
 		sc = makeSnapshotClass(driverClass, snClass)
+		if err = remoteClient.CreateSnapshotClass(ctx, sc); err != nil {
+			log.Error(err, "unable to create default snapshot class")
+			return err
+		}
 	}
 
 	for volumeHandle, snapshotHandle := range lastAction.ActionAttributes {

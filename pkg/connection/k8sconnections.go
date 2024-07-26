@@ -290,6 +290,11 @@ func (c *RemoteK8sControllerClient) GetSnapshotClass(ctx context.Context, snapCl
 	return found, nil
 }
 
+// CreateSnapshotObject creates the snapshot on the remote cluster
+func (c *RemoteK8sControllerClient) CreateSnapshotClass(ctx context.Context, content *s1.VolumeSnapshotClass) error {
+	return c.Client.Create(ctx, content)
+}
+
 // CreateNamespace creates a desired namespace on the remote cluster.
 func (c *RemoteK8sControllerClient) CreateNamespace(ctx context.Context, content *corev1.Namespace) error {
 	return c.Client.Create(ctx, content)
