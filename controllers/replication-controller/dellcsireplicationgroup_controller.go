@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"regexp"
 
 	csireplicator "github.com/dell/csm-replication/controllers/csi-replicator"
 	"github.com/dell/csm-replication/pkg/common"
@@ -366,11 +367,6 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 		return err
 	}
 
-	if _, err := remoteClient.GetSnapshotClass(ctx, actionAnnotation.SnapshotClass); err != nil {
-		log.Error(err, "Snapshot class does not exist on remote cluster. Not creating the remote snapshots.")
-		return err
-	}
-
 	if _, err := remoteClient.GetNamespace(ctx, actionAnnotation.SnapshotNamespace); err != nil {
 		log.V(common.InfoLevel).Info("Namespace - " + actionAnnotation.SnapshotNamespace + " not found, creating it.")
 		nsRef := makeNamespaceReference(actionAnnotation.SnapshotNamespace)
@@ -383,12 +379,25 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 		}
 	}
 
+	// create default snapshot class if it does not exist
+	// example driver class: csi-vxflexos.dellemc.com
+	// example default snapshot class: default-csi-vxflexos
+	sc, err := remoteClient.GetSnapshotClass(ctx, actionAnnotation.SnapshotClass)
+	if err != nil {
+		driverClass := group.Labels[controller.DriverName]
+		r, _ := regexp.Compile(`^.*?(?=\.)`)
+		defaultClass := "default-"+r.FindString(driverClass)
+		if defaultClass == "" {
+			return fmt.Errorf("unable to determine default snapshot class")
+		}
+		sc = makeSnapshotClass(driverClass, defaultClass)
+	}
+
 	for volumeHandle, snapshotHandle := range lastAction.ActionAttributes {
 		msg := "ActionAttributes - volumeHandle: " + volumeHandle + ", snapshotHandle: " + snapshotHandle
 		log.V(common.InfoLevel).Info(msg)
 
 		snapRef := makeSnapReference(snapshotHandle, actionAnnotation.SnapshotNamespace)
-		sc := makeStorageClassContent(group.Labels[controller.DriverName], actionAnnotation.SnapshotClass)
 		snapContent := makeVolSnapContent(snapshotHandle, volumeHandle, *snapRef, sc)
 
 		err = remoteClient.CreateSnapshotContent(ctx, snapContent)
@@ -573,10 +582,10 @@ func makeSnapshotObject(snapName, contentName, className, namespace string) *s1.
 	return volsnap
 }
 
-func makeStorageClassContent(driver, snapClass string) *s1.VolumeSnapshotClass {
+func makeSnapshotClass(driver, snapClass string) *s1.VolumeSnapshotClass {
 	return &s1.VolumeSnapshotClass{
 		Driver:         driver,
-		DeletionPolicy: "Retain",
+		DeletionPolicy: "Delete",
 		ObjectMeta: metav1.ObjectMeta{
 			Name: snapClass,
 		},
