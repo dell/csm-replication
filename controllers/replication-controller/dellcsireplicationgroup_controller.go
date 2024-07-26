@@ -21,7 +21,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"regexp"
 
 	csireplicator "github.com/dell/csm-replication/controllers/csi-replicator"
 	"github.com/dell/csm-replication/pkg/common"
@@ -384,9 +383,10 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 	// example default snapshot class: default-csi-vxflexos
 	sc, err := remoteClient.GetSnapshotClass(ctx, actionAnnotation.SnapshotClass)
 	if err != nil {
+		log.V(common.ErrorLevel).Error(err, "failing to retrieve snapshot class, creating a default class")
 		driverClass := group.Labels[controller.DriverName]
-		r, _ := regexp.Compile(`^.*?(?=\.)`)
-		defaultClass := "default-"+r.FindString(driverClass)
+		part := strings.Split(driverClass, ".")[0]
+		defaultClass := "default-"+strings.TrimPrefix(part, "csi-")+"-snapshotclass"
 		if defaultClass == "" {
 			return fmt.Errorf("unable to determine default snapshot class")
 		}
@@ -395,7 +395,7 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 
 	for volumeHandle, snapshotHandle := range lastAction.ActionAttributes {
 		msg := "ActionAttributes - volumeHandle: " + volumeHandle + ", snapshotHandle: " + snapshotHandle
-		log.V(common.InfoLevel).Info(msg)
+		log.V(common.ErrorLevel).Error(err, msg)
 
 		snapRef := makeSnapReference(snapshotHandle, actionAnnotation.SnapshotNamespace)
 		snapContent := makeVolSnapContent(snapshotHandle, volumeHandle, *snapRef, sc)
