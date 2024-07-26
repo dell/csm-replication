@@ -382,18 +382,22 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 	// example driver class: csi-vxflexos.dellemc.com
 	// example default snapshot class: default-csi-vxflexos
 	snClass := group.Annotations[r.Domain+"/snapshotClass"]
+	driverClass := group.Labels[controller.DriverName]
+	if snClass == "" {
+		part := strings.Split(driverClass, ".")[0]
+		snClass = "default-" + strings.TrimPrefix(part, "csi-") + "-snapshotclass"
+	} else {
+		if _, err := remoteClient.GetSnapshotClass(ctx, snClass) ; err != nil {
+			log.V(common.ErrorLevel).Error(err, "user defined snapshot class does not exist")
+			return err
+		}
+	}
 	sc, err := remoteClient.GetSnapshotClass(ctx, snClass)
 	if err != nil {
 		log.V(common.ErrorLevel).Error(err, "failing to retrieve snapshot class, creating a default class")
-		driverClass := group.Labels[controller.DriverName]
-		part := strings.Split(driverClass, ".")[0]
-		snClass := "default-" + strings.TrimPrefix(part, "csi-") + "-snapshotclass"
-		if snClass == "" {
-			return fmt.Errorf("unable to determine default snapshot class")
-		}
 		sc = makeSnapshotClass(driverClass, snClass)
 		if err = remoteClient.CreateSnapshotClass(ctx, sc); err != nil {
-			log.Error(err, "unable to create default snapshot class")
+			log.V(common.ErrorLevel).Error(err, "unable to create default snapshot class")
 			return err
 		}
 	}
