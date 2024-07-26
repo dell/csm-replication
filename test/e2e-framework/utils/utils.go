@@ -34,6 +34,7 @@ import (
 	"github.com/dell/dell-csi-extensions/replication"
 	"github.com/fatih/color"
 	"github.com/go-logr/logr"
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	v1 "k8s.io/api/core/v1"
@@ -131,6 +132,7 @@ func InitializeSchemes() {
 	if !schemesInitialized {
 		utilruntime.Must(clientgoscheme.AddToScheme(Scheme))
 		utilruntime.Must(repv1.AddToScheme(Scheme))
+		utilruntime.Must(snapshotv1.AddToScheme(Scheme))
 		schemesInitialized = true
 	}
 	// +kubebuilder:scaffold:scheme
@@ -428,4 +430,15 @@ func GetLogger() logr.Logger {
 
 func init() {
 	log = zap.New(zap.UseDevMode(false))
+}
+
+func GetSnapshotClass(provisionerName, snapName string) *snapshotv1.VolumeSnapshotClass {
+	snObj := snapshotv1.VolumeSnapshotClass{
+		Driver:         provisionerName,
+		DeletionPolicy: "Retain",
+		ObjectMeta: metav1.ObjectMeta{
+			Name: snapName,
+		},
+	}
+	return &snObj
 }
