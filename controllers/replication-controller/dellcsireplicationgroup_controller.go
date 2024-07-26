@@ -381,16 +381,17 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 	// create default snapshot class if it does not exist
 	// example driver class: csi-vxflexos.dellemc.com
 	// example default snapshot class: default-csi-vxflexos
-	sc, err := remoteClient.GetSnapshotClass(ctx, actionAnnotation.SnapshotClass)
+	snClass := group.Annotations[r.Domain+"/snapshotClass"]
+	sc, err := remoteClient.GetSnapshotClass(ctx, snClass)
 	if err != nil {
 		log.V(common.ErrorLevel).Error(err, "failing to retrieve snapshot class, creating a default class")
 		driverClass := group.Labels[controller.DriverName]
 		part := strings.Split(driverClass, ".")[0]
-		defaultClass := "default-"+strings.TrimPrefix(part, "csi-")+"-snapshotclass"
-		if defaultClass == "" {
+		snClass := "default-" + strings.TrimPrefix(part, "csi-") + "-snapshotclass"
+		if snClass == "" {
 			return fmt.Errorf("unable to determine default snapshot class")
 		}
-		sc = makeSnapshotClass(driverClass, defaultClass)
+		sc = makeSnapshotClass(driverClass, snClass)
 	}
 
 	for volumeHandle, snapshotHandle := range lastAction.ActionAttributes {
@@ -414,10 +415,10 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 		}
 	}
 
-	storageClass := group.Annotations[r.Domain+"/snapshotStorageClass"] 
+	storageClass := group.Annotations[r.Domain+"/snapshotStorageClass"]
 	createPVC := group.Annotations[r.Domain+"/snapshotCreatePVC"]
-	snClass := group.Annotations[r.Domain+"/snapshotClass"]
-	if createPVC =="true" && storageClass != "" && snClass != "" {
+
+	if createPVC == "true" && storageClass != "" && snClass != "" {
 		err := r.createPVCsFromSnapshots(ctx, group, remoteClient, log, snClass, storageClass)
 		if err != nil {
 			log.Error(err, "unable to create pvc from snapshot")
@@ -428,12 +429,10 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 	return nil
 }
 
-
-
 func (r *ReplicationGroupReconciler) createPVCsFromSnapshots(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger, snClass, storageClass string) error {
 	rgName := group.Name
 
-	pvcList, err := remoteClient.ListPersistentVolumeClaims(ctx, client.MatchingLabels{r.Domain+"/replicationGroupName": rgName})
+	pvcList, err := remoteClient.ListPersistentVolumeClaims(ctx, client.MatchingLabels{r.Domain + "/replicationGroupName": rgName})
 	if err != nil {
 		log.Error(err, "error getting pvcs: %v")
 		return err
@@ -454,7 +453,7 @@ func (r *ReplicationGroupReconciler) createPVCsFromSnapshots(ctx context.Context
 		}
 		// return error if list is empty
 		if len(snContentList.Items) == 0 {
-			return fmt.Errorf("no snapshot contents found for volume %s", pvName) //cannot be changed
+			return fmt.Errorf("no snapshot contents found for volume %s", pvName) // cannot be changed
 		}
 
 		// get the latest snapshot content by timestamp
@@ -514,7 +513,7 @@ func (r *ReplicationGroupReconciler) createPVCsFromSnapshots(ctx context.Context
 
 		err = remoteClient.CreateSnapshotObject(ctx, newSnapshot)
 		if err != nil {
-			log.Error(err,"error creating new Snapshot in namespace %s: %v", newNamespace)
+			log.Error(err, "error creating new Snapshot in namespace %s: %v", newNamespace)
 			return err
 		}
 
@@ -597,7 +596,7 @@ func makeVolSnapContent(snapName, volumeName string, snapRef v1.ObjectReference,
 	matchingLabels["pv-handle"] = volumeName
 	volsnapcontent := &s1.VolumeSnapshotContent{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "volume-" + volumeName + "-" + strconv.FormatInt(time.Now().Unix(), 10),
+			Name:   "volume-" + volumeName + "-" + strconv.FormatInt(time.Now().Unix(), 10),
 			Labels: matchingLabels,
 		},
 		Spec: s1.VolumeSnapshotContentSpec{
