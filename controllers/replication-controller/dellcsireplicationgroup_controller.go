@@ -404,7 +404,7 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 
 	for volumeHandle, snapshotHandle := range lastAction.ActionAttributes {
 		msg := "ActionAttributes - volumeHandle: " + volumeHandle + ", snapshotHandle: " + snapshotHandle
-		log.V(common.ErrorLevel).Error(err, msg)
+		log.V(common.ErrorLevel).Info(msg)
 
 		snapRef := makeSnapReference(snapshotHandle, actionAnnotation.SnapshotNamespace)
 		snapContent := makeVolSnapContent(snapshotHandle, volumeHandle, *snapRef, sc)
