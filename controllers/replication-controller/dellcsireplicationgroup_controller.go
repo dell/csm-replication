@@ -475,7 +475,7 @@ func (r *ReplicationGroupReconciler) createPVCsFromSnapshots(ctx context.Context
 
 		// get the latest snapshot content by timestamp
 		timeStampLatest := pvc.CreationTimestamp
-		snContentLatestName := ""
+		snContentLatestName := snContentList.Items[0].Name
 
 		for _, snContent := range snContentList.Items {
 			if snContent.CreationTimestamp.After(timeStampLatest.Time) {
