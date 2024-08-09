@@ -28,12 +28,11 @@ import (
 	"github.com/dell/csm-replication/pkg/config"
 	"github.com/dell/csm-replication/pkg/connection"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
-	//s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -475,7 +474,10 @@ func (suite *RGControllerTestSuite) TestSetupWithManagerRg() {
 	suite.Error(err, "Setup should fail when there is no manager")
 }
 
-func (suite *RGControllerTestSuite) getSingleClusterSetup() (*repv1.DellCSIReplicationGroup, *repv1.DellCSIReplicationGroup, *corev1.PersistentVolume, *corev1.PersistentVolume, *corev1.PersistentVolumeClaim) {
+// getSingleClusterPVSetup creates replication group, remote replication group,
+// a pair of PVs, and a PVC for single cluster.
+// The setup is exactly the same as the one used in PVC remap.
+func (suite *RGControllerTestSuite) getSingleClusterPVSetup() (*repv1.DellCSIReplicationGroup, *repv1.DellCSIReplicationGroup, *corev1.PersistentVolume, *corev1.PersistentVolume, *corev1.PersistentVolumeClaim) {
 	// scenario: RG without sync complete
 	newConfig := config.NewFakeConfigForSingleCluster(suite.client,
 		suite.driver.SourceClusterID, suite.driver.RemoteClusterID)
@@ -606,7 +608,7 @@ func (suite *RGControllerTestSuite) getSingleClusterSetup() (*repv1.DellCSIRepli
 
 	err = suite.client.Create(ctx, pvcObj)
 	suite.NoError(err)
-	assert.NotNil(suite.T(), pvcObj)
+	suite.NotNil(pvcObj)
 
 	_, err = suite.reconciler.Reconcile(context.Background(), req)
 	suite.NoError(err)
@@ -614,8 +616,8 @@ func (suite *RGControllerTestSuite) getSingleClusterSetup() (*repv1.DellCSIRepli
 	return rg, replicatedRG, localPV, remotePV, pvcObj
 }
 
-func (suite *RGControllerTestSuite) TestSnapshotDraft() {
-	rg, _, _, _, _ := suite.getSingleClusterSetup()
+func (suite *RGControllerTestSuite) TestCreatePVCSnapshotAction() {
+	rg, _, _, _, _ := suite.getSingleClusterPVSetup()
 	rg.Annotations[constants.DefaultDomain+"/snapshotStorageClass"] = "sc-3"
 	rg.Annotations[constants.DefaultDomain+"/snapshotCreatePVC"] = "true"
 
@@ -623,7 +625,7 @@ func (suite *RGControllerTestSuite) TestSnapshotDraft() {
 	err := suite.client.Create(context.Background(), snapshotClass)
 	suite.NoError(err)
 
-	//Invoke snapshot action
+	// Invoke snapshot action
 	time := metav1.Now()
 	lastAction := repv1.LastAction{
 		Time:      &time,
@@ -648,7 +650,6 @@ func (suite *RGControllerTestSuite) TestSnapshotDraft() {
 	}
 	actionString, err := json.Marshal(actionAnnotation)
 	suite.NoError(err)
-
 	
 	rg.Annotations[csireplicator.Action] = string(actionString)
 	err = suite.client.Update(context.Background(), rg)
@@ -657,31 +658,33 @@ func (suite *RGControllerTestSuite) TestSnapshotDraft() {
 	_, err = suite.reconciler.Reconcile(context.Background(), suite.getTypicalRequest())
 	suite.NoError(err)
 
-	req := suite.getTypicalRequest()
-	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
+	// Verify create PVC from snapshot occurred
+	// step 1: use pv-handle to retrieve it -> verify that a snapshotcontent is created
+	rClient, _ := suite.config.GetConnection("self")
+	ctx := context.Background()
+	snContentList, err := rClient.ListVolumeSnapshotContents(ctx, client.MatchingLabels{"pv-handle": "vol-handle"})
 	suite.NoError(err)
-	suite.Equal("yes", rg.Annotations[controllers.RGSyncComplete],
-		"RG Sync annotation applied")
-	replicatedRGName := fmt.Sprintf("%s-%s", replicated, rg.Name)
-	suite.Equal(replicatedRGName, rg.Annotations[controllers.RemoteReplicationGroup],
-		"Remote RG annotation applied")
+	snContent := snContentList.Items[0]
 
-	// Check if remote RG got created
-	rClient, err := suite.config.GetConnection("self")
-	suite.NoError(err)
-	_, err = rClient.GetReplicationGroup(context.Background(), replicatedRGName)
-	suite.NoError(err)
-
-	// Another reconcile
-	_, err = suite.reconciler.Reconcile(context.Background(), req)
+	// step 2: use snapshotcontent to retrieve snapshot -> verify the namespace is demo1
+	var snapshot s1.VolumeSnapshot
+	snapshotName := snContent.Spec.VolumeSnapshotRef.Name
+	err = suite.client.Get(ctx, types.NamespacedName{Name: snapshotName, Namespace: "demo1"}, &snapshot)
 	suite.NoError(err)
 
-	// Reconcile the other RG
-	req.NamespacedName.Name = replicatedRGName
-	_, err = suite.reconciler.Reconcile(context.Background(), req)
+	// step 3: retrieve cloned snapshotcontent, name: cloned-<step1 snapshotcontent name>
+	var clonedSnContent s1.VolumeSnapshotContent
+	err = suite.client.Get(ctx, types.NamespacedName{Name: "cloned-"+snContent.Name}, &clonedSnContent)
 	suite.NoError(err)
-	replicatedRG, err := rClient.GetReplicationGroup(context.Background(), replicatedRGName)
+
+	// step 4: retrieve snapshot, namespace: test-fake-ns, name: same as in step 2
+	var newSnapshot s1.VolumeSnapshot
+	err = suite.client.Get(ctx, types.NamespacedName{Name: snapshotName, Namespace: "test-fake-ns"}, &newSnapshot)
 	suite.NoError(err)
-	suite.T().Log(replicatedRG.Annotations)
-	suite.T().Log(replicatedRG.Labels)
+
+	// step 5: retrieve pvc, namespace: test-fake-ns, name: fake-pvc, storage class: sc-3
+	var newPVC corev1.PersistentVolumeClaim
+	err = suite.client.Get(ctx, types.NamespacedName{Name: "fake-pvc", Namespace: "test-fake-ns"}, &newPVC)
+	suite.NoError(err)
+	suite.Equal("sc-3", *newPVC.Spec.StorageClassName)
 }
