@@ -28,15 +28,10 @@ import (
 	"github.com/dell/csm-replication/pkg/config"
 	"github.com/dell/csm-replication/pkg/connection"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
-<<<<<<< HEAD
 	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	"github.com/stretchr/testify/suite"
-	v1 "k8s.io/api/core/v1"
-=======
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"
->>>>>>> ad85603 (Unit Testing for PVC Remap Feature (#150))
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -492,7 +487,6 @@ func (suite *RGControllerTestSuite) TestSetupWithManagerRg() {
 	err := suite.reconciler.SetupWithManager(mgr, expRateLimiter, 1, false)
 	suite.Error(err, "Setup should fail when there is no manager")
 }
-
 func (suite *RGControllerTestSuite) TestMakeNamespaceReference() {
 	ns := "test-namespace"
 	result := makeNamespaceReference(ns)
@@ -708,7 +702,10 @@ func (suite *RGControllerTestSuite) TestProcessSnapshotEvent() {
 	err = suite.reconciler.processSnapshotEvent(context.Background(), rg, remoteClient, suite.reconciler.Log)
 	suite.NoError(err, "processSnapshotEvent should succeed when a valid snapshot class and action attributes are provided")
 }
-func (suite *RGControllerTestSuite) getPVCRemapSetup() (*repv1.DellCSIReplicationGroup, *repv1.DellCSIReplicationGroup, *corev1.PersistentVolume, *corev1.PersistentVolume, *corev1.PersistentVolumeClaim) {
+
+// getSingleClusterPVSetup creates replication group, remote replication group,
+// a pair of PVs, and a PVC for single cluster.
+func (suite *RGControllerTestSuite) getSingleClusterPVSetup() (*repv1.DellCSIReplicationGroup, *repv1.DellCSIReplicationGroup, *corev1.PersistentVolume, *corev1.PersistentVolume, *corev1.PersistentVolumeClaim) {
 	// scenario: RG without sync complete
 	newConfig := config.NewFakeConfigForSingleCluster(suite.client,
 		suite.driver.SourceClusterID, suite.driver.RemoteClusterID)
@@ -839,7 +836,7 @@ func (suite *RGControllerTestSuite) getPVCRemapSetup() (*repv1.DellCSIReplicatio
 
 	err = suite.client.Create(ctx, pvcObj)
 	suite.NoError(err)
-	assert.NotNil(suite.T(), pvcObj)
+	suite.NotNil(suite.T(), pvcObj)
 
 	_, err = suite.reconciler.Reconcile(context.Background(), req)
 	suite.NoError(err)
@@ -848,7 +845,7 @@ func (suite *RGControllerTestSuite) getPVCRemapSetup() (*repv1.DellCSIReplicatio
 }
 
 func (suite *RGControllerTestSuite) TestPVCRemapPlanned() {
-	rg, replicatedRG, _, _, _ := suite.getPVCRemapSetup()
+	rg, replicatedRG, _, _, _ := suite.getSingleClusterPVSetup()
 	replicatedRGName := replicatedRG.Name
 
 	// Invoke failover action
@@ -886,7 +883,7 @@ func (suite *RGControllerTestSuite) TestPVCRemapPlanned() {
 	var updatedRemotePV corev1.PersistentVolume
 	err = suite.client.Get(context.Background(), types.NamespacedName{Name: "remote-pv"}, &updatedRemotePV)
 	suite.NoError(err)
-	assert.Equal(suite.T(), controllers.RemoteRetentionValueDelete, string(updatedRemotePV.Spec.PersistentVolumeReclaimPolicy), "Remote PV reclaim policy should be 'Delete' after swapAllPVC")
+	suite.Equal(controllers.RemoteRetentionValueDelete, string(updatedRemotePV.Spec.PersistentVolumeReclaimPolicy), "Remote PV reclaim policy should be 'Delete' after swapAllPVC")
 	suite.Equal("fake-pvc", updatedRemotePV.Spec.ClaimRef.Name, "Remote PV should now be claimed by the PVC")
 	suite.Equal("fake-ns", updatedRemotePV.Spec.ClaimRef.Namespace)
 
@@ -895,11 +892,11 @@ func (suite *RGControllerTestSuite) TestPVCRemapPlanned() {
 	err = suite.client.Get(context.Background(), types.NamespacedName{Name: "local-pv"}, &updatedLocalPV)
 	suite.NoError(err)
 	suite.Nil(updatedLocalPV.Spec.ClaimRef, "Local PV's claim reference should be removed")
-	assert.Equal(suite.T(), controllers.RemoteRetentionValueDelete, string(updatedLocalPV.Spec.PersistentVolumeReclaimPolicy), "Local PV reclaim policy should be 'Delete' after swapAllPVC")
+	suite.Equal(controllers.RemoteRetentionValueDelete, string(updatedLocalPV.Spec.PersistentVolumeReclaimPolicy), "Local PV reclaim policy should be 'Delete' after swapAllPVC")
 }
 
 func (suite *RGControllerTestSuite) TestPVCRemapUnplanned() {
-	_, replicatedRG, _, _, _ := suite.getPVCRemapSetup()
+	_, replicatedRG, _, _, _ := suite.getSingleClusterPVSetup()
 	replicatedRGName := replicatedRG.Name
 
 	// Invoke failover action
@@ -941,7 +938,7 @@ func (suite *RGControllerTestSuite) TestPVCRemapUnplanned() {
 	var updatedRemotePV corev1.PersistentVolume
 	err = suite.client.Get(context.Background(), types.NamespacedName{Name: "remote-pv"}, &updatedRemotePV)
 	suite.NoError(err)
-	assert.Equal(suite.T(), controllers.RemoteRetentionValueDelete, string(updatedRemotePV.Spec.PersistentVolumeReclaimPolicy), "Remote PV reclaim policy should be 'Delete' after swapAllPVC")
+	suite.Equal(controllers.RemoteRetentionValueDelete, string(updatedRemotePV.Spec.PersistentVolumeReclaimPolicy), "Remote PV reclaim policy should be 'Delete' after swapAllPVC")
 	suite.Equal("fake-pvc", updatedRemotePV.Spec.ClaimRef.Name, "Remote PV should now be claimed by the PVC")
 	suite.Equal("fake-ns", updatedRemotePV.Spec.ClaimRef.Namespace)
 
@@ -950,11 +947,11 @@ func (suite *RGControllerTestSuite) TestPVCRemapUnplanned() {
 	err = suite.client.Get(context.Background(), types.NamespacedName{Name: "local-pv"}, &updatedLocalPV)
 	suite.NoError(err)
 	suite.Nil(updatedLocalPV.Spec.ClaimRef, "Local PV's claim reference should be removed")
-	assert.Equal(suite.T(), controllers.RemoteRetentionValueDelete, string(updatedLocalPV.Spec.PersistentVolumeReclaimPolicy), "Local PV reclaim policy should be 'Delete' after swapAllPVC")
+	suite.Equal(controllers.RemoteRetentionValueDelete, string(updatedLocalPV.Spec.PersistentVolumeReclaimPolicy), "Local PV reclaim policy should be 'Delete' after swapAllPVC")
 }
 
 func (suite *RGControllerTestSuite) TestPVCRemapDisabled() {
-	rg, _, _, _, _ := suite.getPVCRemapSetup()
+	rg, _, _, _, _ := suite.getSingleClusterPVSetup()
 	rgName := rg.Name
 	suite.reconciler.DisablePVCRemap = true // Disable PVC remapping
 
@@ -1005,7 +1002,7 @@ func (suite *RGControllerTestSuite) TestPVCRemapDisabled() {
 }
 
 func (suite *RGControllerTestSuite) TestPVCRemapWithMismatchedRemotePV() {
-	rg, _, localPV, remotePV, pvcObj := suite.getPVCRemapSetup()
+	rg, _, localPV, remotePV, pvcObj := suite.getSingleClusterPVSetup()
 	rgName := rg.Name
 	ctx := context.Background()
 	// Modify the remotePV annotation to create a mismatch
@@ -1061,4 +1058,3 @@ func (suite *RGControllerTestSuite) TestPVCRemapWithMismatchedRemotePV() {
 	suite.NoError(err)
 	suite.Nil(unchangedRemotePV.Spec.ClaimRef, "Remote PV's claim reference should remain nil")
 }
-
