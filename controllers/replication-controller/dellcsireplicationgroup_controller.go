@@ -787,12 +787,9 @@ func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 		}
 		pv.Spec.ClaimRef = nil
 
-		// replication.storage.dell.com/remotePVCNamespace: pvcNamespace
-		// replication.storage.dell.com/remotePVC: pvcName
 		pv.Annotations[controller.RemotePVCNamespace] = pvcNamespace
 		pv.Labels[controller.RemotePVCNamespace] = pvcNamespace
 		pv.Annotations[controller.RemotePVC] = pvcName
-		pv.Labels[controller.RemotePVC] = pvcName
 
 		err = client.UpdatePersistentVolume(ctx, pv)
 		if err == nil {
@@ -831,8 +828,6 @@ func updatePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 		pv.Spec.ClaimRef.UID = pvcUID
 		pv.Spec.ClaimRef.ResourceVersion = pvcResourceVersion
 
-		// replication.storage.dell.com/remotePVCNamespace: "" => both label and annotation if exists
-		// replication.storage.dell.com/remotePVC: "" => both label and annotation if exists
 		val, exists := pv.Annotations[controller.RemotePVCNamespace]
 		if exists && val != "" {
 			pv.Annotations[controller.RemotePVCNamespace] = ""
@@ -846,11 +841,6 @@ func updatePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 		val, exists = pv.Annotations[controller.RemotePVC]
 		if exists && val != "" {
 			pv.Annotations[controller.RemotePVC] = ""
-		}
-
-		val, exists = pv.Labels[controller.RemotePVC]
-		if exists && val != "" {
-			pv.Labels[controller.RemotePVC] = ""
 		}
 
 		err = client.UpdatePersistentVolume(ctx, pv)
