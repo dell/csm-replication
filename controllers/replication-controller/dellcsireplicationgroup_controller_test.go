@@ -28,11 +28,11 @@ import (
 	"github.com/dell/csm-replication/pkg/config"
 	"github.com/dell/csm-replication/pkg/connection"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
+	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -650,7 +650,7 @@ func (suite *RGControllerTestSuite) TestCreatePVCSnapshotAction() {
 	}
 	actionString, err := json.Marshal(actionAnnotation)
 	suite.NoError(err)
-	
+
 	rg.Annotations[csireplicator.Action] = string(actionString)
 	err = suite.client.Update(context.Background(), rg)
 	suite.NoError(err)
@@ -674,7 +674,7 @@ func (suite *RGControllerTestSuite) TestCreatePVCSnapshotAction() {
 
 	// step 3: retrieve cloned snapshotcontent, name: cloned-<step1 snapshotcontent name>
 	var clonedSnContent s1.VolumeSnapshotContent
-	err = suite.client.Get(ctx, types.NamespacedName{Name: "cloned-"+snContent.Name}, &clonedSnContent)
+	err = suite.client.Get(ctx, types.NamespacedName{Name: "cloned-" + snContent.Name}, &clonedSnContent)
 	suite.NoError(err)
 
 	// step 4: retrieve snapshot, namespace: test-fake-ns, name: same as in step 2
@@ -719,7 +719,7 @@ func (suite *RGControllerTestSuite) TestCreatePVCSnapshotActionWithDefault() {
 	}
 	actionString, err := json.Marshal(actionAnnotation)
 	suite.NoError(err)
-	
+
 	rg.Annotations[csireplicator.Action] = string(actionString)
 	err = suite.client.Update(context.Background(), rg)
 	suite.NoError(err)
@@ -743,7 +743,7 @@ func (suite *RGControllerTestSuite) TestCreatePVCSnapshotActionWithDefault() {
 
 	// step 3: retrieve cloned snapshotcontent, name: cloned-<step1 snapshotcontent name>
 	var clonedSnContent s1.VolumeSnapshotContent
-	err = suite.client.Get(ctx, types.NamespacedName{Name: "cloned-"+snContent.Name}, &clonedSnContent)
+	err = suite.client.Get(ctx, types.NamespacedName{Name: "cloned-" + snContent.Name}, &clonedSnContent)
 	suite.NoError(err)
 
 	// step 4: retrieve snapshot, namespace: test-fake-ns, name: same as in step 2
