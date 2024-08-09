@@ -28,18 +28,15 @@ import (
 	"github.com/dell/csm-replication/pkg/config"
 	"github.com/dell/csm-replication/pkg/connection"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
-	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	//s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -478,13 +475,12 @@ func (suite *RGControllerTestSuite) TestSetupWithManagerRg() {
 	suite.Error(err, "Setup should fail when there is no manager")
 }
 
-func (suite *RGControllerTestSuite) TestReconcileRGWithSnapshotAction() {
+func (suite *RGControllerTestSuite) getSingleClusterSetup() (*repv1.DellCSIReplicationGroup, *repv1.DellCSIReplicationGroup, *corev1.PersistentVolume, *corev1.PersistentVolume, *corev1.PersistentVolumeClaim) {
 	// scenario: RG without sync complete
 	newConfig := config.NewFakeConfigForSingleCluster(suite.client,
 		suite.driver.SourceClusterID, suite.driver.RemoteClusterID)
 	suite.config = newConfig
 	suite.reconciler.Config = newConfig
-
 	sc1 := utils.GetReplicationEnabledSC(suite.driver.DriverName, "sc-1",
 		"sc-2", utils.Self)
 	// create sc-1 and corresponding RG
@@ -493,58 +489,19 @@ func (suite *RGControllerTestSuite) TestReconcileRGWithSnapshotAction() {
 	labels[controllers.DriverName] = suite.driver.DriverName
 	rg1.Labels = labels
 	suite.createSCAndRG(sc1, rg1)
-
 	// create sc-2
 	sc2 := utils.GetReplicationEnabledSC(suite.driver.DriverName, "sc-2",
 		"sc-1", utils.Self)
 	err := suite.client.Create(context.Background(), sc2)
 	suite.NoError(err)
 
-	// create snapshotclass
-	snapshotClass := utils.GetSnapshotClass(suite.driver.DriverName, "sn-class")
-	err = suite.client.Create(context.Background(), snapshotClass)
-	suite.NoError(err)
-
 	rg := new(repv1.DellCSIReplicationGroup)
 	req := suite.getTypicalRequest()
-
-	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
-	suite.NoError(err)
 
 	suite.NotContains(controllers.RemoteReplicationGroup, rg.Annotations,
 		"Remote RG annotation doesn't exist")
 	suite.NotContains(controllers.RGSyncComplete, rg.Annotations,
 		"RG Sync annotation doesn't exist")
-
-	time := metav1.Now()
-	lastAction := repv1.LastAction{
-		Time:      &time,
-		Condition: "Action CREATE_SNAPSHOT succeeded",
-		ActionAttributes: map[string]string{
-			"vol1": "snap1",
-		},
-	}
-
-	// Set Action content
-	rg.Status = repv1.DellCSIReplicationGroupStatus{
-		LastAction: lastAction,
-		Conditions: []repv1.LastAction{lastAction},
-	}
-
-	rg.Annotations[controllers.ActionProcessedTime] = time.String()
-
-	actionAnnotation := csireplicator.ActionAnnotation{
-		ActionName:        "CREATE_SNAPSHOT",
-		SnapshotNamespace: "demo1",
-		SnapshotClass:     "sn-class",
-	}
-	actionString, err := json.Marshal(actionAnnotation)
-	suite.NoError(err)
-
-	rg.Annotations[csireplicator.Action] = string(actionString)
-
-	err = suite.client.Update(context.Background(), rg)
-	suite.NoError(err)
 
 	resp, err := suite.reconciler.Reconcile(context.Background(), req)
 	suite.NoError(err)
@@ -560,313 +517,154 @@ func (suite *RGControllerTestSuite) TestReconcileRGWithSnapshotAction() {
 	// Check if remote RG got created
 	rClient, err := suite.config.GetConnection("self")
 	suite.NoError(err)
-	_, err = rClient.GetReplicationGroup(context.Background(), replicatedRGName)
-	suite.NoError(err)
-
-	// Another reconcile
-	_, err = suite.reconciler.Reconcile(context.Background(), req)
-	suite.NoError(err)
-
-	// Reconcile the other RG
-	req.NamespacedName.Name = replicatedRGName
-	_, err = suite.reconciler.Reconcile(context.Background(), req)
-	suite.NoError(err)
 	replicatedRG, err := rClient.GetReplicationGroup(context.Background(), replicatedRGName)
 	suite.NoError(err)
-	suite.T().Log(replicatedRG.Annotations)
-	suite.T().Log(replicatedRG.Labels)
-}
 
-func (suite *RGControllerTestSuite) TestCreatePVCsFromSnapshots2() {
-	// scenario: Create PVCs from snapshots
-	newConfig := config.NewFakeConfigForSingleCluster(suite.client,
-		suite.driver.SourceClusterID, suite.driver.RemoteClusterID)
-	suite.config = newConfig
-	suite.reconciler.Config = newConfig
+	// rgName, replicatedRGName
+	rgName := rg.Name
+	ctx := context.Background()
 
-	sc1 := utils.GetReplicationEnabledSC(suite.driver.DriverName, "sc-1",
-		"sc-2", utils.Self)
-	// create sc-1 and corresponding RG
-	rg1 := suite.getRGWithoutSyncComplete(suite.driver.RGName, true, true)
-	labels := make(map[string]string)
-	labels[controllers.DriverName] = suite.driver.DriverName
-	rg1.Labels = labels
-	suite.createSCAndRG(sc1, rg1)
+	// create local and remote PV
+	localAnnotations := make(map[string]string)
+	localAnnotations[controllers.RGSyncComplete] = "yes"
+	localAnnotations[controllers.ReplicationGroup] = rgName
+	localAnnotations[controllers.RemoteReplicationGroup] = replicatedRGName
+	localAnnotations[controllers.RemoteClusterID] = "self"
+	localAnnotations[controllers.ContextPrefix] = "csi-fake"
+	localAnnotations[controllers.RemotePV] = "remote-pv"
+	localAnnotations[controllers.RemotePVRetentionPolicy] = "delete"
+	localAnnotations[controllers.RemoteVolumeAnnotation] = `{"capacity_bytes":3000023,"volume_id":"pvc-d559bbfa-6612-4b57-a542-5ca64c9625fe","volume_context":{"RdfGroup":"2","RdfMode":"ASYNC","RemoteRDFGroup":"2","RemoteSYMID":"000000000002","RemoteServiceLevel":"Bronze","SRP":"SRP_1","SYMID":"000000000001","ServiceLevel":"Bronze","replication.storage.dell.com/remotePVRetentionPolicy":"delete","storage.dell.com/isReplicationEnabled":"true","storage.dell.com/remoteClusterID":"self","storage.dell.com/remoteStorageClassName":"sc-2"}}`
 
-	// create sc-2
-	sc2 := utils.GetReplicationEnabledSC(suite.driver.DriverName, "sc-2",
-		"sc-1", utils.Self)
-	err := suite.client.Create(context.Background(), sc2)
-	suite.NoError(err)
+	localLabels := make(map[string]string)
+	localLabels[controllers.DriverName] = suite.driver.DriverName
+	localLabels[controllers.ReplicationGroup] = rgName
+	localLabels[controllers.RemoteClusterID] = "self"
 
-	rg := new(repv1.DellCSIReplicationGroup)
-	req := suite.getTypicalRequest()
+	remoteAnnotations := make(map[string]string)
+	remoteAnnotations[controllers.RGSyncComplete] = "yes"
+	remoteAnnotations[controllers.ReplicationGroup] = replicatedRGName
+	remoteAnnotations[controllers.RemoteReplicationGroup] = rgName
+	remoteAnnotations[controllers.RemoteClusterID] = "self"
+	remoteAnnotations[controllers.ContextPrefix] = "csi-fake"
+	remoteAnnotations[controllers.RemotePV] = "local-pv"
+	remoteAnnotations[controllers.RemotePVRetentionPolicy] = "delete"
+	remoteAnnotations[controllers.RemoteVolumeAnnotation] = `{"capacity_bytes":3000023,"volume_id":"pvc-d559bbfa-6612-4b57-a542-5ca64c9625fe","volume_context":{"RdfGroup":"2","RdfMode":"ASYNC","RemoteRDFGroup":"2","RemoteSYMID":"000000000002","RemoteServiceLevel":"Bronze","SRP":"SRP_1","SYMID":"000000000001","ServiceLevel":"Bronze","replication.storage.dell.com/remotePVRetentionPolicy":"delete","storage.dell.com/isReplicationEnabled":"true","storage.dell.com/remoteClusterID":"self","storage.dell.com/remoteStorageClassName":"sc-1"}}`
 
-	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
-	suite.NoError(err)
+	remoteLabels := make(map[string]string)
+	remoteLabels[controllers.DriverName] = suite.driver.DriverName
+	remoteLabels[controllers.ReplicationGroup] = replicatedRGName
+	remoteLabels[controllers.RemoteClusterID] = "self"
 
-	// Set up annotations for createPVCsFromSnapshots
-	rg.Annotations[suite.reconciler.Domain+"/snapshotClass"] = "test-snapshot-class"
-	rg.Annotations[suite.reconciler.Domain+"/snapshotStorageClass"] = "test-storage-class"
-	rg.Annotations[suite.reconciler.Domain+"/snapshotCreatePVC"] = "true"
-	suite.NotContains(controllers.RemoteReplicationGroup, rg.Annotations,
-		"Remote RG annotation doesn't exist")
-	suite.NotContains(controllers.RGSyncComplete, rg.Annotations,
-		"RG Sync annotation doesn't exist")
+	localPV := utils.GetPVObj("local-pv", "vol-handle", suite.driver.DriverName, "sc-1", nil)
+	localPV.Labels = localLabels
+	localPV.Annotations = localAnnotations
+	localPV.Spec.PersistentVolumeReclaimPolicy = controllers.RemoteRetentionValueDelete
 
-	time := metav1.Now()
-	lastAction := repv1.LastAction{
-		Time:      &time,
-		Condition: "Action CREATE_SNAPSHOT succeeded",
-		ActionAttributes: map[string]string{
-			"vol1": "snap1",
-		},
+	localClaimRef := &corev1.ObjectReference{
+		Kind:            "PersistentVolumeClaim",
+		Namespace:       "fake-ns",
+		Name:            "fake-pvc",
+		UID:             "18802349-2128-43a8-8169-bbb1ca8a4c67",
+		APIVersion:      "v1",
+		ResourceVersion: "32776691",
 	}
-
-	// Set Action content
-	rg.Status = repv1.DellCSIReplicationGroupStatus{
-		LastAction: lastAction,
-		Conditions: []repv1.LastAction{lastAction},
-	}
-	rg.Annotations[controllers.ActionProcessedTime] = time.String()
-	actionAnnotation := csireplicator.ActionAnnotation{
-		ActionName:        "CREATE_SNAPSHOT",
-		SnapshotNamespace: "demo1",
-		SnapshotClass:     "sn-class",
-	}
-	actionString, err := json.Marshal(actionAnnotation)
+	localPV.Spec.ClaimRef = localClaimRef
+	err = suite.client.Create(ctx, localPV)
 	suite.NoError(err)
 
-	rg.Annotations[csireplicator.Action] = string(actionString)
-
-	err = suite.client.Update(context.Background(), rg)
-	suite.NoError(err)
-	// Create a fake PVC
-	pvc := &v1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-pvc",
-			Namespace: "default",
-			Labels: map[string]string{
-				suite.reconciler.Domain + "/replicationGroupName": rg.Name,
-			},
-		},
-		Spec: v1.PersistentVolumeClaimSpec{
-			VolumeName: "test-pv",
-			AccessModes: []v1.PersistentVolumeAccessMode{
-				v1.ReadWriteOnce,
-			},
-			Resources: v1.ResourceRequirements{
-				Requests: v1.ResourceList{
-					v1.ResourceStorage: resource.MustParse("1Gi"),
-				},
-			},
-		},
-	}
-	err = suite.client.Create(context.Background(), pvc)
+	remotePV := utils.GetPVObj("remote-pv", "remote-vol-handle", suite.driver.DriverName, "sc-2", nil)
+	localPV.Labels = remoteLabels
+	remotePV.Annotations = remoteAnnotations
+	remotePV.Spec.PersistentVolumeReclaimPolicy = controllers.RemoteRetentionValueDelete
+	err = suite.client.Create(ctx, remotePV)
 	suite.NoError(err)
 
-	// Create a fake PV
-	pv := &v1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-pv",
-		},
-		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeSource: v1.PersistentVolumeSource{
-				CSI: &v1.CSIPersistentVolumeSource{
-					VolumeHandle: "test-volume-handle",
-				},
-			},
-		},
-	}
-	err = suite.client.Create(context.Background(), pv)
-	suite.NoError(err)
-
-	// Create a fake VolumeSnapshotContent
-	snapshotContent := &s1.VolumeSnapshotContent{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-snapshot-content",
-			Labels: map[string]string{
-				"pv-handle": "test-volume-handle",
-			},
-		},
-		Spec: s1.VolumeSnapshotContentSpec{
-			VolumeSnapshotRef: v1.ObjectReference{
-				Name:      "test-snapshot",
-				Namespace: "default",
-			},
-			Source: s1.VolumeSnapshotContentSource{
-				SnapshotHandle: pointer.String("test-snapshot-handle"),
-			},
-		},
-	}
-	err = suite.client.Create(context.Background(), snapshotContent)
-	suite.NoError(err)
-	resp, err := suite.reconciler.Reconcile(context.Background(), req)
-	suite.NoError(err)
-	suite.Equal(false, resp.Requeue)
-	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
-	suite.NoError(err)
-	suite.Equal("yes", rg.Annotations[controllers.RGSyncComplete],
-		"RG Sync annotation applied")
-	replicatedRGName := fmt.Sprintf("%s-%s", replicated, rg.Name)
-	suite.Equal(replicatedRGName, rg.Annotations[controllers.RemoteReplicationGroup],
-		"Remote RG annotation applied")
-
-	// Check if remote RG got created
-	rClient, err := suite.config.GetConnection("self")
-	suite.NoError(err)
-	_, err = rClient.GetReplicationGroup(context.Background(), replicatedRGName)
-	suite.NoError(err)
-
-	// Another reconcile
 	_, err = suite.reconciler.Reconcile(context.Background(), req)
 	suite.NoError(err)
 
-	// Reconcile the other RG
-	req.NamespacedName.Name = replicatedRGName
-	_, err = suite.reconciler.Reconcile(context.Background(), req)
-	suite.NoError(err)
-	replicatedRG, err := rClient.GetReplicationGroup(context.Background(), replicatedRGName)
-	suite.NoError(err)
-	suite.T().Log(replicatedRG.Annotations)
-	suite.T().Log(replicatedRG.Labels)
-}
+	// create pvc
+	pvcAnnotations := make(map[string]string)
+	pvcAnnotations[controllers.RGSyncComplete] = "yes"
+	pvcAnnotations[controllers.ReplicationGroup] = rgName
+	pvcAnnotations[controllers.RemoteReplicationGroup] = replicatedRGName
+	pvcAnnotations[controllers.RemoteClusterID] = "self"
+	pvcAnnotations[controllers.RemoteStorageClassAnnotation] = "sc-2"
+	pvcAnnotations[controllers.ContextPrefix] = "csi-fake"
+	pvcAnnotations[controllers.RemotePV] = "remote-pv"
+	pvcAnnotations[controllers.RemoteVolumeAnnotation] = `{"capacity_bytes":3000023,"volume_id":"pvc-d559bbfa-6612-4b57-a542-5ca64c9625fe","volume_context":{"RdfGroup":"2","RdfMode":"ASYNC","RemoteRDFGroup":"2","RemoteSYMID":"000000000002","RemoteServiceLevel":"Bronze","SRP":"SRP_1","SYMID":"000000000001","ServiceLevel":"Bronze","replication.storage.dell.com/remotePVRetentionPolicy":"delete","storage.dell.com/isReplicationEnabled":"true","storage.dell.com/remoteClusterID":"self","storage.dell.com/remoteStorageClassName":"sc-2"}}`
 
-func (suite *RGControllerTestSuite) TestCreatePVCsFromSnapshots8() {
-	// scenario: Create PVCs from snapshots
-	newConfig := config.NewFakeConfigForSingleCluster(suite.client, suite.driver.SourceClusterID, suite.driver.RemoteClusterID)
-	suite.config = newConfig
-	suite.reconciler.Config = newConfig
+	pvcLabels := make(map[string]string)
+	pvcLabels[controllers.DriverName] = suite.driver.DriverName
+	pvcLabels[controllers.ReplicationGroup] = rgName
+	pvcLabels[controllers.RemoteClusterID] = "self"
 
-	sc1 := utils.GetReplicationEnabledSC(suite.driver.DriverName, "sc-1", "sc-2", utils.Self)
-	// create sc-1 and corresponding RG
-	rg1 := suite.getRGWithoutSyncComplete(suite.driver.RGName, true, true)
-	labels := make(map[string]string)
-	labels[controllers.DriverName] = suite.driver.DriverName
-	rg1.Labels = labels
-	suite.createSCAndRG(sc1, rg1)
-
-	// create sc-2
-	sc2 := utils.GetReplicationEnabledSC(suite.driver.DriverName, "sc-2", "sc-1", utils.Self)
-	err := suite.client.Create(context.Background(), sc2)
-	suite.NoError(err)
-
-	rg := new(repv1.DellCSIReplicationGroup)
-	req := suite.getTypicalRequest()
-	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
-	suite.NoError(err)
-
-	// Set up annotations for createPVCsFromSnapshots
-	rg.Annotations[suite.reconciler.Domain+"/snapshotClass"] = "test-snapshot-class"
-	rg.Annotations[suite.reconciler.Domain+"/snapshotStorageClass"] = "test-storage-class"
-	rg.Annotations[suite.reconciler.Domain+"/snapshotCreatePVC"] = "true"
-	suite.NotContains(controllers.RemoteReplicationGroup, rg.Annotations, "Remote RG annotation doesn't exist")
-	suite.NotContains(controllers.RGSyncComplete, rg.Annotations, "RG Sync annotation doesn't exist")
-
-	time := metav1.Now()
-	lastAction := repv1.LastAction{
-		Time:      &time,
-		Condition: "Action CREATE_SNAPSHOT succeeded",
-		ActionAttributes: map[string]string{
-			"vol1": "snap1",
-		},
-	}
-	// Set Action content
-	rg.Status = repv1.DellCSIReplicationGroupStatus{
-		LastAction: lastAction,
-		Conditions: []repv1.LastAction{lastAction},
-	}
-	rg.Annotations[controllers.ActionProcessedTime] = time.String()
-	actionAnnotation := csireplicator.ActionAnnotation{
-		ActionName:        "CREATE_SNAPSHOT",
-		SnapshotNamespace: "demo1",
-		SnapshotClass:     "sn-class",
-	}
-	actionString, err := json.Marshal(actionAnnotation)
-	suite.NoError(err)
-	rg.Annotations[csireplicator.Action] = string(actionString)
-	err = suite.client.Update(context.Background(), rg)
-	suite.NoError(err)
-
-	// Create a fake PVC
-	pvcAnnotations := map[string]string{
-		controllers.RGSyncComplete:               "yes",
-		controllers.ReplicationGroup:             rg.Name,
-		controllers.RemoteReplicationGroup:       fmt.Sprintf("%s-%s", "replicated", rg.Name),
-		controllers.RemoteClusterID:              "self",
-		controllers.RemoteStorageClassAnnotation: "sc-2",
-		controllers.ContextPrefix:                "csi-fake",
-		controllers.RemotePV:                     "remote-pv",
-		controllers.RemoteVolumeAnnotation:       `{"capacity_bytes":3000023,"volume_id":"pvc-d559bbfa-6612-4b57-a542-5ca64c9625fe","volume_context":{"RdfGroup":"2","RdfMode":"ASYNC","RemoteRDFGroup":"2","RemoteSYMID":"000000000002","RemoteServiceLevel":"Bronze","SRP":"SRP_1","SYMID":"000000000001","ServiceLevel":"Bronze","replication.storage.dell.com/remotePVRetentionPolicy":"delete","storage.dell.com/isReplicationEnabled":"true","storage.dell.com/remoteClusterID":"self","storage.dell.com/remoteStorageClassName":"sc-2"}}`,
-	}
-	pvcLabels := map[string]string{
-		controllers.DriverName:       suite.driver.DriverName,
-		controllers.ReplicationGroup: rg.Name,
-		controllers.RemoteClusterID:  "self",
-	}
 	pvcObj := utils.GetPVCObj("fake-pvc", "fake-ns", "sc-1")
 	pvcObj.Status.Phase = corev1.ClaimBound
 	pvcObj.Spec.VolumeName = "local-pv"
 	pvcObj.Annotations = pvcAnnotations
 	pvcObj.Labels = pvcLabels
-	err = suite.client.Create(context.Background(), pvcObj)
+
+	err = suite.client.Create(ctx, pvcObj)
 	suite.NoError(err)
 	assert.NotNil(suite.T(), pvcObj)
 
-	// Create a fake PV
-	pv := &v1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-pv",
-		},
-		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeSource: v1.PersistentVolumeSource{
-				CSI: &v1.CSIPersistentVolumeSource{
-					VolumeHandle: "test-volume-handle",
-				},
-			},
-		},
-	}
-	err = suite.client.Create(context.Background(), pv)
+	_, err = suite.reconciler.Reconcile(context.Background(), req)
 	suite.NoError(err)
 
-	// Create a fake VolumeSnapshotContent
-	snapshotContent := &s1.VolumeSnapshotContent{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-snapshot-content",
-			Labels: map[string]string{
-				"pv-handle": "test-volume-handle",
-			},
-		},
-		Spec: s1.VolumeSnapshotContentSpec{
-			VolumeSnapshotRef: v1.ObjectReference{
-				Name:      "test-snapshot",
-				Namespace: "default",
-			},
-			Source: s1.VolumeSnapshotContentSource{
-				SnapshotHandle: pointer.String("test-snapshot-handle"),
-			},
+	return rg, replicatedRG, localPV, remotePV, pvcObj
+}
+
+func (suite *RGControllerTestSuite) TestSnapshotDraft() {
+	rg, _, _, _, _ := suite.getSingleClusterSetup()
+	rg.Annotations[constants.DefaultDomain+"/snapshotStorageClass"] = "sc-3"
+	rg.Annotations[constants.DefaultDomain+"/snapshotCreatePVC"] = "true"
+
+	snapshotClass := utils.GetSnapshotClass(suite.driver.DriverName, "sn-class")
+	err := suite.client.Create(context.Background(), snapshotClass)
+	suite.NoError(err)
+
+	//Invoke snapshot action
+	time := metav1.Now()
+	lastAction := repv1.LastAction{
+		Time:      &time,
+		Condition: "Action CREATE_SNAPSHOT succeeded",
+		ActionAttributes: map[string]string{
+			"vol-handle": "snap1",
 		},
 	}
-	err = suite.client.Create(context.Background(), snapshotContent)
+
+	// Set Action content
+	rg.Status = repv1.DellCSIReplicationGroupStatus{
+		LastAction: lastAction,
+		Conditions: []repv1.LastAction{lastAction},
+	}
+
+	rg.Annotations[controllers.ActionProcessedTime] = time.String()
+
+	actionAnnotation := csireplicator.ActionAnnotation{
+		ActionName:        "CREATE_SNAPSHOT",
+		SnapshotNamespace: "demo1",
+		SnapshotClass:     "sn-class",
+	}
+	actionString, err := json.Marshal(actionAnnotation)
 	suite.NoError(err)
 
-	// Mock the remote client to return the expected PVCs, PVs, and VolumeSnapshotContents
-	remoteClient, err := suite.config.GetConnection(suite.driver.RemoteClusterID)
+	
+	rg.Annotations[csireplicator.Action] = string(actionString)
+	err = suite.client.Update(context.Background(), rg)
 	suite.NoError(err)
 
-	// Call the createPVCsFromSnapshots function
-	err = suite.reconciler.createPVCsFromSnapshots(context.Background(), rg, remoteClient, suite.reconciler.Log, "test-snapshot-class", "test-storage-class")
+	_, err = suite.reconciler.Reconcile(context.Background(), suite.getTypicalRequest())
 	suite.NoError(err)
 
-	resp, err := suite.reconciler.Reconcile(context.Background(), req)
-	suite.NoError(err)
-	suite.Equal(false, resp.Requeue)
-
+	req := suite.getTypicalRequest()
 	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
 	suite.NoError(err)
-	suite.Equal("yes", rg.Annotations[controllers.RGSyncComplete], "RG Sync annotation applied")
-	replicatedRGName := fmt.Sprintf("%s-%s", "replicated", rg.Name)
-	suite.Equal(replicatedRGName, rg.Annotations[controllers.RemoteReplicationGroup], "Remote RG annotation applied")
+	suite.Equal("yes", rg.Annotations[controllers.RGSyncComplete],
+		"RG Sync annotation applied")
+	replicatedRGName := fmt.Sprintf("%s-%s", replicated, rg.Name)
+	suite.Equal(replicatedRGName, rg.Annotations[controllers.RemoteReplicationGroup],
+		"Remote RG annotation applied")
 
 	// Check if remote RG got created
 	rClient, err := suite.config.GetConnection("self")
@@ -882,7 +680,6 @@ func (suite *RGControllerTestSuite) TestCreatePVCsFromSnapshots8() {
 	req.NamespacedName.Name = replicatedRGName
 	_, err = suite.reconciler.Reconcile(context.Background(), req)
 	suite.NoError(err)
-
 	replicatedRG, err := rClient.GetReplicationGroup(context.Background(), replicatedRGName)
 	suite.NoError(err)
 	suite.T().Log(replicatedRG.Annotations)
