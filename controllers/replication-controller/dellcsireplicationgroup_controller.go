@@ -369,11 +369,11 @@ func (r *ReplicationGroupReconciler) processFailoverEvent(ctx context.Context, g
 		log.V(common.InfoLevel).Info("PVC remapping is disabled. Skipping PVC swap.")
 		return nil
 	}
-	remoteClusterID := group.Annotations[r.Domain+"/remoteClusterID"]
+	remoteClusterID := group.Annotations[controller.RemoteClusterID]
 	if remoteClusterID == "self" {
 		log.V(common.InfoLevel).Info("The replication group is associated with the same cluster.")
 		rgName := group.Name
-		rgTarget := group.Annotations[r.Domain+"/remoteReplicationGroupName"]
+		rgTarget := group.Annotations[controller.RemoteReplicationGroup]
 
 		err := r.swapAllPVC(ctx, client, rgName, rgTarget, log)
 		if err != nil {
@@ -629,7 +629,7 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 
 	// Swap some fields in the PVC.
 	localPV := pvc.Spec.VolumeName
-	pvc.Annotations[r.Domain+"/remotePV"] = pvc.Spec.VolumeName
+	pvc.Annotations[controller.RemotePV] = pvc.Spec.VolumeName
 	pvc.Spec.VolumeName = remotePV
 
 	remoteStorageClassName := pvc.Annotations[r.Domain+"/remoteStorageClassName"]
@@ -658,13 +658,13 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 
 	// Verify pvc is created and bound to new PVs
 	// remotePV is the current localPVName arg, localPV is the current remotePVName arg
-	err = r.verifyPVC(ctx, client, remotePV, localPV, pvcName, namespace, log)
+	err = verifyPVC(ctx, client, remotePV, localPV, pvcName, namespace, log)
 	if err != nil {
 		return err
 	}
 
 	// Remove the PVC reclaim of local PV
-	err = removePVClaimRef(ctx, client, localPV, log)
+	err = removePVClaimRef(ctx, client, localPV, namespace, pvcName, log)
 	if err != nil {
 		return err
 	}
@@ -683,14 +683,14 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	return nil
 }
 
-func (r *ReplicationGroupReconciler) verifyPVC(ctx context.Context, client connection.RemoteClusterClient, localPVName string, remotePVName string, pvcName string, namespace string, log logr.Logger) error {
+func verifyPVC(ctx context.Context, client connection.RemoteClusterClient, localPVName string, remotePVName string, pvcName string, namespace string, log logr.Logger) error {
 	log.V(common.InfoLevel).Info("Verifying")
 	done := false
 	for iteration := 0; !done; iteration++ {
 		time.Sleep(1 * time.Second)
 		pvc, err := client.GetPersistentVolumeClaim(ctx, namespace, pvcName)
 
-		if (err == nil) && (localPVName == pvc.Spec.VolumeName) && (remotePVName == pvc.Annotations[r.Domain+"/remotePV"]) {
+		if (err == nil) && (localPVName == pvc.Spec.VolumeName) && (remotePVName == pvc.Annotations[controller.RemotePV]) {
 			done = true
 			return err
 		}
@@ -767,7 +767,7 @@ func makePVReclaimPolicyRetain(ctx context.Context, client connection.RemoteClus
 	return err
 }
 
-func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient, pvName string, log logr.Logger) error {
+func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient, pvName, pvcNamespace, pvcName string, log logr.Logger) error {
 	log.V(common.InfoLevel).Info(fmt.Sprintf("Removing ClaimRef on LocalPV: %s", pvName))
 	pv, err := client.GetPersistentVolume(ctx, pvName)
 	if err != nil {
@@ -786,6 +786,14 @@ func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 			log.V(common.InfoLevel).Info(fmt.Sprintf("finding claimref under pvc: %s", pv.Spec.ClaimRef.Name))
 		}
 		pv.Spec.ClaimRef = nil
+
+		// replication.storage.dell.com/remotePVCNamespace: pvcNamespace
+		// replication.storage.dell.com/remotePVC: pvcName
+		pv.Annotations[controller.RemotePVCNamespace] = pvcNamespace
+		pv.Labels[controller.RemotePVCNamespace] = pvcNamespace
+		pv.Annotations[controller.RemotePVC] = pvcName
+		pv.Labels[controller.RemotePVC] = pvcName
+
 		err = client.UpdatePersistentVolume(ctx, pv)
 		if err == nil {
 			done = true
@@ -822,6 +830,28 @@ func updatePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 		pv.Spec.ClaimRef.Name = pvcName
 		pv.Spec.ClaimRef.UID = pvcUID
 		pv.Spec.ClaimRef.ResourceVersion = pvcResourceVersion
+
+		// replication.storage.dell.com/remotePVCNamespace: "" => both label and annotation if exists
+		// replication.storage.dell.com/remotePVC: "" => both label and annotation if exists
+		val, exists := pv.Annotations[controller.RemotePVCNamespace]
+		if exists && val != "" {
+			pv.Annotations[controller.RemotePVCNamespace] = ""
+		}
+
+		val, exists = pv.Labels[controller.RemotePVCNamespace]
+		if exists && val != "" {
+			pv.Labels[controller.RemotePVCNamespace] = ""
+		}
+
+		val, exists = pv.Annotations[controller.RemotePVC]
+		if exists && val != "" {
+			pv.Annotations[controller.RemotePVC] = ""
+		}
+
+		val, exists = pv.Labels[controller.RemotePVC]
+		if exists && val != "" {
+			pv.Labels[controller.RemotePVC] = ""
+		}
 
 		err = client.UpdatePersistentVolume(ctx, pv)
 		if err == nil {
