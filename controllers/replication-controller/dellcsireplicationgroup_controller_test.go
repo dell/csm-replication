@@ -663,7 +663,7 @@ func (suite *RGControllerTestSuite) TestCreatePVCSnapshotAction() {
 	// step 1: use pv-handle to retrieve it -> verify that a snapshotcontent is created
 	rClient, _ := suite.config.GetConnection("self")
 	ctx := context.Background()
-	snContentList, err := rClient.ListVolumeSnapshotContents(ctx, client.MatchingLabels{"pv-handle": "vol-handle"})
+	snContentList, err := rClient.ListSnapshotContent(ctx, client.MatchingLabels{"pv-handle": "vol-handle"})
 	suite.NoError(err)
 	snContent := snContentList.Items[0]
 
@@ -732,7 +732,7 @@ func (suite *RGControllerTestSuite) TestCreatePVCSnapshotActionWithDefault() {
 	// step 1: use pv-handle to retrieve it -> verify that a snapshotcontent is created
 	rClient, _ := suite.config.GetConnection("self")
 	ctx := context.Background()
-	snContentList, err := rClient.ListVolumeSnapshotContents(ctx, client.MatchingLabels{"pv-handle": "vol-handle"})
+	snContentList, err := rClient.ListSnapshotContent(ctx, client.MatchingLabels{"pv-handle": "vol-handle"})
 	suite.NoError(err)
 	snContent := snContentList.Items[0]
 

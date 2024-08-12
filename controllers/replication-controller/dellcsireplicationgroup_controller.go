@@ -447,7 +447,7 @@ func (r *ReplicationGroupReconciler) createPVCsFromSnapshots(ctx context.Context
 	log.Info("starting create pvcs from snapshot")
 	rgName := group.Name
 
-	pvcList, err := remoteClient.ListPersistentVolumeClaims(ctx, client.MatchingLabels{r.Domain + "/replicationGroupName": rgName})
+	pvcList, err := remoteClient.ListPersistentVolumeClaim(ctx, client.MatchingLabels{r.Domain + "/replicationGroupName": rgName})
 	if err != nil {
 		log.Error(err, "error getting pvcs: %v")
 		return err
@@ -462,7 +462,7 @@ func (r *ReplicationGroupReconciler) createPVCsFromSnapshots(ctx context.Context
 			log.Error(err, "error getting pv: %v")
 		}
 		pvHandle := pv.Spec.CSI.VolumeHandle
-		snContentList, err := remoteClient.ListVolumeSnapshotContents(ctx, client.MatchingLabels{"pv-handle": pvHandle})
+		snContentList, err := remoteClient.ListSnapshotContent(ctx, client.MatchingLabels{"pv-handle": pvHandle})
 		if err != nil {
 			log.Error(err, "error getting snapshot contents: %v")
 		}

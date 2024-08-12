@@ -432,6 +432,7 @@ func init() {
 	log = zap.New(zap.UseDevMode(false))
 }
 
+// GetSnapshotClass returns a VolumeSnapshotClass reference
 func GetSnapshotClass(provisionerName, snapName string) *snapshotv1.VolumeSnapshotClass {
 	snObj := snapshotv1.VolumeSnapshotClass{
 		Driver:         provisionerName,
