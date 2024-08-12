@@ -620,6 +620,7 @@ func (suite *RGControllerTestSuite) TestCreatePVCSnapshotAction() {
 	rg, _, _, _, _ := suite.getSingleClusterPVSetup()
 	rg.Annotations[constants.DefaultDomain+"/snapshotStorageClass"] = "sc-3"
 	rg.Annotations[constants.DefaultDomain+"/snapshotCreatePVC"] = "true"
+	rg.Annotations[constants.DefaultDomain+"/snapshotClass"] = "sn-class"
 
 	snapshotClass := utils.GetSnapshotClass(suite.driver.DriverName, "sn-class")
 	err := suite.client.Create(context.Background(), snapshotClass)
