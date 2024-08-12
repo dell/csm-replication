@@ -274,8 +274,8 @@ func (c *RemoteK8sControllerClient) UpdatePersistentVolumeClaim(ctx context.Cont
 	return c.Client.Update(ctx, claim)
 }
 
-// ListPersistentVolumeClaims gets the list of persistent volume claim objects under the replication group given the replication group name
-func (c *RemoteK8sControllerClient) ListPersistentVolumeClaims(ctx context.Context, opts ...ctrlClient.ListOption) (*corev1.PersistentVolumeClaimList, error) {
+// ListPersistentVolumeClaim gets the list of persistent volume claim objects under the replication group
+func (c *RemoteK8sControllerClient) ListPersistentVolumeClaim(ctx context.Context, opts ...ctrlClient.ListOption) (*corev1.PersistentVolumeClaimList, error) {
 	list := &corev1.PersistentVolumeClaimList{}
 
 	err := c.Client.List(ctx, list, opts...)
