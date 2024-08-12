@@ -320,7 +320,7 @@ func (c *RemoteK8sControllerClient) ListPersistentVolumeClaims(ctx context.Conte
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return list, nil
 }
 
@@ -337,12 +337,12 @@ func (c *RemoteK8sControllerClient) ListVolumeSnapshotContents(ctx context.Conte
 
 func (c *RemoteK8sControllerClient) GetSnapshotContent(ctx context.Context, snapshotContentName string) (*s1.VolumeSnapshotContent, error) {
 	found := &s1.VolumeSnapshotContent{}
-	
+
 	err := c.Client.Get(ctx, types.NamespacedName{Name: snapshotContentName}, found)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return found, nil
 }
 

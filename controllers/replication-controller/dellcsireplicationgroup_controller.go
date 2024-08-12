@@ -438,13 +438,11 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 }
 
 func (r *ReplicationGroupReconciler) createPVCsFromSnapshots(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger, snClass, storageClass string) error {
-
 	if group == nil {
 		return fmt.Errorf("group is nil")
 	}
 	if remoteClient == nil {
 		return fmt.Errorf("remoteClient is nil")
-
 	}
 	log.Info("starting create pvcs from snapshot")
 	rgName := group.Name

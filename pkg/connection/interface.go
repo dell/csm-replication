@@ -35,16 +35,16 @@ type RemoteClusterClient interface {
 	GetPersistentVolume(ctx context.Context, persistentVolumeName string) (*corev1.PersistentVolume, error)
 	CreatePersistentVolume(ctx context.Context, volume *corev1.PersistentVolume) error
 	UpdatePersistentVolume(ctx context.Context, volume *corev1.PersistentVolume) error
-	
+
 	GetPersistentVolumeClaim(ctx context.Context, namespace, claimName string) (*corev1.PersistentVolumeClaim, error)
 	UpdatePersistentVolumeClaim(ctx context.Context, claim *corev1.PersistentVolumeClaim) error
 	CreatePersistentVolumeClaim(ctx context.Context, claim *corev1.PersistentVolumeClaim) error
-	
+
 	GetReplicationGroup(ctx context.Context, replicationGroupName string) (*repv1.DellCSIReplicationGroup, error)
 	UpdateReplicationGroup(ctx context.Context, group *repv1.DellCSIReplicationGroup) error
 	ListReplicationGroup(ctx context.Context) (*repv1.DellCSIReplicationGroupList, error)
 	CreateReplicationGroup(ctx context.Context, group *repv1.DellCSIReplicationGroup) error
-	
+
 	GetSnapshotContent(ctx context.Context, snapshotContentName string) (*s1.VolumeSnapshotContent, error)
 	CreateSnapshotContent(ctx context.Context, content *s1.VolumeSnapshotContent) error
 	CreateSnapshotObject(ctx context.Context, content *s1.VolumeSnapshot) error
@@ -54,8 +54,8 @@ type RemoteClusterClient interface {
 	CreateNamespace(ctx context.Context, content *corev1.Namespace) error
 	GetNamespace(ctx context.Context, namespace string) (*corev1.Namespace, error)
 
-	ListPersistentVolumeClaims(ctx context.Context,  opts ...ctrlClient.ListOption) (*corev1.PersistentVolumeClaimList, error)
-	ListVolumeSnapshotContents(ctx context.Context,  opts ...ctrlClient.ListOption) (*s1.VolumeSnapshotContentList, error)
+	ListPersistentVolumeClaims(ctx context.Context, opts ...ctrlClient.ListOption) (*corev1.PersistentVolumeClaimList, error)
+	ListVolumeSnapshotContents(ctx context.Context, opts ...ctrlClient.ListOption) (*s1.VolumeSnapshotContentList, error)
 }
 
 // ConnHandler - Interface
