@@ -303,7 +303,7 @@ func (c *RemoteK8sControllerClient) GetSnapshotClass(ctx context.Context, snapCl
 	return found, nil
 }
 
-// CreateSnapshotObject creates the snapshot on the remote cluster
+// CreateSnapshotClass creates the snapshot on the remote cluster
 func (c *RemoteK8sControllerClient) CreateSnapshotClass(ctx context.Context, content *s1.VolumeSnapshotClass) error {
 	return c.Client.Create(ctx, content)
 }
@@ -325,6 +325,7 @@ func (c *RemoteK8sControllerClient) GetNamespace(ctx context.Context, namespace 
 	return found, nil
 }
 
+// GetSnapshotContent gets the volume snapshot content object under the replication group by querying cluster using the snapshot content name
 func (c *RemoteK8sControllerClient) GetSnapshotContent(ctx context.Context, snapshotContentName string) (*s1.VolumeSnapshotContent, error) {
 	found := &s1.VolumeSnapshotContent{}
 
@@ -336,7 +337,7 @@ func (c *RemoteK8sControllerClient) GetSnapshotContent(ctx context.Context, snap
 	return found, nil
 }
 
-// ListVolumeSnapshotContent gets the list of volume snapshot content objects under the replication group
+// ListSnapshotContent gets the list of volume snapshot content objects under the replication group
 func (c *RemoteK8sControllerClient) ListSnapshotContent(ctx context.Context, opts ...ctrlClient.ListOption) (*s1.VolumeSnapshotContentList, error) {
 	list := &s1.VolumeSnapshotContentList{}
 
