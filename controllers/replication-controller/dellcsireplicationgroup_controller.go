@@ -521,7 +521,7 @@ func (r *ReplicationGroupReconciler) SetupWithManager(mgr ctrl.Manager, limiter 
 // It also retains the original reclaimPolicy and operates within a single cluster.
 func (r *ReplicationGroupReconciler) swapAllPVC(ctx context.Context, c connection.RemoteClusterClient, rgName string, rgTarget string, log logr.Logger) error {
 	log.V(common.InfoLevel).Info(fmt.Sprintf("calling getPVList from %s\n", rgName))
-	pvcs, err := c.ListPersistentVolumeClaims(ctx, client.MatchingLabels{r.Domain + "/replicationGroupName": rgName})
+	pvcs, err := c.ListPersistentVolumeClaim(ctx, client.MatchingLabels{r.Domain + "/replicationGroupName": rgName})
 	if err != nil {
 		return fmt.Errorf("failed to list PVCs: %w", err)
 	}
