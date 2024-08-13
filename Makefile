@@ -6,8 +6,8 @@ GOBIN=$(shell go env GOBIN)
 endif
 
 # Take tools from GOBIN
-CONTROLLER_GEN=$(GOBIN)/controller-gen
-KUSTOMIZE=$(GOBIN)/kustomize
+CONTROLLER_GEN ?= $(GOBIN)/controller-gen
+KUSTOMIZE ?= $(GOBIN)/kustomize
 
 IMG ?= "NOIMG"
 
@@ -99,8 +99,7 @@ vet: gen-semver
 	go vet ./...
 
 # Install Go tools to build the code
-tools:
-	go list -f '{{range .Imports}}{{.}} {{end}}' pkg/tools/tools.go | xargs go install
+tools: controller-gen kustomize
 
 # Generate code
 generate: tools
@@ -185,3 +184,39 @@ gen-coverage-replication-controller:
 #To generate coverage for all the controllers
 gen-coverage:
 	( cd controllers; go clean -cache; go test -race -v -cover ./... -coverprofile cover.out )
+
+## Tool Versions
+KUSTOMIZE_VERSION ?= v5.4.3
+CONTROLLER_TOOLS_VERSION ?= v0.15.0
+
+# find or download controller-gen
+# download controller-gen if necessary
+controller-gen:
+ifeq (, $(shell which controller-gen))
+	@{ \
+	set -e ;\
+	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
+	cd $$CONTROLLER_GEN_TMP_DIR ;\
+	go mod init tmp ;\
+	go install sigs.k8s.io/controller-tools/cmd/controller-gen@${CONTROLLER_TOOLS_VERSION} ;\
+	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
+	}
+CONTROLLER_GEN=$(GOBIN)/controller-gen
+else
+CONTROLLER_GEN=$(shell which controller-gen)
+endif
+
+kustomize:
+ifeq (, $(shell which kustomize))
+	@{ \
+	set -e ;\
+	KUSTOMIZE_TMP_DIR=$$(mktemp -d) ;\
+	cd $$KUSTOMIZE_TMP_DIR ;\
+	go mod init tmp ;\
+	GO111MODULE=on go install sigs.k8s.io/kustomize/kustomize/v5@${KUSTOMIZE_VERSION} ;\
+	rm -rf $$KUSTOMIZE_TMP_DIR ;\
+	}
+KUSTOMIZE=$(GOBIN)/kustomize
+else
+KUSTOMIZE=$(shell which kustomize)
+endif

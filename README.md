@@ -62,10 +62,10 @@ This project contains multiple go modules, and you can build multiple binaries &
 
 This project relies on the following tools which have to be installed in order to generate certain manifests.
 
-| Tool | Version |
-| --------- | ----------- |
-| controller-gen | v0.4.1 |
-| kustomize | v3.10.0 |
+| Tool              | Version      |
+| ----------------- | ------------ |
+| controller-gen    | v0.15.0      |
+| kustomize         | v5.4.3       |
 
 The above tools can also be installed by running the command `make tools`.
 
