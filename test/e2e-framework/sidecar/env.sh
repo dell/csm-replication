@@ -15,7 +15,7 @@
 export CSI_SOCK_DIR="/var/run/csi"
 export CSI_SOCK_FILE="csi.sock"
 export CSI_ADDRESS=$CSI_SOCK_DIR/$CSI_SOCK_FILE
-export KUBECONFIG_PATH="/root/.kube/config"
+export KUBECONFIG_PATH=$HOME/.kube/config
 
 export PROBE_TIMEOUT="10s"
 export TIMEOUT="180s"
