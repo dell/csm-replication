@@ -129,7 +129,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileWithTransientEr
 	// Inject temporary error
 
 	errorMsg := "failed to create storage protection group"
-	suite.repClient.InjectErrorAutoClear(fmt.Errorf(errorMsg))
+	suite.repClient.InjectErrorAutoClear(fmt.Errorf("%s", errorMsg))
 	_, err = suite.reconciler.Reconcile(context.Background(), req)
 	suite.EqualError(err, errorMsg)
 

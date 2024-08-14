@@ -188,7 +188,7 @@ func FindStub(service, method string, in, out interface{}) error {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf(string(body))
+		return fmt.Errorf("%s", string(body))
 	}
 
 	respRPC := new(response)
@@ -198,7 +198,7 @@ func FindStub(service, method string, in, out interface{}) error {
 	}
 
 	if respRPC.Error != "" {
-		return fmt.Errorf(respRPC.Error)
+		return fmt.Errorf("%s", respRPC.Error)
 	}
 
 	data, _ := json.Marshal(respRPC.Data)

@@ -117,7 +117,7 @@ func stubNotFoundError(stub *findStubPayload, closestMatches []closeMatch) error
 	template += expectString
 
 	if len(closestMatches) == 0 {
-		return fmt.Errorf(template)
+		return fmt.Errorf("%s", template)
 	}
 
 	highestRank := struct {
@@ -144,7 +144,7 @@ func stubNotFoundError(stub *findStubPayload, closestMatches []closeMatch) error
 	closestMatchString := renderFieldAsString(closestMatch.expect)
 	template += fmt.Sprintf("\n\nClosest Match \n\n%s:%s", closestMatch.rule, closestMatchString)
 
-	return fmt.Errorf(template)
+	return fmt.Errorf("%s", template)
 }
 
 // we made our own simple ranking logic
