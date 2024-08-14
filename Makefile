@@ -11,12 +11,12 @@ KUSTOMIZE ?= $(GOBIN)/kustomize
 
 IMG ?= "NOIMG"
 
-#Generate semver.mk
+#Generate semver.mk for setting the semantic version
 gen-semver:
 	(cd core; rm -f core_generated.go; go generate)
 	go run core/semver/semver.go -f mk > semver.mk
 
-# Run tests
+# Run all _test.go files (including those in repctl/) in this repo and generate coverage report
 test: generate fmt vet static-crd gen-semver
 	go test ./... -coverprofile cover.out
 
@@ -155,6 +155,7 @@ image-migrator-dev: build-sidecar-migrator
 
 image-node-rescanner-dev: build-sidecar-node-rescanner
 	make -f image.mk sidecar-node-rescanner-dev
+
 #To start mock-grpc server
 start-server-win:
 	go run test/mock-server/main.go --csi-address localhost:4772 --stubs test/mock-server/stubs
@@ -170,20 +171,18 @@ run-fake-e2e-test:
 	go test test/e2e-framework/fake_integration_test.go -v
 
 # To run e2e tests for controller
-# Set the kubernetes config file path to REMOTE_KUBE_CONFIG_PATH environment variable
-# Example: export REMOTE_KUBE_CONFIG_PATH=C:\config-files\remote-cluster-config.yaml
 run-controller-tests:
 	go test test/e2e-framework/controller_integration_test.go -v
 
-#To generate coverage for the csi-replicator
+# Execute unit tests for the csi-replicator controller and generate coverage report
 unit-test-csi-replicator:
 	go test ./controllers/csi-replicator/ ./pkg/connection/ -v -race -coverpkg=./controllers/csi-replicator/ -coverprofile cover.out
 
-#To generate coverage for the replication-controller
+# Execute unit tests for the replication-controller and generate coverage report
 unit-test-replication-controller:
 	go test ./controllers/replication-controller/ -v -race -coverpkg=./controllers/replication-controller/ -coverprofile cover.out
 
-#To generate coverage for all the controllers
+# Execute unit tests for all the controllers and generate coverage report
 unit-test:
 	( cd controllers; go clean -cache; go test -race -v -cover ./... -coverprofile cover.out )
 
@@ -208,6 +207,7 @@ else
 CONTROLLER_GEN=$(shell which controller-gen)
 endif
 
+# find or download kustomize
 kustomize:
 ifeq (, $(shell which kustomize))
 	@{ \
