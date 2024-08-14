@@ -21,16 +21,18 @@ test: generate fmt vet static-crd gen-semver
 	go test ./... -coverprofile cover.out
 
 # Build manager binary for csi-replicator
-sidecar-manager: pre
+build-sidecar-manager: pre
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/dell-csi-replicator cmd/csi-replicator/main.go
-sidecar-migrator: pre
+build-sidecar-migrator: pre
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/dell-csi-migrator cmd/csi-migrator/main.go
 # Build manager binary for csi-node re scanner
-sidecar-node-rescanner: pre
+build-sidecar-node-rescanner: pre
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/dell-csi-node-rescanner cmd/csi-node-rescanner/main.go
 # Build manager binary for replication-controller
-controller-manager: pre
+build-controller-manager: pre
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/dell-replication-controller cmd/replication-controller/main.go
+# Build all binaries for replication
+build: build-sidecar-manager build-sidecar-migrator build-sidecar-node-rescanner build-controller-manager
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run-sidecar: pre static-crd
@@ -142,16 +144,16 @@ images: gen-semver
 images-push: gen-semver
 	make -f image.mk images-push
 
-image-sidecar-dev: sidecar-manager
+image-sidecar-dev: build-sidecar-manager
 	make -f image.mk sidecar-dev
 
-image-controller-dev: controller-manager
+image-controller-dev: build-controller-manager
 	make -f image.mk controller-dev
 
-image-migrator-dev: sidecar-migrator
+image-migrator-dev: build-sidecar-migrator
 	make -f image.mk sidecar-migrator-dev
 
-image-node-rescanner-dev: sidecar-node-rescanner
+image-node-rescanner-dev: build-sidecar-node-rescanner
 	make -f image.mk sidecar-node-rescanner-dev
 #To start mock-grpc server
 start-server-win:
