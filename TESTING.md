@@ -1,6 +1,7 @@
 # Testing
 There are many unit tests written in the respective packages in `_test.go` files, Along with the unit tests there are integration tests written separately for both Sidecar and Replication controller. These integration tests cover complete end to end scenario testing starting from automated way of creating the resources PVC, PV and RG and by running the sidecar/replication controllers internally from the tests itself.
 
+## Integration Tests
 The integration test cases can be executed by using the `Makefile` recipe or from any IDE directly. These tests can be ran against any driver without any modification to the code by just updating the driver and the storage class to use in the stubs and in the integration tests config variable.
 
 ```
@@ -9,13 +10,14 @@ The integration test cases can be executed by using the `Makefile` recipe or fro
 		StorageClass: "replication-unity",
 	}
 ```
-
+### Sidecar
 To run sidecar integration tests: 
 
 ```bash
 make run-sidecar-tests
 ```
 
+### Replication Controller Manager
 To run replication controller tests:
 
 Set the remote cluster config file path into the environment variable and run the tests.
@@ -25,7 +27,17 @@ export REMOTE_KUBE_CONFIG_PATH=C:\config-files\remote-cluster-config.yaml
 make run-controller-tests
 ```
 
-To run unit tests: 
+## Unit Tests
+To run unit tests for CSM Replication: 
+
 ```bash
-make gen-coverage
+make unit-test
+```
+
+### Repctl
+To run unit test for repctl:
+
+```bash
+cd ./repctl
+make test
 ```

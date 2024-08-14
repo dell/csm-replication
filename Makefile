@@ -176,15 +176,15 @@ run-controller-tests:
 	go test test/e2e-framework/controller_integration_test.go -v
 
 #To generate coverage for the csi-replicator
-gen-coverage-csi-replicator:
+unit-test-csi-replicator:
 	go test ./controllers/csi-replicator/ ./pkg/connection/ -v -race -coverpkg=./controllers/csi-replicator/ -coverprofile cover.out
 
 #To generate coverage for the replication-controller
-gen-coverage-replication-controller:
+unit-test-replication-controller:
 	go test ./controllers/replication-controller/ -v -race -coverpkg=./controllers/replication-controller/ -coverprofile cover.out
 
 #To generate coverage for all the controllers
-gen-coverage:
+unit-test:
 	( cd controllers; go clean -cache; go test -race -v -cover ./... -coverprofile cover.out )
 
 ## Tool Versions
