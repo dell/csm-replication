@@ -6,7 +6,7 @@ The integration test cases can be executed by using the `Makefile` recipe or fro
 
 ```
 	suite.driver = common.Driver{
-		DriverName:   "csi-unity.dellemc.com",
+		DriverName:   "csi-powerstore.dellemc.com",
 		StorageClass: "replication-powerstore",
 	}
 ```
