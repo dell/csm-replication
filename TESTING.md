@@ -12,7 +12,7 @@ The integration test cases can be executed by using the `Makefile` recipe or fro
 ```
 ### Sidecar
 To run sidecar integration tests: 
-- Start the mock gRPC server based on the dev environment operating system.
+- Start the mock gRPC server based on the dev environment operating system and wait for the server to start.
 
 	For Linux distros:
 	```bash
