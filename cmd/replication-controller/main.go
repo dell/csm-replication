@@ -246,7 +246,7 @@ func main() {
 		Config:          controllerMgr.config,
 		Domain:          domain,
 		DisablePVCRemap: disablePVCRemap,
-	}).SetupWithManager(mgr, expRateLimiter, workerThreads, disablePVCRemap); err != nil {
+	}).SetupWithManager(mgr, expRateLimiter, workerThreads); err != nil {
 		setupLog.Error(err, "unable to create controller", common.DellReplicationController, "DellCSIReplicationGroup")
 		os.Exit(1)
 	}
