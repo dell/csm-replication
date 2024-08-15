@@ -395,7 +395,7 @@ func (suite *RGControllerTestSuite) TestDeleteWithErrors() {
 
 	// Inject temporary error
 	errorMsg := fmt.Sprintf("error during delete")
-	suite.repClient.InjectErrorClearAfterN(fmt.Errorf(errorMsg), 5)
+	suite.repClient.InjectErrorClearAfterN(fmt.Errorf("%s", errorMsg), 5)
 
 	for i := 0; i < 5; i++ {
 		_, err := suite.rgReconcile.Reconcile(context.Background(), req)
@@ -429,7 +429,7 @@ func (suite *RGControllerTestSuite) TestDeleteWithPersistentError() {
 
 	// Inject error which doesn't clear
 	errorMsg := fmt.Sprintf("error during delete")
-	suite.repClient.InjectError(fmt.Errorf(errorMsg))
+	suite.repClient.InjectError(fmt.Errorf("%s", errorMsg))
 	defer suite.repClient.ClearErrorAndCondition(true)
 
 	// Reconcile a few times
@@ -459,7 +459,7 @@ func (suite *RGControllerTestSuite) TestDeleteWithFinalError() {
 
 	// Inject temporary error
 	errorMsg := fmt.Sprintf("error during delete")
-	suite.repClient.InjectErrorAutoClear(fmt.Errorf(errorMsg))
+	suite.repClient.InjectErrorAutoClear(fmt.Errorf("%s", errorMsg))
 	_, err = suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.EqualError(err, errorMsg, "error should match injected error")
 
