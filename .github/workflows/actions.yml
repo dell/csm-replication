@@ -37,7 +37,7 @@ jobs:
           go-version: ^1.22
       - run: cd repctl && make test
       - name: Run unit tests and check package coverage
-        run: make gen-coverage
+        run: make unit-test
   go_security_scan:
     permissions: write-all
     name: Go security - Main Folder
