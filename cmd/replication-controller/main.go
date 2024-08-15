@@ -309,7 +309,6 @@ func main() {
 		startManager(mgr, setupLog)
 	}
 }
-
 func startManager(mgr manager.Manager, setupLog logr.Logger) {
 	setupLog.Info("starting manager")
 
