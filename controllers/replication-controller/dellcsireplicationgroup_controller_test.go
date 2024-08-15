@@ -39,13 +39,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-type PVCRemapTestSuite struct {
-	suite.Suite
-	client client.Client
-	driver utils.Driver
-	config connection.MultiClusterClient
-}
-
 type RGControllerTestSuite struct {
 	suite.Suite
 	client     client.Client
