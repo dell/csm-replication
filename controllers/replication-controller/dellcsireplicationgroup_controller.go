@@ -583,16 +583,17 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	remotePVPolicy := pv.Spec.PersistentVolumeReclaimPolicy
 	log.V(common.InfoLevel).Info(fmt.Sprintf("Saving reclaim policy of remote PV: %s\n", string(remotePVPolicy)))
 
-	// Make the PVS reclaim policy Retain
+	// Make the local PV reclaim policy Retain
 	if err = makePVReclaimPolicyRetain(ctx, client, pvc.Spec.VolumeName, log); err != nil {
 		return err
 	}
 
+	// Make the remote PV reclaim policy Retain
 	if err = makePVReclaimPolicyRetain(ctx, client, pvc.Annotations[controller.RemotePV], log); err != nil {
 		return err
 	}
 
-	// Check that the request targetPV volume is our replia (remotePV)
+	// Check that the request targetPV volume is our replica (remotePV)
 	remotePV := pvc.Annotations[controller.RemotePV]
 	if targetPV != remotePV {
 		err := fmt.Errorf("requested target %s doesn't match available replica %s", targetPV, remotePV)
@@ -621,7 +622,7 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 				log.V(common.InfoLevel).Info(fmt.Sprintf("Error checking PVC %s/%s: %s", namespace, pvcName, err.Error()))
 			}
 		}
-		if iteration > 60 {
+		if iteration > 30 {
 			return fmt.Errorf("timed out waiting on PVC %s/%s to be deleted", namespace, pvcName)
 		}
 	}
@@ -724,7 +725,7 @@ func setPVReclaimPolicy(ctx context.Context, client connection.RemoteClusterClie
 		}
 		if pv.Spec.PersistentVolumeReclaimPolicy == prevPolicy {
 			done = true
-		} else if iterations > 20 {
+		} else if iterations > 30 {
 			err := fmt.Errorf("timed out waiting on PV VolumeReclaimPolicy to be set to previous policy")
 			return err
 		}
@@ -757,7 +758,7 @@ func makePVReclaimPolicyRetain(ctx context.Context, client connection.RemoteClus
 		}
 		if pv.Spec.PersistentVolumeReclaimPolicy == "Retain" {
 			done = true
-		} else if iterations > 20 {
+		} else if iterations > 30 {
 			err := fmt.Errorf("timed out waiting on PV VolumeReclaimPolicy to be set to Retain")
 			return err
 		}
@@ -793,7 +794,7 @@ func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 		err = client.UpdatePersistentVolume(ctx, pv)
 		if err == nil {
 			done = true
-		} else if iterations > 20 {
+		} else if iterations > 30 {
 			err := fmt.Errorf("timed out waiting on Local PV Claim Ref to be remove")
 			return err
 		}
@@ -845,7 +846,7 @@ func updatePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 		err = client.UpdatePersistentVolume(ctx, pv)
 		if err == nil {
 			done = true
-		} else if iterations > 20 {
+		} else if iterations > 30 {
 			err := fmt.Errorf("timed out updating the claim ref")
 			return err
 		}
