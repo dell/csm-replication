@@ -169,7 +169,7 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	// Try to get the client
-	client, err := r.Config.GetConnection(remoteClusterID)
+	remoteClient, err := r.Config.GetConnection(remoteClusterID)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -192,7 +192,7 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 		if _, ok := localRG.Annotations[controller.DeletionRequested]; !ok {
 			log.V(common.InfoLevel).Info("Deletion requested annotation not found")
-			remoteRG, err := client.GetReplicationGroup(ctx, localRG.Annotations[controller.RemoteReplicationGroup])
+			remoteRG, err := remoteClient.GetReplicationGroup(ctx, localRG.Annotations[controller.RemoteReplicationGroup])
 			if err != nil {
 				log.V(common.ErrorLevel).WithValues(err.Error()).Info("error getting replication group")
 				// If remote RG doesn't exist, proceed to removing finalizer
@@ -208,7 +208,7 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 						// Add annotation on the remote RG to request its deletion
 						remoteRGCopy := remoteRG.DeepCopy()
 						controller.AddAnnotation(remoteRGCopy, controller.DeletionRequested, "yes")
-						err := client.UpdateReplicationGroup(ctx, remoteRGCopy)
+						err := remoteClient.UpdateReplicationGroup(ctx, remoteRGCopy)
 						if err != nil {
 							return ctrl.Result{}, err
 						}
@@ -250,7 +250,7 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	// We treat this as idempotent.
 	log.V(common.InfoLevel).Info(fmt.Sprintf("Checking if remote RG with the name %s exists on ClusterId: %s",
 		remoteRGName, remoteClusterID))
-	rgObj, err := client.GetReplicationGroup(ctx, remoteRGName)
+	rgObj, err := remoteClient.GetReplicationGroup(ctx, remoteRGName)
 	if err != nil && !errors.IsNotFound(err) {
 		log.Error(err, "failed to get RG details on the remote cluster")
 		return ctrl.Result{Requeue: true}, err
@@ -310,7 +310,7 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	if createRG {
-		err = client.CreateReplicationGroup(ctx, remoteRG)
+		err = remoteClient.CreateReplicationGroup(ctx, remoteRG)
 		if err != nil {
 			log.Error(err, "failed to create remote CR for DellCSIReplicationGroup")
 			r.EventRecorder.Eventf(localRG, eventTypeWarning, eventReasonUpdated,
@@ -333,7 +333,7 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	err = r.processLastActionResult(ctx, localRG, remoteRG, client, log)
+	err = r.processLastActionResult(ctx, localRG, remoteRG, remoteClient, log)
 	if err != nil {
 		r.EventRecorder.Eventf(localRG, eventTypeWarning, eventReasonUpdated,
 			"failed to process the last action %s", localRG.Status.LastAction.Condition)
@@ -343,7 +343,7 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	return ctrl.Result{}, nil
 }
 
-func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteGroup *repv1.DellCSIReplicationGroup, client connection.RemoteClusterClient, log logr.Logger) error {
+func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteGroup *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
 	if len(group.Status.Conditions) == 0 || group.Status.LastAction.Time == nil {
 		log.V(common.InfoLevel).Info("No action to process")
 		return nil
@@ -371,13 +371,13 @@ func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context
 	}
 
 	if strings.Contains(group.Status.LastAction.Condition, "FAILOVER_REMOTE") {
-		if err := r.processFailoverEvent(ctx, group, client, log); err != nil {
+		if err := r.processFailoverEvent(ctx, group, remoteClient, log); err != nil {
 			return err
 		}
 	}
 
 	if strings.Contains(group.Status.LastAction.Condition, "UNPLANNED_FAILOVER_LOCAL") {
-		if err := r.processFailoverEvent(ctx, remoteGroup, client, log); err != nil {
+		if err := r.processFailoverEvent(ctx, remoteGroup, remoteClient, log); err != nil {
 			return err
 		}
 	}
@@ -388,7 +388,7 @@ func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context
 	return getDellCsiReplicationGroupUpdate(r, ctx, group)
 }
 
-func (r *ReplicationGroupReconciler) processFailoverEvent(ctx context.Context, group *repv1.DellCSIReplicationGroup, client connection.RemoteClusterClient, log logr.Logger) error {
+func (r *ReplicationGroupReconciler) processFailoverEvent(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
 	if r.DisablePVCRemap {
 		log.V(common.InfoLevel).Info("PVC remapping is disabled. Skipping PVC swap.")
 		return nil
@@ -399,7 +399,7 @@ func (r *ReplicationGroupReconciler) processFailoverEvent(ctx context.Context, g
 		rgName := group.Name
 		rgTarget := group.Annotations[controller.RemoteReplicationGroup]
 
-		err := r.swapAllPVC(ctx, client, rgName, rgTarget, log)
+		err := r.swapAllPVC(ctx, remoteClient, rgName, rgTarget, log)
 		if err != nil {
 			log.Error(err, "Error swapping all PVCs")
 			return err
@@ -410,7 +410,7 @@ func (r *ReplicationGroupReconciler) processFailoverEvent(ctx context.Context, g
 	return nil
 }
 
-func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, group *repv1.DellCSIReplicationGroup, client connection.RemoteClusterClient, log logr.Logger) error {
+func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
 	lastAction := group.Status.LastAction
 
 	val, ok := group.Annotations[csireplicator.Action]
@@ -435,7 +435,6 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 		log.V(common.InfoLevel).Info("Namespace - " + actionAnnotation.SnapshotNamespace + " not found, creating it.")
 		nsRef := makeNamespaceReference(actionAnnotation.SnapshotNamespace)
 		err = getDellCsiReplicationGroupCreateNamespace(remoteClient, ctx, nsRef)
-
 		if err != nil {
 			msg := "unable to create the desired namespace" + actionAnnotation.SnapshotNamespace
 			log.V(common.ErrorLevel).Error(err, msg)
@@ -530,8 +529,7 @@ func makeVolSnapContent(snapName, volumeName string, snapRef v1.ObjectReference,
 }
 
 // SetupWithManager start using reconciler by creating new controller managed by provided manager
-func (r *ReplicationGroupReconciler) SetupWithManager(mgr ctrl.Manager, limiter ratelimiter.RateLimiter, maxReconcilers int, disablePVCRemap bool) error {
-	r.DisablePVCRemap = disablePVCRemap
+func (r *ReplicationGroupReconciler) SetupWithManager(mgr ctrl.Manager, limiter ratelimiter.RateLimiter, maxReconcilers int) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&repv1.DellCSIReplicationGroup{}).
 		WithOptions(reconciler.Options{
