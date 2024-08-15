@@ -62,26 +62,30 @@ This project contains multiple go modules, and you can build multiple binaries &
 
 This project relies on the following tools which have to be installed in order to generate certain manifests.
 
-| Tool | Version |
-| --------- | ----------- |
-| controller-gen | v0.4.1 |
-| kustomize | v3.10.0 |
+| Tool              | Version      |
+| ----------------- | ------------ |
+| controller-gen    | v0.15.0      |
+| kustomize         | v5.4.3       |
 
 The above tools can also be installed by running the command `make tools`.
 
 ### Custom Resource Definitions
 
-Run the command `make manifests` to build the CSM Replication CRDs. This command invokes `controller-gen` to generate the CRDs. 
+Run the command `make manifests` to build the CSM Replication Custom Resource Definitions (CRDs). This command invokes `controller-gen` to generate the CRDs. 
 The API code is annotated with `kubebuilder` tags which are used by the `controller-gen` generators. The generated definitions are present in the form
 of a _kustomize_ recipe in the `config/crd` folder.
 
 ### Binaries
+To build all the binaries associated with CSM Replication, run `make build`.
 
-For building the CSM Replication sidecar, _dell-csi-replicator_, run `make sidecar-manager`.
+To compile individual binaries run:
+- `make build-controller-manager` to build the CSM Replication Controller, _dell-replication-controller_.
+- `make build-sidecar-manager` to build the CSM Replication sidecar, _dell-csi-replicator_.
+- `make build-sidecar-migrator` to build the CSM Replication sidecar, _dell-csi-migrator_.
+- `make build-sidecar-node-rescanner` to build the CSM Replication sidecar, _dell-csi-node-rescanner_.
 
-For building the CSM Replication Controller, _dell-replication-controller_, run `make controller-manager`.
-
-For building the repctl binary, run `cd repctl && make build`.
+#### Repctl
+To build the repctl binary, run `cd repctl && make build`. 
 
 ### Static manifests
 
