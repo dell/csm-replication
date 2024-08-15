@@ -520,7 +520,7 @@ func (r *ReplicationGroupReconciler) SetupWithManager(mgr ctrl.Manager, limiter 
 // It also retains the original reclaimPolicy and operates within a single cluster.
 func (r *ReplicationGroupReconciler) swapAllPVC(ctx context.Context, c connection.RemoteClusterClient, rgName string, rgTarget string, log logr.Logger) error {
 	log.V(common.InfoLevel).Info(fmt.Sprintf("calling getPVList from %s\n", rgName))
-	pvcs, err := c.ListPersistentVolumeClaim(ctx, client.MatchingLabels{r.Domain + "/replicationGroupName": rgName})
+	pvcs, err := c.ListPersistentVolumeClaim(ctx, client.MatchingLabels{controller.ReplicationGroup: rgName})
 	if err != nil {
 		return fmt.Errorf("failed to list PVCs: %w", err)
 	}
@@ -534,7 +534,7 @@ func (r *ReplicationGroupReconciler) swapAllPVC(ctx context.Context, c connectio
 			defer wg.Done()
 			pvcName := pvc.Name
 			namespace := pvc.Namespace
-			targetPV := pvc.Annotations[r.Domain+"/remotePV"]
+			targetPV := pvc.Annotations[controller.RemotePV]
 			err := r.swapPVC(ctx, c, pvcName, namespace, targetPV, rgTarget, log)
 			if err != nil {
 				errChan <- fmt.Errorf("error swapping PVC %s/%s: %w", namespace, pvcName, err)
@@ -553,7 +553,7 @@ func (r *ReplicationGroupReconciler) swapAllPVC(ctx context.Context, c connectio
 	}
 
 	if len(errs) > 0 {
-		return fmt.Errorf("errors occurred while swapping PVCs: %v", errs)
+		return fmt.Errorf("errors occurred while swapping PVCs: %s", errs)
 	}
 
 	return nil
@@ -563,7 +563,7 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	// Read the PVC
 	pvc, err := client.GetPersistentVolumeClaim(ctx, namespace, pvcName)
 	if err != nil {
-		log.V(common.InfoLevel).Info(fmt.Sprintf("Error getting pv %s: %s:", pvcName, err))
+		return fmt.Errorf("error getting pv %s: %s", pvcName, err)
 	}
 
 	// Save the Reclaim Policy for both PVs - return reclaim policy to makepvcreclaimpolicyretain
@@ -575,9 +575,9 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	localPVPolicy := pv.Spec.PersistentVolumeReclaimPolicy
 	log.V(common.InfoLevel).Info(fmt.Sprintf("Saving reclaim policy of local PV: %s\n", string(localPVPolicy)))
 
-	pv, err = client.GetPersistentVolume(ctx, pvc.Annotations[r.Domain+"/remotePV"])
+	pv, err = client.GetPersistentVolume(ctx, pvc.Annotations[controller.RemotePV])
 	if err != nil {
-		log.V(common.InfoLevel).Info(fmt.Sprintf("Error retrieving remote PV %s: %s", pvc.Annotations[r.Domain+"/remotePV"], err.Error()))
+		log.V(common.InfoLevel).Info(fmt.Sprintf("Error retrieving remote PV %s: %s", pvc.Annotations[controller.RemotePV], err.Error()))
 		return err
 	}
 	remotePVPolicy := pv.Spec.PersistentVolumeReclaimPolicy
@@ -588,12 +588,12 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 		return err
 	}
 
-	if err = makePVReclaimPolicyRetain(ctx, client, pvc.Annotations[r.Domain+"/remotePV"], log); err != nil {
+	if err = makePVReclaimPolicyRetain(ctx, client, pvc.Annotations[controller.RemotePV], log); err != nil {
 		return err
 	}
 
 	// Check that the request targetPV volume is our replia (remotePV)
-	remotePV := pvc.Annotations[r.Domain+"/remotePV"]
+	remotePV := pvc.Annotations[controller.RemotePV]
 	if targetPV != remotePV {
 		err := fmt.Errorf("requested target %s doesn't match available replica %s", targetPV, remotePV)
 		log.V(common.InfoLevel).Info(err.Error())
@@ -673,7 +673,7 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	if err != nil {
 		return err
 	}
-	err = setPVReclaimPolicy(ctx, client, pvc.Annotations[r.Domain+"/remotePV"], localPVPolicy, log)
+	err = setPVReclaimPolicy(ctx, client, pvc.Annotations[controller.RemotePV], localPVPolicy, log)
 	if err != nil {
 		return err
 	}
