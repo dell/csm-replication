@@ -579,12 +579,12 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	remotePVPolicy := pv.Spec.PersistentVolumeReclaimPolicy
 
 	// Make the local PV reclaim policy Retain
-	if err = setPVReclaimPolicy(ctx, client, pvc.Spec.VolumeName, "Retain", log); err != nil {
+	if err = setPVReclaimPolicy(ctx, client, pvc.Spec.VolumeName, "Retain"); err != nil {
 		return fmt.Errorf("error making source PV %s reclaim policy Retain: %s", pvc.Spec.VolumeName, err)
 	}
 
 	// Make the remote PV reclaim policy Retain
-	if err = setPVReclaimPolicy(ctx, client, pvc.Annotations[controller.RemotePV], "Retain", log); err != nil {
+	if err = setPVReclaimPolicy(ctx, client, pvc.Annotations[controller.RemotePV], "Retain"); err != nil {
 		return fmt.Errorf("error making target PV %s reclaim policy Retain: %s", pvc.Annotations[controller.RemotePV], err)
 	}
 
@@ -641,7 +641,7 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 
 	// Verify pvc is created and bound to new PVs
 	// remotePV is the current localPVName arg, localPV is the current remotePVName arg
-	err = verifyPVC(ctx, client, targetPV, localPV, pvcName, namespace, log)
+	err = verifyPVC(ctx, client, targetPV, localPV, pvcName, namespace)
 	if err != nil {
 		return fmt.Errorf("error verifying PVC %s: %s", pvcName, err.Error())
 	}
@@ -653,11 +653,11 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	}
 
 	// Restore the PVs original volume reclaim policy
-	err = setPVReclaimPolicy(ctx, client, pvc.Spec.VolumeName, remotePVPolicy, log)
+	err = setPVReclaimPolicy(ctx, client, pvc.Spec.VolumeName, remotePVPolicy)
 	if err != nil {
 		return fmt.Errorf("restoring PV reclaim policy of %s: %s", pvc.Spec.VolumeName, err.Error())
 	}
-	err = setPVReclaimPolicy(ctx, client, pvc.Annotations[controller.RemotePV], localPVPolicy, log)
+	err = setPVReclaimPolicy(ctx, client, pvc.Annotations[controller.RemotePV], localPVPolicy)
 	if err != nil {
 		return fmt.Errorf("restoring PV reclaim policy of %s: %s", pvc.Annotations[controller.RemotePV], err.Error())
 	}
@@ -665,7 +665,7 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	return nil
 }
 
-func verifyPVC(ctx context.Context, client connection.RemoteClusterClient, localPVName string, remotePVName string, pvcName string, namespace string, log logr.Logger) error {
+func verifyPVC(ctx context.Context, client connection.RemoteClusterClient, localPVName string, remotePVName string, pvcName string, namespace string) error {
 	for iteration := 0; iteration < 30; iteration++ {
 		pvc, err := client.GetPersistentVolumeClaim(ctx, namespace, pvcName)
 
@@ -679,7 +679,7 @@ func verifyPVC(ctx context.Context, client connection.RemoteClusterClient, local
 	return fmt.Errorf("timed out waiting on PVC %s/%s to be created and bound", namespace, pvcName)
 }
 
-func setPVReclaimPolicy(ctx context.Context, client connection.RemoteClusterClient, pvName string, prevPolicy v1.PersistentVolumeReclaimPolicy, log logr.Logger) error {
+func setPVReclaimPolicy(ctx context.Context, client connection.RemoteClusterClient, pvName string, prevPolicy v1.PersistentVolumeReclaimPolicy) error {
 	for iteration := 0; iteration < 30; iteration++ {
 		pv, err := client.GetPersistentVolume(ctx, pvName)
 		if err != nil {
