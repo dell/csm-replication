@@ -311,6 +311,7 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	err = r.processLastActionResult(ctx, localRG, remoteRG, remoteClient, log)
 	if err != nil {
+		log.V(common.ErrorLevel).Error(err, "failed to process the last action")
 		r.EventRecorder.Eventf(localRG, eventTypeWarning, eventReasonUpdated,
 			"failed to process the last action %s", localRG.Status.LastAction.Condition)
 	}
@@ -561,41 +562,36 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	// Save the Reclaim Policy for both PVs - return reclaim policy to makepvcreclaimpolicyretain
 	pv, err := client.GetPersistentVolume(ctx, pvc.Spec.VolumeName)
 	if err != nil {
-		log.V(common.InfoLevel).Info(fmt.Sprintf("Error retrieving local PV %s: %s", pvc.Spec.VolumeName, err.Error()))
-		return err
+		return fmt.Errorf("error retrieving local PV %s", pvc.Spec.VolumeName)
 	}
 	localPVPolicy := pv.Spec.PersistentVolumeReclaimPolicy
 
 	pv, err = client.GetPersistentVolume(ctx, pvc.Annotations[controller.RemotePV])
 	if err != nil {
-		log.V(common.InfoLevel).Info(fmt.Sprintf("Error retrieving remote PV %s: %s", pvc.Annotations[controller.RemotePV], err.Error()))
-		return err
+		return fmt.Errorf("error retrieving remote PV %s", pvc.Annotations[controller.RemotePV])
 	}
+
+	// The target PV should be unclaimed.
+	if pv.Spec.ClaimRef != nil {
+		return fmt.Errorf("target PV %s is claimed", pv.Name)
+	}
+
 	remotePVPolicy := pv.Spec.PersistentVolumeReclaimPolicy
 
 	// Make the local PV reclaim policy Retain
-	if err = makePVReclaimPolicyRetain(ctx, client, pvc.Spec.VolumeName, log); err != nil {
-		return err
+	if err = setPVReclaimPolicy(ctx, client, pvc.Spec.VolumeName, "Retain", log); err != nil {
+		return fmt.Errorf("error making source PV %s reclaim policy Retain: %s", pvc.Spec.VolumeName, err)
 	}
 
 	// Make the remote PV reclaim policy Retain
-	if err = makePVReclaimPolicyRetain(ctx, client, pvc.Annotations[controller.RemotePV], log); err != nil {
-		return err
-	}
-
-	// Check that the request targetPV volume is our replica (remotePV)
-	remotePV := pvc.Annotations[controller.RemotePV]
-	if targetPV != remotePV {
-		err := fmt.Errorf("requested target %s doesn't match available replica %s", targetPV, remotePV)
-		log.V(common.InfoLevel).Info(err.Error())
-		return err
+	if err = setPVReclaimPolicy(ctx, client, pvc.Annotations[controller.RemotePV], "Retain", log); err != nil {
+		return fmt.Errorf("error making target PV %s reclaim policy Retain: %s", pvc.Annotations[controller.RemotePV], err)
 	}
 
 	// Delete the existing PVC
 	err = client.DeletePersistentVolumeClaim(ctx, pvc)
 	if err != nil {
-		log.V(common.InfoLevel).Info(fmt.Sprintf("error deleting PVC %s: %s", pvcName, err.Error()))
-		return err
+		return fmt.Errorf("error deleting PVC %s", pvcName)
 	}
 
 	// Wait until PVC is deleted
@@ -606,11 +602,12 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 		if err != nil {
 			if errors.IsNotFound(err) {
 				done = true
-			} else {
-				log.V(common.InfoLevel).Info(fmt.Sprintf("Error checking PVC %s/%s: %s", namespace, pvcName, err.Error()))
-				return err
+				break
 			}
+
+			return fmt.Errorf("error when waiting for PVC %s/%s to be deleted", namespace, pvcName)
 		}
+
 		if iteration > 30 {
 			return fmt.Errorf("timed out waiting on PVC %s/%s to be deleted", namespace, pvcName)
 		}
@@ -619,20 +616,19 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	// Swap some fields in the PVC.
 	localPV := pvc.Spec.VolumeName
 	pvc.Annotations[controller.RemotePV] = pvc.Spec.VolumeName
-	pvc.Spec.VolumeName = remotePV
+	pvc.Spec.VolumeName = targetPV
 
-	remoteStorageClassName := pvc.Annotations[r.Domain+"/remoteStorageClassName"]
-	pvc.Annotations[r.Domain+"/remoteStorageClassName"] = *pvc.Spec.StorageClassName
-	pvc.Annotations[r.Domain+"/replicationGroupName"] = rgTarget
-	pvc.Labels[r.Domain+"/replicationGroupName"] = rgTarget
+	remoteStorageClassName := pvc.Annotations[controller.StorageClassRemoteStorageClassParam]
+	pvc.Annotations[controller.StorageClassRemoteStorageClassParam] = *pvc.Spec.StorageClassName
+	pvc.Annotations[controller.ReplicationGroup] = rgTarget
+	pvc.Labels[controller.ReplicationGroup] = rgTarget
 	pvc.Spec.StorageClassName = &remoteStorageClassName
 	pvc.ObjectMeta.ResourceVersion = ""
 
 	// Re-create the PVC, now pointing to the target.
 	err = client.CreatePersistentVolumeClaim(ctx, pvc)
 	if err != nil {
-		log.V(common.InfoLevel).Info(fmt.Sprintf("Error creating final PVC: %s\n", err.Error()))
-		return err
+		return fmt.Errorf("unable to create PVC %s: %s", pvc.Name, err.Error())
 	}
 
 	// Update the target PV's claimref to point to our pvc.
@@ -640,30 +636,30 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	pvcResourceVersion := pvc.ObjectMeta.ResourceVersion
 	err = updatePVClaimRef(ctx, client, targetPV, pvc.Namespace, pvcResourceVersion, pvc.Name, pvcUID, log)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to update PVClaimRef for %s: %s", targetPV, err.Error())
 	}
 
 	// Verify pvc is created and bound to new PVs
 	// remotePV is the current localPVName arg, localPV is the current remotePVName arg
-	err = verifyPVC(ctx, client, remotePV, localPV, pvcName, namespace, log)
+	err = verifyPVC(ctx, client, targetPV, localPV, pvcName, namespace, log)
 	if err != nil {
-		return err
+		return fmt.Errorf("error verifying PVC %s: %s", pvcName, err.Error())
 	}
 
 	// Remove the PVC reclaim of local PV
 	err = removePVClaimRef(ctx, client, localPV, namespace, pvcName, log)
 	if err != nil {
-		return err
+		return fmt.Errorf("error removing PV claim ref from %s: %s", localPV, err.Error())
 	}
 
 	// Restore the PVs original volume reclaim policy
 	err = setPVReclaimPolicy(ctx, client, pvc.Spec.VolumeName, remotePVPolicy, log)
 	if err != nil {
-		return err
+		return fmt.Errorf("restoring PV reclaim policy of %s: %s", pvc.Spec.VolumeName, err.Error())
 	}
 	err = setPVReclaimPolicy(ctx, client, pvc.Annotations[controller.RemotePV], localPVPolicy, log)
 	if err != nil {
-		return err
+		return fmt.Errorf("restoring PV reclaim policy of %s: %s", pvc.Annotations[controller.RemotePV], err.Error())
 	}
 
 	return nil
@@ -679,7 +675,7 @@ func verifyPVC(ctx context.Context, client connection.RemoteClusterClient, local
 
 		time.Sleep(2 * time.Second)
 	}
-	log.V(common.InfoLevel).Info(fmt.Sprintf("Timed out waiting on PVC %s/%s to be created and bound", namespace, pvcName))
+
 	return fmt.Errorf("timed out waiting on PVC %s/%s to be created and bound", namespace, pvcName)
 }
 
@@ -687,69 +683,42 @@ func setPVReclaimPolicy(ctx context.Context, client connection.RemoteClusterClie
 	for iteration := 0; iteration < 30; iteration++ {
 		pv, err := client.GetPersistentVolume(ctx, pvName)
 		if err != nil {
-			log.V(common.InfoLevel).Info(fmt.Sprintf("Error retrieving PV %s: %s", pvName, err.Error()))
-			return err
+			return fmt.Errorf("error retrieving PV %s: %s", pvName, err.Error())
 		}
+
 		pv.Spec.PersistentVolumeReclaimPolicy = prevPolicy
 		err = client.UpdatePersistentVolume(ctx, pv)
 		if err != nil {
-			log.V(common.InfoLevel).Info(fmt.Sprintf("Error updating PV %s: %s", pvName, err.Error()))
-			return err
+			return fmt.Errorf("error updating PV %s: %s", pvName, err.Error())
 		}
+
 		pv, err = client.GetPersistentVolume(ctx, pvName)
 		if err != nil {
-			log.V(common.InfoLevel).Info(fmt.Sprintf("Error retrieving PV %s: %s", pvName, err.Error()))
-			return err
+			return fmt.Errorf("error retrieving PV %s: %s", pvName, err.Error())
 		}
+
 		if pv.Spec.PersistentVolumeReclaimPolicy == prevPolicy {
 			return nil
 		}
 
 		time.Sleep(2 * time.Second)
 	}
-	err := fmt.Errorf("timed out waiting on PV VolumeReclaimPolicy to be set to previous policy")
-	return err
-}
-
-func makePVReclaimPolicyRetain(ctx context.Context, client connection.RemoteClusterClient, pvName string, log logr.Logger) error {
-	for iteration := 0; iteration < 30; iteration++ {
-		pv, err := client.GetPersistentVolume(ctx, pvName)
-		if err != nil {
-			log.V(common.InfoLevel).Info(fmt.Sprintf("Error retrieving PV %s: %s", pvName, err.Error()))
-			return err
-		}
-		pv.Spec.PersistentVolumeReclaimPolicy = "Retain"
-		err = client.UpdatePersistentVolume(ctx, pv)
-		if err != nil {
-			log.V(common.InfoLevel).Info(fmt.Sprintf("Error updating PV %s: %s", pvName, err.Error()))
-			return err
-		}
-
-		pv, err = client.GetPersistentVolume(ctx, pvName)
-		if err != nil {
-			log.V(common.InfoLevel).Info(fmt.Sprintf("Error retrieving PV %s: %s", pvName, err.Error()))
-			return err
-		}
-
-		if pv.Spec.PersistentVolumeReclaimPolicy == "Retain" {
-			return nil
-		}
-
-		time.Sleep(2 * time.Second)
-	}
-
-	err := fmt.Errorf("timed out waiting on PV VolumeReclaimPolicy to be set to Retain")
-	return err
+	return fmt.Errorf("timed out waiting on PV VolumeReclaimPolicy to be set to previous policy")
 }
 
 func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient, pvName, pvcNamespace, pvcName string, log logr.Logger) error {
+	log.V(common.InfoLevel).Info(fmt.Sprintf("Removing ClaimRef on LocalPV: %s", pvName))
 	for iteration := 0; iteration < 30; iteration++ {
-
 		pv, err := client.GetPersistentVolume(ctx, pvName)
 		if err != nil {
-			log.V(common.InfoLevel).Info(fmt.Sprintf("Error retrieving PV %s: %s", pvName, err.Error()))
-			return err
+			return fmt.Errorf("error retrieving PV %s: %s", pvName, err.Error())
 		}
+
+		if pv.Spec.ClaimRef == nil {
+			log.V(common.InfoLevel).Info(fmt.Sprintf("ClaimRef removed from LocalPV: %s", pvName))
+			return nil
+		}
+
 		pv.Spec.ClaimRef = nil
 		pv.Annotations[controller.RemotePVCNamespace] = pvcNamespace
 		pv.Labels[controller.RemotePVCNamespace] = pvcNamespace
@@ -757,23 +726,16 @@ func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 
 		err = client.UpdatePersistentVolume(ctx, pv)
 		if err != nil {
-			return err
-		}
+			if !errors.IsConflict(err) {
+				return fmt.Errorf("error updating PV %s: %s", pvName, err.Error())
+			}
 
-		pv, err = client.GetPersistentVolume(ctx, pvName)
-		if err != nil {
-			log.V(common.InfoLevel).Info(fmt.Sprintf("Error retrieving PV %s: %s", pvName, err.Error()))
-			return err
+			log.V(common.InfoLevel).Info(fmt.Sprintf("Issue retrieving latest for %s and trying again", pvName))
+			time.Sleep(2 * time.Second)
 		}
-
-		if pv.Spec.ClaimRef == nil {
-			return nil
-		}
-
-		time.Sleep(2 * time.Second)
 	}
-	err := fmt.Errorf("timed out waiting on Local PV Claim Ref to be remove")
-	return err
+
+	return fmt.Errorf("timed out waiting on Local PV Claim Ref to be removed")
 }
 
 func updatePVClaimRef(ctx context.Context, client connection.RemoteClusterClient, pvName, pvcNamespace, pvcResourceVersion, pvcName string, pvcUID types.UID, log logr.Logger) error {
@@ -783,47 +745,41 @@ func updatePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 			log.V(common.InfoLevel).Info(fmt.Sprintf("Error retrieving PV %s: %s", pvName, err.Error()))
 			return err
 		}
-		if pv.Spec.ClaimRef == nil {
-			pv.Spec.ClaimRef = &v1.ObjectReference{}
-		}
-		pv.Spec.ClaimRef.Kind = "PersistentVolumeClaim"
-		pv.Spec.ClaimRef.Namespace = pvcNamespace
-		pv.Spec.ClaimRef.Name = pvcName
-		pv.Spec.ClaimRef.UID = pvcUID
-		pv.Spec.ClaimRef.ResourceVersion = pvcResourceVersion
-
-		val, exists := pv.Annotations[controller.RemotePVCNamespace]
-		if exists && val != "" {
-			pv.Annotations[controller.RemotePVCNamespace] = ""
-		}
-
-		val, exists = pv.Labels[controller.RemotePVCNamespace]
-		if exists && val != "" {
-			pv.Labels[controller.RemotePVCNamespace] = ""
-		}
-
-		val, exists = pv.Annotations[controller.RemotePVC]
-		if exists && val != "" {
-			pv.Annotations[controller.RemotePVC] = ""
-		}
-
-		err = client.UpdatePersistentVolume(ctx, pv)
-		if err != nil {
-			return err
-		}
-
-		pv, err = client.GetPersistentVolume(ctx, pvName)
-		if err != nil {
-			log.V(common.InfoLevel).Info(fmt.Sprintf("Error retrieving PV %s: %s", pvName, err.Error()))
-			return err
-		}
 
 		if pv.Spec.ClaimRef != nil {
 			return nil
 		}
 
-		time.Sleep(2 * time.Second)
+		pv.Spec.ClaimRef = &v1.ObjectReference{
+			Kind:            "PersistentVolumeClaim",
+			Namespace:       pvcNamespace,
+			Name:            pvcName,
+			UID:             pvcUID,
+			ResourceVersion: pvcResourceVersion,
+		}
+
+		if val, exists := pv.Annotations[controller.RemotePVCNamespace]; exists && val != "" {
+			pv.Annotations[controller.RemotePVCNamespace] = ""
+		}
+
+		if val, exists := pv.Labels[controller.RemotePVCNamespace]; exists && val != "" {
+			pv.Labels[controller.RemotePVCNamespace] = ""
+		}
+
+		if val, exists := pv.Annotations[controller.RemotePVC]; exists && val != "" {
+			pv.Annotations[controller.RemotePVC] = ""
+		}
+
+		err = client.UpdatePersistentVolume(ctx, pv)
+		if err != nil {
+			if !errors.IsConflict(err) {
+				return fmt.Errorf("error updating PV %s: %s", pvName, err.Error())
+			}
+
+			log.V(common.InfoLevel).Info(fmt.Sprintf("Issue retrieving latest for %s and trying again", pvName))
+			time.Sleep(2 * time.Second)
+		}
 	}
-	err := fmt.Errorf("timed out updating the claim ref")
-	return err
+
+	return fmt.Errorf("timed out updating the claim ref")
 }
