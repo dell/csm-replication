@@ -636,7 +636,7 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	pvcResourceVersion := pvc.ObjectMeta.ResourceVersion
 	err = updatePVClaimRef(ctx, client, targetPV, pvc.Namespace, pvcResourceVersion, pvc.Name, pvcUID, log)
 	if err != nil {
-		return fmt.Errorf("unable to update PVClaimRef for %s: %s", targetPV, err.Error())
+		return fmt.Errorf("unable to update PV ClaimRef for %s: %s", targetPV, err.Error())
 	}
 
 	// Verify pvc is created and bound to new PVs
@@ -655,11 +655,11 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	// Restore the PVs original volume reclaim policy
 	err = setPVReclaimPolicy(ctx, client, pvc.Spec.VolumeName, remotePVPolicy)
 	if err != nil {
-		return fmt.Errorf("restoring PV reclaim policy of %s: %s", pvc.Spec.VolumeName, err.Error())
+		return fmt.Errorf("restoring source PV reclaim policy of %s: %s", pvc.Spec.VolumeName, err.Error())
 	}
 	err = setPVReclaimPolicy(ctx, client, pvc.Annotations[controller.RemotePV], localPVPolicy)
 	if err != nil {
-		return fmt.Errorf("restoring PV reclaim policy of %s: %s", pvc.Annotations[controller.RemotePV], err.Error())
+		return fmt.Errorf("restoring remote PV reclaim policy of %s: %s", pvc.Annotations[controller.RemotePV], err.Error())
 	}
 
 	return nil
