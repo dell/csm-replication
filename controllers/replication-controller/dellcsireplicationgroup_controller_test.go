@@ -747,7 +747,7 @@ func (suite *RGControllerTestSuite) TestCreatePVCSnapshotActionErrors() {
 
 	// Invoke snapshot action
 	location, _ := time.LoadLocation("America/New_York")
-	time := metav1.Date(2024, 01, 01, 0+0, 0, 0, 0, location)
+	time := metav1.Date(2024, 0o1, 0o1, 0, 0, 0, 0, location)
 	lastAction := repv1.LastAction{
 		Time:      &time,
 		Condition: "Action CREATE_SNAPSHOT succeeded",
@@ -778,6 +778,7 @@ func (suite *RGControllerTestSuite) TestCreatePVCSnapshotActionErrors() {
 	_, err = suite.reconciler.Reconcile(context.Background(), suite.getTypicalRequest())
 	suite.NoError(err)
 
+	_ = suite.client.Get(context.Background(), types.NamespacedName{Name: rg.Name}, rg)
 	rg.Annotations[controllers.ActionProcessedTime] = time.String()
 	err = suite.client.Update(context.Background(), rg)
 	suite.NoError(err)
@@ -787,6 +788,7 @@ func (suite *RGControllerTestSuite) TestCreatePVCSnapshotActionErrors() {
 	suite.NoError(err)
 
 	// Scenario: Storage class provided is replication enabled.
+	_ = suite.client.Get(context.Background(), types.NamespacedName{Name: rg.Name}, rg)
 	rg.Annotations[constants.DefaultDomain+"/snapshotStorageClass"] = "sc-1"
 	rg.Annotations[constants.DefaultDomain+"/snapshotCreatePVC"] = "true"
 
@@ -799,7 +801,6 @@ func (suite *RGControllerTestSuite) TestCreatePVCSnapshotActionErrors() {
 		},
 	}
 
-	// Set Action content
 	rg.Status = repv1.DellCSIReplicationGroupStatus{
 		LastAction: lastAction,
 		Conditions: []repv1.LastAction{lastAction},

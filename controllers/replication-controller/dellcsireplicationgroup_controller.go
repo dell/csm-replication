@@ -349,7 +349,10 @@ func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context
 
 	// Informing the RG that the last action has been processed. Do not retry on error.
 	controller.AddAnnotation(group, controller.ActionProcessedTime, group.Status.LastAction.Time.String())
-	r.Update(ctx, group)
+	err := r.Update(ctx, group)
+	if err != nil {
+		return fmt.Errorf("failed to update rg")
+	}
 
 	return returnErr
 }
@@ -374,7 +377,7 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 
 	if _, err := remoteClient.GetNamespace(ctx, namespace); err != nil {
 		log.V(common.InfoLevel).Info("Namespace - " + namespace + " not found, creating it.")
-		err = CreateNamespace(ctx, namespace, remoteClient)
+		err = createNamespace(ctx, namespace, remoteClient)
 		if err != nil {
 			return err
 		}
@@ -430,7 +433,7 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 			if pvc != nil && pvc.Namespace == namespace {
 				log.V(common.InfoLevel).Info("Namespace - " + namespace + " not found, creating clone.")
 				namespace = "cloned-" + namespace
-				err = CreateNamespace(ctx, namespace, remoteClient)
+				err = createNamespace(ctx, namespace, remoteClient)
 				if err != nil {
 					return err
 				}
@@ -582,7 +585,7 @@ func makePersistentVolumeClaimFromSnapshot(name, namespace, snName, storageClass
 	}
 }
 
-func CreateNamespace(ctx context.Context, namespace string, remoteClient connection.RemoteClusterClient) error {
+func createNamespace(ctx context.Context, namespace string, remoteClient connection.RemoteClusterClient) error {
 	nsRef := makeNamespaceReference(namespace)
 	err := remoteClient.CreateNamespace(ctx, nsRef)
 	if err != nil {
