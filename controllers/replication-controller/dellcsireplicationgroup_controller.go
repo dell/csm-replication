@@ -336,7 +336,7 @@ func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context
 		return nil
 	}
 
-	if val == group.Status.LastAction.Time.GoString() {
+	if val == group.Status.LastAction.Time.String() {
 		log.V(common.InfoLevel).Info("Last action has already been processed")
 		return nil
 	}
@@ -348,7 +348,7 @@ func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context
 	}
 
 	// Informing the RG that the last action has been processed. Do not retry on error.
-	controller.AddAnnotation(group, controller.ActionProcessedTime, group.Status.LastAction.Time.GoString())
+	controller.AddAnnotation(group, controller.ActionProcessedTime, group.Status.LastAction.Time.String())
 	r.Update(ctx, group)
 
 	return returnErr
@@ -427,7 +427,7 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 				log.V(common.ErrorLevel).Error(err, "unable to get PVC information")
 			}
 
-			if pvc.Namespace == namespace {
+			if pvc != nil && pvc.Namespace == namespace {
 				log.V(common.InfoLevel).Info("Namespace - " + namespace + " not found, creating clone.")
 				namespace = "cloned-" + namespace
 				err = CreateNamespace(ctx, namespace, remoteClient)
@@ -453,7 +453,7 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 			return err
 		}
 
-		if shouldCreatePvc {
+		if shouldCreatePvc && pvc != nil {
 			// Check to see if the storage class has replication enabled. Continue making snapshots but not PVCs.
 			if sc, err := remoteClient.GetStorageClass(ctx, storageClass); err == nil {
 				if val, ok := sc.Parameters[controller.StorageClassReplicationParam]; ok && val == "true" {

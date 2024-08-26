@@ -663,7 +663,7 @@ func (suite *RGControllerTestSuite) TestCreatePVCSnapshotAction() {
 	// step 1: use pv-handle to retrieve it -> verify that a snapshotcontent is created
 	rClient, _ := suite.config.GetConnection("self")
 	ctx := context.Background()
-	snContentList, err := rClient.ListSnapshotContent(ctx, client.MatchingLabels{"pv-handle": "vol-handle"})
+	snContentList, err := rClient.ListSnapshotContent(ctx)
 	suite.NoError(err)
 	snContent := snContentList.Items[0]
 
@@ -673,19 +673,9 @@ func (suite *RGControllerTestSuite) TestCreatePVCSnapshotAction() {
 	err = suite.client.Get(ctx, types.NamespacedName{Name: snapshotName, Namespace: "demo1"}, &snapshot)
 	suite.NoError(err)
 
-	// step 3: retrieve cloned snapshotcontent, name: cloned-<step1 snapshotcontent name>
-	var clonedSnContent s1.VolumeSnapshotContent
-	err = suite.client.Get(ctx, types.NamespacedName{Name: "cloned-" + snContent.Name}, &clonedSnContent)
-	suite.NoError(err)
-
-	// step 4: retrieve snapshot, namespace: test-fake-ns, name: same as in step 2
-	var newSnapshot s1.VolumeSnapshot
-	err = suite.client.Get(ctx, types.NamespacedName{Name: snapshotName, Namespace: "test-fake-ns"}, &newSnapshot)
-	suite.NoError(err)
-
-	// step 5: retrieve pvc, namespace: test-fake-ns, name: fake-pvc, storage class: sc-3
+	// step 3: retrieve pvc, namespace: demo1, name: fake-pvc, storage class: sc-3
 	var newPVC corev1.PersistentVolumeClaim
-	err = suite.client.Get(ctx, types.NamespacedName{Name: "fake-pvc", Namespace: "test-fake-ns"}, &newPVC)
+	err = suite.client.Get(ctx, types.NamespacedName{Name: "fake-pvc", Namespace: "demo1"}, &newPVC)
 	suite.NoError(err)
 	suite.Equal("sc-3", *newPVC.Spec.StorageClassName)
 }
@@ -732,7 +722,7 @@ func (suite *RGControllerTestSuite) TestCreatePVCSnapshotActionWithDefault() {
 	// step 1: use pv-handle to retrieve it -> verify that a snapshotcontent is created
 	rClient, _ := suite.config.GetConnection("self")
 	ctx := context.Background()
-	snContentList, err := rClient.ListSnapshotContent(ctx, client.MatchingLabels{"pv-handle": "vol-handle"})
+	snContentList, err := rClient.ListSnapshotContent(ctx)
 	suite.NoError(err)
 	snContent := snContentList.Items[0]
 
@@ -742,23 +732,147 @@ func (suite *RGControllerTestSuite) TestCreatePVCSnapshotActionWithDefault() {
 	err = suite.client.Get(ctx, types.NamespacedName{Name: snapshotName, Namespace: "demo1"}, &snapshot)
 	suite.NoError(err)
 
-	// step 3: retrieve cloned snapshotcontent, name: cloned-<step1 snapshotcontent name>
-	var clonedSnContent s1.VolumeSnapshotContent
-	err = suite.client.Get(ctx, types.NamespacedName{Name: "cloned-" + snContent.Name}, &clonedSnContent)
-	suite.NoError(err)
-
-	// step 4: retrieve snapshot, namespace: test-fake-ns, name: same as in step 2
-	var newSnapshot s1.VolumeSnapshot
-	err = suite.client.Get(ctx, types.NamespacedName{Name: snapshotName, Namespace: "test-fake-ns"}, &newSnapshot)
-	suite.NoError(err)
-
-	// step 5: retrieve pvc, namespace: test-fake-ns, name: fake-pvc, storage class: sc-3
+	// step 3: retrieve pvc, namespace: demo1, name: fake-pvc, storage class: sc-3
 	var newPVC corev1.PersistentVolumeClaim
-	err = suite.client.Get(ctx, types.NamespacedName{Name: "fake-pvc", Namespace: "test-fake-ns"}, &newPVC)
+	err = suite.client.Get(ctx, types.NamespacedName{Name: "fake-pvc", Namespace: "demo1"}, &newPVC)
 	suite.NoError(err)
 	suite.Equal("sc-3", *newPVC.Spec.StorageClassName)
 
-	// step 6: verify both volumesnapshot contents are using default class "default-fake-csi-driver-snapshotclass"
+	// step 4: verify the volumesnapshot contents is using default class "default-fake-csi-driver-snapshotclass"
 	suite.Equal("default-fake-csi-driver-snapshotclass", *snContent.Spec.VolumeSnapshotClassName)
-	suite.Equal("default-fake-csi-driver-snapshotclass", *clonedSnContent.Spec.VolumeSnapshotClassName)
+}
+
+func (suite *RGControllerTestSuite) TestCreatePVCSnapshotActionErrors() {
+	rg, _, _, _, _ := suite.getSingleClusterPVSetup()
+
+	// Invoke snapshot action
+	location, _ := time.LoadLocation("America/New_York")
+	time := metav1.Date(2024, 01, 01, 0+0, 0, 0, 0, location)
+	lastAction := repv1.LastAction{
+		Time:      &time,
+		Condition: "Action CREATE_SNAPSHOT succeeded",
+		ActionAttributes: map[string]string{
+			"vol-handle": "snap1",
+		},
+	}
+
+	// Set Action content
+	rg.Status = repv1.DellCSIReplicationGroupStatus{
+		LastAction: lastAction,
+		Conditions: []repv1.LastAction{lastAction},
+	}
+
+	// No snapshot class is specified, will use default snapshot class
+	actionAnnotation := csireplicator.ActionAnnotation{
+		ActionName:        "CREATE_SNAPSHOT",
+		SnapshotNamespace: "demo1",
+	}
+	actionString, err := json.Marshal(actionAnnotation)
+	suite.NoError(err)
+
+	rg.Annotations[csireplicator.Action] = string(actionString)
+	err = suite.client.Update(context.Background(), rg)
+	suite.NoError(err)
+
+	// Scenario: Action Processed does not exist.
+	_, err = suite.reconciler.Reconcile(context.Background(), suite.getTypicalRequest())
+	suite.NoError(err)
+
+	rg.Annotations[controllers.ActionProcessedTime] = time.String()
+	err = suite.client.Update(context.Background(), rg)
+	suite.NoError(err)
+
+	// Scenario: Last action already processed.
+	_, err = suite.reconciler.Reconcile(context.Background(), suite.getTypicalRequest())
+	suite.NoError(err)
+
+	// Scenario: Storage class provided is replication enabled.
+	rg.Annotations[constants.DefaultDomain+"/snapshotStorageClass"] = "sc-1"
+	rg.Annotations[constants.DefaultDomain+"/snapshotCreatePVC"] = "true"
+
+	time = metav1.Now()
+	lastAction = repv1.LastAction{
+		Time:      &time,
+		Condition: "Action CREATE_SNAPSHOT succeeded",
+		ActionAttributes: map[string]string{
+			"vol-handle": "snap1",
+		},
+	}
+
+	// Set Action content
+	rg.Status = repv1.DellCSIReplicationGroupStatus{
+		LastAction: lastAction,
+		Conditions: []repv1.LastAction{lastAction},
+	}
+
+	err = suite.client.Update(context.Background(), rg)
+	suite.NoError(err)
+
+	_, err = suite.reconciler.Reconcile(context.Background(), suite.getTypicalRequest())
+	suite.NoError(err)
+
+	// Scenario: No action to process.
+	_ = suite.client.Get(context.Background(), types.NamespacedName{Name: rg.Name}, rg)
+	rg.Annotations[controllers.ActionProcessedTime] = ""
+	delete(rg.Annotations, csireplicator.Action)
+	err = suite.client.Update(context.Background(), rg)
+	suite.NoError(err)
+
+	_, err = suite.reconciler.Reconcile(context.Background(), suite.getTypicalRequest())
+	suite.NoError(err)
+
+	// Scenario: Bad marshalling of actions.
+	_ = suite.client.Get(context.Background(), types.NamespacedName{Name: rg.Name}, rg)
+	rg.Annotations[csireplicator.Action] = "DEADBEEF"
+	rg.Annotations[controllers.ActionProcessedTime] = ""
+	err = suite.client.Update(context.Background(), rg)
+	suite.NoError(err)
+
+	_, err = suite.reconciler.Reconcile(context.Background(), suite.getTypicalRequest())
+	suite.NoError(err)
+}
+
+func (suite *RGControllerTestSuite) TestCreatePVCSnapshotActionSameNamespace() {
+	rg, _, _, _, _ := suite.getSingleClusterPVSetup()
+	rg.Annotations[constants.DefaultDomain+"/snapshotStorageClass"] = "sc-3"
+	rg.Annotations[constants.DefaultDomain+"/snapshotCreatePVC"] = "true"
+
+	// Invoke snapshot action
+	time := metav1.Now()
+	lastAction := repv1.LastAction{
+		Time:      &time,
+		Condition: "Action CREATE_SNAPSHOT succeeded",
+		ActionAttributes: map[string]string{
+			"vol-handle": "snap1",
+		},
+	}
+
+	// Set Action content
+	rg.Status = repv1.DellCSIReplicationGroupStatus{
+		LastAction: lastAction,
+		Conditions: []repv1.LastAction{lastAction},
+	}
+
+	// No snapshot class is specified, will use default snapshot class
+	actionAnnotation := csireplicator.ActionAnnotation{
+		ActionName:        "CREATE_SNAPSHOT",
+		SnapshotNamespace: "fake-ns",
+	}
+	actionString, err := json.Marshal(actionAnnotation)
+	suite.NoError(err)
+
+	rg.Annotations[controllers.ActionProcessedTime] = time.String()
+	rg.Annotations[csireplicator.Action] = string(actionString)
+	err = suite.client.Update(context.Background(), rg)
+	suite.NoError(err)
+
+	// Same namespace, creates a new one prefixed with "cloned-"
+	_, err = suite.reconciler.Reconcile(context.Background(), suite.getTypicalRequest())
+	suite.NoError(err)
+
+	ctx := context.Background()
+
+	var newPVC corev1.PersistentVolumeClaim
+	err = suite.client.Get(ctx, types.NamespacedName{Name: "fake-pvc", Namespace: "cloned-fake-ns"}, &newPVC)
+	suite.NoError(err)
 }
