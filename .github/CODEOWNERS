@@ -1,25 +1,19 @@
 # CODEOWNERS
 #
-# documentation for this file can be found at:
+# Documentation for this file can be found at:
 # https://help.github.com/en/articles/about-code-owners
 
 # These are the default owners for the code and will
 # be requested for review when someone opens a pull request.
-# order is alphabetical for easier maintenance.
+# Order is alphabetical for easier maintenance.
 #
-# Aron Suliman (AronAtDell)
-# Bharath Sreekanth (bharathsreekanth)
-# Sean Gallacher (gallacher)
-# Christian Coffield (ChristianAtDell)
-# Don Khan (donatwork)
-# Utkarsh Dubey (delldubey)
-# Alexander Hoppe (hoppea2)
 # Harsha Yalamanchili (harshaatdell)
+# Karthik K (karthikk92)
+# Nitesh Rewatkar (nitesh3108)
+# Rajendra Indukuri (rajendraindukuri)
+# Rajshree Khare (khareRajshree)
 # Santhosh Lakshmanan (santhoshatdell)
-# Nida Taranum (nidtara)
-# Yamunadevi Shanmugam (shanmydell)
-# Abrar Basha (mbasha-dell)
 
+# for all files
+* @harshaatdell @karthikk92 @nitesh3108 @rajendraindukuri @rajshreekhare @santhoshatdell 
 
-# for all files:
-* @AronAtDell @bharathsreekanth @ChristianAtDell @donatwork @delldubey @gallacher @harshaatdell @hoppea2 @santhoshatdell @nidtara @shanmydell @mbasha-dell
