@@ -94,7 +94,7 @@ func (s *Replication) ProbeController(_ context.Context, in *commonext.ProbeCont
 // GetReplicationCapabilities calls stub for GetReplicationCapabilities
 func (s *Replication) GetReplicationCapabilities(_ context.Context, in *replication.GetReplicationCapabilityRequest) (*replication.GetReplicationCapabilityResponse, error) {
 	out := &replication.GetReplicationCapabilityResponse{}
-	outTemp := make(map[string][]int)
+	outTemp := make(map[string][]int32)
 	err := FindStub("Replication", "GetReplicationCapabilities", in, &outTemp)
 	for _, capability := range outTemp["capabilities"] {
 		out.Capabilities = append(out.Capabilities, &replication.ReplicationCapability{

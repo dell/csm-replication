@@ -62,7 +62,7 @@ func (m *mockIdentity) GetMigrationCapabilities(_ context.Context) (MigrationCap
 
 func getSupportedActions() (ReplicationCapabilitySet, []*replication.SupportedActions) {
 	capResponse := &replication.GetReplicationCapabilityResponse{}
-	for i := 0; i < 3; i++ {
+	for i := int32(0); i < 3; i++ {
 		capResponse.Capabilities = append(capResponse.Capabilities, &replication.ReplicationCapability{
 			Type: &replication.ReplicationCapability_Rpc{
 				Rpc: &replication.ReplicationCapability_RPC{
@@ -83,7 +83,7 @@ func getSupportedActions() (ReplicationCapabilitySet, []*replication.SupportedAc
 		t := rpc.GetType()
 		capabilitySet[t] = true
 	}
-	for i := 1; i < 20; i++ {
+	for i := int32(1); i < 20; i++ {
 		capResponse.Actions = append(capResponse.Actions, &replication.SupportedActions{
 			Actions: &replication.SupportedActions_Type{
 				Type: replication.ActionTypes(i),
