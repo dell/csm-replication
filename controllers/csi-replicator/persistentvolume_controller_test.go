@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -229,6 +229,54 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVReconcileNonReplicationE
 	ctx := context.Background()
 	anotherSc := "another-storage-class"
 	scObj := utils.GetNonReplicationEnabledSC(suite.driver.DriverName, anotherSc)
+	err := suite.client.Create(context.Background(), scObj)
+	suite.NoError(err)
+	pvName := utils.FakePVName
+	pvObj := suite.getFakePV(pvName)
+	pvObj.Spec.StorageClassName = anotherSc
+
+	err = suite.client.Create(ctx, pvObj)
+	suite.NoError(err)
+
+	req := suite.getTypicalReconcileRequest(pvName)
+
+	res, err := suite.reconciler.Reconcile(context.Background(), req)
+	suite.NoError(err, "No error on PV reconcile")
+	suite.Equal(false, res.Requeue, "Requeue should be set to false")
+	updatedPV := new(corev1.PersistentVolume)
+	err = suite.client.Get(ctx, req.NamespacedName, updatedPV)
+	suite.NoError(err)
+	suite.Equal(pvObj.Annotations, updatedPV.Annotations, "No updates to annotation")
+}
+
+func (suite *PersistentVolumeControllerTestSuite) TestPVReconcilePowerMaxMetro() {
+	ctx := context.Background()
+	anotherSc := "another-storage-class"
+	scObj := utils.GetReplicationEnabledSCWithMetroMode(suite.driver.DriverName, anotherSc, "RdfMode")
+	err := suite.client.Create(context.Background(), scObj)
+	suite.NoError(err)
+	pvName := utils.FakePVName
+	pvObj := suite.getFakePV(pvName)
+	pvObj.Spec.StorageClassName = anotherSc
+
+	err = suite.client.Create(ctx, pvObj)
+	suite.NoError(err)
+
+	req := suite.getTypicalReconcileRequest(pvName)
+
+	res, err := suite.reconciler.Reconcile(context.Background(), req)
+	suite.NoError(err, "No error on PV reconcile")
+	suite.Equal(false, res.Requeue, "Requeue should be set to false")
+	updatedPV := new(corev1.PersistentVolume)
+	err = suite.client.Get(ctx, req.NamespacedName, updatedPV)
+	suite.NoError(err)
+	suite.Equal(pvObj.Annotations, updatedPV.Annotations, "No updates to annotation")
+}
+
+func (suite *PersistentVolumeControllerTestSuite) TestPVReconcilePowerStoreMetro() {
+	ctx := context.Background()
+	anotherSc := "another-storage-class"
+	scObj := utils.GetReplicationEnabledSCWithMetroMode(suite.driver.DriverName, anotherSc, "mode")
 	err := suite.client.Create(context.Background(), scObj)
 	suite.NoError(err)
 	pvName := utils.FakePVName
