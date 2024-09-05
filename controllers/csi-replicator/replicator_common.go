@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -39,13 +39,16 @@ func shouldContinue(ctx context.Context, class *storageV1.StorageClass, driverNa
 		return false
 	}
 
-	// TODO: This should be removed when we start supporting RGs for SRDF Metro too
-	// Check for PowerMax SRDF Metro
-	if value, ok := class.Parameters["replication.storage.dell.com/RdfMode"]; ok {
-		if strings.ToUpper(value) == "METRO" {
-			log.V(common.InfoLevel).Info("Metro replication is not supported by Dell CSI Replication Controllers")
-			return false
-		}
+	// Check for PowerMax SRDF Metro and skip since it is only supported at the driver level
+	if value, ok := class.Parameters["replication.storage.dell.com/RdfMode"]; ok && strings.ToUpper(value) == "METRO" {
+		log.V(common.InfoLevel).Info("Metro replication is not supported by Dell CSI Replication Controllers")
+		return false
+	}
+
+	// Check for PowerStore Metro and skip since it is only supported at the driver level
+	if value, ok := class.Parameters["replication.storage.dell.com/mode"]; ok && strings.ToUpper(value) == "METRO" {
+		log.V(common.InfoLevel).Info("Metro replication is not supported by Dell CSI Replication Controllers")
+		return false
 	}
 
 	// Check for the remote-storage-class-param on the local storage-class
