@@ -1,5 +1,5 @@
 /*
-Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -330,6 +330,20 @@ func GetNonReplicationEnabledSC(provisionerName, scName string) *storagev1.Stora
 		ObjectMeta:  metav1.ObjectMeta{Name: scName},
 		Provisioner: provisionerName,
 		Parameters:  map[string]string{},
+	}
+	return &scObj
+}
+
+// GetReplicationEnabledSCWithMetroMode returns replication enabled StorageClass testing object with Metro mode
+func GetReplicationEnabledSCWithMetroMode(provisionerName, scName, modeParamName string) *storagev1.StorageClass {
+	scObj := storagev1.StorageClass{
+		ObjectMeta:  metav1.ObjectMeta{Name: scName},
+		Provisioner: provisionerName,
+		Parameters: map[string]string{
+			"param": "val",
+			"replication.storage.dell.com/isReplicationEnabled": "true",
+			"replication.storage.dell.com/" + modeParamName:     "Metro",
+		},
 	}
 	return &scObj
 }
