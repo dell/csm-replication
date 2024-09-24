@@ -15,5 +15,6 @@ parameters:
     source: "RT-A0001"
     target: "RT-A0002"
   rpo: "Five_Minutes"
+  Mode : "ASYNC"  # For SYNC rpo will be set to zero by default and not required to specify.
   ignoreNamespaces: "false"
   volumeGroupPrefix: "csi"
