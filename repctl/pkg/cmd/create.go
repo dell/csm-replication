@@ -52,7 +52,7 @@ type GlobalParameters struct {
 	Rpo               string
 	IgnoreNamespaces  bool
 	VolumeGroupPrefix string
-	mode              string
+	Mode              string
 
 	// PowerMax
 	Srp          Mirrored
