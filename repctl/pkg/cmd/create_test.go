@@ -124,7 +124,7 @@ func (suite *CreateTestSuite) TestCreateSCs() {
 				Target: "WX-0002",
 			},
 			Rpo:  "Five_Minutes",
-			Mode: "ASYNC",
+			mode: "ASYNC",
 		},
 	}
 
