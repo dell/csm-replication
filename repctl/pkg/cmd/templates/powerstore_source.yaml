@@ -16,6 +16,7 @@ parameters:
   {{- end }}
   {{ .ReplicationPrefix }}/remoteSystem: {{ .Parameters.RemoteSystem.Source }}
   {{ .ReplicationPrefix }}/rpo: {{ .Parameters.Rpo }}
+  {{ .ReplicationPrefix }}/mode: {{ .Parameters.Mode }}
   {{ .ReplicationPrefix }}/ignoreNamespaces: "{{ .Parameters.IgnoreNamespaces }}"
   {{ .ReplicationPrefix }}/volumeGroupPrefix: {{ .Parameters.VolumeGroupPrefix }}
   {{ .ReplicationPrefix }}/remoteRGRetentionPolicy: {{ .RemoteRetentionPolicy.RG }}
