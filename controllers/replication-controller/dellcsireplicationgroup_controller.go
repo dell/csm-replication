@@ -32,6 +32,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 	reconcile "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/ratelimiter"
 
@@ -317,6 +319,8 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 }
 
 func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
+	var returnErr error
+
 	if len(group.Status.Conditions) == 0 || group.Status.LastAction.Time == nil {
 		log.V(common.InfoLevel).Info("No action to process")
 		return nil
@@ -332,21 +336,25 @@ func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context
 		return nil
 	}
 
-	if val == group.Status.LastAction.Time.GoString() {
+	if val == group.Status.LastAction.Time.String() {
 		log.V(common.InfoLevel).Info("Last action has already been processed")
 		return nil
 	}
 
 	if strings.Contains(group.Status.LastAction.Condition, "CREATE_SNAPSHOT") {
 		if err := r.processSnapshotEvent(ctx, group, remoteClient, log); err != nil {
-			return err
+			returnErr = err
 		}
 	}
 
-	// Informing the RG that the last action has been processed.
-	controller.AddAnnotation(group, controller.ActionProcessedTime, group.Status.LastAction.Time.GoString())
+	// Informing the RG that the last action has been processed. Do not retry on error.
+	controller.AddAnnotation(group, controller.ActionProcessedTime, group.Status.LastAction.Time.String())
+	err := r.Update(ctx, group)
+	if err != nil {
+		return fmt.Errorf("failed to update rg")
+	}
 
-	return r.Update(ctx, group)
+	return returnErr
 }
 
 func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
@@ -365,20 +373,49 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 		return err
 	}
 
-	if _, err := remoteClient.GetSnapshotClass(ctx, actionAnnotation.SnapshotClass); err != nil {
-		log.Error(err, "Snapshot class does not exist on remote cluster. Not creating the remote snapshots.")
-		return err
+	namespace := actionAnnotation.SnapshotNamespace
+
+	if _, err := remoteClient.GetNamespace(ctx, namespace); err != nil {
+		log.V(common.InfoLevel).Info("Namespace - " + namespace + " not found, creating it.")
+		err = createNamespace(ctx, namespace, remoteClient)
+		if err != nil {
+			return err
+		}
 	}
 
-	if _, err := remoteClient.GetNamespace(ctx, actionAnnotation.SnapshotNamespace); err != nil {
-		log.V(common.InfoLevel).Info("Namespace - " + actionAnnotation.SnapshotNamespace + " not found, creating it.")
-		nsRef := makeNamespaceReference(actionAnnotation.SnapshotNamespace)
-
-		err = remoteClient.CreateNamespace(ctx, nsRef)
-		if err != nil {
-			msg := "unable to create the desired namespace" + actionAnnotation.SnapshotNamespace
-			log.V(common.ErrorLevel).Error(err, msg)
+	// create default snapshot class if it does not exist
+	// example driver class: csi-vxflexos.dellemc.com
+	// example default snapshot class: default-csi-vxflexos
+	snClass := group.Annotations[controller.SnapshotClass]
+	driverClass := group.Labels[controller.DriverName]
+	if snClass == "" {
+		part := strings.Split(driverClass, ".")[0]
+		snClass = "default-" + strings.TrimPrefix(part, "csi-") + "-snapshotclass"
+	} else {
+		if _, err := remoteClient.GetSnapshotClass(ctx, snClass); err != nil {
+			log.V(common.ErrorLevel).Error(err, "user defined snapshot class does not exist")
 			return err
+		}
+	}
+
+	shouldCreatePvc := false
+	storageClass := group.Annotations[r.Domain+"/snapshotStorageClass"]
+	createPVC := group.Annotations[r.Domain+"/snapshotCreatePVC"]
+
+	if createPVC == "true" && storageClass != "" {
+		shouldCreatePvc = true
+	}
+
+	sc, err := remoteClient.GetSnapshotClass(ctx, snClass)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return fmt.Errorf("error getting snapshot class: %s", err.Error())
+		}
+
+		log.V(common.InfoLevel).Info("Snapshotclass %s not found, creating a default class", snClass)
+		sc = makeSnapshotClassRef(driverClass, snClass)
+		if err = remoteClient.CreateSnapshotClass(ctx, sc); err != nil {
+			return fmt.Errorf("unable to create default snapshot class: %s", err.Error())
 		}
 	}
 
@@ -386,8 +423,24 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 		msg := "ActionAttributes - volumeHandle: " + volumeHandle + ", snapshotHandle: " + snapshotHandle
 		log.V(common.InfoLevel).Info(msg)
 
-		snapRef := makeSnapReference(snapshotHandle, actionAnnotation.SnapshotNamespace)
-		sc := makeStorageClassContent(group.Labels[controller.DriverName], actionAnnotation.SnapshotClass)
+		var pvc *v1.PersistentVolumeClaim
+		if shouldCreatePvc {
+			pvc, err = r.getPVCInformation(ctx, group, volumeHandle)
+			if err != nil {
+				log.V(common.ErrorLevel).Error(err, "unable to get PVC information")
+			}
+
+			if pvc != nil && pvc.Namespace == namespace {
+				log.V(common.InfoLevel).Info("Namespace - " + namespace + " not found, creating clone.")
+				namespace = "cloned-" + namespace
+				err = createNamespace(ctx, namespace, remoteClient)
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		snapRef := makeSnapReference(snapshotHandle, namespace)
 		snapContent := makeVolSnapContent(snapshotHandle, volumeHandle, *snapRef, sc)
 
 		err = remoteClient.CreateSnapshotContent(ctx, snapContent)
@@ -396,15 +449,60 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 			return err
 		}
 
-		snapshot := makeSnapshotObject(snapRef.Name, snapContent.Name, sc.ObjectMeta.Name, actionAnnotation.SnapshotNamespace)
+		snapshot := makeSnapshotObject(snapRef.Name, snapContent.Name, sc.ObjectMeta.Name, namespace)
 		err = remoteClient.CreateSnapshotObject(ctx, snapshot)
 		if err != nil {
 			log.Error(err, "unable to create snapshot object")
 			return err
 		}
+
+		if shouldCreatePvc && pvc != nil {
+			// Check to see if the storage class has replication enabled. Continue making snapshots but not PVCs.
+			if sc, err := remoteClient.GetStorageClass(ctx, storageClass); err == nil {
+				if val, ok := sc.Parameters[controller.StorageClassReplicationParam]; ok && val == "true" {
+					log.V(common.ErrorLevel).Error(err, fmt.Sprintf("storage class %s has replication enabled, PVC %s not created", storageClass, pvc.Name))
+					continue
+				}
+			}
+
+			newPVC := makePersistentVolumeClaimFromSnapshot(pvc.Name, namespace, snapContent.Spec.VolumeSnapshotRef.Name, storageClass, pvc.Spec)
+			err = remoteClient.CreatePersistentVolumeClaim(ctx, newPVC)
+			if err != nil {
+				log.Error(err, "unable to create PVC")
+				return err
+			}
+
+			log.V(common.InfoLevel).Info("Created PVC " + newPVC.Name + " in namespace " + namespace + " from snapshot")
+		}
 	}
 
 	return nil
+}
+
+func (r *ReplicationGroupReconciler) getPVCInformation(ctx context.Context, group *repv1.DellCSIReplicationGroup, volumeHandle string) (*v1.PersistentVolumeClaim, error) {
+	// Retrieve the list of pvcs in the source cluster.
+	var pvcList v1.PersistentVolumeClaimList
+	err := r.List(ctx, &pvcList, client.MatchingLabels{controller.ReplicationGroup: group.Name})
+	if err != nil {
+		return nil, fmt.Errorf("unable to get pvcs: %s", err.Error())
+	}
+
+	for _, pvc := range pvcList.Items {
+		pvName := pvc.Spec.VolumeName
+
+		var pv v1.PersistentVolume
+		err = r.Get(ctx, types.NamespacedName{Name: pvName}, &pv)
+		if err != nil {
+			return nil, fmt.Errorf("error getting pv %s: %s", pvName, err.Error())
+		}
+
+		if pv.Spec.PersistentVolumeSource.CSI.VolumeHandle == volumeHandle {
+			fmt.Printf("Found PVC %s with PV %s\n", pvc.Name, pvName)
+			return &pvc, nil
+		}
+	}
+
+	return nil, nil
 }
 
 func makeNamespaceReference(namespace string) *v1.Namespace {
@@ -440,10 +538,10 @@ func makeSnapshotObject(snapName, contentName, className, namespace string) *s1.
 	return volsnap
 }
 
-func makeStorageClassContent(driver, snapClass string) *s1.VolumeSnapshotClass {
+func makeSnapshotClassRef(driver, snapClass string) *s1.VolumeSnapshotClass {
 	return &s1.VolumeSnapshotClass{
 		Driver:         driver,
-		DeletionPolicy: "Retain",
+		DeletionPolicy: "Delete",
 		ObjectMeta: metav1.ObjectMeta{
 			Name: snapClass,
 		},
@@ -466,6 +564,35 @@ func makeVolSnapContent(snapName, volumeName string, snapRef v1.ObjectReference,
 		},
 	}
 	return volsnapcontent
+}
+
+func makePersistentVolumeClaimFromSnapshot(name, namespace, snName, storageClass string, pvcSpec v1.PersistentVolumeClaimSpec) *v1.PersistentVolumeClaim {
+	return &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: v1.PersistentVolumeClaimSpec{
+			StorageClassName: &storageClass,
+			AccessModes:      pvcSpec.AccessModes,
+			Resources:        pvcSpec.Resources,
+			DataSource: &v1.TypedLocalObjectReference{
+				APIGroup: pointer.String("snapshot.storage.k8s.io"),
+				Kind:     "VolumeSnapshot",
+				Name:     snName,
+			},
+		},
+	}
+}
+
+func createNamespace(ctx context.Context, namespace string, remoteClient connection.RemoteClusterClient) error {
+	nsRef := makeNamespaceReference(namespace)
+	err := remoteClient.CreateNamespace(ctx, nsRef)
+	if err != nil {
+		return fmt.Errorf("unable to create the desired namespace %s: %s", namespace, err.Error())
+	}
+
+	return nil
 }
 
 // SetupWithManager start using reconciler by creating new controller managed by provided manager
