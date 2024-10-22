@@ -2,6 +2,8 @@ module github.com/dell/repctl
 
 go 1.23
 
+toolchain 1.23.2
+
 replace github.com/dell/csm-replication => ../
 
 require (
