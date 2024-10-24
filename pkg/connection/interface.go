@@ -22,6 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	storageV1 "k8s.io/api/storage/v1"
 	apiExtensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // RemoteClusterClient interface provides methods for creating, modifying, deleting objects on a remote k8s cluster
@@ -36,13 +37,18 @@ type RemoteClusterClient interface {
 	UpdatePersistentVolume(ctx context.Context, volume *corev1.PersistentVolume) error
 	GetPersistentVolumeClaim(ctx context.Context, namespace, claimName string) (*corev1.PersistentVolumeClaim, error)
 	UpdatePersistentVolumeClaim(ctx context.Context, claim *corev1.PersistentVolumeClaim) error
+	CreatePersistentVolumeClaim(ctx context.Context, claim *corev1.PersistentVolumeClaim) error
+	ListPersistentVolumeClaim(ctx context.Context, opts ...ctrlClient.ListOption) (*corev1.PersistentVolumeClaimList, error)
 	GetReplicationGroup(ctx context.Context, replicationGroupName string) (*repv1.DellCSIReplicationGroup, error)
 	UpdateReplicationGroup(ctx context.Context, group *repv1.DellCSIReplicationGroup) error
 	ListReplicationGroup(ctx context.Context) (*repv1.DellCSIReplicationGroupList, error)
 	CreateReplicationGroup(ctx context.Context, group *repv1.DellCSIReplicationGroup) error
+	GetSnapshotContent(ctx context.Context, snapshotContentName string) (*s1.VolumeSnapshotContent, error)
 	CreateSnapshotContent(ctx context.Context, content *s1.VolumeSnapshotContent) error
+	ListSnapshotContent(ctx context.Context, opts ...ctrlClient.ListOption) (*s1.VolumeSnapshotContentList, error)
 	CreateSnapshotObject(ctx context.Context, content *s1.VolumeSnapshot) error
 	GetSnapshotClass(ctx context.Context, snapClassName string) (*s1.VolumeSnapshotClass, error)
+	CreateSnapshotClass(ctx context.Context, content *s1.VolumeSnapshotClass) error
 	CreateNamespace(ctx context.Context, content *corev1.Namespace) error
 	GetNamespace(ctx context.Context, namespace string) (*corev1.Namespace, error)
 }
