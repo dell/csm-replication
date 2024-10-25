@@ -7,7 +7,7 @@ toolchain go1.23.2
 replace github.com/dell/csm-replication => ../
 
 require (
-	github.com/dell/csm-replication v1.9.0
+	github.com/dell/csm-replication v1.10.0
 	github.com/rifflock/lfshook v0.0.0-20180920164130-b9218ef580f5
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.7.0
