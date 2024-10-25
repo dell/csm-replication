@@ -21,8 +21,8 @@ spec:
         args:
         - --enable-leader-election
         - --prefix=replication.storage.dell.com
-        image: dellemc/dell-replication-controller:v1.9.0
-        imagePullPolicy: Always
+        image: quay.io/dell/container-storage-modules/dell-replication-controller:v1.10.0
+        imagePullPolicy: IfNotPresent
         name: manager
         env:
           - name: X_CSI_REPLICATION_POD_NAME
