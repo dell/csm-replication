@@ -61,7 +61,7 @@ func main() {
 		Use:     "repctl",
 		Short:   "repctl is CLI tool for managing replication in Kubernetes",
 		Long:    "repctl is CLI tool for managing replication in Kubernetes",
-		Version: "v1.9.0",
+		Version: "v1.10.0",
 
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			metadata.Init(viper.GetString(config.ReplicationPrefix))
