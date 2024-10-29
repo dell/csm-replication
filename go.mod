@@ -6,10 +6,10 @@ toolchain go1.23.2
 
 require (
 	github.com/bombsimon/logrusr/v4 v4.0.0
-	github.com/dell/dell-csi-extensions/common v1.5.0
-	github.com/dell/dell-csi-extensions/migration v1.5.0
-	github.com/dell/dell-csi-extensions/replication v1.8.0
-	github.com/dell/gobrick v1.11.0
+	github.com/dell/dell-csi-extensions/common v1.6.0
+	github.com/dell/dell-csi-extensions/migration v1.6.0
+	github.com/dell/dell-csi-extensions/replication v1.9.0
+	github.com/dell/gobrick v1.12.0
 	github.com/fatih/color v1.15.0
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/go-chi/chi v1.5.4
@@ -35,8 +35,8 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/dell/goiscsi v1.9.0 // indirect
-	github.com/dell/gonvme v1.8.0 // indirect
+	github.com/dell/goiscsi v1.10.0 // indirect
+	github.com/dell/gonvme v1.9.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.10.2 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
