@@ -182,9 +182,23 @@ unit-test-csi-replicator:
 unit-test-replication-controller:
 	go test ./controllers/replication-controller/ -v -race -coverpkg=./controllers/replication-controller/ -coverprofile cover.out
 
-# Execute unit tests for all the controllers and generate coverage report
-unit-test:
-	( cd controllers; go clean -cache; go test -race -v -cover ./... -coverprofile cover.out )
+# Execute all unit tests and generate coverage report
+unit-test: clean test-cmd test-pkg test-controllers
+
+clean:
+	go clean -cache
+
+# Execute unit tests in ./cmd and generate coverage report
+test-cmd:
+	( cd cmd; go test -race -cover ./... -coverprofile cmd-cover.out )
+
+# Execute unit tests in ./pkg and generate coverage report
+test-pkg:
+	( cd pkg; go test -race -cover ./... -coverprofile pkg-cover.out )
+
+# Execute unit tests in ./controllers and generate coverage report
+test-controllers:
+	( cd controllers; go test -race -cover ./... -coverprofile ctrl-cover.out )
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.4.3
