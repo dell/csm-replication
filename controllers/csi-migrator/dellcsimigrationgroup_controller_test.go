@@ -453,7 +453,7 @@ func (suite *MGControllerTestSuite) getTypicalReconcileRequest(name string) reco
 
 func (suite *MGControllerTestSuite) TestSetupWithManagerMG() {
 	mgr := manager.Manager(nil)
-	expRateLimiter := workqueue.NewItemExponentialFailureRateLimiter(1*time.Second, 10*time.Second)
+	expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second)
 	err := suite.mgReconcile.SetupWithManager(mgr, expRateLimiter, 1)
 	suite.Error(err, "Setup should fail when there is no manager")
 }

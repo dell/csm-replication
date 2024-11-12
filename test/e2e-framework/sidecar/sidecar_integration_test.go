@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"k8s.io/client-go/util/workqueue"
 
@@ -97,7 +98,7 @@ type SidecarTestSuite struct {
 	replicationCapabilities csiidentity.ReplicationCapabilitySet
 	supportedActions        []*replication.SupportedActions
 	manager                 manager.Manager
-	rateLimiter             workqueue.RateLimiter
+	rateLimiter             workqueue.TypedRateLimiter[reconcile.Request]
 	workers                 int
 	timeout                 time.Duration
 	testTimeout             time.Duration
@@ -241,7 +242,7 @@ func (ss *SidecarTestSuite) createRateLimiter() {
 			maxInterval = max
 		}
 	}
-	ss.rateLimiter = workqueue.NewItemExponentialFailureRateLimiter(startInterval, maxInterval)
+	ss.rateLimiter = workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](startInterval, maxInterval)
 }
 
 func (ss *SidecarTestSuite) createClaimController() error {
@@ -412,7 +413,7 @@ func (ss *SidecarTestSuite) TestCreatePVC() {
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: []v1.PersistentVolumeAccessMode{"ReadWriteOnce"},
-			Resources: v1.ResourceRequirements{
+			Resources: v1.VolumeResourceRequirements{
 				Requests: v1.ResourceList{
 					"storage": quantity,
 				},

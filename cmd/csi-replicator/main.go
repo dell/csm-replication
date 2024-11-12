@@ -51,6 +51,9 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
+	metricsServer "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 var (
@@ -201,9 +204,11 @@ func main() {
 
 	leaderElectionID := common.DellCSIReplicator + strings.ReplaceAll(driverName, ".", "-")
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                     scheme,
-		MetricsBindAddress:         metricsAddr,
-		Port:                       9443,
+		Scheme: scheme,
+		Metrics: metricsServer.Options{
+			BindAddress: metricsAddr,
+		},
+		WebhookServer:              webhook.NewServer(webhook.Options{Port: 9443}),
 		LeaderElection:             enableLeaderElection,
 		LeaderElectionResourceLock: "leases",
 		LeaderElectionID:           leaderElectionID,
@@ -239,7 +244,7 @@ func main() {
 		clusterUID = string(ns.GetUID())
 	}
 
-	expRateLimiter := workqueue.NewItemExponentialFailureRateLimiter(retryIntervalStart, retryIntervalMax)
+	expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](retryIntervalStart, retryIntervalMax)
 	if err = (&controller.PersistentVolumeClaimReconciler{
 		Client:            mgr.GetClient(),
 		Log:               ctrl.Log.WithName("controllers").WithName("PersistentVolumeClaim"),

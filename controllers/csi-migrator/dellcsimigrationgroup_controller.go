@@ -29,7 +29,7 @@ import (
 	storagev1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
 	reconciler "sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/ratelimiter"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/dell/csm-replication/pkg/common"
 	csimigration "github.com/dell/csm-replication/pkg/csi-clients/migration"
@@ -37,6 +37,7 @@ import (
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -315,7 +316,7 @@ func (r *MigrationGroupReconciler) updateMGSpecWithActionResult(ctx context.Cont
 }
 
 // SetupWithManager start using reconciler by creating new controller managed by provided manager
-func (r *MigrationGroupReconciler) SetupWithManager(mgr ctrl.Manager, limiter ratelimiter.RateLimiter, maxReconcilers int) error {
+func (r *MigrationGroupReconciler) SetupWithManager(mgr ctrl.Manager, limiter workqueue.TypedRateLimiter[reconcile.Request], maxReconcilers int) error {
 	if r.MaxRetryDurationForActions == 0 {
 		r.MaxRetryDurationForActions = MaxRetryDurationForActions
 	}

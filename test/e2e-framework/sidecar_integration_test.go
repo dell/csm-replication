@@ -29,6 +29,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	metricsServer "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/workqueue"
@@ -92,18 +95,20 @@ func (suite *ReplicationTestSuite) runReplicationManager() {
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:             utils.Scheme,
-		MetricsBindAddress: ":8000",
-		Port:               9443,
-		LeaderElection:     false,
-		LeaderElectionID:   "bec0e175.replication.storage.dell.com",
+		Scheme: utils.Scheme,
+		Metrics: metricsServer.Options{
+			BindAddress: ":8000",
+		},
+		WebhookServer:    webhook.NewServer(webhook.Options{Port: 9443}),
+		LeaderElection:   false,
+		LeaderElectionID: "bec0e175.replication.storage.dell.com",
 	})
 	if err != nil {
 		suite.T().Error(err, "unable to start manager")
 		os.Exit(1)
 	}
 	controllers.InitLabelsAndAnnotations(constants.DefaultDomain)
-	expRateLimiter := workqueue.NewItemExponentialFailureRateLimiter(5*time.Minute, 10*time.Minute)
+	expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](5*time.Minute, 10*time.Minute)
 	if err = (&controller.PersistentVolumeClaimReconciler{
 		Client:            mgr.GetClient(),
 		Log:               ctrl.Log.WithName("controllers").WithName("PersistentVolumeClaim"),

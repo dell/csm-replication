@@ -34,11 +34,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/util/workqueue"
-	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	metricsServer "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/spf13/viper"
 
@@ -90,10 +91,10 @@ func (mgr *ControllerManager) startSecretController() error {
 	if err != nil {
 		return err
 	}
-	err = secretController.Watch(&source.Kind{Type: &corev1.Secret{}}, &handler.EnqueueRequestForObject{},
-		predicate.NewPredicateFuncs(func(object ctrlClient.Object) bool {
+	err = secretController.Watch(source.Kind(mgr.Manager.GetCache(), &corev1.Secret{}, &handler.TypedEnqueueRequestForObject[*corev1.Secret]{},
+		predicate.NewTypedPredicateFuncs[*corev1.Secret](func(object *corev1.Secret) bool {
 			return object.GetNamespace() == mgr.Opts.WatchNamespace
-		}))
+		})))
 
 	return err
 }
@@ -188,9 +189,11 @@ func main() {
 
 	// Create the manager instance
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                     scheme,
-		MetricsBindAddress:         metricsAddr,
-		Port:                       9443,
+		Scheme: scheme,
+		Metrics: metricsServer.Options{
+			BindAddress: metricsAddr,
+		},
+		WebhookServer:              webhook.NewServer(webhook.Options{Port: 9443}),
 		LeaderElection:             enableLeaderElection,
 		LeaderElectionResourceLock: "leases",
 		LeaderElectionID:           fmt.Sprintf("%s-manager", common.DellReplicationController),
@@ -223,7 +226,7 @@ func main() {
 		setupLog.Error(err, "failed to setup secret controller. Continuing")
 	}
 
-	expRateLimiter := workqueue.NewItemExponentialFailureRateLimiter(retryIntervalStart, retryIntervalMax)
+	expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](retryIntervalStart, retryIntervalMax)
 	if err = (&repController.PersistentVolumeClaimReconciler{
 		Client:        mgr.GetClient(),
 		Log:           ctrl.Log.WithName("controllers").WithName("PersistentVolumeClaim"),
