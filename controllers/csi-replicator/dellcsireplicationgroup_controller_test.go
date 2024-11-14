@@ -202,8 +202,8 @@ func (suite *RGControllerTestSuite) TestReconcileWithNoState() {
 	// scenario: When there is no state
 	ctx := context.Background()
 	replicationGroup := suite.getLocalRG("")
-	err := suite.client.Create(ctx, &replicationGroup)
-	suite.Nil(err)
+	suite.client = utils.GetFakeClientWithObjects(&replicationGroup)
+	suite.rgReconcile.Client = suite.client
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 	resp, err := suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on RG reconcile")
@@ -225,10 +225,10 @@ func (suite *RGControllerTestSuite) TestReconcileWithEmptyPGID() {
 	ctx := context.Background()
 	replicationGroup := suite.getLocalRG("")
 	replicationGroup.Spec.ProtectionGroupID = ""
-	err := suite.client.Create(ctx, &replicationGroup)
-	suite.Nil(err)
+	suite.client = utils.GetFakeClientWithObjects(&replicationGroup)
+	suite.rgReconcile.Client = suite.client
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
-	_, err = suite.rgReconcile.Reconcile(context.Background(), req)
+	_, err := suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.EqualError(err, "missing protection group id")
 	rg := new(repv1.DellCSIReplicationGroup)
 	err = suite.client.Get(ctx, req.NamespacedName, rg)
@@ -245,10 +245,10 @@ func (suite *RGControllerTestSuite) TestDeleteWithInvalidState() {
 	}
 	replicationGroup.Status.State = InvalidState
 	replicationGroup.Finalizers = append(replicationGroup.Finalizers, controllers.ReplicationFinalizer)
-	err := suite.client.Create(ctx, &replicationGroup)
-	suite.Nil(err)
+	suite.client = utils.GetFakeClientWithObjects(&replicationGroup)
+	suite.rgReconcile.Client = suite.client
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
-	res, err := suite.rgReconcile.Reconcile(context.Background(), req)
+	res, err := suite.rgReconcile.Reconcile(ctx, req)
 	suite.NoError(err, "No error on RG reconcile")
 	suite.Equal(res.Requeue, false, "Requeue should be set to false")
 }
@@ -278,10 +278,10 @@ func (suite *RGControllerTestSuite) TestReconcileWithInvalidStateAfterFix() {
 	replicationGroup := suite.getLocalRG("")
 	replicationGroup.Status.State = InvalidState
 	replicationGroup.Spec.ProtectionGroupID = protectionGroupID
-	err := suite.client.Create(ctx, &replicationGroup)
-	suite.Nil(err)
+	suite.client = utils.GetFakeClientWithObjects(&replicationGroup)
+	suite.rgReconcile.Client = suite.client
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
-	_, err = suite.rgReconcile.Reconcile(context.Background(), req)
+	_, err := suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on RG reconcile")
 
 	rg := new(repv1.DellCSIReplicationGroup)
@@ -300,8 +300,8 @@ func (suite *RGControllerTestSuite) TestDeleteWithInvalidStateAndNoPGID() {
 	replicationGroup.Status.State = InvalidState
 	replicationGroup.Spec.ProtectionGroupID = ""
 	replicationGroup.Finalizers = append(replicationGroup.Finalizers, controllers.ReplicationFinalizer)
-	err := suite.client.Create(ctx, &replicationGroup)
-	suite.Nil(err)
+	suite.client = utils.GetFakeClientWithObjects(&replicationGroup)
+	suite.rgReconcile.Client = suite.client
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 	res, err := suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on RG reconcile")
@@ -321,10 +321,10 @@ func (suite *RGControllerTestSuite) TestDeleteWithNoPGID() {
 	}
 	replicationGroup.Spec.ProtectionGroupID = ""
 	replicationGroup.Finalizers = append(replicationGroup.Finalizers, controllers.ReplicationFinalizer)
-	err := suite.client.Create(ctx, &replicationGroup)
-	suite.Nil(err)
+	suite.client = utils.GetFakeClientWithObjects(&replicationGroup)
+	suite.rgReconcile.Client = suite.client
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
-	_, err = suite.rgReconcile.Reconcile(context.Background(), req)
+	_, err := suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on reconcile")
 
 	rg := new(repv1.DellCSIReplicationGroup)
@@ -349,10 +349,10 @@ func (suite *RGControllerTestSuite) TestDeleteWithNoState() {
 		Time: time.Now(),
 	}
 	replicationGroup.Finalizers = append(replicationGroup.Finalizers, controllers.ReplicationFinalizer)
-	err := suite.client.Create(ctx, &replicationGroup)
-	suite.Nil(err)
+	suite.client = utils.GetFakeClientWithObjects(&replicationGroup)
+	suite.rgReconcile.Client = suite.client
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
-	res, err := suite.rgReconcile.Reconcile(context.Background(), req)
+	res, err := suite.rgReconcile.Reconcile(ctx, req)
 	suite.NoError(err, "No error on RG reconcile")
 	suite.Equal(res.Requeue, false, "Requeue should be set to false")
 }
@@ -367,11 +367,11 @@ func (suite *RGControllerTestSuite) TestDeleteWithReadyState() {
 		Time: time.Now(),
 	}
 	replicationGroup.Status.State = ReadyState
-	err := suite.client.Create(ctx, &replicationGroup)
-	suite.Nil(err)
+	suite.client = utils.GetFakeClientWithObjects(&replicationGroup)
+	suite.rgReconcile.Client = suite.client
 
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
-	_, err = suite.rgReconcile.Reconcile(context.Background(), req)
+	_, err := suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err)
 	rg := new(repv1.DellCSIReplicationGroup)
 	err = suite.client.Get(ctx, req.NamespacedName, rg)
@@ -382,14 +382,15 @@ func (suite *RGControllerTestSuite) TestDeleteWithErrors() {
 	// scenario: When there is valid deletion time-stamp and Ready state
 	ctx := context.Background()
 	replicationGroup := suite.getLocalRG("")
+
 	// Set Finalizer
 	replicationGroup.Finalizers = append(replicationGroup.Finalizers, controllers.ReplicationFinalizer)
 	replicationGroup.DeletionTimestamp = &metav1.Time{
 		Time: time.Now(),
 	}
 	replicationGroup.Status.State = ReadyState
-	err := suite.client.Create(ctx, &replicationGroup)
-	suite.Nil(err)
+	suite.client = utils.GetFakeClientWithObjects(&replicationGroup)
+	suite.rgReconcile.Client = suite.client
 
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 
@@ -403,7 +404,7 @@ func (suite *RGControllerTestSuite) TestDeleteWithErrors() {
 	}
 
 	rg := new(repv1.DellCSIReplicationGroup)
-	err = suite.client.Get(ctx, req.NamespacedName, rg)
+	err := suite.client.Get(ctx, req.NamespacedName, rg)
 	suite.NoError(err)
 	suite.Equal(DeletingState, rg.Status.State, "State should be set to Deleting")
 
@@ -423,8 +424,8 @@ func (suite *RGControllerTestSuite) TestDeleteWithPersistentError() {
 		Time: time.Now(),
 	}
 	replicationGroup.Status.State = ReadyState
-	err := suite.client.Create(ctx, &replicationGroup)
-	suite.Nil(err)
+	suite.client = utils.GetFakeClientWithObjects(&replicationGroup)
+	suite.rgReconcile.Client = suite.client
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 
 	// Inject error which doesn't clear
@@ -439,7 +440,7 @@ func (suite *RGControllerTestSuite) TestDeleteWithPersistentError() {
 	}
 
 	rg := new(repv1.DellCSIReplicationGroup)
-	err = suite.client.Get(ctx, req.NamespacedName, rg)
+	err := suite.client.Get(ctx, req.NamespacedName, rg)
 	suite.NoError(err)
 	suite.Equal(DeletingState, rg.Status.State, "State should be set to Deleting")
 }
@@ -453,14 +454,14 @@ func (suite *RGControllerTestSuite) TestDeleteWithFinalError() {
 		Time: time.Now(),
 	}
 	replicationGroup.Status.State = ReadyState
-	err := suite.client.Create(ctx, &replicationGroup)
-	suite.Nil(err)
+	suite.client = utils.GetFakeClientWithObjects(&replicationGroup)
+	suite.rgReconcile.Client = suite.client
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 
 	// Inject temporary error
 	errorMsg := fmt.Sprintf("error during delete")
 	suite.repClient.InjectErrorAutoClear(fmt.Errorf("%s", errorMsg))
-	_, err = suite.rgReconcile.Reconcile(context.Background(), req)
+	_, err := suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.EqualError(err, errorMsg, "error should match injected error")
 
 	// Inject another error which is final
@@ -489,6 +490,9 @@ func (suite *RGControllerTestSuite) TestDeleteWithActionInProgress() {
 	actionName := "Resume"
 	replicationGroup, err := suite.createRGInActionInProgressState("", actionName, false, true)
 	suite.Nil(err)
+
+	suite.client = utils.GetFakeClientWithObjects(replicationGroup)
+	suite.rgReconcile.Client = suite.client
 
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 	rg := new(repv1.DellCSIReplicationGroup)
@@ -1183,10 +1187,10 @@ func (suite *RGControllerTestSuite) TestNoDeletionTimeStamp() {
 	replicationGroup := suite.getLocalRG("")
 	replicationGroup.Finalizers = append(replicationGroup.Finalizers, controllers.ReplicationFinalizer)
 
-	err := suite.client.Create(context.Background(), &replicationGroup)
-	suite.Nil(err)
+	suite.client = utils.GetFakeClientWithObjects(&replicationGroup)
+	suite.rgReconcile.Client = suite.client
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
-	_, err = suite.rgReconcile.Reconcile(context.Background(), req)
+	_, err := suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.Nil(err, "This should reconcile successfully")
 }
 
