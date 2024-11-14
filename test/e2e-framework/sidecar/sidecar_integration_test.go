@@ -237,9 +237,9 @@ func (ss *SidecarTestSuite) createRateLimiter() {
 		}
 	}
 	if maxStr, ok := os.LookupEnv("RETRY_MAX_INTERVAL"); ok {
-		max, err := time.ParseDuration(maxStr)
+		maximum, err := time.ParseDuration(maxStr)
 		if err == nil {
-			maxInterval = max
+			maxInterval = maximum
 		}
 	}
 	ss.rateLimiter = workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](startInterval, maxInterval)
