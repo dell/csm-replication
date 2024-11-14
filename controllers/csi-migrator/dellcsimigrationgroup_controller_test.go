@@ -428,8 +428,6 @@ func (suite *MGControllerTestSuite) TestMGReconcileWithInvalidState() {
 	suite.mgReconcile.Client = suite.client
 
 	ctx := context.Background()
-	// err := suite.client.Create(ctx, mg1)
-	// suite.Nil(err)
 
 	req := suite.getTypicalReconcileRequest(mg1.Name)
 	_, err := suite.mgReconcile.Reconcile(context.Background(), req)
