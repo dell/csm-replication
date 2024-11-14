@@ -1,12 +1,12 @@
 apiVersion: certificates.k8s.io/v1beta1
 kind: CertificateSigningRequest
 metadata:
-    name: ${certname}
+  name: ${certname}
 spec:
-    groups:
+  groups:
     - system:authenticated
-    request: ${base64_csr}
-    usages:
+  request: ${base64_csr}
+  usages:
     - digital signature
     - key encipherment
     - server auth

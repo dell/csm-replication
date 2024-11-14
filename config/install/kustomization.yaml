@@ -1,17 +1,13 @@
 # Adds namespace to all resources.
 namespace: dell-replication-controller
 namePrefix: dell-replication-
-
 # Labels to add to all resources and selectors.
 #commonLabels:
 #  someName: someValue
-
 generatorOptions:
   disableNameSuffixHash: true
-
 bases:
-- ../rbac
-- ../manager
-
+  - ../rbac
+  - ../manager
 resources:
-- namespace.yaml
+  - namespace.yaml
