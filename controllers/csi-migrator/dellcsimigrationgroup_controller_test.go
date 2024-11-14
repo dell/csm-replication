@@ -91,6 +91,23 @@ func (suite *MGControllerTestSuite) TearDownTest() {
 	suite.T().Log("Cleaning up resources...")
 }
 
+// Return a base migration group
+func getTypicalMigrationGroup() *storagev1.DellCSIMigrationGroup {
+	return &storagev1.DellCSIMigrationGroup{
+		ObjectMeta: metav1.ObjectMeta{Name: "mg1"},
+		Spec: storagev1.DellCSIMigrationGroupSpec{
+			DriverName:               "driverName",
+			SourceID:                 "001",
+			TargetID:                 "0002",
+			MigrationGroupAttributes: map[string]string{"test": "test"},
+		},
+		Status: storagev1.DellCSIMigrationGroupStatus{
+			LastAction: "",
+			State:      ReadyState,
+		},
+	}
+}
+
 // MG with ReadyState
 func (suite *MGControllerTestSuite) TestMGReconcileWithReadyState() {
 	mg1 := &storagev1.DellCSIMigrationGroup{
@@ -453,4 +470,53 @@ func (suite *MGControllerTestSuite) TestSetupWithManagerMG() {
 	expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second)
 	err := suite.mgReconcile.SetupWithManager(mgr, expRateLimiter, 1)
 	suite.Error(err, "Setup should fail when there is no manager")
+}
+
+func (suite *MGControllerTestSuite) TestSetupWithManagerMGNoRetry() {
+	// Do not provide MaxRetryDurationForActions and confirm it is set to the default, 1 hour
+
+	// must get the client which will register the scheme
+	suite.client = utils.GetFakeClient()
+	suite.mgReconcile.Client = suite.client
+
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+		Scheme: utils.Scheme,
+	})
+	if err != nil {
+		suite.T().Fatalf("failed to create manager: %v", err)
+	}
+	expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second)
+
+	// set max retry to 0
+	suite.mgReconcile.MaxRetryDurationForActions = 0
+
+	err = suite.mgReconcile.SetupWithManager(mgr, expRateLimiter, 1)
+	suite.NoError(err)
+	suite.Equal(suite.mgReconcile.MaxRetryDurationForActions, 1*time.Hour, "Should setup manager with max retry duration of 1 hour")
+}
+
+func (suite *MGControllerTestSuite) TestIgnoreMGNotFound() {
+	// If the MG is not found, return an empty result
+	mg1 := getTypicalMigrationGroup()
+
+	// create a fake client, but do not give it info about the mg in order
+	// to trigger MG not found error.
+	suite.client = utils.GetFakeClient()
+	suite.mgReconcile.Client = suite.client
+
+	req := suite.getTypicalReconcileRequest(mg1.Name)
+	res, err := suite.mgReconcile.Reconcile(context.Background(), req)
+	suite.NoError(err)
+	suite.Equal(ctrl.Result{}, res)
+}
+
+func (suite *MGControllerTestSuite) TestUpdateMGSpecWithActionResultSuccess() {
+	// successfully update the MG spec with the action result
+	mg1 := getTypicalMigrationGroup()
+
+	suite.client = utils.GetFakeClientWithObjects(mg1)
+	suite.mgReconcile.Client = suite.client
+
+	isUpdated := suite.mgReconcile.updateMGSpecWithActionResult(context.Background(), mg1, "Delete")
+	suite.True(isUpdated, "MG should be updated")
 }
