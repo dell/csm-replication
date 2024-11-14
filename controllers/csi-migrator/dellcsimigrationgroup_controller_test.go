@@ -546,5 +546,33 @@ func (suite *MGControllerTestSuite) TestAddfinalizerFailToUpdate() {
 
 	ok, err := suite.mgReconcile.addFinalizer(context.Background(), mg1)
 	suite.Error(err)
+	suite.Contains(err.Error(), "not found")
 	suite.True(ok)
+}
+
+func (suite *MGControllerTestSuite) TestUpdateMGOnError() {
+	// Successfully update the MG on error
+
+	mg1 := getTypicalMigrationGroup()
+
+	suite.client = utils.GetFakeClientWithObjects(mg1)
+	suite.mgReconcile.Client = suite.client
+
+	err := suite.mgReconcile.updateMGOnError(context.Background(), mg1, DeletingState, "")
+	suite.NoError(err)
+}
+
+func (suite *MGControllerTestSuite) TestUpdateMGSpecWithStateFail() {
+	// Unsuccessfully attempt to update the MG spec with the given state
+
+	mg1 := getTypicalMigrationGroup()
+
+	// create a client without knowledge of the migration group in order
+	// to force a failed update
+	suite.client = utils.GetFakeClient()
+	suite.mgReconcile.Client = suite.client
+
+	err := suite.mgReconcile.updateMGSpecWithState(context.Background(), mg1, DeletingState)
+	suite.Error(err)
+	suite.Contains(err.Error(), "not found")
 }
