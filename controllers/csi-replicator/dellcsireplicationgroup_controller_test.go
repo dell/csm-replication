@@ -135,7 +135,7 @@ func (suite *RGControllerTestSuite) getRemoteRG(name string) repv1.DellCSIReplic
 
 func (suite *RGControllerTestSuite) createRGInActionInProgressState(name string, actionName string,
 	completed bool, deleteInProgress bool,
-) (*repv1.DellCSIReplicationGroup, error) {
+) *repv1.DellCSIReplicationGroup {
 	rg := suite.getLocalRG(name)
 	actionType := ActionType(actionName)
 	rg.Spec.Action = actionName
@@ -155,11 +155,11 @@ func (suite *RGControllerTestSuite) createRGInActionInProgressState(name string,
 		}
 		rg.Finalizers = append(rg.Finalizers, controllers.ReplicationFinalizer)
 	}
-	err := suite.client.Create(context.Background(), &rg)
-	if err != nil {
-		return nil, err
-	}
-	return &rg, nil
+
+	suite.client = utils.GetFakeClientWithObjects(&rg)
+	suite.rgReconcile.Client = suite.client
+
+	return &rg
 }
 
 func (suite *RGControllerTestSuite) getLocalParams() map[string]string {
@@ -204,6 +204,7 @@ func (suite *RGControllerTestSuite) TestReconcileWithNoState() {
 	replicationGroup := suite.getLocalRG("")
 	suite.client = utils.GetFakeClientWithObjects(&replicationGroup)
 	suite.rgReconcile.Client = suite.client
+
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 	resp, err := suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on RG reconcile")
@@ -224,12 +225,16 @@ func (suite *RGControllerTestSuite) TestReconcileWithEmptyPGID() {
 	// scenario: When there is no protection group ID and no valid state is set
 	ctx := context.Background()
 	replicationGroup := suite.getLocalRG("")
+
+	// unset the protection group
 	replicationGroup.Spec.ProtectionGroupID = ""
 	suite.client = utils.GetFakeClientWithObjects(&replicationGroup)
 	suite.rgReconcile.Client = suite.client
+
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 	_, err := suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.EqualError(err, "missing protection group id")
+
 	rg := new(repv1.DellCSIReplicationGroup)
 	err = suite.client.Get(ctx, req.NamespacedName, rg)
 	suite.NoError(err, "No error on RG get")
@@ -247,6 +252,7 @@ func (suite *RGControllerTestSuite) TestDeleteWithInvalidState() {
 	replicationGroup.Finalizers = append(replicationGroup.Finalizers, controllers.ReplicationFinalizer)
 	suite.client = utils.GetFakeClientWithObjects(&replicationGroup)
 	suite.rgReconcile.Client = suite.client
+
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 	res, err := suite.rgReconcile.Reconcile(ctx, req)
 	suite.NoError(err, "No error on RG reconcile")
@@ -280,6 +286,7 @@ func (suite *RGControllerTestSuite) TestReconcileWithInvalidStateAfterFix() {
 	replicationGroup.Spec.ProtectionGroupID = protectionGroupID
 	suite.client = utils.GetFakeClientWithObjects(&replicationGroup)
 	suite.rgReconcile.Client = suite.client
+
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 	_, err := suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on RG reconcile")
@@ -302,6 +309,7 @@ func (suite *RGControllerTestSuite) TestDeleteWithInvalidStateAndNoPGID() {
 	replicationGroup.Finalizers = append(replicationGroup.Finalizers, controllers.ReplicationFinalizer)
 	suite.client = utils.GetFakeClientWithObjects(&replicationGroup)
 	suite.rgReconcile.Client = suite.client
+
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 	res, err := suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on RG reconcile")
@@ -323,6 +331,7 @@ func (suite *RGControllerTestSuite) TestDeleteWithNoPGID() {
 	replicationGroup.Finalizers = append(replicationGroup.Finalizers, controllers.ReplicationFinalizer)
 	suite.client = utils.GetFakeClientWithObjects(&replicationGroup)
 	suite.rgReconcile.Client = suite.client
+
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 	_, err := suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on reconcile")
@@ -351,6 +360,7 @@ func (suite *RGControllerTestSuite) TestDeleteWithNoState() {
 	replicationGroup.Finalizers = append(replicationGroup.Finalizers, controllers.ReplicationFinalizer)
 	suite.client = utils.GetFakeClientWithObjects(&replicationGroup)
 	suite.rgReconcile.Client = suite.client
+
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 	res, err := suite.rgReconcile.Reconcile(ctx, req)
 	suite.NoError(err, "No error on RG reconcile")
@@ -424,8 +434,10 @@ func (suite *RGControllerTestSuite) TestDeleteWithPersistentError() {
 		Time: time.Now(),
 	}
 	replicationGroup.Status.State = ReadyState
+
 	suite.client = utils.GetFakeClientWithObjects(&replicationGroup)
 	suite.rgReconcile.Client = suite.client
+
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 
 	// Inject error which doesn't clear
@@ -454,8 +466,10 @@ func (suite *RGControllerTestSuite) TestDeleteWithFinalError() {
 		Time: time.Now(),
 	}
 	replicationGroup.Status.State = ReadyState
+
 	suite.client = utils.GetFakeClientWithObjects(&replicationGroup)
 	suite.rgReconcile.Client = suite.client
+
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 
 	// Inject temporary error
@@ -488,15 +502,11 @@ func (suite *RGControllerTestSuite) TestDeleteWithActionInProgress() {
 	ctx := context.Background()
 	// scenario: When there is valid PG-ID and state is in ActionInProgress
 	actionName := "Resume"
-	replicationGroup, err := suite.createRGInActionInProgressState("", actionName, false, true)
-	suite.Nil(err)
-
-	suite.client = utils.GetFakeClientWithObjects(replicationGroup)
-	suite.rgReconcile.Client = suite.client
+	replicationGroup := suite.createRGInActionInProgressState("", actionName, false, true)
 
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 	rg := new(repv1.DellCSIReplicationGroup)
-	err = suite.client.Get(ctx, req.NamespacedName, rg)
+	err := suite.client.Get(ctx, req.NamespacedName, rg)
 	suite.NoError(err)
 
 	// Reconcile
@@ -575,14 +585,13 @@ func (suite *RGControllerTestSuite) TestActionInReadyState() {
 func (suite *RGControllerTestSuite) TestActionInProgressState() {
 	// scenario: When there is valid PG-ID and state is in ActionInProgress
 	actionName := "Failover_Local"
-	replicationGroup, err := suite.createRGInActionInProgressState("", actionName, false, false)
-	suite.client = utils.GetFakeClientWithObjects(replicationGroup)
-	suite.rgReconcile.Client = suite.client
+	replicationGroup := suite.createRGInActionInProgressState("", actionName, false, false)
+
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 	// Inject condition
 	suite.repClient.SetCondition(csireplication.ExecuteActionWithSwap)
 	// Reconcile
-	_, err = suite.rgReconcile.Reconcile(context.Background(), req)
+	_, err := suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on RG reconcile")
 
 	// Get the updated RG
@@ -612,16 +621,15 @@ func (suite *RGControllerTestSuite) TestActionInProgressStateWithSingleError() {
 	// and driver returns a temporary error
 	actionName := "Resume"
 	actionType := ActionType(actionName)
-	replicationGroup, err := suite.createRGInActionInProgressState("", actionName, false, false)
-	suite.client = utils.GetFakeClientWithObjects(replicationGroup)
-	suite.rgReconcile.Client = suite.client
+	replicationGroup := suite.createRGInActionInProgressState("", actionName, false, false)
+
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 
 	// Inject an error
 	errorMsg := "failed to perform action"
 	suite.repClient.InjectErrorAutoClear(fmt.Errorf("%s", errorMsg))
 	// Reconcile
-	_, err = suite.rgReconcile.Reconcile(context.Background(), req)
+	_, err := suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.EqualError(err, errorMsg)
 
 	// Get the updated RG
@@ -663,9 +671,8 @@ func (suite *RGControllerTestSuite) TestActionInProgressStateWithContextDeadline
 	// and driver returns a temporary error
 	actionName := "Resume"
 	actionType := ActionType(actionName)
-	replicationGroup, err := suite.createRGInActionInProgressState("", actionName, false, false)
-	suite.client = utils.GetFakeClientWithObjects(replicationGroup)
-	suite.rgReconcile.Client = suite.client
+	replicationGroup := suite.createRGInActionInProgressState("", actionName, false, false)
+
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 
 	// Inject an error
@@ -674,7 +681,7 @@ func (suite *RGControllerTestSuite) TestActionInProgressStateWithContextDeadline
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 	// Reconcile
-	_, err = suite.rgReconcile.Reconcile(ctx, req)
+	_, err := suite.rgReconcile.Reconcile(ctx, req)
 	suite.EqualError(err, deadlineExceededError.Error())
 
 	// Get the updated RG
@@ -717,16 +724,15 @@ func (suite *RGControllerTestSuite) TestActionInProgressWithFinalError() {
 	// and driver returns a temporary error
 	actionName := "Resume"
 	actionType := ActionType(actionName)
-	replicationGroup, err := suite.createRGInActionInProgressState("", actionName, false, false)
-	suite.client = utils.GetFakeClientWithObjects(replicationGroup)
-	suite.rgReconcile.Client = suite.client
+	replicationGroup := suite.createRGInActionInProgressState("", actionName, false, false)
+
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 
 	// Inject an error
 	errorMsg := "failed to perform action"
 	failedPreconditionError := status.Error(codes.FailedPrecondition, errorMsg)
 	suite.repClient.InjectErrorAutoClear(failedPreconditionError)
-	_, err = suite.rgReconcile.Reconcile(context.Background(), req)
+	_, err := suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err)
 
 	// Get the updated RG
@@ -757,16 +763,15 @@ func (suite *RGControllerTestSuite) TestActionInProgressStateWithPersistentError
 	// and driver returns errors
 	actionName := "Failback_Local"
 	actionType := ActionType(actionName)
-	replicationGroup, err := suite.createRGInActionInProgressState("", actionName, false, false)
-	suite.client = utils.GetFakeClientWithObjects(replicationGroup)
-	suite.rgReconcile.Client = suite.client
+	replicationGroup := suite.createRGInActionInProgressState("", actionName, false, false)
+
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 	rg := new(repv1.DellCSIReplicationGroup)
 
 	errorMsg := "can't process request"
 	suite.repClient.InjectErrorClearAfterN(fmt.Errorf("%s", errorMsg), 10)
 	for i := 0; i < 10; i++ {
-		_, err = suite.rgReconcile.Reconcile(context.Background(), req)
+		_, err := suite.rgReconcile.Reconcile(context.Background(), req)
 		suite.EqualError(err, errorMsg)
 		// Get the updated RG
 		err = suite.client.Get(context.Background(), req.NamespacedName, rg)
@@ -776,7 +781,7 @@ func (suite *RGControllerTestSuite) TestActionInProgressStateWithPersistentError
 	}
 
 	// Final reconcile
-	_, err = suite.rgReconcile.Reconcile(context.Background(), req)
+	_, err := suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on reconcile")
 	// Refresh RG
 	var latestRG repv1.DellCSIReplicationGroup
@@ -803,8 +808,8 @@ func (suite *RGControllerTestSuite) TestActionInProgressStateWithTimeout() {
 	// and driver returns errors
 	actionName := "Failover_Remote"
 	actionType := ActionType(actionName)
-	replicationGroup, err := suite.createRGInActionInProgressState("", actionName, false, false)
-	suite.NoError(err, "No error on create")
+	replicationGroup := suite.createRGInActionInProgressState("", actionName, false, false)
+
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 
 	// Inject an error which doesn't automatically clear
@@ -817,7 +822,7 @@ func (suite *RGControllerTestSuite) TestActionInProgressStateWithTimeout() {
 	}()
 	// Reconcile in a loop
 	for i := 0; i < 4; i++ {
-		_, err = suite.rgReconcile.Reconcile(context.Background(), req)
+		_, err := suite.rgReconcile.Reconcile(context.Background(), req)
 		// Get the updated RG
 		rg := new(repv1.DellCSIReplicationGroup)
 		err = suite.client.Get(context.Background(), req.NamespacedName, rg)
@@ -926,8 +931,6 @@ func (suite *RGControllerTestSuite) TestActionInProgressWithFailedAction() {
 	replicationGroup.ObjectMeta.Annotations[Action] = string(bytes)
 	suite.client = utils.GetFakeClientWithObjects(&replicationGroup)
 	suite.rgReconcile.Client = suite.client
-	// err := suite.client.Create(context.Background(), &replicationGroup)
-	// suite.NoError(err)
 
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 	_, err := suite.rgReconcile.Reconcile(context.Background(), req)
@@ -1006,13 +1009,11 @@ func (suite *RGControllerTestSuite) TestActionInProgressWithMissingEverything() 
 func (suite *RGControllerTestSuite) TestActionInProgressWithIncorrectAnnotation() {
 	actionName := "Failover_Local"
 
-	replicationGroup, err := suite.createRGInActionInProgressState("", actionName, false, false)
-	suite.client = utils.GetFakeClientWithObjects(replicationGroup)
-	suite.rgReconcile.Client = suite.client
+	replicationGroup := suite.createRGInActionInProgressState("", actionName, false, false)
 
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 
-	_, err = suite.rgReconcile.Reconcile(context.Background(), req)
+	_, err := suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on RG reconcile")
 
 	// Get the updated RG
@@ -1038,13 +1039,11 @@ func (suite *RGControllerTestSuite) TestActionInProgressWithMismatchingAction() 
 	// scenario: State is ActionInProgress, correct ActionInProgress annotation & user modifies the action field
 	// expectation: controller ignores this & finishes the current action
 	actionName := "Sync"
-	replicationGroup, err := suite.createRGInActionInProgressState("", actionName, false, false)
-	suite.client = utils.GetFakeClientWithObjects(replicationGroup)
-	suite.rgReconcile.Client = suite.client
+	replicationGroup := suite.createRGInActionInProgressState("", actionName, false, false)
 
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 	// Reconcile
-	_, err = suite.rgReconcile.Reconcile(context.Background(), req)
+	_, err := suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on RG reconcile")
 
 	// Get the updated RG
@@ -1072,16 +1071,15 @@ func (suite *RGControllerTestSuite) TestActionInErrorStateWithContextDeadlineErr
 	// and driver returns a temporary error
 	actionName := "Resume"
 	actionType := ActionType(actionName)
-	replicationGroup, err := suite.createRGInActionInProgressState("", actionName, false, false)
-	suite.client = utils.GetFakeClientWithObjects(replicationGroup)
-	suite.rgReconcile.Client = suite.client
+	replicationGroup := suite.createRGInActionInProgressState("", actionName, false, false)
+
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 
 	// Inject an error
 	errorMsg := "failed to perform action"
 	failedPreconditionError := status.Error(codes.FailedPrecondition, errorMsg)
 	suite.repClient.InjectErrorAutoClear(failedPreconditionError)
-	_, err = suite.rgReconcile.Reconcile(context.Background(), req)
+	_, err := suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err)
 
 	// Get the updated RG
