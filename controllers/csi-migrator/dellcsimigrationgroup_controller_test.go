@@ -520,3 +520,31 @@ func (suite *MGControllerTestSuite) TestUpdateMGSpecWithActionResultSuccess() {
 	isUpdated := suite.mgReconcile.updateMGSpecWithActionResult(context.Background(), mg1, "Delete")
 	suite.True(isUpdated, "MG should be updated")
 }
+
+func (suite *MGControllerTestSuite) TestAddfinalizer() {
+	// Successfully add MG finalizers to a migration group
+
+	mg1 := getTypicalMigrationGroup()
+
+	suite.client = utils.GetFakeClientWithObjects(mg1)
+	suite.mgReconcile.Client = suite.client
+
+	ok, err := suite.mgReconcile.addFinalizer(context.Background(), mg1)
+	suite.NoError(err)
+	suite.True(ok)
+}
+
+func (suite *MGControllerTestSuite) TestAddfinalizerFailToUpdate() {
+	// Add the finalizer to the MG but fail when calling reconciler Update
+
+	mg1 := getTypicalMigrationGroup()
+
+	// create a client without knowledge of the migration group in order
+	// to force a failed update
+	suite.client = utils.GetFakeClient()
+	suite.mgReconcile.Client = suite.client
+
+	ok, err := suite.mgReconcile.addFinalizer(context.Background(), mg1)
+	suite.Error(err)
+	suite.True(ok)
+}
