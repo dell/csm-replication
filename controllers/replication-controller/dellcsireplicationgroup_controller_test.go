@@ -22,6 +22,7 @@ import (
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
+	csireplicator "github.com/dell/csm-replication/controllers/csi-replicator"
 	constants "github.com/dell/csm-replication/pkg/common"
 	"github.com/dell/csm-replication/pkg/config"
 	"github.com/dell/csm-replication/pkg/connection"
@@ -48,8 +49,17 @@ type RGControllerTestSuite struct {
 	reconciler *ReplicationGroupReconciler
 }
 
+func TestRGControllerTestSuite(t *testing.T) {
+	testSuite := new(RGControllerTestSuite)
+	suite.Run(t, testSuite)
+}
+
 func (suite *RGControllerTestSuite) SetupTest() {
 	suite.Init()
+}
+
+func (suite *RGControllerTestSuite) TearDownTest() {
+	suite.T().Log("Cleaning up resources...")
 }
 
 func (suite *RGControllerTestSuite) Init() {
@@ -253,6 +263,7 @@ func (suite *RGControllerTestSuite) TestReconcileRGWithAnnotations() {
 	req := suite.getTypicalRequest()
 
 	err := suite.client.Get(context.Background(), req.NamespacedName, rg)
+	suite.NoError(err)
 	suite.NotContains(controllers.RemoteReplicationGroup, rg.Annotations,
 		"Remote RG annotation doesn't exist")
 	suite.NotContains(controllers.RGSyncComplete, rg.Annotations,
@@ -299,6 +310,7 @@ func (suite *RGControllerTestSuite) TestReconcileRGWithAnnotationsSingleCluster(
 	req := suite.getTypicalRequest()
 
 	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
+	suite.NoError(err)
 	suite.NotContains(controllers.RemoteReplicationGroup, rg.Annotations,
 		"Remote RG annotation doesn't exist")
 	suite.NotContains(controllers.RGSyncComplete, rg.Annotations,
@@ -340,6 +352,7 @@ func (suite *RGControllerTestSuite) TestRGSyncWithFinalizer() {
 	rg := new(repv1.DellCSIReplicationGroup)
 	req := suite.getTypicalRequest()
 	err := suite.client.Get(context.Background(), req.NamespacedName, rg)
+	suite.NoError(err)
 	suite.NotContains(controllers.RGSyncComplete, rg.Finalizers,
 		"RG finalizer doesn't exist")
 	resp, err := suite.reconciler.Reconcile(context.Background(), req)
@@ -371,6 +384,7 @@ func (suite *RGControllerTestSuite) TestReconcileRGWithContextPrefix() {
 	req := suite.getTypicalRequest()
 
 	err := suite.client.Get(context.Background(), req.NamespacedName, rg)
+	suite.NoError(err)
 	suite.NotContains(controllers.RemoteReplicationGroup, rg.Annotations,
 		"Remote RG annotation doesn't exist")
 	suite.NotContains(controllers.RGSyncComplete, rg.Annotations,
@@ -438,6 +452,7 @@ func (suite *RGControllerTestSuite) TestRGSyncDeletion() {
 	req := suite.getTypicalRequest()
 
 	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
+	suite.NoError(err)
 	suite.NotContains(controllers.RemoteReplicationGroup, rg.Annotations,
 		"Remote RG annotation doesn't exist")
 	suite.NotContains(controllers.RGSyncComplete, rg.Annotations,
@@ -453,15 +468,6 @@ func (suite *RGControllerTestSuite) TestRGSyncDeletion() {
 	resp, err = suite.reconciler.Reconcile(context.Background(), req)
 	suite.NoError(err)
 	suite.Equal(false, resp.Requeue)
-}
-
-func TestRGControllerTestSuite(t *testing.T) {
-	testSuite := new(RGControllerTestSuite)
-	suite.Run(t, testSuite)
-}
-
-func (suite *RGControllerTestSuite) TearDownTest() {
-	suite.T().Log("Cleaning up resources...")
 }
 
 func (suite *RGControllerTestSuite) TestSetupWithManagerRg() {
@@ -534,4 +540,112 @@ func (suite *RGControllerTestSuite) TestMakeVolSnapContent() {
 	suite.Equal(result.Spec.VolumeSnapshotRef.Name, snapRef.Name)
 	suite.Equal(*result.Spec.VolumeSnapshotClassName, sc.Name)
 	suite.Equal(*result.Spec.Source.SnapshotHandle, snapName)
+}
+
+func (suite *RGControllerTestSuite) TestProcessLastActionResult() {
+	// Process the last action result by updating the RG annotation,
+	// controllers.ActionProcessedTime, with the time of the last action
+
+	rg := suite.getRGWithSyncComplete(suite.driver.RGName)
+
+	// add a timestamp for the last action processed
+	actionTimeStamp := time.Now()
+	rg.Status.LastAction.Time = &metav1.Time{
+		Time: actionTimeStamp,
+	}
+
+	// provide the RG with at least one condition.
+	condition := repv1.LastAction{
+		Condition: "successfully updated",
+		Time:      &metav1.Time{Time: actionTimeStamp},
+	}
+	controllers.UpdateConditions(rg, condition, csireplicator.MaxNumberOfConditions)
+
+	// make sure the actionProcessedTime and Status.LastAction.Time do not match
+	rg.Annotations[controllers.ActionProcessedTime] = actionTimeStamp.Add(-1 * time.Minute).GoString()
+
+	suite.client = utils.GetFakeClientWithObjects(rg)
+	suite.reconciler.Client = suite.client
+
+	remoteClient, err := suite.config.GetConnection(suite.driver.RemoteClusterID)
+	suite.NoError(err)
+
+	// Process the last action. Should update the RG, updating the actionProcessedTime annotation
+	err = suite.reconciler.processLastActionResult(context.Background(), rg, remoteClient, suite.reconciler.Log)
+	suite.NoError(err, "processLastActionResult should not fail")
+
+	updatedRG := new(repv1.DellCSIReplicationGroup)
+	err = suite.client.Get(context.Background(), types.NamespacedName{Name: suite.driver.RGName}, updatedRG)
+	suite.NoError(err, "should successfully get the updated RG")
+	suite.Equal(actionTimeStamp.GoString(), updatedRG.Annotations[controllers.ActionProcessedTime],
+		"Last action processed time should be updated with actionTimeStamp time")
+}
+
+func (suite *RGControllerTestSuite) TestProcessLastActionResult_AlreadyProcessed() {
+	// Attempt to process the last action result when the RG has already been processed
+	// and the actionProcessedTime and Status.LastAction.Time match
+
+	rg := suite.getRGWithSyncComplete(suite.driver.RGName)
+
+	// add a timestamp for the last action processed
+	actionTimeStamp := time.Now()
+	rg.Status.LastAction.Time = &metav1.Time{
+		Time: actionTimeStamp,
+	}
+
+	// provide the RG with at least one condition.
+	condition := repv1.LastAction{
+		Condition: "successfully updated",
+		Time:      &metav1.Time{Time: actionTimeStamp},
+	}
+	controllers.UpdateConditions(rg, condition, csireplicator.MaxNumberOfConditions)
+
+	// make sure the actionProcessedTime and Status.LastAction.Time do not match
+	rg.Annotations[controllers.ActionProcessedTime] = actionTimeStamp.GoString()
+
+	suite.client = utils.GetFakeClientWithObjects(rg)
+	suite.reconciler.Client = suite.client
+
+	remoteClient, err := suite.config.GetConnection(suite.driver.RemoteClusterID)
+	suite.NoError(err)
+
+	// Process the last action. Should update the RG, updating the actionProcessedTime annotation
+	err = suite.reconciler.processLastActionResult(context.Background(), rg, remoteClient, suite.reconciler.Log)
+	suite.NoError(err, "processLastActionResult should do nothing")
+	// Ideally, we'd check the log output here to confirm it logged "Last action has already been processed", but
+	// it appears there is no method to get the log output.
+}
+
+func (suite *RGControllerTestSuite) TestProcessLastActionResult_NoActionProcessedTime() {
+	// Attempt to process the last action result but do not provide any annotation
+	// for controllers.ActionProcessedTime
+
+	rg := suite.getRGWithSyncComplete(suite.driver.RGName)
+
+	// add a timestamp for the last action processed
+	actionTimeStamp := time.Now()
+	rg.Status.LastAction.Time = &metav1.Time{
+		Time: actionTimeStamp,
+	}
+
+	// provide the RG with at least one condition.
+	condition := repv1.LastAction{
+		Condition: "successfully updated",
+		Time:      &metav1.Time{Time: actionTimeStamp},
+	}
+	controllers.UpdateConditions(rg, condition, csireplicator.MaxNumberOfConditions)
+
+	// leave out the annotation for controllers.ActionProcessedTime
+
+	suite.client = utils.GetFakeClientWithObjects(rg)
+	suite.reconciler.Client = suite.client
+
+	remoteClient, err := suite.config.GetConnection(suite.driver.RemoteClusterID)
+	suite.NoError(err)
+
+	// Process the last action. Should update the RG, updating the actionProcessedTime annotation
+	err = suite.reconciler.processLastActionResult(context.Background(), rg, remoteClient, suite.reconciler.Log)
+	suite.NoError(err, "processLastActionResult should do nothing")
+	// Ideally, we'd check the log output here to confirm it logged "Action Processed does not exist", but
+	// it appears there is no method to get the log output.
 }
