@@ -260,6 +260,11 @@ func (c *RemoteK8sControllerClient) GetPersistentVolumeClaim(ctx context.Context
 	return claim, nil
 }
 
+// CreatePersistentVolumeClaim returns persistent volume claim object in current cluster
+func (c *RemoteK8sControllerClient) CreatePersistentVolumeClaim(ctx context.Context, claim *corev1.PersistentVolumeClaim) error {
+	return c.Client.Create(ctx, claim)
+}
+
 // UpdatePersistentVolumeClaim updates persistent volume claim object in current cluster
 func (c *RemoteK8sControllerClient) UpdatePersistentVolumeClaim(ctx context.Context, claim *corev1.PersistentVolumeClaim) error {
 	return c.Client.Update(ctx, claim)
@@ -268,6 +273,18 @@ func (c *RemoteK8sControllerClient) UpdatePersistentVolumeClaim(ctx context.Cont
 // CreateSnapshotContent creates the snapshot content on the remote cluster
 func (c *RemoteK8sControllerClient) CreateSnapshotContent(ctx context.Context, content *s1.VolumeSnapshotContent) error {
 	return c.Client.Create(ctx, content)
+}
+
+// ListPersistentVolumeClaim gets the list of persistent volume claim objects under the replication group
+func (c *RemoteK8sControllerClient) ListPersistentVolumeClaim(ctx context.Context, opts ...ctrlClient.ListOption) (*corev1.PersistentVolumeClaimList, error) {
+	list := &corev1.PersistentVolumeClaimList{}
+
+	err := c.Client.List(ctx, list, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	return list, nil
 }
 
 // CreateSnapshotObject creates the snapshot on the remote cluster
@@ -286,6 +303,11 @@ func (c *RemoteK8sControllerClient) GetSnapshotClass(ctx context.Context, snapCl
 	return found, nil
 }
 
+// CreateSnapshotClass creates the snapshot on the remote cluster
+func (c *RemoteK8sControllerClient) CreateSnapshotClass(ctx context.Context, content *s1.VolumeSnapshotClass) error {
+	return c.Client.Create(ctx, content)
+}
+
 // CreateNamespace creates a desired namespace on the remote cluster.
 func (c *RemoteK8sControllerClient) CreateNamespace(ctx context.Context, content *corev1.Namespace) error {
 	return c.Client.Create(ctx, content)
@@ -301,6 +323,30 @@ func (c *RemoteK8sControllerClient) GetNamespace(ctx context.Context, namespace 
 	}
 
 	return found, nil
+}
+
+// GetSnapshotContent gets the volume snapshot content object under the replication group by querying cluster using the snapshot content name
+func (c *RemoteK8sControllerClient) GetSnapshotContent(ctx context.Context, snapshotContentName string) (*s1.VolumeSnapshotContent, error) {
+	found := &s1.VolumeSnapshotContent{}
+
+	err := c.Client.Get(ctx, types.NamespacedName{Name: snapshotContentName}, found)
+	if err != nil {
+		return nil, err
+	}
+
+	return found, nil
+}
+
+// ListSnapshotContent gets the list of volume snapshot content objects under the replication group
+func (c *RemoteK8sControllerClient) ListSnapshotContent(ctx context.Context, opts ...ctrlClient.ListOption) (*s1.VolumeSnapshotContentList, error) {
+	list := &s1.VolumeSnapshotContentList{}
+
+	err := c.Client.List(ctx, list, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	return list, nil
 }
 
 // GetControllerClient - Returns a controller client which reads and writes directly to API server
