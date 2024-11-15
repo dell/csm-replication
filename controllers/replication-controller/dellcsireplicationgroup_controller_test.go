@@ -26,7 +26,9 @@ import (
 	"github.com/dell/csm-replication/pkg/config"
 	"github.com/dell/csm-replication/pkg/connection"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
+	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	"github.com/stretchr/testify/suite"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -468,4 +470,68 @@ func (suite *RGControllerTestSuite) TestSetupWithManagerRg() {
 	expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second)
 	err := suite.reconciler.SetupWithManager(mgr, expRateLimiter, 1)
 	suite.Error(err, "Setup should fail when there is no manager")
+}
+
+func (suite *RGControllerTestSuite) TestMakeNamespaceReference() {
+	ns := "test-namespace"
+	result := makeNamespaceReference(ns)
+	suite.Equal(ns, result.ObjectMeta.Name)
+}
+
+func (suite *RGControllerTestSuite) TestMakeSnapReference() {
+	snapName := "test-snapshot"
+	namespace := "test-namespace"
+	result := makeSnapReference(snapName, namespace)
+
+	expectedName := "snapshot-" + snapName
+	suite.Equal(result.Name, expectedName)
+	suite.Equal(result.Namespace, namespace)
+	suite.Equal(result.Kind, "VolumeSnapshot")
+	suite.Equal(result.APIVersion, "snapshot.storage.k8s.io/v1")
+}
+
+func (suite *RGControllerTestSuite) TestMakeSnapshotObject() {
+	snapName := "test-snapshot"
+	contentName := "test-content"
+	className := "test-class"
+	namespace := "test-namespace"
+	result := makeSnapshotObject(snapName, contentName, className, namespace)
+
+	suite.Equal(result.Name, snapName)
+	suite.Equal(result.Namespace, namespace)
+	suite.Equal(*result.Spec.Source.VolumeSnapshotContentName, contentName)
+	suite.Equal(*result.Spec.VolumeSnapshotClassName, className)
+}
+
+func (suite *RGControllerTestSuite) TestMakeStorageClassContent() {
+	driver := "test-driver"
+	snapClass := "test-snap-class"
+	result := makeStorageClassContent(driver, snapClass)
+
+	suite.Equal(result.Driver, driver)
+	suite.Equal(result.Name, snapClass)
+}
+
+func (suite *RGControllerTestSuite) TestMakeVolSnapContent() {
+	snapName := "test-snapshot"
+	volumeName := "test-volume"
+	snapRef := v1.ObjectReference{
+		Name:      "test-snapshot-ref",
+		Namespace: "test-namespace",
+	}
+	sc := &s1.VolumeSnapshotClass{
+		Driver:         "test-driver",
+		DeletionPolicy: "Retain",
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-snap-class",
+		},
+	}
+
+	result := makeVolSnapContent(snapName, volumeName, snapRef, sc)
+
+	suite.Equal(result.Spec.Driver, sc.Driver)
+	suite.Equal(result.Spec.DeletionPolicy, sc.DeletionPolicy)
+	suite.Equal(result.Spec.VolumeSnapshotRef.Name, snapRef.Name)
+	suite.Equal(*result.Spec.VolumeSnapshotClassName, sc.Name)
+	suite.Equal(*result.Spec.Source.SnapshotHandle, snapName)
 }
