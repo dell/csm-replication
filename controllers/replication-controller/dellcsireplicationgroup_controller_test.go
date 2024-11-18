@@ -16,6 +16,7 @@ package replicationcontroller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -648,4 +649,48 @@ func (suite *RGControllerTestSuite) TestProcessLastActionResult_NoActionProcesse
 	suite.NoError(err, "processLastActionResult should do nothing")
 	// Ideally, we'd check the log output here to confirm it logged "Action Processed does not exist", but
 	// it appears there is no method to get the log output.
+}
+
+func (suite *RGControllerTestSuite) TestProcessSnapshotEvent() {
+	// scenario: Test snapshot event processing
+	rg := suite.getRGWithSyncComplete(suite.driver.RGName)
+	rg.Status.LastAction.Time = &metav1.Time{Time: time.Now()}
+	rg.Status.LastAction.Condition = "CREATE_SNAPSHOT"
+
+	suite.client = utils.GetFakeClientWithObjects(rg)
+	suite.reconciler.Client = suite.client
+
+	remoteClient, err := suite.config.GetConnection(suite.driver.RemoteClusterID)
+	suite.NoError(err)
+
+	// Test case: No action annotation
+	err = suite.reconciler.processSnapshotEvent(context.Background(), rg, remoteClient, suite.reconciler.Log)
+	suite.NoError(err, "processSnapshotEvent should return nil when no action annotation is provided")
+
+	// Test case: JSON unmarshal error
+	rg.Annotations[csireplicator.Action] = "invalid-json"
+	err = suite.reconciler.processSnapshotEvent(context.Background(), rg, remoteClient, suite.reconciler.Log)
+	suite.Error(err, "processSnapshotEvent should return an error for invalid JSON annotation")
+
+	// Test case: Snapshot class does not exist in remote cluster
+	actionAnnotation := csireplicator.ActionAnnotation{
+		SnapshotClass:     "test-snap-class",
+		SnapshotNamespace: "test-namespace",
+	}
+	annotationBytes, _ := json.Marshal(actionAnnotation)
+	rg.Annotations[csireplicator.Action] = string(annotationBytes)
+
+	err = suite.reconciler.processSnapshotEvent(context.Background(), rg, remoteClient, suite.reconciler.Log)
+	suite.Error(err, "processSnapshotEvent should return an error when the snapshot class is not found")
+
+	// Test case: Valid Snapshot Class and Action Attributes
+	actionAnnotation.SnapshotClass = "test-snapshot-class"
+	annotationBytes, _ = json.Marshal(actionAnnotation)
+	rg.Annotations[csireplicator.Action] = string(annotationBytes)
+	rg.Status.LastAction.ActionAttributes = map[string]string{
+		"volume1": "snapshot1",
+	}
+
+	err = suite.reconciler.processSnapshotEvent(context.Background(), rg, remoteClient, suite.reconciler.Log)
+	suite.NoError(err, "processSnapshotEvent should succeed when a valid snapshot class and action attributes are provided")
 }
