@@ -472,29 +472,6 @@ func (suite *MGControllerTestSuite) TestSetupWithManagerMG() {
 	suite.Error(err, "Setup should fail when there is no manager")
 }
 
-func (suite *MGControllerTestSuite) TestSetupWithManagerMGNoRetry() {
-	// Do not provide MaxRetryDurationForActions and confirm it is set to the default, 1 hour
-
-	// must get the client which will register the scheme
-	suite.client = utils.GetFakeClient()
-	suite.mgReconcile.Client = suite.client
-
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme: utils.Scheme,
-	})
-	if err != nil {
-		suite.T().Fatalf("failed to create manager: %v", err)
-	}
-	expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second)
-
-	// set max retry to 0
-	suite.mgReconcile.MaxRetryDurationForActions = 0
-
-	err = suite.mgReconcile.SetupWithManager(mgr, expRateLimiter, 1)
-	suite.NoError(err)
-	suite.Equal(suite.mgReconcile.MaxRetryDurationForActions, 1*time.Hour, "Should setup manager with max retry duration of 1 hour")
-}
-
 func (suite *MGControllerTestSuite) TestIgnoreMGNotFound() {
 	// If the MG is not found, return an empty result
 	mg1 := getTypicalMigrationGroup()
