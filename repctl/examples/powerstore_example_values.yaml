@@ -8,13 +8,13 @@ remoteRetentionPolicy:
   RG: "Retain"
   PV: "Retain"
 parameters:
-  arrayID: # populate with unique ids of storage arrays
+  arrayID:    # populate with unique ids of storage arrays
     source: "PS000000000001"
     target: "PS000000000002"
-  remoteSystem: # populate with name of the remote system as seen from the current PowerStore instance
+  remoteSystem:    # populate with name of the remote system as seen from the current PowerStore instance
     source: "RT-A0001"
     target: "RT-A0002"
   rpo: "Five_Minutes"
-  mode : "ASYNC"  # For SYNC, rpo will be set to zero by default and not required to specify.
+  mode: "ASYNC"    # For SYNC, rpo will be set to zero by default and not required to specify.
   ignoreNamespaces: "false"
   volumeGroupPrefix: "csi"

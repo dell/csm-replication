@@ -365,7 +365,7 @@ func (c *Cluster) CreatePersistentVolumeClaimsFromPVs(ctx context.Context, names
 			},
 			Spec: v1.PersistentVolumeClaimSpec{
 				AccessModes: pv.AccessMode,
-				Resources: v1.ResourceRequirements{
+				Resources: v1.VolumeResourceRequirements{
 					Requests: pv.Requests,
 				},
 				VolumeName: pv.Name,

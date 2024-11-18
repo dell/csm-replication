@@ -32,12 +32,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	reconcile "sigs.k8s.io/controller-runtime/pkg/controller"
+	reconciler "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/ratelimiter"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 // PersistentVolumeReconciler reconciles PersistentVolume resources
@@ -204,13 +205,13 @@ func bytesToQuantity(bytes int64) resource.Quantity {
 }
 
 // SetupWithManager start using reconciler by creating new controller managed by provided manager
-func (r *PersistentVolumeReconciler) SetupWithManager(_ context.Context, mgr ctrl.Manager, limiter ratelimiter.RateLimiter, maxReconcilers int) error {
+func (r *PersistentVolumeReconciler) SetupWithManager(_ context.Context, mgr ctrl.Manager, limiter workqueue.TypedRateLimiter[reconcile.Request], maxReconcilers int) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.PersistentVolume{}, builder.WithPredicates(
 			predicate.Or(
 				isMigrationRequested(),
 			),
-		)).WithOptions(reconcile.Options{
+		)).WithOptions(reconciler.Options{
 		RateLimiter:             limiter,
 		MaxConcurrentReconciles: maxReconcilers,
 	}).

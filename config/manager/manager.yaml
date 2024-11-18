@@ -16,43 +16,42 @@ spec:
         control-plane: controller-manager
     spec:
       containers:
-      - command:
-        - /dell-replication-controller
-        args:
-        - --enable-leader-election
-        - --prefix=replication.storage.dell.com
-        image: quay.io/dell/container-storage-modules/dell-replication-controller:v1.10.0
-        imagePullPolicy: IfNotPresent
-        name: manager
-        env:
-          - name: X_CSI_REPLICATION_POD_NAME
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.name
-          - name: X_CSI_REPLICATION_POD_NAMESPACE
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.namespace
-          - name: X_CSI_REPLICATION_IN_CLUSTER
-            value: "true"
-          - name: X_CSI_REPLICATION_WATCH_NAMESPACE
-            value: "dell-replication-controller"
-          - name: X_CSI_REPLICATION_CONFIG_DIR
-            value: "/app/config"
-          - name: X_CSI_REPLICATION_CERT_DIR
-            value: "/app/certs"
-          - name: X_CSI_REPLICATION_CONFIG_FILE_NAME
-            value: "config"
-
-        volumeMounts:
-          - name: configmap-volume
-            mountPath: /app/config
-          - name: cert-dir
-            mountPath: /app/certs
-        resources:
-          requests:
-            cpu: 100m
-            memory: 100Mi
+        - command:
+            - /dell-replication-controller
+          args:
+            - --enable-leader-election
+            - --prefix=replication.storage.dell.com
+          image: quay.io/dell/container-storage-modules/dell-replication-controller:v1.10.0
+          imagePullPolicy: IfNotPresent
+          name: manager
+          env:
+            - name: X_CSI_REPLICATION_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: X_CSI_REPLICATION_POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: X_CSI_REPLICATION_IN_CLUSTER
+              value: "true"
+            - name: X_CSI_REPLICATION_WATCH_NAMESPACE
+              value: "dell-replication-controller"
+            - name: X_CSI_REPLICATION_CONFIG_DIR
+              value: "/app/config"
+            - name: X_CSI_REPLICATION_CERT_DIR
+              value: "/app/certs"
+            - name: X_CSI_REPLICATION_CONFIG_FILE_NAME
+              value: "config"
+          volumeMounts:
+            - name: configmap-volume
+              mountPath: /app/config
+            - name: cert-dir
+              mountPath: /app/certs
+          resources:
+            requests:
+              cpu: 100m
+              memory: 100Mi
       terminationGracePeriodSeconds: 10
       volumes:
         - name: cert-dir

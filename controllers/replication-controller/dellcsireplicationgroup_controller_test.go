@@ -16,17 +16,21 @@ package replicationcontroller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
+	csireplicator "github.com/dell/csm-replication/controllers/csi-replicator"
 	constants "github.com/dell/csm-replication/pkg/common"
 	"github.com/dell/csm-replication/pkg/config"
 	"github.com/dell/csm-replication/pkg/connection"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
+	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	"github.com/stretchr/testify/suite"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -46,8 +50,17 @@ type RGControllerTestSuite struct {
 	reconciler *ReplicationGroupReconciler
 }
 
+func TestRGControllerTestSuite(t *testing.T) {
+	testSuite := new(RGControllerTestSuite)
+	suite.Run(t, testSuite)
+}
+
 func (suite *RGControllerTestSuite) SetupTest() {
 	suite.Init()
+}
+
+func (suite *RGControllerTestSuite) TearDownTest() {
+	suite.T().Log("Cleaning up resources...")
 }
 
 func (suite *RGControllerTestSuite) Init() {
@@ -251,6 +264,7 @@ func (suite *RGControllerTestSuite) TestReconcileRGWithAnnotations() {
 	req := suite.getTypicalRequest()
 
 	err := suite.client.Get(context.Background(), req.NamespacedName, rg)
+	suite.NoError(err)
 	suite.NotContains(controllers.RemoteReplicationGroup, rg.Annotations,
 		"Remote RG annotation doesn't exist")
 	suite.NotContains(controllers.RGSyncComplete, rg.Annotations,
@@ -297,6 +311,7 @@ func (suite *RGControllerTestSuite) TestReconcileRGWithAnnotationsSingleCluster(
 	req := suite.getTypicalRequest()
 
 	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
+	suite.NoError(err)
 	suite.NotContains(controllers.RemoteReplicationGroup, rg.Annotations,
 		"Remote RG annotation doesn't exist")
 	suite.NotContains(controllers.RGSyncComplete, rg.Annotations,
@@ -338,6 +353,7 @@ func (suite *RGControllerTestSuite) TestRGSyncWithFinalizer() {
 	rg := new(repv1.DellCSIReplicationGroup)
 	req := suite.getTypicalRequest()
 	err := suite.client.Get(context.Background(), req.NamespacedName, rg)
+	suite.NoError(err)
 	suite.NotContains(controllers.RGSyncComplete, rg.Finalizers,
 		"RG finalizer doesn't exist")
 	resp, err := suite.reconciler.Reconcile(context.Background(), req)
@@ -369,6 +385,7 @@ func (suite *RGControllerTestSuite) TestReconcileRGWithContextPrefix() {
 	req := suite.getTypicalRequest()
 
 	err := suite.client.Get(context.Background(), req.NamespacedName, rg)
+	suite.NoError(err)
 	suite.NotContains(controllers.RemoteReplicationGroup, rg.Annotations,
 		"Remote RG annotation doesn't exist")
 	suite.NotContains(controllers.RGSyncComplete, rg.Annotations,
@@ -436,6 +453,7 @@ func (suite *RGControllerTestSuite) TestRGSyncDeletion() {
 	req := suite.getTypicalRequest()
 
 	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
+	suite.NoError(err)
 	suite.NotContains(controllers.RemoteReplicationGroup, rg.Annotations,
 		"Remote RG annotation doesn't exist")
 	suite.NotContains(controllers.RGSyncComplete, rg.Annotations,
@@ -453,19 +471,226 @@ func (suite *RGControllerTestSuite) TestRGSyncDeletion() {
 	suite.Equal(false, resp.Requeue)
 }
 
-func TestRGControllerTestSuite(t *testing.T) {
-	testSuite := new(RGControllerTestSuite)
-	suite.Run(t, testSuite)
-}
-
-func (suite *RGControllerTestSuite) TearDownTest() {
-	suite.T().Log("Cleaning up resources...")
-}
-
 func (suite *RGControllerTestSuite) TestSetupWithManagerRg() {
 	suite.Init()
 	mgr := manager.Manager(nil)
-	expRateLimiter := workqueue.NewItemExponentialFailureRateLimiter(1*time.Second, 10*time.Second)
+	expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second)
 	err := suite.reconciler.SetupWithManager(mgr, expRateLimiter, 1)
 	suite.Error(err, "Setup should fail when there is no manager")
+}
+
+func (suite *RGControllerTestSuite) TestMakeNamespaceReference() {
+	ns := "test-namespace"
+	result := makeNamespaceReference(ns)
+	suite.Equal(ns, result.ObjectMeta.Name)
+}
+
+func (suite *RGControllerTestSuite) TestMakeSnapReference() {
+	snapName := "test-snapshot"
+	namespace := "test-namespace"
+	result := makeSnapReference(snapName, namespace)
+
+	expectedName := "snapshot-" + snapName
+	suite.Equal(result.Name, expectedName)
+	suite.Equal(result.Namespace, namespace)
+	suite.Equal(result.Kind, "VolumeSnapshot")
+	suite.Equal(result.APIVersion, "snapshot.storage.k8s.io/v1")
+}
+
+func (suite *RGControllerTestSuite) TestMakeSnapshotObject() {
+	snapName := "test-snapshot"
+	contentName := "test-content"
+	className := "test-class"
+	namespace := "test-namespace"
+	result := makeSnapshotObject(snapName, contentName, className, namespace)
+
+	suite.Equal(result.Name, snapName)
+	suite.Equal(result.Namespace, namespace)
+	suite.Equal(*result.Spec.Source.VolumeSnapshotContentName, contentName)
+	suite.Equal(*result.Spec.VolumeSnapshotClassName, className)
+}
+
+func (suite *RGControllerTestSuite) TestMakeStorageClassContent() {
+	driver := "test-driver"
+	snapClass := "test-snap-class"
+	result := makeStorageClassContent(driver, snapClass)
+
+	suite.Equal(result.Driver, driver)
+	suite.Equal(result.Name, snapClass)
+}
+
+func (suite *RGControllerTestSuite) TestMakeVolSnapContent() {
+	snapName := "test-snapshot"
+	volumeName := "test-volume"
+	snapRef := v1.ObjectReference{
+		Name:      "test-snapshot-ref",
+		Namespace: "test-namespace",
+	}
+	sc := &s1.VolumeSnapshotClass{
+		Driver:         "test-driver",
+		DeletionPolicy: "Retain",
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-snap-class",
+		},
+	}
+
+	result := makeVolSnapContent(snapName, volumeName, snapRef, sc)
+
+	suite.Equal(result.Spec.Driver, sc.Driver)
+	suite.Equal(result.Spec.DeletionPolicy, sc.DeletionPolicy)
+	suite.Equal(result.Spec.VolumeSnapshotRef.Name, snapRef.Name)
+	suite.Equal(*result.Spec.VolumeSnapshotClassName, sc.Name)
+	suite.Equal(*result.Spec.Source.SnapshotHandle, snapName)
+}
+
+func (suite *RGControllerTestSuite) TestProcessLastActionResult() {
+	// Process the last action result by updating the RG annotation,
+	// controllers.ActionProcessedTime, with the time of the last action
+
+	rg := suite.getRGWithSyncComplete(suite.driver.RGName)
+
+	// add a timestamp for the last action processed
+	actionTimeStamp := time.Now()
+	rg.Status.LastAction.Time = &metav1.Time{
+		Time: actionTimeStamp,
+	}
+
+	// provide the RG with at least one condition.
+	condition := repv1.LastAction{
+		Condition: "successfully updated",
+		Time:      &metav1.Time{Time: actionTimeStamp},
+	}
+	controllers.UpdateConditions(rg, condition, csireplicator.MaxNumberOfConditions)
+
+	// make sure the actionProcessedTime and Status.LastAction.Time do not match
+	rg.Annotations[controllers.ActionProcessedTime] = actionTimeStamp.Add(-1 * time.Minute).GoString()
+
+	suite.client = utils.GetFakeClientWithObjects(rg)
+	suite.reconciler.Client = suite.client
+
+	remoteClient, err := suite.config.GetConnection(suite.driver.RemoteClusterID)
+	suite.NoError(err)
+
+	// Process the last action. Should update the RG, updating the actionProcessedTime annotation
+	err = suite.reconciler.processLastActionResult(context.Background(), rg, remoteClient, suite.reconciler.Log)
+	suite.NoError(err, "processLastActionResult should not fail")
+
+	updatedRG := new(repv1.DellCSIReplicationGroup)
+	err = suite.client.Get(context.Background(), types.NamespacedName{Name: suite.driver.RGName}, updatedRG)
+	suite.NoError(err, "should successfully get the updated RG")
+	suite.Equal(actionTimeStamp.GoString(), updatedRG.Annotations[controllers.ActionProcessedTime],
+		"Last action processed time should be updated with actionTimeStamp time")
+}
+
+func (suite *RGControllerTestSuite) TestProcessLastActionResult_AlreadyProcessed() {
+	// Attempt to process the last action result when the RG has already been processed
+	// and the actionProcessedTime and Status.LastAction.Time match
+
+	rg := suite.getRGWithSyncComplete(suite.driver.RGName)
+
+	// add a timestamp for the last action processed
+	actionTimeStamp := time.Now()
+	rg.Status.LastAction.Time = &metav1.Time{
+		Time: actionTimeStamp,
+	}
+
+	// provide the RG with at least one condition.
+	condition := repv1.LastAction{
+		Condition: "successfully updated",
+		Time:      &metav1.Time{Time: actionTimeStamp},
+	}
+	controllers.UpdateConditions(rg, condition, csireplicator.MaxNumberOfConditions)
+
+	// make sure the actionProcessedTime and Status.LastAction.Time do not match
+	rg.Annotations[controllers.ActionProcessedTime] = actionTimeStamp.GoString()
+
+	suite.client = utils.GetFakeClientWithObjects(rg)
+	suite.reconciler.Client = suite.client
+
+	remoteClient, err := suite.config.GetConnection(suite.driver.RemoteClusterID)
+	suite.NoError(err)
+
+	// Process the last action. Should update the RG, updating the actionProcessedTime annotation
+	err = suite.reconciler.processLastActionResult(context.Background(), rg, remoteClient, suite.reconciler.Log)
+	suite.NoError(err, "processLastActionResult should do nothing")
+	// Ideally, we'd check the log output here to confirm it logged "Last action has already been processed", but
+	// it appears there is no method to get the log output.
+}
+
+func (suite *RGControllerTestSuite) TestProcessLastActionResult_NoActionProcessedTime() {
+	// Attempt to process the last action result but do not provide any annotation
+	// for controllers.ActionProcessedTime
+
+	rg := suite.getRGWithSyncComplete(suite.driver.RGName)
+
+	// add a timestamp for the last action processed
+	actionTimeStamp := time.Now()
+	rg.Status.LastAction.Time = &metav1.Time{
+		Time: actionTimeStamp,
+	}
+
+	// provide the RG with at least one condition.
+	condition := repv1.LastAction{
+		Condition: "successfully updated",
+		Time:      &metav1.Time{Time: actionTimeStamp},
+	}
+	controllers.UpdateConditions(rg, condition, csireplicator.MaxNumberOfConditions)
+
+	// leave out the annotation for controllers.ActionProcessedTime
+
+	suite.client = utils.GetFakeClientWithObjects(rg)
+	suite.reconciler.Client = suite.client
+
+	remoteClient, err := suite.config.GetConnection(suite.driver.RemoteClusterID)
+	suite.NoError(err)
+
+	// Process the last action. Should update the RG, updating the actionProcessedTime annotation
+	err = suite.reconciler.processLastActionResult(context.Background(), rg, remoteClient, suite.reconciler.Log)
+	suite.NoError(err, "processLastActionResult should do nothing")
+	// Ideally, we'd check the log output here to confirm it logged "Action Processed does not exist", but
+	// it appears there is no method to get the log output.
+}
+
+func (suite *RGControllerTestSuite) TestProcessSnapshotEvent() {
+	// scenario: Test snapshot event processing
+	rg := suite.getRGWithSyncComplete(suite.driver.RGName)
+	rg.Status.LastAction.Time = &metav1.Time{Time: time.Now()}
+	rg.Status.LastAction.Condition = "CREATE_SNAPSHOT"
+
+	suite.client = utils.GetFakeClientWithObjects(rg)
+	suite.reconciler.Client = suite.client
+
+	remoteClient, err := suite.config.GetConnection(suite.driver.RemoteClusterID)
+	suite.NoError(err)
+
+	// Test case: No action annotation
+	err = suite.reconciler.processSnapshotEvent(context.Background(), rg, remoteClient, suite.reconciler.Log)
+	suite.NoError(err, "processSnapshotEvent should return nil when no action annotation is provided")
+
+	// Test case: JSON unmarshal error
+	rg.Annotations[csireplicator.Action] = "invalid-json"
+	err = suite.reconciler.processSnapshotEvent(context.Background(), rg, remoteClient, suite.reconciler.Log)
+	suite.Error(err, "processSnapshotEvent should return an error for invalid JSON annotation")
+
+	// Test case: Snapshot class does not exist in remote cluster
+	actionAnnotation := csireplicator.ActionAnnotation{
+		SnapshotClass:     "test-snap-class",
+		SnapshotNamespace: "test-namespace",
+	}
+	annotationBytes, _ := json.Marshal(actionAnnotation)
+	rg.Annotations[csireplicator.Action] = string(annotationBytes)
+
+	err = suite.reconciler.processSnapshotEvent(context.Background(), rg, remoteClient, suite.reconciler.Log)
+	suite.Error(err, "processSnapshotEvent should return an error when the snapshot class is not found")
+
+	// Test case: Valid Snapshot Class and Action Attributes
+	actionAnnotation.SnapshotClass = "test-snapshot-class"
+	annotationBytes, _ = json.Marshal(actionAnnotation)
+	rg.Annotations[csireplicator.Action] = string(annotationBytes)
+	rg.Status.LastAction.ActionAttributes = map[string]string{
+		"volume1": "snapshot1",
+	}
+
+	err = suite.reconciler.processSnapshotEvent(context.Background(), rg, remoteClient, suite.reconciler.Log)
+	suite.NoError(err, "processSnapshotEvent should succeed when a valid snapshot class and action attributes are provided")
 }

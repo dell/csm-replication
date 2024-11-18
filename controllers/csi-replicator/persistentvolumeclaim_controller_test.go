@@ -573,7 +573,7 @@ func (suite *PVControllerTestSuite) TestUpdatingTerminatingObjects() {
 
 func (suite *PVControllerTestSuite) TestSetupWithManager() {
 	mgr := manager.Manager(nil)
-	expRateLimiter := workqueue.NewItemExponentialFailureRateLimiter(1*time.Second, 10*time.Second)
+	expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second)
 	err := PVCReconciler.SetupWithManager(mgr, expRateLimiter, 1)
 	suite.Error(err, "Setup should fail when there is no manager")
 }

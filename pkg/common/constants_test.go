@@ -17,8 +17,10 @@ limitations under the License.
 package common
 
 import (
+	"context"
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -38,6 +40,18 @@ func (suite *ConstantsTestSuite) TestParseLevel() {
 func (suite *ConstantsTestSuite) TestParseLevelInvalid() {
 	_, err := ParseLevel("invalid")
 	suite.Error(err, "not a valid logrus level")
+}
+
+func (suite *ConstantsTestSuite) TestGetLoggerFromContext() {
+	// Test case: Context with logger
+	ctxWithLogger := context.WithValue(context.Background(), LoggerContextKey, logr.Discard())
+	logger := GetLoggerFromContext(ctxWithLogger)
+	suite.NotNil(logger)
+
+	// Test case: Context without logger
+	ctxWithoutLogger := context.Background()
+	logger = GetLoggerFromContext(ctxWithoutLogger)
+	suite.NotNil(logger)
 }
 
 func TestConstantsTestSuite(t *testing.T) {

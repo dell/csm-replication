@@ -27,7 +27,7 @@ import (
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	reconciler "sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/ratelimiter"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	csireplication "github.com/dell/csm-replication/pkg/csi-clients/replication"
@@ -35,6 +35,7 @@ import (
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -445,7 +446,7 @@ func (r *ReplicationGroupReconciler) updateState(ctx context.Context, rg *repv1.
 }
 
 // SetupWithManager start using reconciler by creating new controller managed by provided manager
-func (r *ReplicationGroupReconciler) SetupWithManager(mgr ctrl.Manager, limiter ratelimiter.RateLimiter, maxReconcilers int) error {
+func (r *ReplicationGroupReconciler) SetupWithManager(mgr ctrl.Manager, limiter workqueue.TypedRateLimiter[reconcile.Request], maxReconcilers int) error {
 	if r.MaxRetryDurationForActions == 0 {
 		r.MaxRetryDurationForActions = MaxRetryDurationForActions
 	}

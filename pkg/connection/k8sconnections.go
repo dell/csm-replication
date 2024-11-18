@@ -93,7 +93,6 @@ func (k8sConnHandler *RemoteK8sConnHandler) getControllerClient(clusterID string
 	utilruntime.Must(s1.AddToScheme(scheme))
 	if clientConfig, ok := k8sConnHandler.configs[clusterID]; ok {
 		client, err := GetControllerClient(clientConfig, scheme)
-		// client, err := ctrlClient.New(clientConfig, ctrlClient.Options{Scheme: scheme})
 		if err != nil {
 			return nil, err
 		}

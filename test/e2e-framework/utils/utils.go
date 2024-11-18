@@ -43,7 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	corev1 "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
@@ -129,7 +129,7 @@ const PVCName = "test-pvc"
 // InitializeSchemes inits client-go and replication v1 schemes
 func InitializeSchemes() {
 	if !schemesInitialized {
-		utilruntime.Must(clientgoscheme.AddToScheme(Scheme))
+		utilruntime.Must(corev1.AddToScheme(Scheme))
 		utilruntime.Must(repv1.AddToScheme(Scheme))
 		schemesInitialized = true
 	}
@@ -256,7 +256,7 @@ func GetFakeClient() client.Client {
 // GetFakeClientWithObjects returns fake k8s client and populates it with given objects
 func GetFakeClientWithObjects(initObjs ...client.Object) client.Client {
 	InitializeSchemes()
-	fakeClient := fake.NewClientBuilder().WithScheme(Scheme).WithObjects(initObjs...).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(Scheme).WithObjects(initObjs...).WithStatusSubresource(initObjs...).Build()
 	return fakeClient
 }
 
@@ -292,7 +292,7 @@ func GetPVCObj(pvcName string, namespace string, sc string) *v1.PersistentVolume
 		Spec: v1.PersistentVolumeClaimSpec{
 			StorageClassName: &sc,
 			AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-			Resources: v1.ResourceRequirements{
+			Resources: v1.VolumeResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceStorage: resource.MustParse("3Gi"),
 				},

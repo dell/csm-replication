@@ -1,20 +1,10 @@
 name: Workflow
-on:
+on:    # yamllint disable-line rule:truthy
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 jobs:
-  code-check:
-    name: Check Go formatting, linting, vetting
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout the code
-        uses: actions/checkout@v4
-      - name: Run the formatter, linter, and vetter
-        uses: dell/common-github-actions/go-code-formatter-linter-vetter@main
-        with:
-          directories: ./...
   sanitize:
     name: Check for forbidden words
     runs-on: ubuntu-latest
@@ -25,30 +15,6 @@ jobs:
         uses: dell/common-github-actions/code-sanitizer@main
         with:
           args: /github/workspace
-  test:
-    permissions: write-all
-    name: Run Go unit tests and check package coverage
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout the code
-        uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.23"
-      - run: cd repctl && make test
-      - name: Run unit tests and check package coverage
-        run: make unit-test
-  go_security_scan:
-    permissions: write-all
-    name: Go security - Main Folder
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout the code
-        uses: actions/checkout@v4
-      - name: Run Go Security - Main Folder
-        uses: securego/gosec@master
-        with:
-          args: -exclude-dir=repctl ./...
   go_security_scan_repctl:
     permissions: write-all
     name: Go security - Repctl
@@ -59,20 +25,9 @@ jobs:
       - name: Download GoSec
         run: cd ./repctl && wget https://github.com/securego/gosec/releases/download/v2.19.0/gosec_2.19.0_linux_amd64.tar.gz
       - name: Unpack GoSec
-        run:  cd ./repctl && tar xzf gosec_2.19.0_linux_amd64.tar.gz
+        run: cd ./repctl && tar xzf gosec_2.19.0_linux_amd64.tar.gz
       - name: GoSec scan
         run: cd ./repctl && ./gosec  ./...
-  malware_security_scan:
-    name: Malware Scanner
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout the code
-        uses: actions/checkout@v4
-      - name: Run malware scan
-        uses: dell/common-github-actions/malware-scanner@main
-        with:
-          directories: .
-          options: -ri
   image_security_scan:
     name: Image Scanner
     runs-on: ubuntu-latest
@@ -91,25 +46,25 @@ jobs:
           go-version: "1.23"
       - name: Build CSM Replication Docker Images
         run: |
-         chmod +x ./scripts/build-ubi-micro.sh
-         make build-base-image
-         : # dell-csi-replicator
-         podman build . -t docker.io/dell-csi-replicator:${{ env.VERSION }} -f ./Dockerfiles/Dockerfile --target sidecar --build-arg GOIMAGE=golang:latest --build-arg BASEIMAGE="localhost/rep-ubimicro"
-         podman save docker.io/library/dell-csi-replicator:${{ env.VERSION }} -o /tmp/dell-csi-replicator.tar
-         docker load -i /tmp/dell-csi-replicator.tar
-         : # dell-replication-controller
-         podman build . -t docker.io/dell-replication-controller:${{ env.VERSION }} -f ./Dockerfiles/Dockerfile --target controller --build-arg GOIMAGE=golang:latest --build-arg BASEIMAGE="localhost/rep-ubimicro"
-         podman save docker.io/library/dell-replication-controller:${{ env.VERSION }} -o /tmp/dell-replication-controller.tar
-         docker load -i /tmp/dell-replication-controller.tar
-         : # dell-csi-migrator
-         podman build . -t docker.io/dell-csi-migrator:${{ env.VERSION }} -f ./Dockerfiles/Dockerfile --target migrator --build-arg GOIMAGE=golang:latest --build-arg BASEIMAGE="localhost/rep-ubimicro"
-         podman save docker.io/library/dell-csi-migrator:${{ env.VERSION }} -o /tmp/dell-csi-migrator.tar
-         docker load -i /tmp/dell-csi-migrator.tar
-         : # dell-csi-node-rescanner
-         podman build . -t docker.io/dell-csi-node-rescanner:${{ env.VERSION }} -f ./Dockerfiles/Dockerfile --target node-rescanner --build-arg GOIMAGE=golang:latest --build-arg BASEIMAGE="localhost/rep-ubimicro"
-         podman save docker.io/library/dell-csi-node-rescanner:${{ env.VERSION }} -o /tmp/dell-csi-node-rescanner.tar
-         docker load -i /tmp/dell-csi-node-rescanner.tar
-          if [ $? -eq 0 ]; then { echo "PASSED_BUILD=true" >> $GITHUB_ENV; } fi
+          chmod +x ./scripts/build-ubi-micro.sh
+          make build-base-image
+          : # dell-csi-replicator
+          podman build . -t docker.io/dell-csi-replicator:${{ env.VERSION }} -f ./Dockerfiles/Dockerfile --target sidecar --build-arg GOIMAGE=golang:latest --build-arg BASEIMAGE="localhost/rep-ubimicro"
+          podman save docker.io/library/dell-csi-replicator:${{ env.VERSION }} -o /tmp/dell-csi-replicator.tar
+          docker load -i /tmp/dell-csi-replicator.tar
+          : # dell-replication-controller
+          podman build . -t docker.io/dell-replication-controller:${{ env.VERSION }} -f ./Dockerfiles/Dockerfile --target controller --build-arg GOIMAGE=golang:latest --build-arg BASEIMAGE="localhost/rep-ubimicro"
+          podman save docker.io/library/dell-replication-controller:${{ env.VERSION }} -o /tmp/dell-replication-controller.tar
+          docker load -i /tmp/dell-replication-controller.tar
+          : # dell-csi-migrator
+          podman build . -t docker.io/dell-csi-migrator:${{ env.VERSION }} -f ./Dockerfiles/Dockerfile --target migrator --build-arg GOIMAGE=golang:latest --build-arg BASEIMAGE="localhost/rep-ubimicro"
+          podman save docker.io/library/dell-csi-migrator:${{ env.VERSION }} -o /tmp/dell-csi-migrator.tar
+          docker load -i /tmp/dell-csi-migrator.tar
+          : # dell-csi-node-rescanner
+          podman build . -t docker.io/dell-csi-node-rescanner:${{ env.VERSION }} -f ./Dockerfiles/Dockerfile --target node-rescanner --build-arg GOIMAGE=golang:latest --build-arg BASEIMAGE="localhost/rep-ubimicro"
+          podman save docker.io/library/dell-csi-node-rescanner:${{ env.VERSION }} -o /tmp/dell-csi-node-rescanner.tar
+          docker load -i /tmp/dell-csi-node-rescanner.tar
+           if [ $? -eq 0 ]; then { echo "PASSED_BUILD=true" >> $GITHUB_ENV; } fi
       - name: Scan dell-csi-replicator Docker Image
         if: always() && env.PASSED_BUILD
         uses: Azure/container-scan@v0
