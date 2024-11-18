@@ -305,10 +305,17 @@ func TestStub(t *testing.T) {
 
 // Start and query the mock server
 func TestRunStubServer(t *testing.T) {
+	const (
+		serverPort     = "4771"
+		serverAddr     = "0.0.0.0"
+		serverStubPath = "../stubs"
+		serverEndpoint = "http://" + serverAddr + ":" + serverPort + "/"
+	)
+
 	opt := Options{
-		Port:     "4771",
-		BindAddr: "0.0.0.0",
-		StubPath: "../stubs",
+		Port:     serverPort,
+		BindAddr: serverAddr,
+		StubPath: serverStubPath,
 	}
 
 	// run the server
@@ -316,13 +323,11 @@ func TestRunStubServer(t *testing.T) {
 
 	// query the server. May take some time for the server
 	// to start.
-	queryEndpoint := "http://" + opt.BindAddr + ":" + opt.Port + "/"
-
 	var resp *http.Response
 	var err error
 	for i := 0; i < 10; i++ {
 		time.Sleep(1 * time.Second)
-		resp, err = http.Get(queryEndpoint)
+		resp, err = http.Get(serverEndpoint)
 		if err == nil {
 			break
 		}
