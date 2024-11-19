@@ -20,6 +20,7 @@ import (
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/pkg/connection"
 	fake_client "github.com/dell/csm-replication/test/e2e-framework/fake-client"
+	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -105,8 +106,14 @@ func NewFakeConfig(source string, targets ...string) connection.MultiClusterClie
 	scheme1 := runtime.NewScheme()
 	runtime2.Must(scheme.AddToScheme(scheme1))
 	runtime2.Must(repv1.AddToScheme(scheme1))
+	runtime2.Must(s1.AddToScheme(scheme1))
 	for _, target := range targets {
-		fakeClient := fake.NewClientBuilder().WithScheme(scheme1).Build()
+		snapshotClass := &s1.VolumeSnapshotClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-snapshot-class",
+			},
+		}
+		fakeClient := fake.NewClientBuilder().WithScheme(scheme1).WithObjects(snapshotClass).Build()
 		config.clusterClient[target] = &connection.RemoteK8sControllerClient{
 			ClusterID: target,
 			Client:    fakeClient,

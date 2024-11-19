@@ -40,6 +40,9 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	controller "github.com/dell/csm-replication/controllers/csi-migrator"
+	metricsServer "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/dell/csm-replication/core"
 	"github.com/dell/csm-replication/pkg/connection"
@@ -194,9 +197,11 @@ func main() {
 	}
 	leaderElectionID := common.DellCSIMigrator + strings.ReplaceAll(driverName, ".", "-")
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                     scheme,
-		MetricsBindAddress:         metricsAddr,
-		Port:                       8443,
+		Scheme: scheme,
+		Metrics: metricsServer.Options{
+			BindAddress: metricsAddr,
+		},
+		WebhookServer:              webhook.NewServer(webhook.Options{Port: 8443}),
 		LeaderElection:             enableLeaderElection,
 		LeaderElectionResourceLock: "leases",
 		LeaderElectionID:           leaderElectionID,
@@ -222,7 +227,7 @@ func main() {
 	log.Println("set level to", level)
 	logrusLog.SetLevel(level)
 
-	expRateLimiter := workqueue.NewItemExponentialFailureRateLimiter(retryIntervalStart, retryIntervalMax)
+	expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](retryIntervalStart, retryIntervalMax)
 
 	if err = (&controller.PersistentVolumeReconciler{
 		Client:            mgr.GetClient(),

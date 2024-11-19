@@ -1,3 +1,5 @@
+# yamllint disable-file
+# This file is not valid YAML because it is a Helm template
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -22,4 +24,3 @@ parameters:
   {{ .ReplicationPrefix }}/remoteRGRetentionPolicy: {{ .RemoteRetentionPolicy.RG }}
   {{ .ReplicationPrefix }}/remotePVRetentionPolicy: {{ .RemoteRetentionPolicy.PV }}
   arrayID: {{ .Parameters.ArrayID.Source }}
-

@@ -23,14 +23,15 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
-	reconcile "sigs.k8s.io/controller-runtime/pkg/controller"
+	reconciler "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/ratelimiter"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/dell/csm-replication/pkg/connection"
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -230,13 +231,13 @@ func (r *PersistentVolumeClaimReconciler) processLocalPVC(ctx context.Context,
 }
 
 // SetupWithManager start using reconciler by creating new controller managed by provided manager
-func (r *PersistentVolumeClaimReconciler) SetupWithManager(mgr ctrl.Manager, limiter ratelimiter.RateLimiter, maxReconcilers int) error {
+func (r *PersistentVolumeClaimReconciler) SetupWithManager(mgr ctrl.Manager, limiter workqueue.TypedRateLimiter[reconcile.Request], maxReconcilers int) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.PersistentVolumeClaim{}, builder.WithPredicates(
 			predicate.And(
 				pvcProtectionIsComplete(),
 			),
-		)).WithOptions(reconcile.Options{
+		)).WithOptions(reconciler.Options{
 		MaxConcurrentReconciles: maxReconcilers,
 		RateLimiter:             limiter,
 	}).Complete(r)

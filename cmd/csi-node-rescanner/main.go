@@ -41,6 +41,9 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
+	metricsServer "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/dell/csm-replication/pkg/connection"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -193,9 +196,11 @@ func main() {
 	}
 	leaderElectionID := common.DellCSINodeReScanner + strings.ReplaceAll(driverName, ".", "-")
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                     scheme,
-		MetricsBindAddress:         metricsAddr,
-		Port:                       8443,
+		Scheme: scheme,
+		Metrics: metricsServer.Options{
+			BindAddress: metricsAddr,
+		},
+		WebhookServer:              webhook.NewServer(webhook.Options{Port: 8443}),
 		LeaderElection:             enableLeaderElection,
 		LeaderElectionResourceLock: "leases",
 		LeaderElectionID:           leaderElectionID,
@@ -222,7 +227,7 @@ func main() {
 	log.Println("set level to", level)
 	logrusLog.SetLevel(level)
 
-	expRateLimiter := workqueue.NewItemExponentialFailureRateLimiter(retryIntervalStart, retryIntervalMax)
+	expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](retryIntervalStart, retryIntervalMax)
 
 	if err = (&controller.NodeRescanReconciler{
 		Client:                     mgr.GetClient(),

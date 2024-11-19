@@ -8,15 +8,15 @@ remoteRetentionPolicy:
   RG: "Delete"
   PV: "Retain"
 parameters:
-  storagePool: # populate with storage pool to use of arrays
+  storagePool:    # populate with storage pool to use of arrays
     source: "pool1"
     target: "pool1"
-  protectionDomain: # populate with protection domain to use of arrays
+  protectionDomain:    # populate with protection domain to use of arrays
     source: "domain1"
     target: "domain1"
-  arrayID: # populate with unique ids of storage arrays
+  arrayID:    # populate with unique ids of storage arrays
     source: "0000000000000001"
     target: "0000000000000002"
   rpo: "60"
   volumeGroupPrefix: "csi"
-  consistencyGroupName: "" # optional name to be given to the rcg
+  consistencyGroupName: ""    # optional name to be given to the rcg

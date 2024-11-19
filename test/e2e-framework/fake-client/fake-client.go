@@ -348,3 +348,13 @@ func (f SubResourceClient) Patch(_ context.Context, _ client.Object, _ client.Pa
 func (f SubResourceClient) Get(_ context.Context, _ client.Object, _ client.Object, _ ...client.SubResourceGetOption) error {
 	panic("implement me")
 }
+
+// GroupVersionKindFor returns the GroupVersionKind for the given object.
+func (f Client) GroupVersionKindFor(_ runtime.Object) (schema.GroupVersionKind, error) {
+	panic("implement me")
+}
+
+// IsObjectNamespaced returns true if the GroupVersionKind of the object is namespaced.
+func (f Client) IsObjectNamespaced(_ runtime.Object) (bool, error) {
+	panic("implement me")
+}
