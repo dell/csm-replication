@@ -465,7 +465,7 @@ func (suite *ClusterTestSuite) TestFilterReplicationGroups() {
 func (suite *ClusterTestSuite) TestGetAllClusters() {
 	suite.Run("failed to get any config files", func() {
 		mc := k8s.MultiClusterConfigurator{}
-		_, err := mc.GetAllClusters([]string{"cluster-1"}, "testdata/")
+		_, err := mc.GetAllClusters([]string{"cluster-2"}, "testdata/")
 		suite.Error(err)
 		suite.Contains(err.Error(), "failed to find any valid config files")
 	})

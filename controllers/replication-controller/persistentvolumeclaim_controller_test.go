@@ -299,7 +299,7 @@ func (suite *PVControllerTestSuite) TestRemoteReplication() {
 
 func (suite *PVControllerTestSuite) TestSetupWithManagerRg() {
 	mgr := manager.Manager(nil)
-	expRateLimiter := workqueue.NewItemExponentialFailureRateLimiter(1*time.Second, 10*time.Second)
+	expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second)
 	err := externalReconcile.SetupWithManager(mgr, expRateLimiter, 1)
 	assert.Error(suite.T(), err, "Setup should fail when there is no manager")
 }

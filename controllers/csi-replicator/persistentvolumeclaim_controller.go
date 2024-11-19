@@ -25,11 +25,11 @@ import (
 
 	csireplication "github.com/dell/csm-replication/pkg/csi-clients/replication"
 
-	"sigs.k8s.io/controller-runtime/pkg/ratelimiter"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 
-	reconcile "sigs.k8s.io/controller-runtime/pkg/controller"
+	reconciler "sigs.k8s.io/controller-runtime/pkg/controller"
 
 	v1 "k8s.io/api/core/v1"
 	storageV1 "k8s.io/api/storage/v1"
@@ -37,6 +37,7 @@ import (
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -233,10 +234,10 @@ func (r *PersistentVolumeClaimReconciler) processClaimForReplicationGroup(ctx co
 }
 
 // SetupWithManager start using reconciler by creating new controller managed by provided manager
-func (r *PersistentVolumeClaimReconciler) SetupWithManager(mgr ctrl.Manager, limiter ratelimiter.RateLimiter, maxReconcilers int) error {
+func (r *PersistentVolumeClaimReconciler) SetupWithManager(mgr ctrl.Manager, limiter workqueue.TypedRateLimiter[reconcile.Request], maxReconcilers int) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.PersistentVolumeClaim{}).
-		WithOptions(reconcile.Options{
+		WithOptions(reconciler.Options{
 			MaxConcurrentReconciles: maxReconcilers,
 			RateLimiter:             limiter,
 		}).

@@ -22,6 +22,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 const connectionLoggingInterval = 10 * time.Second
@@ -29,12 +30,11 @@ const connectionLoggingInterval = 10 * time.Second
 // Connect establishes connection to socket
 func Connect(address string, log logr.Logger) (*grpc.ClientConn, error) {
 	dialOptions := []grpc.DialOption{
-		grpc.WithInsecure(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithConnectParams(grpc.ConnectParams{
 			Backoff:           backoff.DefaultConfig,
 			MinConnectTimeout: 10 * time.Second,
 		}),
-		grpc.WithBlock(),
 	}
 	unixPrefix := "unix://"
 	if strings.HasPrefix(address, "/") {
@@ -46,7 +46,7 @@ func Connect(address string, log logr.Logger) (*grpc.ClientConn, error) {
 	var err error
 	ready := make(chan bool)
 	go func() {
-		conn, err = grpc.Dial(address, dialOptions...)
+		conn, err = grpc.NewClient(address, dialOptions...)
 		close(ready)
 	}()
 

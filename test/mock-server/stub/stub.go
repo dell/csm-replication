@@ -148,7 +148,7 @@ func validateStub(stub *Stub) error {
 	}
 
 	if stub.Method == "" {
-		return fmt.Errorf("Method name can't be emtpy")
+		return fmt.Errorf("Method name can't be empty")
 	}
 
 	// due to golang implementation

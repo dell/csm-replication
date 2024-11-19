@@ -61,10 +61,6 @@ func (suite *MGControllerTestSuite) SetupTest() {
 
 func (suite *MGControllerTestSuite) Init() {
 	suite.driver = utils.GetDefaultDriver()
-	fakeClient := errorFakeCtrlRuntimeClient{
-		Client: utils.GetFakeClient(),
-	}
-	suite.client = fakeClient
 	migrationClient := csimigration.NewFakeMigrationClient(utils.ContextPrefix)
 	suite.migrationClient = &migrationClient
 }
@@ -95,6 +91,23 @@ func (suite *MGControllerTestSuite) TearDownTest() {
 	suite.T().Log("Cleaning up resources...")
 }
 
+// Return a base migration group
+func getTypicalMigrationGroup() *storagev1.DellCSIMigrationGroup {
+	return &storagev1.DellCSIMigrationGroup{
+		ObjectMeta: metav1.ObjectMeta{Name: "mg1"},
+		Spec: storagev1.DellCSIMigrationGroupSpec{
+			DriverName:               "driverName",
+			SourceID:                 "001",
+			TargetID:                 "0002",
+			MigrationGroupAttributes: map[string]string{"test": "test"},
+		},
+		Status: storagev1.DellCSIMigrationGroupStatus{
+			LastAction: "",
+			State:      ReadyState,
+		},
+	}
+}
+
 // MG with ReadyState
 func (suite *MGControllerTestSuite) TestMGReconcileWithReadyState() {
 	mg1 := &storagev1.DellCSIMigrationGroup{
@@ -111,12 +124,12 @@ func (suite *MGControllerTestSuite) TestMGReconcileWithReadyState() {
 		},
 	}
 
-	ctx := context.Background()
-	err := suite.client.Create(ctx, mg1)
-	suite.Nil(err)
+	suite.client = utils.GetFakeClientWithObjects(mg1)
+	suite.mgReconcile.Client = suite.client
 
+	ctx := context.Background()
 	req := suite.getTypicalReconcileRequest(mg1.Name)
-	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
+	_, err := suite.mgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on MG reconcile")
 
 	mg := new(storagev1.DellCSIMigrationGroup)
@@ -142,12 +155,12 @@ func (suite *MGControllerTestSuite) TestMGReconcileWithMigratedState() {
 		},
 	}
 
-	ctx := context.Background()
-	err := suite.client.Create(ctx, mg1)
-	suite.Nil(err)
+	suite.client = utils.GetFakeClientWithObjects(mg1)
+	suite.mgReconcile.Client = suite.client
 
+	ctx := context.Background()
 	req := suite.getTypicalReconcileRequest(mg1.Name)
-	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
+	_, err := suite.mgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on MG reconcile")
 
 	mg := new(storagev1.DellCSIMigrationGroup)
@@ -172,12 +185,12 @@ func (suite *MGControllerTestSuite) TestMGReconcileWithCommitReadyState() {
 		},
 	}
 
-	ctx := context.Background()
-	err := suite.client.Create(ctx, mg1)
-	suite.Nil(err)
+	suite.client = utils.GetFakeClientWithObjects(mg1)
+	suite.mgReconcile.Client = suite.client
 
+	ctx := context.Background()
 	req := suite.getTypicalReconcileRequest(mg1.Name)
-	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
+	_, err := suite.mgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on MG reconcile")
 
 	mg := new(storagev1.DellCSIMigrationGroup)
@@ -203,12 +216,12 @@ func (suite *MGControllerTestSuite) TestMGReconcileWithCommittedState() {
 		},
 	}
 
-	ctx := context.Background()
-	err := suite.client.Create(ctx, mg1)
-	suite.Nil(err)
+	suite.client = utils.GetFakeClientWithObjects(mg1)
+	suite.mgReconcile.Client = suite.client
 
+	ctx := context.Background()
 	req := suite.getTypicalReconcileRequest(mg1.Name)
-	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
+	_, err := suite.mgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on MG reconcile")
 
 	mg := new(storagev1.DellCSIMigrationGroup)
@@ -234,12 +247,12 @@ func (suite *MGControllerTestSuite) TestMGReconcileWithDeletingState() {
 		},
 	}
 
-	ctx := context.Background()
-	err := suite.client.Create(ctx, mg1)
-	suite.Nil(err)
+	suite.client = utils.GetFakeClientWithObjects(mg1)
+	suite.mgReconcile.Client = suite.client
 
+	ctx := context.Background()
 	req := suite.getTypicalReconcileRequest(mg1.Name)
-	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
+	_, err := suite.mgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on MG reconcile")
 
 	mg := new(storagev1.DellCSIMigrationGroup)
@@ -263,12 +276,12 @@ func (suite *MGControllerTestSuite) TestMGReconcileWithErrorState() {
 		},
 	}
 
-	ctx := context.Background()
-	err := suite.client.Create(ctx, mg1)
-	suite.Nil(err)
+	suite.client = utils.GetFakeClientWithObjects(mg1)
+	suite.mgReconcile.Client = suite.client
 
+	ctx := context.Background()
 	req := suite.getTypicalReconcileRequest(mg1.Name)
-	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
+	_, err := suite.mgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on MG reconcile")
 
 	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
@@ -296,12 +309,12 @@ func (suite *MGControllerTestSuite) TestMGReconcileWithErrorState_fromReady() {
 		},
 	}
 
-	ctx := context.Background()
-	err := suite.client.Create(ctx, mg1)
-	suite.Nil(err)
+	suite.client = utils.GetFakeClientWithObjects(mg1)
+	suite.mgReconcile.Client = suite.client
 
+	ctx := context.Background()
 	req := suite.getTypicalReconcileRequest(mg1.Name)
-	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
+	_, err := suite.mgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on MG reconcile")
 
 	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
@@ -329,12 +342,12 @@ func (suite *MGControllerTestSuite) TestMGReconcileWithErrorState_fromMigrated()
 		},
 	}
 
-	ctx := context.Background()
-	err := suite.client.Create(ctx, mg1)
-	suite.Nil(err)
+	suite.client = utils.GetFakeClientWithObjects(mg1)
+	suite.mgReconcile.Client = suite.client
 
+	ctx := context.Background()
 	req := suite.getTypicalReconcileRequest(mg1.Name)
-	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
+	_, err := suite.mgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on MG reconcile")
 
 	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
@@ -362,12 +375,12 @@ func (suite *MGControllerTestSuite) TestMGReconcileWithErrorState_fromCommitRead
 		},
 	}
 
-	ctx := context.Background()
-	err := suite.client.Create(ctx, mg1)
-	suite.Nil(err)
+	suite.client = utils.GetFakeClientWithObjects(mg1)
+	suite.mgReconcile.Client = suite.client
 
+	ctx := context.Background()
 	req := suite.getTypicalReconcileRequest(mg1.Name)
-	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
+	_, err := suite.mgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on MG reconcile")
 
 	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
@@ -395,12 +408,12 @@ func (suite *MGControllerTestSuite) TestMGReconcileWithErrorState_fromCommitted(
 		},
 	}
 
-	ctx := context.Background()
-	err := suite.client.Create(ctx, mg1)
-	suite.Nil(err)
+	suite.client = utils.GetFakeClientWithObjects(mg1)
+	suite.mgReconcile.Client = suite.client
 
+	ctx := context.Background()
 	req := suite.getTypicalReconcileRequest(mg1.Name)
-	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
+	_, err := suite.mgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on MG reconcile")
 
 	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
@@ -428,12 +441,13 @@ func (suite *MGControllerTestSuite) TestMGReconcileWithInvalidState() {
 		},
 	}
 
+	suite.client = utils.GetFakeClientWithObjects(mg1)
+	suite.mgReconcile.Client = suite.client
+
 	ctx := context.Background()
-	err := suite.client.Create(ctx, mg1)
-	suite.Nil(err)
 
 	req := suite.getTypicalReconcileRequest(mg1.Name)
-	_, err = suite.mgReconcile.Reconcile(context.Background(), req)
+	_, err := suite.mgReconcile.Reconcile(context.Background(), req)
 	suite.EqualError(err, "Unknown state")
 
 	mg := new(storagev1.DellCSIMigrationGroup)
@@ -453,7 +467,183 @@ func (suite *MGControllerTestSuite) getTypicalReconcileRequest(name string) reco
 
 func (suite *MGControllerTestSuite) TestSetupWithManagerMG() {
 	mgr := manager.Manager(nil)
-	expRateLimiter := workqueue.NewItemExponentialFailureRateLimiter(1*time.Second, 10*time.Second)
+	expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second)
 	err := suite.mgReconcile.SetupWithManager(mgr, expRateLimiter, 1)
 	suite.Error(err, "Setup should fail when there is no manager")
+}
+
+func (suite *MGControllerTestSuite) TestIgnoreMGNotFound() {
+	// If the MG is not found, return an empty result
+	mg1 := getTypicalMigrationGroup()
+
+	// create a fake client, but do not give it info about the mg in order
+	// to trigger MG not found error.
+	suite.client = utils.GetFakeClient()
+	suite.mgReconcile.Client = suite.client
+
+	req := suite.getTypicalReconcileRequest(mg1.Name)
+	res, err := suite.mgReconcile.Reconcile(context.Background(), req)
+	suite.NoError(err)
+	suite.Equal(ctrl.Result{}, res)
+}
+
+func (suite *MGControllerTestSuite) TestUpdateMGSpecWithActionResultSuccess() {
+	// successfully update the MG spec with the action result
+	mg1 := getTypicalMigrationGroup()
+
+	suite.client = utils.GetFakeClientWithObjects(mg1)
+	suite.mgReconcile.Client = suite.client
+
+	isUpdated := suite.mgReconcile.updateMGSpecWithActionResult(context.Background(), mg1, "Delete")
+	suite.True(isUpdated, "MG should be updated")
+}
+
+func (suite *MGControllerTestSuite) TestAddfinalizer() {
+	// Successfully add MG finalizers to a migration group
+
+	mg1 := getTypicalMigrationGroup()
+
+	suite.client = utils.GetFakeClientWithObjects(mg1)
+	suite.mgReconcile.Client = suite.client
+
+	ok, err := suite.mgReconcile.addFinalizer(context.Background(), mg1)
+	suite.NoError(err)
+	suite.True(ok)
+}
+
+func (suite *MGControllerTestSuite) TestAddfinalizerFailToUpdate() {
+	// Add the finalizer to the MG but fail when calling reconciler Update
+
+	mg1 := getTypicalMigrationGroup()
+
+	// create a client without knowledge of the migration group in order
+	// to force a failed update
+	suite.client = utils.GetFakeClient()
+	suite.mgReconcile.Client = suite.client
+
+	ok, err := suite.mgReconcile.addFinalizer(context.Background(), mg1)
+	suite.Error(err)
+	suite.Contains(err.Error(), "not found")
+	suite.True(ok)
+}
+
+func (suite *MGControllerTestSuite) TestUpdateMGOnError() {
+	// Successfully update the MG on error
+
+	mg1 := getTypicalMigrationGroup()
+
+	suite.client = utils.GetFakeClientWithObjects(mg1)
+	suite.mgReconcile.Client = suite.client
+
+	err := suite.mgReconcile.updateMGOnError(context.Background(), mg1, DeletingState, "")
+	suite.NoError(err)
+}
+
+func (suite *MGControllerTestSuite) TestUpdateMGSpecWithStateFail() {
+	// Unsuccessfully attempt to update the MG spec with the given state
+
+	mg1 := getTypicalMigrationGroup()
+
+	// create a client without knowledge of the migration group in order
+	// to force a failed update
+	suite.client = utils.GetFakeClient()
+	suite.mgReconcile.Client = suite.client
+
+	err := suite.mgReconcile.updateMGSpecWithState(context.Background(), mg1, DeletingState)
+	suite.Error(err)
+	suite.Contains(err.Error(), "not found")
+}
+
+func (suite *MGControllerTestSuite) TestProcessMGInNoState() {
+	// Process a brand new MG with no state and no finalizers.
+	// Should add the MG finalizers and set for requeueing.
+
+	mg := getTypicalMigrationGroup()
+	mg.Status.State = NoState
+
+	suite.client = utils.GetFakeClientWithObjects(mg)
+	suite.mgReconcile.Client = suite.client
+
+	// Processing should add the finalizers and requeue
+	result, err := suite.mgReconcile.processMGInNoState(context.Background(), mg.DeepCopy())
+	suite.NoError(err, "Should not return an error")
+	suite.True(result.Requeue, "Should be set to requeue")
+}
+
+func (suite *MGControllerTestSuite) TestProcessMGWithFinalizersInNoState() {
+	// Process a brand new MG that has finalizers, but no state.
+	// Should update the MG with 'Ready' state.
+
+	mg1 := getTypicalMigrationGroup()
+
+	suite.client = utils.GetFakeClientWithObjects(mg1)
+	suite.mgReconcile.Client = suite.client
+
+	ctx := context.Background()
+
+	// add the finalizers
+	ok, err := suite.mgReconcile.addFinalizer(ctx, mg1)
+	suite.NoError(err)
+	suite.True(ok)
+
+	// Processing should add the finalizers and requeue
+	result, err := suite.mgReconcile.processMGInNoState(ctx, mg1.DeepCopy())
+	suite.NoError(err, "Should not return an error")
+	suite.Equal(ctrl.Result{}, result, "Should be empty result")
+
+	// Get the updated MG to confirm it is in 'Ready' state
+	updatedMG := &storagev1.DellCSIMigrationGroup{}
+	err = suite.mgReconcile.Client.Get(ctx, types.NamespacedName{Name: mg1.Name}, updatedMG)
+	suite.Nil(err, "MG should be retrieved successfully")
+	suite.Equal(ReadyState, updatedMG.Status.State, "MG should now be in 'Ready' state")
+}
+
+func (suite *MGControllerTestSuite) TestRemoveFinalizer() {
+	// Should successfully remove MG finalizer from the MG.
+	mg1 := getTypicalMigrationGroup()
+
+	suite.client = utils.GetFakeClientWithObjects(mg1)
+	suite.mgReconcile.Client = suite.client
+
+	ctx := context.Background()
+
+	// add the finalizers to be removed
+	ok, err := suite.mgReconcile.addFinalizer(ctx, mg1)
+	suite.NoError(err)
+	suite.True(ok)
+
+	// remove the finalizers
+	err = suite.mgReconcile.removeFinalizer(ctx, mg1.DeepCopy())
+	suite.NoError(err, "Should remove the finalizers without issues")
+
+	// get the MG to confirm the finalizers have been removed
+	updatedMG := &storagev1.DellCSIMigrationGroup{}
+	err = suite.mgReconcile.Client.Get(ctx, types.NamespacedName{Name: mg1.Name}, updatedMG)
+	suite.Nil(err, "MG should be retrieved successfully")
+	suite.Equal(0, len(updatedMG.Finalizers), "MG should have no finalizers")
+}
+
+func (suite *MGControllerTestSuite) TestRemoveFinalizerFailure() {
+	// Should fail to remove MG finalizer from the MG.
+	mg1 := getTypicalMigrationGroup()
+
+	suite.client = utils.GetFakeClientWithObjects(mg1)
+	suite.mgReconcile.Client = suite.client
+
+	ctx := context.Background()
+
+	// add the finalizers to be removed
+	ok, err := suite.mgReconcile.addFinalizer(ctx, mg1)
+	suite.NoError(err)
+	suite.True(ok)
+
+	// Replace the client with a new client that has no knowledge
+	// of the migration group, mg1, in order to force a failed update.
+	suite.client = utils.GetFakeClient()
+	suite.mgReconcile.Client = suite.client
+
+	// remove the finalizers
+	err = suite.mgReconcile.removeFinalizer(ctx, mg1.DeepCopy())
+	suite.Error(err, "Should fail to remove the finalizers")
+	suite.Contains(err.Error(), "not found")
 }

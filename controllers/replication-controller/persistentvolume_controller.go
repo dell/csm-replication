@@ -32,13 +32,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/dell/csm-replication/pkg/connection"
-	reconcile "sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/ratelimiter"
+	reconciler "sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -470,7 +471,7 @@ func (r *PersistentVolumeReconciler) processLocalPV(ctx context.Context, localPV
 }
 
 // SetupWithManager start using reconciler by creating new controller managed by provided manager
-func (r *PersistentVolumeReconciler) SetupWithManager(mgr ctrl.Manager, limiter ratelimiter.RateLimiter, maxReconcilers int) error {
+func (r *PersistentVolumeReconciler) SetupWithManager(mgr ctrl.Manager, limiter workqueue.TypedRateLimiter[reconcile.Request], maxReconcilers int) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.PersistentVolume{}, builder.WithPredicates(
 			predicate.Or(
@@ -478,7 +479,7 @@ func (r *PersistentVolumeReconciler) SetupWithManager(mgr ctrl.Manager, limiter 
 				hasDeletionTimestamp(),
 				isDeletionRequested(),
 			),
-		)).WithOptions(reconcile.Options{
+		)).WithOptions(reconciler.Options{
 		RateLimiter:             limiter,
 		MaxConcurrentReconciles: maxReconcilers,
 	}).

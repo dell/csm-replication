@@ -34,10 +34,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	reconcile "sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/ratelimiter"
+	reconciler "sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 // PersistentVolumeReconciler reconciles PersistentVolume resources
@@ -349,13 +350,13 @@ func (r *PersistentVolumeReconciler) createReplicationGroup(ctx context.Context,
 }
 
 // SetupWithManager start using reconciler by creating new controller managed by provided manager
-func (r *PersistentVolumeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, limiter ratelimiter.RateLimiter, maxReconcilers int) error {
+func (r *PersistentVolumeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, limiter workqueue.TypedRateLimiter[reconcile.Request], maxReconcilers int) error {
 	if err := mgr.GetFieldIndexer().IndexField(ctx, &repv1.DellCSIReplicationGroup{}, protectionIndexKey, getProtectionGroupID); err != nil {
 		return err
 	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.PersistentVolume{}).
-		WithOptions(reconcile.Options{
+		WithOptions(reconciler.Options{
 			MaxConcurrentReconciles: maxReconcilers,
 			RateLimiter:             limiter,
 		}).
