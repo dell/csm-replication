@@ -2,7 +2,7 @@ module github.com/dell/csm-replication
 
 go 1.23
 
-toolchain go1.23.2
+toolchain go1.23.3
 
 require (
 	github.com/bombsimon/logrusr/v4 v4.1.0
