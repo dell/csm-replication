@@ -32,6 +32,11 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o dell-csi
 
 # Base image
 FROM $BASEIMAGE AS container-base
+LABEL vendor="Dell Technologies" \
+      maintainer="Dell Technologies" \
+      release="1.13.0" \
+      version="1.11.0" \
+      license="Apache-2.0"
 
 # Controller
 FROM container-base AS controller
@@ -39,6 +44,9 @@ COPY licenses licenses/
 WORKDIR /
 COPY --from=builder /workspace/dell-csi-replicator/dell-replication-controller ./
 ENTRYPOINT ["/dell-replication-controller"]
+LABEL name="dell-replication-controller" \
+    description="CSI Replication controller" \
+    summary="Controller which replicates the resources across (or within) Kubernetes clusters"
 
 # Sidecar
 FROM container-base AS sidecar
@@ -46,6 +54,9 @@ COPY licenses licenses/
 WORKDIR /
 COPY --from=builder /workspace/dell-csi-replicator/dell-csi-replicator ./
 ENTRYPOINT ["/dell-csi-replicator"]
+LABEL name="dell-csi-replicator" \
+    description="CSI Replicator sidecar" \
+    summary="Sidecar used for managing the replication processes"
 
 # Sidecar migrator
 FROM container-base AS migrator
@@ -53,6 +64,9 @@ COPY licenses licenses/
 WORKDIR /
 COPY --from=builder /workspace/dell-csi-replicator/dell-csi-migrator ./
 ENTRYPOINT ["/dell-csi-migrator"]
+LABEL name="dell-csi-migrator" \
+    description="CSI Migrator sidecar" \
+    summary="Sidecar used for managing the replication processes"
 
 # Sidecar node-rescanner
 FROM container-base AS node-rescanner
@@ -60,3 +74,6 @@ COPY licenses licenses/
 WORKDIR /
 COPY --from=builder /workspace/dell-csi-replicator/dell-csi-node-rescanner ./
 ENTRYPOINT ["/dell-csi-node-rescanner"]
+LABEL name="dell-csi-node-rescanner" \
+    description="CSI Node Rescanner sidecar" \
+    summary="Sidecar used for managing the replication processes"
