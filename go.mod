@@ -6,9 +6,9 @@ toolchain go1.23.4
 
 require (
 	github.com/bombsimon/logrusr/v4 v4.1.0
-	github.com/dell/dell-csi-extensions/common v1.6.0
-	github.com/dell/dell-csi-extensions/migration v1.6.0
-	github.com/dell/dell-csi-extensions/replication v1.9.0
+	github.com/dell/dell-csi-extensions/common v1.7.0
+	github.com/dell/dell-csi-extensions/migration v1.7.1
+	github.com/dell/dell-csi-extensions/replication v1.10.1
 	github.com/dell/gobrick v1.13.0
 	github.com/fatih/color v1.18.0
 	github.com/fsnotify/fsnotify v1.8.0
@@ -23,7 +23,7 @@ require (
 	golang.org/x/net v0.34.0
 	golang.org/x/sync v0.10.0
 	golang.org/x/text v0.21.0 // indirect
-	google.golang.org/grpc v1.69.2
+	google.golang.org/grpc v1.69.4
 	k8s.io/api v0.32.0
 	k8s.io/apiextensions-apiserver v0.32.0
 	k8s.io/apimachinery v0.32.0
@@ -36,7 +36,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dell/goiscsi v1.11.0 // indirect
-	github.com/dell/gonvme v1.10.0 // indirect
+	github.com/dell/gonvme v1.10.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
 	github.com/evanphx/json-patch v5.9.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.9.0 // indirect
