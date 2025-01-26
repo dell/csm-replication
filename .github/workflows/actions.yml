@@ -47,8 +47,6 @@ jobs:
           go-version: "1.23"
       - name: Build CSM Replication Docker Images
         run: |
-          chmod +x ./scripts/build-ubi-micro.sh
-          make build-base-image
           : # dell-csi-replicator
           podman build . -t docker.io/dell-csi-replicator:${{ env.VERSION }} -f ./Dockerfiles/Dockerfile --target sidecar --build-arg GOIMAGE=golang:latest --build-arg BASEIMAGE=${{ env.CSM_BASEIMAGE }}
           podman save docker.io/library/dell-csi-replicator:${{ env.VERSION }} -o /tmp/dell-csi-replicator.tar
