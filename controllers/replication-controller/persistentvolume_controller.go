@@ -340,6 +340,33 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			return ctrl.Result{}, err
 		}
 
+		// Watson: If we're creating the remote PV, let's add a claimRef so the PV can only be used with
+		// a pvc of the specified namespace/name. Criteria
+		// 1. Should have no remoteVolume annotation, this is only on source and is the volume handle for the remove volume
+		// 2. The remotePVCNamespace and remotePVName must be supplied.
+		if createRemotePV {
+			log.V(common.DebugLevel).Info(fmt.Sprintf("checking for need to create claimRef on remote PV: %+v", pv))
+			remoteVolume, _ := getValueFromAnnotations(controller.RemoteVolumeAnnotation, pv.Annotations)
+			remotePVCNamespace, _ := getValueFromAnnotations(controller.RemotePVCNamespace, pv.Annotations)
+			remotePVCName, _ := getValueFromAnnotations(controller.RemotePVC, pv.Annotations)
+			remoteClusterID, _ := getValueFromAnnotations(controller.RemoteClusterID, pv.Annotations)
+			if remoteVolume == "" && remotePVCNamespace != "" && remotePVCName != "" {
+				if remoteClusterID == controller.Self {
+					// If single cluster replication, just make the namespace/name in the claim "reserved"
+					remotePVCNamespace = "reserved"
+					remotePVCName = "reserved"
+				}
+				claimRef := &v1.ObjectReference{
+					APIVersion: "v1",
+					Kind:       "PersistentVolumeClaim",
+					Name:       remotePVCName,
+					Namespace:  remotePVCNamespace,
+				}
+				pv.Spec.ClaimRef = claimRef
+				log.V(common.InfoLevel).Info(fmt.Sprintf("added remote pv %s claimref %s/%s", pv.Name, remotePVCNamespace, remotePVCName))
+			}
+		}
+
 		if createRemotePV {
 			// We need to create the PV
 			err = rClient.CreatePersistentVolume(ctx, pv)
