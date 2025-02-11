@@ -11,8 +11,12 @@ updates:
       interval: "daily"
       time: "18:00"
     allow:
-      # Allow both direct and indirect updates for all packages
-      - dependency-type: all
+      # Allow direct updates for packages
+      - dependency-type: direct
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-patch
     # a group of dependencies will be updated together in one pull request
     groups:
       golang:
@@ -20,7 +24,6 @@ updates:
         update-types:
           - major
           - minor
-          - patch
         patterns:
           - "*"
   # github actions
