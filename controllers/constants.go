@@ -133,4 +133,7 @@ const (
 	ClusterUID = "clusterUID"
 	// NodeReScanned will flag the current rescan status
 	NodeReScanned = "node-rescanned"
+
+	X_CSI_REPLICATION_POD_NAME      = "X_CSI_REPLICATION_POD_NAME"
+	X_CSI_REPLICATION_POD_NAMESPACE = "X_CSI_REPLICATION_POD_NAMESPACE"
 )
