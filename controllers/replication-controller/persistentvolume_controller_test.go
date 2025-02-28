@@ -38,7 +38,9 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -488,4 +490,314 @@ func (suite *PVReconcileSuite) TestSetupWithManager() {
 	expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second)
 	err := PVReconciler.SetupWithManager(mgr, expRateLimiter, 1)
 	assert.Error(suite.T(), err, "Setup should fail when there is no manager")
+}
+
+func TestPvProtectionIsComplete(t *testing.T) {
+	originalNewPredicateFuncs := newPredicateFuncs
+	originalGetAnnotations := getAnnotations
+
+	defer func() {
+		newPredicateFuncs = originalNewPredicateFuncs
+		getAnnotations = originalGetAnnotations
+	}()
+
+	type testCase struct {
+		name        string
+		annotations map[string]string
+		setupMocks  func()
+		expected    bool
+	}
+
+	testCases := []testCase{
+		{
+			name: "PVProtectionComplete annotation is yes",
+			annotations: map[string]string{
+				controllers.PVProtectionComplete: "yes",
+			},
+			setupMocks: func() {
+				getAnnotations = func(meta client.Object) map[string]string {
+					return map[string]string{
+						controllers.PVProtectionComplete: "yes",
+					}
+				}
+			},
+			expected: true,
+		},
+		{
+			name: "PVProtectionComplete annotation is no",
+			annotations: map[string]string{
+				controllers.PVProtectionComplete: "no",
+			},
+			setupMocks: func() {
+				getAnnotations = func(meta client.Object) map[string]string {
+					return map[string]string{
+						controllers.PVProtectionComplete: "no",
+					}
+				}
+			},
+			expected: false,
+		},
+		{
+			name:        "No PVProtectionComplete annotation",
+			annotations: map[string]string{},
+			setupMocks: func() {
+				getAnnotations = func(meta client.Object) map[string]string {
+					return map[string]string{}
+				}
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setupMocks != nil {
+				tt.setupMocks()
+			}
+
+			meta := &fakeClientObject{
+				annotations: tt.annotations,
+			}
+			newPredicateFuncs = func(f func(client.Object) bool) predicate.Funcs {
+				return predicate.Funcs{
+					GenericFunc: func(e event.GenericEvent) bool {
+						return f(e.Object)
+					},
+				}
+			}
+			predicateFunc := pvProtectionIsComplete()
+			result := predicateFunc.Generic(event.GenericEvent{Object: meta})
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestIsDeletionRequested(t *testing.T) {
+	originalNewPredicateFuncs := newPredicateFuncs
+	originalGetAnnotations := getAnnotations
+
+	defer func() {
+		newPredicateFuncs = originalNewPredicateFuncs
+		getAnnotations = originalGetAnnotations
+	}()
+
+	type testCase struct {
+		name        string
+		annotations map[string]string
+		setupMocks  func()
+		expected    bool
+	}
+
+	testCases := []testCase{
+		{
+			name: "DeletionRequested annotation is yes",
+			annotations: map[string]string{
+				controllers.DeletionRequested: "yes",
+			},
+			setupMocks: func() {
+				getAnnotations = func(meta client.Object) map[string]string {
+					return map[string]string{
+						controllers.DeletionRequested: "yes",
+					}
+				}
+			},
+			expected: true,
+		},
+		{
+			name: "DeletionRequested annotation is no",
+			annotations: map[string]string{
+				controllers.DeletionRequested: "no",
+			},
+			setupMocks: func() {
+				getAnnotations = func(meta client.Object) map[string]string {
+					return map[string]string{
+						controllers.DeletionRequested: "no",
+					}
+				}
+			},
+			expected: false,
+		},
+		{
+			name:        "No DeletionRequested annotation",
+			annotations: map[string]string{},
+			setupMocks: func() {
+				getAnnotations = func(meta client.Object) map[string]string {
+					return map[string]string{}
+				}
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setupMocks != nil {
+				tt.setupMocks()
+			}
+
+			meta := &fakeClientObject{
+				annotations: tt.annotations,
+			}
+			newPredicateFuncs = func(f func(client.Object) bool) predicate.Funcs {
+				return predicate.Funcs{
+					GenericFunc: func(e event.GenericEvent) bool {
+						return f(e.Object)
+					},
+				}
+			}
+			predicateFunc := isDeletionRequested()
+			result := predicateFunc.Generic(event.GenericEvent{Object: meta})
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestHasDeletionTimestamp(t *testing.T) {
+	originalNewPredicateFuncs := newPredicateFuncs
+	originalGetDeletionTimestamp := getDeletionTimestamp
+
+	defer func() {
+		newPredicateFuncs = originalNewPredicateFuncs
+		getDeletionTimestamp = originalGetDeletionTimestamp
+	}()
+
+	type testCase struct {
+		name              string
+		deletionTimestamp *metav1.Time
+		setupMocks        func()
+		expected          bool
+	}
+
+	testCases := []testCase{
+		{
+			name: "Has deletion timestamp",
+			deletionTimestamp: func() *metav1.Time {
+				t := metav1.NewTime(time.Now())
+				return &t
+			}(),
+			setupMocks: func() {
+				getDeletionTimestamp = func(meta client.Object) *metav1.Time {
+					t := metav1.NewTime(time.Now())
+					return &t
+				}
+			},
+			expected: true,
+		},
+		{
+			name:              "No deletion timestamp",
+			deletionTimestamp: nil,
+			setupMocks: func() {
+				getDeletionTimestamp = func(meta client.Object) *metav1.Time {
+					return nil
+				}
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setupMocks != nil {
+				tt.setupMocks()
+			}
+
+			meta := &fakeClientObject{
+				deletionTimestamp: tt.deletionTimestamp,
+			}
+			newPredicateFuncs = func(f func(client.Object) bool) predicate.Funcs {
+				return predicate.Funcs{
+					GenericFunc: func(e event.GenericEvent) bool {
+						return f(e.Object)
+					},
+				}
+			}
+			predicateFunc := hasDeletionTimestamp()
+			result := predicateFunc.Generic(event.GenericEvent{Object: meta})
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+type fakeClientObject struct {
+	client.Object
+	annotations       map[string]string
+	deletionTimestamp *metav1.Time
+}
+
+func (f *fakeClientObject) GetAnnotations() map[string]string {
+	return f.annotations
+}
+
+func (f *fakeClientObject) GetDeletionTimestamp() *metav1.Time {
+	return f.deletionTimestamp
+}
+
+func TestGetAnnotations(t *testing.T) {
+	type testCase struct {
+		name        string
+		annotations map[string]string
+		expected    map[string]string
+	}
+
+	testCases := []testCase{
+		{
+			name: "Has annotations",
+			annotations: map[string]string{
+				"key1": "value1",
+				"key2": "value2",
+			},
+			expected: map[string]string{
+				"key1": "value1",
+				"key2": "value2",
+			},
+		},
+		{
+			name:        "No annotations",
+			annotations: nil,
+			expected:    nil,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			meta := &fakeClientObject{
+				annotations: tt.annotations,
+			}
+			result := getAnnotations(meta)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestGetDeletionTimestamp(t *testing.T) {
+	type testCase struct {
+		name              string
+		deletionTimestamp *metav1.Time
+		expected          *metav1.Time
+	}
+
+	fixedTime := metav1.NewTime(time.Date(2025, time.February, 28, 4, 1, 42, 0, time.UTC))
+
+	testCases := []testCase{
+		{
+			name:              "Has deletion timestamp",
+			deletionTimestamp: &fixedTime,
+			expected:          &fixedTime,
+		},
+		{
+			name:              "No deletion timestamp",
+			deletionTimestamp: nil,
+			expected:          nil,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			meta := &fakeClientObject{
+				deletionTimestamp: tt.deletionTimestamp,
+			}
+			result := getDeletionTimestamp(meta)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }

@@ -36,7 +36,9 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -312,4 +314,84 @@ func TestPVControllerTestSuite(t *testing.T) {
 
 func (suite *PVControllerTestSuite) TearDownTestSuite() {
 	suite.T().Log("Cleaning up resources...")
+}
+
+func TestPvcProtectionIsComplete(t *testing.T) {
+	originalNewPredicateFuncs := newPredicateFuncs
+	originalGetAnnotations := getAnnotations
+
+	defer func() {
+		newPredicateFuncs = originalNewPredicateFuncs
+		getAnnotations = originalGetAnnotations
+	}()
+
+	type testCase struct {
+		name        string
+		annotations map[string]string
+		setupMocks  func()
+		expected    bool
+	}
+
+	testCases := []testCase{
+		{
+			name: "PVProtectionComplete annotation is yes",
+			annotations: map[string]string{
+				controllers.PVProtectionComplete: "yes",
+			},
+			setupMocks: func() {
+				getAnnotations = func(meta client.Object) map[string]string {
+					return map[string]string{
+						controllers.PVProtectionComplete: "yes",
+					}
+				}
+			},
+			expected: true,
+		},
+		{
+			name: "PVProtectionComplete annotation is no",
+			annotations: map[string]string{
+				controllers.PVProtectionComplete: "no",
+			},
+			setupMocks: func() {
+				getAnnotations = func(meta client.Object) map[string]string {
+					return map[string]string{
+						controllers.PVProtectionComplete: "no",
+					}
+				}
+			},
+			expected: false,
+		},
+		{
+			name:        "No PVProtectionComplete annotation",
+			annotations: map[string]string{},
+			setupMocks: func() {
+				getAnnotations = func(meta client.Object) map[string]string {
+					return map[string]string{}
+				}
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setupMocks != nil {
+				tt.setupMocks()
+			}
+
+			meta := &fakeClientObject{
+				annotations: tt.annotations,
+			}
+			newPredicateFuncs = func(f func(client.Object) bool) predicate.Funcs {
+				return predicate.Funcs{
+					GenericFunc: func(e event.GenericEvent) bool {
+						return f(e.Object)
+					},
+				}
+			}
+			predicateFunc := pvcProtectionIsComplete()
+			result := predicateFunc.Generic(event.GenericEvent{Object: meta})
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }
