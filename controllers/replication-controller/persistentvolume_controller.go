@@ -486,22 +486,34 @@ func (r *PersistentVolumeReconciler) SetupWithManager(mgr ctrl.Manager, limiter 
 		Complete(r)
 }
 
+// External function variables
+var (
+	newPredicateFuncs = predicate.NewPredicateFuncs
+	getAnnotations    = func(meta client.Object) map[string]string {
+		return meta.GetAnnotations()
+	}
+	getDeletionTimestamp = func(meta client.Object) *metav1.Time {
+		return meta.GetDeletionTimestamp()
+	}
+)
+
+// pvProtectionIsComplete checks if the PV protection is complete based on annotations.
 func pvProtectionIsComplete() predicate.Predicate {
-	return predicate.NewPredicateFuncs(func(meta client.Object) bool {
-		a := meta.GetAnnotations()
+	return newPredicateFuncs(func(meta client.Object) bool {
+		a := getAnnotations(meta)
 		return a != nil && a[controller.PVProtectionComplete] == "yes"
 	})
 }
 
 func hasDeletionTimestamp() predicate.Predicate {
-	return predicate.NewPredicateFuncs(func(meta client.Object) bool {
-		return meta.GetDeletionTimestamp() != nil
+	return newPredicateFuncs(func(meta client.Object) bool {
+		return getDeletionTimestamp(meta) != nil
 	})
 }
 
 func isDeletionRequested() predicate.Predicate {
-	return predicate.NewPredicateFuncs(func(meta client.Object) bool {
-		a := meta.GetAnnotations()
+	return newPredicateFuncs(func(meta client.Object) bool {
+		a := getAnnotations(meta)
 		return a != nil && a[controller.DeletionRequested] == "yes"
 	})
 }
