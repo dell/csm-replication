@@ -38,39 +38,76 @@ var (
 	export bool
 )
 
-func main() {
-	flag.StringVar(
-		&format,
-		"f",
-		"ver",
-		"The output format: env, go, json, mk, rpm, ver")
-	flag.StringVar(
-		&output,
-		"o",
-		"",
-		"The output file")
-	flag.BoolVar(
-		&export,
-		"x",
-		false,
-		"Export env vars. Used with -f env")
-	flag.Parse()
+func init() {
+	if flag.Lookup("f") == nil {
+		flag.StringVar(
+			&format,
+			"f",
+			"ver",
+			"The output format: env, go, json, mk, rpm, ver")
+	}
+	if flag.Lookup("o") == nil {
+		flag.StringVar(
+			&output,
+			"o",
+			"",
+			"The output file")
+	}
+	if flag.Lookup("x") == nil {
+		flag.BoolVar(
+			&export,
+			"x",
+			false,
+			"Export env vars. Used with -f env")
+	}
+}
 
-	format = getFormat(format)
+func initFlags() {
+	format = flag.Lookup("f").Value.(flag.Getter).Get().(string)
+	output = flag.Lookup("o").Value.(flag.Getter).Get().(string)
+	export = flag.Lookup("x").Value.(flag.Getter).Get().(bool)
+}
+
+func main() {
+	flag.Parse()
+	initFlags()
+
+	if strings.EqualFold("env", format) {
+		format = "env"
+	} else if strings.EqualFold("go", format) {
+		format = "go"
+	} else if strings.EqualFold("json", format) {
+		format = "json"
+	} else if strings.EqualFold("mk", format) {
+		format = "mk"
+	} else if strings.EqualFold("rpm", format) {
+		format = "rpm"
+	} else if strings.EqualFold("ver", format) {
+		format = "ver"
+	} else {
+		if fileExists(format) {
+			buf, err := ReadFile(format) // #nosec G304
+			if err != nil {
+				errorExit(fmt.Sprintf("error: read tpl failed: %v\n", err))
+			}
+			format = string(buf)
+		}
+		tpl = template.Must(template.New("tpl").Parse(format))
+		format = "tpl"
+	}
 
 	var w io.Writer = os.Stdout
 	if len(output) > 0 {
 		fout, err := os.Create(filepath.Clean(output))
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			os.Exit(1)
+			errorExit(fmt.Sprintf("error: %v\n", err))
 		}
 		w = fout
-		defer func(fout *os.File) {
+		defer func() {
 			if err := fout.Close(); err != nil {
-				fmt.Fprintf(os.Stderr, "error closing file: %s\n", err)
+				panic(err)
 			}
-		}(fout)
+		}() // #nosec G20
 	}
 
 	gitdesc := chkErr(doExec("git", "describe", "--long", "--dirty"))
@@ -78,18 +115,27 @@ func main() {
 		`^[^\d]*(\d+)\.(\d+)\.(\d+)(?:-([a-zA-Z].+?))?(?:-(\d+)-g(.+?)(?:-(dirty))?)?\s*$`)
 	m := rx.FindStringSubmatch(gitdesc)
 	if len(m) == 0 {
-		fmt.Fprintf(os.Stderr, "error: match git describe failed: %s\n", gitdesc)
-		os.Exit(1)
+		errorExit(fmt.Sprintf("error: match git describe failed: %s\n", gitdesc))
 	}
 
-	goos := getGoOS()
-	goarch := getGoArch()
-
+	goos := os.Getenv("XGOOS")
+	if goos == "" {
+		goos = runtime.GOOS
+	}
+	goarch := os.Getenv("XGOARCH")
+	if goarch == "" {
+		goarch = runtime.GOARCH
+	}
 	// get the build number. Jenkins exposes this as an
 	// env variable called BUILD_NUMBER
-	buildNumber := getBuildNumber(m)
-	buildType := getBuildType()
-
+	buildNumber := os.Getenv("BUILD_NUMBER")
+	if buildNumber == "" {
+		buildNumber = m[5]
+	}
+	buildType := os.Getenv("BUILD_TYPE")
+	if buildType == "" {
+		buildType = "X"
+	}
 	ver := &semver{
 		GOOS:   goos,
 		GOARCH: goarch,
@@ -111,76 +157,58 @@ func main() {
 	ver.BuildDate = ver.Timestamp().Format("Mon, 02 Jan 2006 15:04:05 MST")
 	ver.ReleaseDate = ver.Timestamp().Format("06-01-02")
 
-	handleFormat(format, ver, w)
-}
-
-func getFormat(format string) string {
-	if strings.EqualFold("env", format) {
-		return format
-	} else if strings.EqualFold("go", format) {
-		return format
-	} else if strings.EqualFold("json", format) {
-		return format
-	} else if strings.EqualFold("mk", format) {
-		return format
-	} else if strings.EqualFold("rpm", format) {
-		return format
-	} else if strings.EqualFold("ver", format) {
-		return format
-	} else {
-		if fileExists(format) {
-			buf, err := os.ReadFile(filepath.Clean(format))
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "error: read tpl failed: %v\n", err)
-				os.Exit(1)
+	switch format {
+	case "env":
+		for _, v := range ver.EnvVars() {
+			if export {
+				fmt.Fprint(w, "export ")
 			}
-			format = string(buf)
+			fmt.Fprintln(w, v)
 		}
-		tpl = template.Must(template.New("tpl").Parse(format))
-		format = "tpl"
-		return format
+	case "go":
+	case "json":
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(ver); err != nil {
+			errorExit(fmt.Sprintf("error: encode to json failed: %v\n", err))
+		}
+	case "mk":
+		for _, v := range ver.EnvVars() {
+			p := strings.SplitN(v, "=", 2)
+			key := p[0]
+			fmt.Fprintf(w, "%s ?=", key)
+			if len(p) == 1 {
+				fmt.Fprintln(w)
+			} else {
+				val := p[1]
+				if strings.HasPrefix(val, `"`) &&
+					strings.HasSuffix(val, `"`) {
+					val = val[1 : len(val)-1]
+				}
+				val = strings.Replace(val, "$", "$$", -1)
+				fmt.Fprintf(w, " %s\n", val)
+			}
+		}
+	case "rpm":
+		fmt.Fprintln(w, ver.RPM())
+	case "tpl":
+		if err := tpl.Execute(w, ver); err != nil {
+			errorExit(fmt.Sprintf("error: template failed: %v\n", err))
+		}
+	case "ver":
+		fmt.Fprintln(w, ver.String())
 	}
 }
 
-func getGoOS() string {
-	goos := os.Getenv("XGOOS")
-	if goos == "" {
-		goos = runtime.GOOS
-	}
-	return goos
-}
-
-func getGoArch() string {
-	goarch := os.Getenv("XGOARCH")
-	if goarch == "" {
-		goarch = runtime.GOARCH
-	}
-	return goarch
-}
-
-func getBuildNumber(m []string) string {
-	if len(m) <= 5 {
-		return ""
-	}
-	buildNumber := os.Getenv("BUILD_NUMBER")
-	if buildNumber == "" {
-		buildNumber = m[5]
-	}
-	return buildNumber
-}
-
-func getBuildType() string {
-	buildType := os.Getenv("BUILD_TYPE")
-	if buildType == "" {
-		buildType = "X"
-	}
-	return buildType
-}
-
-func doExec(cmd string, args ...string) ([]byte, error) {
+var doExec = func(cmd string, args ...string) ([]byte, error) {
 	c := exec.Command(cmd, args...) // #nosec G204
 	c.Stderr = os.Stderr
 	return c.Output()
+}
+
+func errorExit(message string) {
+	fmt.Fprintf(os.Stderr, "%s", message)
+	OSExit(1)
 }
 
 func chkErr(out []byte, err error) string {
@@ -188,17 +216,17 @@ func chkErr(out []byte, err error) string {
 		return strings.TrimSpace(string(out))
 	}
 
-	e, ok := err.(*exec.ExitError)
+	e, ok := GetExitError(err)
 	if !ok {
-		os.Exit(1)
+		OSExit(1)
 	}
 
-	st, ok := e.Sys().(syscall.WaitStatus)
+	status, ok := GetStatusError(e)
 	if !ok {
-		os.Exit(1)
+		OSExit(1)
 	}
 
-	os.Exit(st.ExitStatus())
+	OSExit(status)
 	return ""
 }
 
@@ -315,46 +343,26 @@ func fileExists(filePath string) bool {
 	return false
 }
 
-func handleFormat(format string, ver *semver, w io.Writer) {
-	switch format {
-	case "env":
-		for _, v := range ver.EnvVars() {
-			if export {
-				fmt.Fprint(w, "export ")
-			}
-			fmt.Fprintln(w, v)
-		}
-	case "go":
-	case "json":
-		enc := json.NewEncoder(w)
-		enc.SetIndent("", "  ")
-		if err := enc.Encode(ver); err != nil {
-			fmt.Fprintf(os.Stderr, "error: encode to json failed: %v\n", err)
-		}
-	case "mk":
-		for _, v := range ver.EnvVars() {
-			p := strings.SplitN(v, "=", 2)
-			key := p[0]
-			fmt.Fprintf(w, "%s ?=", key)
-			if len(p) == 1 {
-				fmt.Fprintln(w)
-				continue
-			}
-			val := p[1]
-			if strings.HasPrefix(val, `"`) &&
-				strings.HasSuffix(val, `"`) {
-				val = val[1 : len(val)-1]
-			}
-			val = strings.Replace(val, "$", "$$", -1)
-			fmt.Fprintf(w, " %s\n", val)
-		}
-	case "rpm":
-		fmt.Fprintln(w, ver.RPM())
-	case "tpl":
-		if err := tpl.Execute(w, ver); err != nil {
-			fmt.Fprintf(os.Stderr, "error: template failed: %v\n", err)
-		}
-	case "ver":
-		fmt.Fprintln(w, ver.String())
+// ReadFile is a wrapper around os.ReadFile
+var ReadFile = func(file string) ([]byte, error) {
+	return os.ReadFile(file) // #nosec G304
+}
+
+// OSExit is a wrapper around os.Exit
+var OSExit = func(code int) {
+	os.Exit(code)
+}
+
+// GetExitError is a wrapper around exec.ExitError
+var GetExitError = func(err error) (e *exec.ExitError, ok bool) {
+	e, ok = err.(*exec.ExitError)
+	return
+}
+
+// GetStatusError is a wrapper around syscall.WaitStatus
+var GetStatusError = func(exitError *exec.ExitError) (status int, ok bool) {
+	if e, ok := exitError.Sys().(syscall.WaitStatus); ok {
+		return e.ExitStatus(), true
 	}
+	return 1, false
 }

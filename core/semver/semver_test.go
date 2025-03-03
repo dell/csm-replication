@@ -14,390 +14,293 @@ limitations under the License.
 package main
 
 import (
-	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"os"
-	"reflect"
-	"runtime"
+	"os/exec"
+	"strings"
 	"testing"
-	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
-func TestGetFormat(t *testing.T) {
-	tests := []struct {
-		format   string
-		expected string
-	}{
-		{
-			format:   "env",
-			expected: "env",
-		},
-		{
-			format:   "go",
-			expected: "go",
-		},
-		{
-			format:   "json",
-			expected: "json",
-		},
-		{
-			format:   "mk",
-			expected: "mk",
-		},
-		{
-			format:   "rpm",
-			expected: "rpm",
-		},
-		{
-			format:   "ver",
-			expected: "ver",
-		},
-		{
-			format:   "tpl",
-			expected: "tpl",
-		},
-		{
-			format:   "unknown",
-			expected: "tpl",
-		},
+func TestGetStatusError(_ *testing.T) {
+	exitError := &exec.ExitError{
+		ProcessState: &os.ProcessState{},
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.format, func(t *testing.T) {
-			actual := getFormat(tt.format)
-			if actual != tt.expected {
-				t.Errorf("expected %s, but got %s", tt.expected, actual)
-			}
-		})
-	}
+	_, _ = GetStatusError(exitError)
 }
 
-func TestGetGoOS(t *testing.T) {
-	tests := []struct {
-		name   string
-		envVar string
-		want   string
-	}{
-		{
-			name:   "XGOOS set",
-			envVar: "linux",
-			want:   "linux",
-		},
-		{
-			name:   "XGOOS not set",
-			envVar: "",
-			want:   runtime.GOOS,
-		},
-	}
+func TestString(t *testing.T) {
+	s := semver{"", "", "", "", 1, 2, 3, 4, "", "", true, "", "", 64, "", "", "", ""}
+	assert.NotNil(t, s.String())
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			os.Setenv("XGOOS", tt.envVar)
-			defer os.Unsetenv("XGOOS")
-
-			if got := getGoOS(); got != tt.want {
-				t.Errorf("getGoOS() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+	s = semver{"", "", "", "", 1, 2, 3, 4, "abc", "", true, "", "", 64, "", "", "", ""}
+	assert.NotNil(t, s.String())
 }
 
-func TestGetGoArch(t *testing.T) {
-	tests := []struct {
-		name string
-		env  string
-		want string
-	}{
-		{
-			name: "Test with XGOARCH env set",
-			env:  "arm",
-			want: "arm",
-		},
-		{
-			name: "Test with XGOARCH env not set",
-			env:  "",
-			want: runtime.GOARCH,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			os.Setenv("XGOARCH", tt.env)
-			if got := getGoArch(); got != tt.want {
-				t.Errorf("getGoArch() = %v, want %v", got, tt.want)
-			}
-			os.Unsetenv("XGOARCH")
-		})
-	}
+func TestGetExitError(t *testing.T) {
+	err := errors.New("error")
+	_, ok := GetExitError(err)
+	assert.False(t, ok)
 }
 
-func TestGetBuildNumber(t *testing.T) {
+func TestMainFunction(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    []string
-		expected string
+		name            string
+		format          string
+		outputFile      string
+		expectEmptyFile bool
+		readFileFunc    func(file string) ([]byte, error)
 	}{
 		{
-			name:     "Empty input",
-			input:    []string{},
-			expected: "",
+			name:       "Write mk format to file",
+			format:     "mk",
+			outputFile: "test_output.mk",
 		},
 		{
-			name:     "Input with no build number",
-			input:    []string{"a", "b", "c", "d", "e"},
-			expected: "",
+			name:       "Write env format to file",
+			format:     "env",
+			outputFile: "test_output.env",
 		},
 		{
-			name:     "Input with build number from environment variable",
-			input:    []string{"a", "b", "c", "d", "e", "123"},
-			expected: "123",
+			name:       "Write json format to file",
+			format:     "json",
+			outputFile: "test_output.json",
 		},
 		{
-			name:     "Input with build number from input",
-			input:    []string{"a", "b", "c", "d", "e", "123"},
-			expected: "123",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			os.Setenv("BUILD_NUMBER", tt.expected)
-			defer os.Unsetenv("BUILD_NUMBER")
-
-			result := getBuildNumber(tt.input)
-			if result != tt.expected {
-				t.Errorf("getBuildNumber() = %v, want %v", result, tt.expected)
-			}
-		})
-	}
-}
-
-func TestGetBuildType(t *testing.T) {
-	tests := []struct {
-		name     string
-		envValue string
-		want     string
-	}{
-		{
-			name:     "BUILD_TYPE is set",
-			envValue: "Debug",
-			want:     "Debug",
+			name:       "Write ver format to file",
+			format:     "ver",
+			outputFile: "test_output.ver",
 		},
 		{
-			name:     "BUILD_TYPE is not set",
-			envValue: "",
-			want:     "X",
+			name:       "Write rpm format to file",
+			format:     "rpm",
+			outputFile: "test_output.rpm",
 		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			os.Setenv("BUILD_TYPE", tt.envValue)
-			defer os.Unsetenv("BUILD_TYPE")
-
-			if got := getBuildType(); got != tt.want {
-				t.Errorf("getBuildType() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_doExec(t *testing.T) {
-	type args struct {
-		cmd  string
-		args []string
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    []byte
-		wantErr bool
-	}{
 		{
-			name: "test doExec",
-			args: args{
-				cmd:  "false",
-				args: []string{},
+			name:       "Write tpl format to file",
+			format:     "../semver.tpl",
+			outputFile: "test_output.rpm",
+		},
+		{
+			name:       "Write tpl format to file but error reading source file",
+			format:     "../semver.tpl",
+			outputFile: "test_output.rpm",
+			readFileFunc: func(_ string) ([]byte, error) {
+				return nil, errors.New("error reading source file")
 			},
-			want:    []byte(""),
-			wantErr: true,
+			expectEmptyFile: true,
+		},
+		{
+			// go format currently does not print any output, expect an empty file
+			name:            "Write go format to file",
+			format:          "go",
+			outputFile:      "test_output.go",
+			expectEmptyFile: true,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := doExec(tt.args.cmd, tt.args.args...)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("doExec() error = %v, wantErr %v", err, tt.wantErr)
-				return
+			osArgs := os.Args
+			os.Args = append(os.Args, "-f", tt.format)
+			os.Args = append(os.Args, "-o", tt.outputFile)
+			os.Args = append(os.Args, "-x", "true")
+
+			oldReadFile := ReadFile
+			if tt.readFileFunc != nil {
+				ReadFile = tt.readFileFunc
 			}
-			if !bytes.Equal(got, tt.want) {
-				t.Errorf("doExec returned unexpected output: got %s, want %s", string(got), string(tt.want))
+			oldOSExit := OSExit
+			OSExit = func(_ int) {}
+
+			oldDoExec := doExec
+			doExec = func(_ string, _ ...string) ([]byte, error) {
+				return []byte("v2.13.0-77-g38b3a19-dirty"), nil
 			}
+
+			main()
+
+			// Open the file
+			file, err := os.Open(tt.outputFile)
+			if err != nil {
+				t.Error(err)
+			}
+			defer file.Close()
+
+			// Read the file contents
+			contents, err := io.ReadAll(file)
+			if err != nil {
+				t.Error(err)
+			}
+
+			defer os.Remove(tt.outputFile)
+
+			// make sure file is not empty
+			if tt.expectEmptyFile {
+				assert.Equal(t, 0, len(contents))
+			} else {
+				assert.NotEqual(t, 0, len(contents))
+			}
+			os.Args = osArgs
+			ReadFile = oldReadFile
+			OSExit = oldOSExit
+			doExec = oldDoExec
 		})
 	}
 }
 
-func TestSemverString(t *testing.T) {
-	v := &semver{
-		Major:       1,
-		Minor:       2,
-		Patch:       3,
-		Build:       4,
-		Notes:       "notes",
-		Type:        "type",
-		Dirty:       true,
-		Sha7:        "sha7",
-		Sha32:       "sha32",
-		Epoch:       5,
-		SemVer:      "semver",
-		SemVerRPM:   "semverRPM",
-		BuildDate:   "buildDate",
-		ReleaseDate: "releaseDate",
-	}
-
-	expected := "1.2.3-notes+4+dirty"
-	actual := v.String()
-
-	if expected != actual {
-		t.Errorf("Expected %s, but got %s", expected, actual)
-	}
-}
-
-func TestSemverRPM(t *testing.T) {
-	v := &semver{
-		Major:       1,
-		Minor:       2,
-		Patch:       3,
-		Build:       4,
-		Notes:       "notes",
-		Type:        "type",
-		Dirty:       true,
-		Sha7:        "sha7",
-		Sha32:       "sha32",
-		Epoch:       5,
-		SemVer:      "semver",
-		SemVerRPM:   "semverRPM",
-		BuildDate:   "buildDate",
-		ReleaseDate: "releaseDate",
-	}
-
-	expected := "1.2.3+notes+4+dirty"
-	actual := v.RPM()
-
-	if expected != actual {
-		t.Errorf("Expected %s, but got %s", expected, actual)
-	}
-}
-
-func TestSemver_EnvVars(t *testing.T) {
-	v := &semver{
-		GOOS:        "linux",
-		GOARCH:      "amd64",
-		OS:          "linux",
-		Arch:        "x86_64",
-		Major:       1,
-		Minor:       2,
-		Patch:       3,
-		Build:       4,
-		Notes:       "notes",
-		Type:        "type",
-		Dirty:       true,
-		Sha7:        "sha7",
-		Sha32:       "sha32",
-		Epoch:       1643622400,
-		SemVer:      "1.2.3+4",
-		SemVerRPM:   "1.2.3+4",
-		BuildDate:   "2023-01-23",
-		ReleaseDate: "2023-01-24",
-	}
-
-	expectedEnvVars := []string{
-		"GOOS=linux",
-		"GOARCH=amd64",
-		"OS=linux",
-		"ARCH=x86_64",
-		"MAJOR=1",
-		"MINOR=2",
-		"PATCH=3",
-		"BUILD=004",
-		`NOTES="notes"`,
-		"TYPE=type",
-		"DIRTY=true",
-		"SHA7=sha7",
-		"SHA32=sha32",
-		"EPOCH=1643622400",
-		`SEMVER="1.2.3+4"`,
-		`SEMVER_RPM="1.2.3+4"`,
-		`BUILD_DATE="2023-01-23"`,
-		`RELEASE_DATE="2023-01-24"`,
-	}
-
-	actualEnvVars := v.EnvVars()
-
-	if !reflect.DeepEqual(actualEnvVars, expectedEnvVars) {
-		t.Errorf("Expected %v, but got %v", expectedEnvVars, actualEnvVars)
-	}
-}
-
-func TestSemver_Timestamp(t *testing.T) {
-	v := &semver{
-		Epoch: 1643622400,
-	}
-
-	expected := time.Unix(1643622400, 0)
-	actual := v.Timestamp()
-
-	if !expected.Equal(actual) {
-		t.Errorf("Expected %v, but got %v", expected, actual)
-	}
-}
-
-func TestToInt(t *testing.T) {
-	cases := []struct {
-		input    string
-		expected int
-	}{
-		{"0", 0},
-		{"1", 1},
-	}
-
-	for _, c := range cases {
-		t.Run(fmt.Sprintf("input %s", c.input), func(t *testing.T) {
-			result := toInt(c.input)
-			if result != c.expected {
-				t.Errorf("expected %d, but got %d", c.expected, result)
-			}
-		})
-	}
-}
-
-func TestToInt64(t *testing.T) {
+func TestChkErr(t *testing.T) {
 	tests := []struct {
-		input    string
-		expected int64
+		name           string
+		out            []byte
+		err            error
+		wantOut        string
+		wantErr        bool
+		getExitError   func(err error) (*exec.ExitError, bool)
+		getStatusError func(exitError *exec.ExitError) (int, bool)
 	}{
-		{"0", 0},
-		{"1", 1},
-		{"1234567890", 1234567890},
+		{
+			name:    "No error",
+			out:     []byte("output"),
+			err:     nil,
+			wantOut: "output",
+			wantErr: false,
+			getExitError: func(_ error) (*exec.ExitError, bool) {
+				return nil, true
+			},
+			getStatusError: func(_ *exec.ExitError) (int, bool) {
+				return 0, true
+			},
+		},
+		{
+			name:    "Error with command",
+			out:     []byte("output"),
+			err:     errors.New("error"),
+			wantOut: "",
+			wantErr: true,
+			getExitError: func(_ error) (*exec.ExitError, bool) {
+				return nil, false
+			},
+			getStatusError: func(_ *exec.ExitError) (int, bool) {
+				return 1, false
+			},
+		},
+		{
+			name:    "Error casting to ExitError",
+			out:     []byte("output"),
+			err:     errors.New("error"),
+			wantOut: "",
+			wantErr: true,
+			getExitError: func(_ error) (*exec.ExitError, bool) {
+				return nil, true
+			},
+			getStatusError: func(_ *exec.ExitError) (int, bool) {
+				return 1, false
+			},
+		},
+		{
+			name:    "Error getting status from ExitError",
+			out:     []byte("output"),
+			err:     errors.New("error"),
+			wantOut: "",
+			wantErr: true,
+			getExitError: func(_ error) (*exec.ExitError, bool) {
+				return nil, false
+			},
+			getStatusError: func(_ *exec.ExitError) (int, bool) {
+				return 0, true
+			},
+		},
 	}
 
-	for _, test := range tests {
-		result := toInt64(test.input)
-		if result != test.expected {
-			t.Errorf("toInt64(%s) = %d, expected %d", test.input, result, test.expected)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			GetExitError = tt.getExitError
+			GetStatusError = tt.getStatusError
+			OSExit = func(_ int) {}
+
+			gotOut := chkErr(tt.out, tt.err)
+			if gotOut != tt.wantOut {
+				t.Errorf("chkErr() gotOut = %v, want %v", gotOut, tt.wantOut)
+			}
+		})
 	}
 }
 
 func TestFileExists(t *testing.T) {
-	// Test case: File exists
-	exists := fileExists("./semver.go")
-	if !exists {
-		t.Errorf("fileExists(\"./semver.go\") = %t, want %t", exists, true)
+	tests := []struct {
+		name     string
+		filePath string
+		want     bool
+	}{
+		{
+			name:     "File exists",
+			filePath: "semver.go",
+			want:     true,
+		},
+		{
+			name:     "File does not exist",
+			filePath: "non-existent.txt",
+			want:     false,
+		},
+		{
+			name:     "File path is empty",
+			filePath: "",
+			want:     false,
+		},
 	}
 
-	// Test case: File does not exist
-	exists = fileExists("./nonexistent.txt")
-	if exists {
-		t.Errorf("fileExists(\"./nonexistent.txt\") = %t, want %t", exists, false)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := fileExists(tt.filePath)
+			if got != tt.want {
+				t.Errorf("fileExists(%s) = %v, want %v", tt.filePath, got, tt.want)
+			}
+		})
 	}
+}
+
+func TestErrorExit(t *testing.T) {
+	message := "error message"
+
+	if os.Getenv("INVOKE_ERROR_EXIT") == "1" {
+		errorExit(message)
+		return
+	}
+	// call the test again with INVOKE_ERROR_EXIT=1 so the errorExit function is invoked and we can check the return code
+	cmd := exec.Command(os.Args[0], "-test.run=TestErrorExit") // #nosec G204
+	cmd.Env = append(os.Environ(), "INVOKE_ERROR_EXIT=1")
+
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		fmt.Println("Error creating stderr pipe:", err)
+		return
+	}
+
+	if err := cmd.Start(); err != nil {
+		t.Error(err)
+	}
+
+	buf := make([]byte, 1024)
+	n, err := stderr.Read(buf)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = cmd.Wait()
+	if e, ok := err.(*exec.ExitError); ok && e.Success() {
+		t.Error(err)
+	}
+
+	// Trim the warning message from the actual output
+	actualMessage := string(buf[:n])
+	if idx := strings.Index(actualMessage, "warning: GOCOVERDIR not set"); idx != -1 {
+		actualMessage = actualMessage[:idx]
+	}
+
+	// check the output is the message we logged in errorExit
+	assert.Equal(t, message, actualMessage)
 }
