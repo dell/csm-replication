@@ -149,7 +149,7 @@ func PublishControllerEvent(ctx context.Context, client ctrlClient.Client, recor
 
 // GetPodNameFromEnv gets value of X_CSI_REPLICATION_POD_NAME env variable
 func GetPodNameFromEnv() string {
-	if p := os.Getenv("X_CSI_REPLICATION_POD_NAME"); p != "" {
+	if p := os.Getenv(X_CSI_REPLICATION_POD_NAME); p != "" {
 		return p
 	}
 	return ""
@@ -157,7 +157,7 @@ func GetPodNameFromEnv() string {
 
 // GetPodNameSpaceFromEnv gets value of X_CSI_REPLICATION_POD_NAMESPACE env variable
 func GetPodNameSpaceFromEnv() string {
-	if p := os.Getenv("X_CSI_REPLICATION_POD_NAMESPACE"); p != "" {
+	if p := os.Getenv(X_CSI_REPLICATION_POD_NAMESPACE); p != "" {
 		return p
 	}
 	return ""
