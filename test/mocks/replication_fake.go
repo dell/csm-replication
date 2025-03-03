@@ -12,7 +12,7 @@
  limitations under the License.
 */
 
-package replication
+package mocks
 
 import (
 	"context"
