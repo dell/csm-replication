@@ -334,35 +334,35 @@ func TestPvcProtectionIsComplete(t *testing.T) {
 
 	testCases := []testCase{
 		{
-			name: "PVProtectionComplete annotation is yes",
+			name: "PVCProtectionComplete annotation is yes",
 			annotations: map[string]string{
-				controllers.PVProtectionComplete: "yes",
+				controllers.PVCProtectionComplete: "yes",
 			},
 			setupMocks: func() {
 				getAnnotations = func(meta client.Object) map[string]string {
 					return map[string]string{
-						controllers.PVProtectionComplete: "yes",
+						controllers.PVCProtectionComplete: "yes",
 					}
 				}
 			},
 			expected: true,
 		},
 		{
-			name: "PVProtectionComplete annotation is no",
+			name: "PVCProtectionComplete annotation is no",
 			annotations: map[string]string{
-				controllers.PVProtectionComplete: "no",
+				controllers.PVCProtectionComplete: "no",
 			},
 			setupMocks: func() {
 				getAnnotations = func(meta client.Object) map[string]string {
 					return map[string]string{
-						controllers.PVProtectionComplete: "no",
+						controllers.PVCProtectionComplete: "no",
 					}
 				}
 			},
 			expected: false,
 		},
 		{
-			name:        "No PVProtectionComplete annotation",
+			name:        "No PVCProtectionComplete annotation",
 			annotations: map[string]string{},
 			setupMocks: func() {
 				getAnnotations = func(meta client.Object) map[string]string {
