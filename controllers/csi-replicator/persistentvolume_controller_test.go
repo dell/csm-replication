@@ -461,3 +461,27 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVSetupWithManager_Error()
 	err = suite.reconciler.SetupWithManager(context.Background(), mgr, limiter, 1)
 	suite.Error(err)
 }
+
+func (suite *PersistentVolumeControllerTestSuite) TestPVSetupWithManager() {
+	ctx := context.Background()
+	pvName := utils.FakePVName
+	pvObj := suite.getFakePV(pvName)
+
+	err := suite.client.Create(ctx, pvObj)
+	suite.NoError(err)
+
+	mgr := suite.getTypicalManagerManager()
+	limiter := suite.getWorkQueueTypeLimiter()
+
+	defaultGetManagerIndexField := getManagerIndexField
+	defer func() {
+		getManagerIndexField = defaultGetManagerIndexField
+	}()
+
+	getManagerIndexField = func(mgr ctrl.Manager, ctx context.Context) error {
+		return nil
+	}
+
+	err = suite.reconciler.SetupWithManager(context.Background(), mgr, limiter, 1)
+	suite.Error(err)
+}
