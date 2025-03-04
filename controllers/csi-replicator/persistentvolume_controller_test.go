@@ -118,6 +118,7 @@ func (suite *PersistentVolumeControllerTestSuite) initReconciler() {
 		ReplicationClient: suite.repClient,
 		Domain:            constants.DefaultDomain,
 		ContextPrefix:     utils.ContextPrefix,
+		ClusterUID:        "test-clusterid",
 	}
 }
 
@@ -484,4 +485,16 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVSetupWithManager() {
 
 	err = suite.reconciler.SetupWithManager(context.Background(), mgr, limiter, 1)
 	suite.Error(err)
+}
+
+func (suite *PersistentVolumeControllerTestSuite) TestCreateProtectionGroupAndRG_Error() {
+	ctx := context.Background()
+	pvName := utils.FakePVName
+	pvObj := suite.getFakePV(pvName)
+
+	err := suite.client.Create(ctx, pvObj)
+	suite.NoError(err)
+
+	_, err = suite.reconciler.createProtectionGroupAndRG(ctx, "", map[string]string{})
+	suite.NoError(err)
 }
