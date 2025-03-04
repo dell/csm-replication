@@ -22,18 +22,25 @@ import (
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
+	"github.com/dell/csm-replication/pkg/common"
 	constants "github.com/dell/csm-replication/pkg/common"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
 	csireplication "github.com/dell/csm-replication/test/mocks"
 	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	metricsServer "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 type PersistentVolumeControllerTestSuite struct {
@@ -72,6 +79,29 @@ func (suite *PersistentVolumeControllerTestSuite) getTypicalReconcileRequest(nam
 		},
 	}
 	return req
+}
+
+func (suite *PersistentVolumeControllerTestSuite) getTypicalManagerManager() manager.Manager {
+	scheme := runtime.NewScheme()
+	metricsAddr := ""
+	enableLeaderElection := false
+
+	mgr, _ := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+		Scheme: scheme,
+		Metrics: metricsServer.Options{
+			BindAddress: metricsAddr,
+		},
+		WebhookServer:              webhook.NewServer(webhook.Options{Port: 9443}),
+		LeaderElection:             enableLeaderElection,
+		LeaderElectionResourceLock: "leases",
+		LeaderElectionID:           fmt.Sprintf("%s-manager", common.DellReplicationController),
+	})
+	return mgr
+}
+
+func (suite *PersistentVolumeControllerTestSuite) getWorkQueueTypeLimiter() workqueue.TypedRateLimiter[reconcile.Request] {
+	lim := workqueue.DefaultTypedItemBasedRateLimiter[reconcile.Request]()
+	return lim
 }
 
 func (suite *PersistentVolumeControllerTestSuite) initReconciler() {
@@ -415,4 +445,19 @@ func TestPersistentVolumeControllerTestSuite(t *testing.T) {
 
 func (suite *PersistentVolumeControllerTestSuite) TearDownTest() {
 	suite.T().Log("Cleaning up resources...")
+}
+
+func (suite *PersistentVolumeControllerTestSuite) TestPVSetupWithManager_Error() {
+	ctx := context.Background()
+	pvName := utils.FakePVName
+	pvObj := suite.getFakePV(pvName)
+
+	err := suite.client.Create(ctx, pvObj)
+	suite.NoError(err)
+
+	mgr := suite.getTypicalManagerManager()
+	limiter := suite.getWorkQueueTypeLimiter()
+
+	err = suite.reconciler.SetupWithManager(context.Background(), mgr, limiter, 1)
+	suite.Error(err)
 }
