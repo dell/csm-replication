@@ -1198,3 +1198,85 @@ func (suite *RGControllerTestSuite) TestSetupWithManagerRg() {
 	err := suite.rgReconcile.SetupWithManager(mgr, expRateLimiter, 1)
 	suite.Error(err, "Setup should fail when there is no manager")
 }
+
+func TestActionType_Equals(t *testing.T) {
+	type args struct {
+		ctx context.Context
+		val string
+	}
+	tests := []struct {
+		name string
+		a    ActionType
+		args args
+		want bool
+	}{
+		{
+			name: "Equal action types",
+			a:    "Action1",
+			args: args{
+				ctx: context.Background(),
+				val: "action1",
+			},
+			want: true,
+		},
+		{
+			name: "Different action types",
+			a:    "Action1",
+			args: args{
+				ctx: context.Background(),
+				val: "action2",
+			},
+			want: false,
+		},
+		{
+			name: "Empty action type",
+			a:    "",
+			args: args{
+				ctx: context.Background(),
+				val: "action1",
+			},
+			want: false,
+		},
+		{
+			name: "Empty value",
+			a:    "Action1",
+			args: args{
+				ctx: context.Background(),
+				val: "",
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.a.Equals(tt.args.ctx, tt.args.val); got != tt.want {
+				t.Errorf("ActionType.Equals() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetActionResultFromActionAnnotation(t *testing.T) {
+	ctx := context.Background()
+
+	// Test case: Action annotation with invalid finish time
+	actionAnnotation := ActionAnnotation{
+		ActionName: "TestAction",
+		FinishTime: "invalid time",
+	}
+	_, err := getActionResultFromActionAnnotation(ctx, actionAnnotation)
+	if err == nil {
+		t.Errorf("Expected error, but got nil")
+	}
+
+	// Test case: Action annotation with invalid protection group status
+	actionAnnotation = ActionAnnotation{
+		ActionName:            "TestAction",
+		FinishTime:            "2022-01-01T00:00:00Z",
+		ProtectionGroupStatus: "invalid",
+	}
+	_, err = getActionResultFromActionAnnotation(ctx, actionAnnotation)
+	if err == nil {
+		t.Errorf("Expected error, but got nil")
+	}
+}
