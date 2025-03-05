@@ -22,6 +22,7 @@ import (
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
+	controller "github.com/dell/csm-replication/controllers"
 	constants "github.com/dell/csm-replication/pkg/common"
 	"github.com/dell/csm-replication/pkg/config"
 	"github.com/dell/csm-replication/pkg/connection"
@@ -98,6 +99,15 @@ func (suite *PVReconcileSuite) runRemoteReplicationManager(fakeConfig connection
 		Config:        fakeConfig,
 	}
 
+	// Create and add the PersistentVolume to the fake client
+	localPV := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "fake-pv",
+			Annotations: map[string]string{},
+		},
+	}
+	suite.mockUtils.FakeClient.Create(context.TODO(), localPV)
+
 	// scenario: Positive scenario
 	req := reconcile.Request{
 		NamespacedName: types.NamespacedName{
@@ -133,7 +143,14 @@ func (suite *PVReconcileSuite) runRemoteReplicationManager(fakeConfig connection
 
 	// scenario: processLocalPV should fail with an error
 	logger := PVReconciler.Log.WithValues("persistentvolumeclaim")
-	e := PVReconciler.processLocalPV(context.WithValue(context.TODO(), constants.LoggerContextKey, logger), &corev1.PersistentVolume{}, "", "")
+
+	// Test case where PV has already been synced
+	localPV.Annotations[controller.PVSyncComplete] = "yes"
+	e := PVReconciler.processLocalPV(context.WithValue(context.TODO(), constants.LoggerContextKey, logger), localPV, "", "")
+	assert.NoError(suite.T(), e, "PV has already been synced")
+
+	// Test case where processLocalPV should fail with an error
+	e = PVReconciler.processLocalPV(context.WithValue(context.TODO(), constants.LoggerContextKey, logger), &corev1.PersistentVolume{}, "", "")
 	assert.Error(suite.T(), e, "Process local PV failed with an error")
 
 	// scenario: process remotePV should fail with an error
