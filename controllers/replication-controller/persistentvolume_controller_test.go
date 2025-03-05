@@ -157,6 +157,10 @@ func (suite *PVReconcileSuite) runRemoteReplicationManager(fakeConfig connection
 	_, e = PVReconciler.processRemotePV(context.WithValue(context.TODO(), constants.LoggerContextKey, logger), remoteClient, &corev1.PersistentVolume{}, "xyz")
 	assert.Error(suite.T(), e, "Process remote PV failed with an error")
 
+	// scenario: process remotePV should work with no error
+	_, e = PVReconciler.processRemotePV(context.WithValue(context.TODO(), constants.LoggerContextKey, logger), remoteClient, localPV, "")
+	assert.NoError(suite.T(), e, "Process remote PV with no error")
+
 	annotations := make(map[string]string)
 	annotations[controllers.PVProtectionComplete] = "yes"
 	annotations[controllers.RemotePV] = "fake-pv"
@@ -244,7 +248,7 @@ func (suite *PVReconcileSuite) runRemoteReplicationManager(fakeConfig connection
 
 	// scenario: Negative case failed to fetch remote storage class name
 	res, err = PVReconciler.Reconcile(context.Background(), req)
-	assert.Error(suite.T(), err, "volume_id missing from the remote volume annotation")
+	assert.Error(suite.T(), err, "storage class name missing from the remote volume annotation")
 
 	annotations[controllers.RemoteVolumeAnnotation] = `{"capacity_bytes":5369364480,"volume_context":{"CapacityGB":"5.00","RdfGroup":"4","RemoteRDFGroup":"4","ServiceLevel":"Bronze","StorageGroup":"csi-no-srp-sg-test-4-ASYNC","powermax/RdfMode":"ASYNC","powermax/RemoteSYMID":"000000000001","powermax/SYMID":"000000000002"}}`
 	annotations[controllers.RemoteStorageClassAnnotation] = "fake-sc"
