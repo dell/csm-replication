@@ -358,13 +358,7 @@ func (r *PersistentVolumeReconciler) SetupWithManager(ctx context.Context, mgr c
 	if err := getManagerIndexField(mgr, ctx); err != nil {
 		return err
 	}
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&v1.PersistentVolume{}).
-		WithOptions(reconciler.Options{
-			MaxConcurrentReconciles: maxReconcilers,
-			RateLimiter:             limiter,
-		}).
-		Complete(r)
+	return ctrl.NewControllerManagedBy(mgr).For(&v1.PersistentVolume{}).WithOptions(reconciler.Options{MaxConcurrentReconciles: maxReconcilers, RateLimiter: limiter}).Complete(r)
 }
 
 // getProtectionGroupID take a DellCSIReplicationGroup instance and returns its protection group ID.
