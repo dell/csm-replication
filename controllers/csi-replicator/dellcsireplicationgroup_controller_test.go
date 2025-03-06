@@ -17,6 +17,7 @@ package csireplicator
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -1257,26 +1258,148 @@ func TestActionType_Equals(t *testing.T) {
 }
 
 func TestGetActionResultFromActionAnnotation(t *testing.T) {
-	ctx := context.Background()
+	testTime, _ := json.Marshal(metav1.Time{Time: time.Now()})
 
-	// Test case: Action annotation with invalid finish time
-	actionAnnotation := ActionAnnotation{
-		ActionName: "TestAction",
+	tests := []struct {
+		name          string
+		actionAnnot   ActionAnnotation
+		expectedError error
+	}{
+		{
+			name: "Action annotation with invalid finish time",
+			actionAnnot: ActionAnnotation{
+				ActionName: "TestAction",
+				FinishTime: "invalid time",
+			},
+			expectedError: errors.New(""),
+		},
+		{
+			name: "Action annotation with invalid protection group status",
+			actionAnnot: ActionAnnotation{
+				ActionName:            "TestAction",
+				FinishTime:            string(testTime),
+				ProtectionGroupStatus: "invalid",
+			},
+			expectedError: errors.New(""),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+			_, err := getActionResultFromActionAnnotation(ctx, test.actionAnnot)
+			if err == nil && test.expectedError != nil {
+				t.Errorf("Expected error, but got nil")
+			}
+			if err != nil && test.expectedError == nil {
+				t.Errorf("Expected nil error, but got %v", err)
+			}
+		})
+	}
+}
+
+func TestUpdateRGStatusWithActionResult(t *testing.T) {
+	dummyActionAnnotation, _ := json.Marshal(ActionAnnotation{
+		FinalError: "",
 		FinishTime: "invalid time",
-	}
-	_, err := getActionResultFromActionAnnotation(ctx, actionAnnotation)
-	if err == nil {
-		t.Errorf("Expected error, but got nil")
+	})
+	tests := []struct {
+		name         string
+		rg           *repv1.DellCSIReplicationGroup
+		actionResult *ActionResult
+		expectedErr  error
+	}{
+		{
+			name: "ActionResult is nil AND failed in getActionInProgress",
+			rg: &repv1.DellCSIReplicationGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						Action:                        "action",
+						controllers.SnapshotNamespace: "default",
+						controllers.SnapshotClass:     "test",
+					},
+				},
+			},
+			actionResult: nil,
+			expectedErr:  errors.New(""),
+		},
+		{
+			name: "ActionResult is nil AND failed in getActionResultFromActionAnnotation",
+			rg: &repv1.DellCSIReplicationGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						Action:                        string(dummyActionAnnotation),
+						controllers.SnapshotNamespace: "default",
+						controllers.SnapshotClass:     "test",
+					},
+				},
+			},
+			actionResult: nil,
+			expectedErr:  errors.New(""),
+		},
 	}
 
-	// Test case: Action annotation with invalid protection group status
-	actionAnnotation = ActionAnnotation{
-		ActionName:            "TestAction",
-		FinishTime:            "2022-01-01T00:00:00Z",
-		ProtectionGroupStatus: "invalid",
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+			err := updateRGStatusWithActionResult(ctx, test.rg, test.actionResult)
+			if err == nil && test.expectedErr != nil {
+				t.Errorf("Expected error, but got nil")
+			}
+			if err != nil && test.expectedErr == nil {
+				t.Errorf("Expected nil error, but got %v", err)
+			}
+		})
 	}
-	_, err = getActionResultFromActionAnnotation(ctx, actionAnnotation)
-	if err == nil {
-		t.Errorf("Expected error, but got nil")
+}
+
+func TestUpdateActionAttributes(t *testing.T) {
+	tests := []struct {
+		name          string
+		actionType    ActionType
+		actionAttrs   map[string]string
+		expectedAttrs map[string]string
+	}{
+		{
+			name:          "ActionType is CREATE_SNAPSHOT and result.ActionAttributes is not empty",
+			actionType:    ActionType(csiext.ActionTypes_CREATE_SNAPSHOT.String()),
+			actionAttrs:   map[string]string{"key1": "value1", "key2": "value2"},
+			expectedAttrs: map[string]string{"key1": "value1", "key2": "value2"},
+		},
+		{
+			name:          "ActionType is not CREATE_SNAPSHOT",
+			actionType:    ActionType(csiext.ActionTypes_ABORT_SNAPSHOT.String()),
+			actionAttrs:   map[string]string{"key1": "value1", "key2": "value2"},
+			expectedAttrs: nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+			rg := &repv1.DellCSIReplicationGroup{}
+			result := &ActionResult{
+				ActionType:       test.actionType,
+				ActionAttributes: test.actionAttrs,
+			}
+
+			updateActionAttributes(ctx, rg, result)
+
+			if test.expectedAttrs == nil {
+				if rg.Status.LastAction.ActionAttributes != nil {
+					t.Errorf("Expected ActionAttributes to be nil, but it was not")
+				}
+			} else {
+				if rg.Status.LastAction.ActionAttributes == nil {
+					t.Errorf("Expected ActionAttributes to be set, but it was nil")
+				}
+
+				for key, val := range test.expectedAttrs {
+					if rg.Status.LastAction.ActionAttributes[key] != val {
+						t.Errorf("Expected ActionAttributes to be set correctly, but it was not")
+					}
+				}
+			}
+		})
 	}
 }
