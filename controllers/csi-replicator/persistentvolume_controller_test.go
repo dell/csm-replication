@@ -16,6 +16,7 @@ package csireplicator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path"
 	"testing"
@@ -458,6 +459,15 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVSetupWithManager_Error()
 
 	mgr := suite.getTypicalManagerManager()
 	limiter := suite.getWorkQueueTypeLimiter()
+
+	defaultGetManagerIndexField := getManagerIndexField
+	defer func() {
+		getManagerIndexField = defaultGetManagerIndexField
+	}()
+
+	getManagerIndexField = func(mgr ctrl.Manager, ctx context.Context) error {
+		return errors.New("error in getManagerIndexField")
+	}
 
 	err = suite.reconciler.SetupWithManager(context.Background(), mgr, limiter, 1)
 	suite.Error(err)
