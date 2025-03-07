@@ -474,6 +474,38 @@ func (suite *PersistentVolumeControllerTestSuite) TearDownTest() {
 // 	suite.Error(err)
 // }
 
+func (suite *PersistentVolumeControllerTestSuite) TestPVSetupWithManager_Error() {
+	ctx := context.Background()
+
+	defaultGetManagerIndexField := getManagerIndexField
+	defer func() {
+		getManagerIndexField = defaultGetManagerIndexField
+	}()
+
+	getManagerIndexField = func(_ ctrl.Manager, _ context.Context) error {
+		return errors.New("error in getManagerIndexField")
+	}
+
+	err := suite.reconciler.SetupWithManager(ctx, nil, nil, 1)
+	suite.Error(err)
+}
+
+func (suite *PersistentVolumeControllerTestSuite) TestPVSetupWithManager() {
+	ctx := context.Background()
+
+	defaultGetManagerIndexField := getManagerIndexField
+	defer func() {
+		getManagerIndexField = defaultGetManagerIndexField
+	}()
+
+	getManagerIndexField = func(_ ctrl.Manager, _ context.Context) error {
+		return nil
+	}
+
+	err := suite.reconciler.SetupWithManager(ctx, nil, nil, 1)
+	suite.Error(err)
+}
+
 // func (suite *PersistentVolumeControllerTestSuite) TestPVSetupWithManager() {
 // 	ctx := context.Background()
 // 	pvName := utils.FakePVName
@@ -497,22 +529,6 @@ func (suite *PersistentVolumeControllerTestSuite) TearDownTest() {
 // 	err = suite.reconciler.SetupWithManager(context.Background(), mgr, limiter, 1)
 // 	suite.Error(err)
 // }
-
-func (suite *PersistentVolumeControllerTestSuite) TestPVSetupWithManager_Error() {
-	ctx := context.Background()
-
-	defaultGetManagerIndexField := getManagerIndexField
-	defer func() {
-		getManagerIndexField = defaultGetManagerIndexField
-	}()
-
-	getManagerIndexField = func(_ ctrl.Manager, _ context.Context) error {
-		return errors.New("error in getManagerIndexField")
-	}
-
-	err := suite.reconciler.SetupWithManager(ctx, nil, nil, 1)
-	suite.Error(err)
-}
 
 func (suite *PersistentVolumeControllerTestSuite) TestCreateProtectionGroupAndRG_Error() {
 	ctx := context.Background()
