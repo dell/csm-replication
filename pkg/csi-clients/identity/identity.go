@@ -44,6 +44,12 @@ type Identity interface {
 	GetMigrationCapabilities(ctx context.Context) (MigrationCapabilitySet, error)
 }
 
+var (
+	getClientGetReplicationCapabilities = func(client replication.ReplicationClient, ctx context.Context, in *replication.GetReplicationCapabilityRequest, opts ...grpc.CallOption) (*replication.GetReplicationCapabilityResponse, error) {
+		return client.GetReplicationCapabilities(ctx, in, opts...)
+	}
+)
+
 // New return new Identity interface implementation
 func New(conn *grpc.ClientConn, log logr.Logger, timeout time.Duration, frequency time.Duration) Identity {
 	return &identity{
@@ -118,7 +124,7 @@ func (r *identity) GetReplicationCapabilities(ctx context.Context) (ReplicationC
 
 	client := replication.NewReplicationClient(r.conn)
 
-	response, err := client.GetReplicationCapabilities(tctx, &replication.GetReplicationCapabilityRequest{})
+	response, err := getClientGetReplicationCapabilities(client, tctx, &replication.GetReplicationCapabilityRequest{})
 	if err != nil {
 		return nil, nil, err
 	}

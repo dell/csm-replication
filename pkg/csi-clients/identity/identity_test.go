@@ -16,6 +16,8 @@ package identity
 
 import (
 	"context"
+	"errors"
+	"reflect"
 	"testing"
 	"time"
 
@@ -281,4 +283,109 @@ func NewIdentity(t interface {
 	t.Cleanup(func() { mock.AssertExpectations(t) })
 
 	return mock
+}
+
+func Test_identity_GetReplicationCapabilities(t *testing.T) {
+	originalGetClientGetReplicationCapabilities := getClientGetReplicationCapabilities
+
+	after := func() {
+		getClientGetReplicationCapabilities = originalGetClientGetReplicationCapabilities
+	}
+
+	type fields struct {
+		conn      *grpc.ClientConn
+		log       logr.Logger
+		timeout   time.Duration
+		frequency time.Duration
+	}
+	type args struct {
+		ctx context.Context
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		setup   func()
+		want    ReplicationCapabilitySet
+		want1   []*replication.SupportedActions
+		wantErr bool
+	}{
+		{
+			name:   "GetReplicationCapabilities Failed",
+			fields: fields{createFakeConnection(), ctrl.Log.WithName("identity.v1.Identity/GetReplicationCapabilities"), 10, 10},
+			args:   args{context.Background()},
+			setup: func() {
+				getClientGetReplicationCapabilities = func(client replication.ReplicationClient, ctx context.Context, in *replication.GetReplicationCapabilityRequest, opts ...grpc.CallOption) (*replication.GetReplicationCapabilityResponse, error) {
+					return nil, errors.New("error")
+				}
+			},
+			want:    nil,
+			want1:   nil,
+			wantErr: true,
+		},
+		{
+			name:   "GetReplicationCapabilities Passed",
+			fields: fields{createFakeConnection(), ctrl.Log.WithName("identity.v1.Identity/GetReplicationCapabilities"), 10, 10},
+			args:   args{context.Background()},
+			setup: func() {
+				getClientGetReplicationCapabilities = func(client replication.ReplicationClient, ctx context.Context, in *replication.GetReplicationCapabilityRequest, opts ...grpc.CallOption) (*replication.GetReplicationCapabilityResponse, error) {
+					return &replication.GetReplicationCapabilityResponse{
+						Capabilities: []*replication.ReplicationCapability{
+							{
+								Type: &replication.ReplicationCapability_Rpc{
+									Rpc: &replication.ReplicationCapability_RPC{
+										Type: replication.ReplicationCapability_RPC_CREATE_REMOTE_VOLUME,
+									},
+								},
+							},
+						},
+						Actions: []*replication.SupportedActions{
+							{
+								Actions: &replication.SupportedActions_Type{
+									Type: replication.ActionTypes_CREATE_SNAPSHOT,
+								},
+							},
+						},
+					}, nil
+				}
+			},
+			want: ReplicationCapabilitySet{
+				replication.ReplicationCapability_RPC_CREATE_REMOTE_VOLUME: true,
+			},
+			want1: []*replication.SupportedActions{
+				{
+					Actions: &replication.SupportedActions_Type{
+						Type: replication.ActionTypes_CREATE_SNAPSHOT,
+					},
+				},
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer after()
+			if tt.setup != nil {
+				tt.setup()
+			}
+
+			r := &identity{
+				conn:      tt.fields.conn,
+				log:       tt.fields.log,
+				timeout:   tt.fields.timeout,
+				frequency: tt.fields.frequency,
+			}
+			got, got1, err := r.GetReplicationCapabilities(tt.args.ctx)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("identity.GetReplicationCapabilities() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("identity.GetReplicationCapabilities() got = %v, want %v", got, tt.want)
+			}
+			if !reflect.DeepEqual(got1, tt.want1) {
+				t.Errorf("identity.GetReplicationCapabilities() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
 }
