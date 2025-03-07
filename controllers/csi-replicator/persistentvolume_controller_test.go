@@ -408,6 +408,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVProtectionCompleteAnnota
 	annotations := map[string]string{}
 	annotations[controllers.CreatedBy] = "dell-csi-replicator"
 	annotations[controllers.ReplicationGroup] = "xyz"
+	annotations[controllers.SynchronizedDeletionStatus] = "requested"
 
 	pvObj.Annotations = annotations
 
@@ -450,30 +451,6 @@ func (suite *PersistentVolumeControllerTestSuite) TearDownTest() {
 	suite.T().Log("Cleaning up resources...")
 }
 
-// func (suite *PersistentVolumeControllerTestSuite) TestPVSetupWithManager_Error() {
-// 	ctx := context.Background()
-// 	pvName := utils.FakePVName
-// 	pvObj := suite.getFakePV(pvName)
-
-// 	err := suite.client.Create(ctx, pvObj)
-// 	suite.NoError(err)
-
-// 	mgr := suite.getTypicalManagerManager()
-// 	limiter := suite.getWorkQueueTypeLimiter()
-
-// 	defaultGetManagerIndexField := getManagerIndexField
-// 	defer func() {
-// 		getManagerIndexField = defaultGetManagerIndexField
-// 	}()
-
-// 	getManagerIndexField = func(mgr ctrl.Manager, ctx context.Context) error {
-// 		return errors.New("error in getManagerIndexField")
-// 	}
-
-// 	err = suite.reconciler.SetupWithManager(context.Background(), mgr, limiter, 1)
-// 	suite.Error(err)
-// }
-
 func (suite *PersistentVolumeControllerTestSuite) TestPVSetupWithManager_Error() {
 	ctx := context.Background()
 
@@ -505,30 +482,6 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVSetupWithManager() {
 	err := suite.reconciler.SetupWithManager(ctx, nil, nil, 1)
 	suite.Error(err)
 }
-
-// func (suite *PersistentVolumeControllerTestSuite) TestPVSetupWithManager() {
-// 	ctx := context.Background()
-// 	pvName := utils.FakePVName
-// 	pvObj := suite.getFakePV(pvName)
-
-// 	err := suite.client.Create(ctx, pvObj)
-// 	suite.NoError(err)
-
-// 	mgr := suite.getTypicalManagerManager()
-// 	limiter := suite.getWorkQueueTypeLimiter()
-
-// 	defaultGetManagerIndexField := getManagerIndexField
-// 	defer func() {
-// 		getManagerIndexField = defaultGetManagerIndexField
-// 	}()
-
-// 	getManagerIndexField = func(mgr ctrl.Manager, ctx context.Context) error {
-// 		return nil
-// 	}
-
-// 	err = suite.reconciler.SetupWithManager(context.Background(), mgr, limiter, 1)
-// 	suite.Error(err)
-// }
 
 func (suite *PersistentVolumeControllerTestSuite) TestCreateProtectionGroupAndRG_Error() {
 	ctx := context.Background()
