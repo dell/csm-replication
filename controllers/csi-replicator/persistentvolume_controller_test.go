@@ -16,8 +16,10 @@ package csireplicator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path"
+	"reflect"
 	"testing"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
@@ -448,29 +450,29 @@ func (suite *PersistentVolumeControllerTestSuite) TearDownTest() {
 	suite.T().Log("Cleaning up resources...")
 }
 
-// func (suite *PersistentVolumeControllerTestSuite) TestPVSetupWithManager_Error() {
-// 	ctx := context.Background()
-// 	pvName := utils.FakePVName
-// 	pvObj := suite.getFakePV(pvName)
+func (suite *PersistentVolumeControllerTestSuite) TestPVSetupWithManager_Error() {
+	ctx := context.Background()
+	pvName := utils.FakePVName
+	pvObj := suite.getFakePV(pvName)
 
-// 	err := suite.client.Create(ctx, pvObj)
-// 	suite.NoError(err)
+	err := suite.client.Create(ctx, pvObj)
+	suite.NoError(err)
 
-// 	mgr := suite.getTypicalManagerManager()
-// 	limiter := suite.getWorkQueueTypeLimiter()
+	mgr := suite.getTypicalManagerManager()
+	limiter := suite.getWorkQueueTypeLimiter()
 
-// 	defaultGetManagerIndexField := getManagerIndexField
-// 	defer func() {
-// 		getManagerIndexField = defaultGetManagerIndexField
-// 	}()
+	defaultGetManagerIndexField := getManagerIndexField
+	defer func() {
+		getManagerIndexField = defaultGetManagerIndexField
+	}()
 
-// 	getManagerIndexField = func(mgr ctrl.Manager, ctx context.Context) error {
-// 		return errors.New("error in getManagerIndexField")
-// 	}
+	getManagerIndexField = func(mgr ctrl.Manager, ctx context.Context) error {
+		return errors.New("error in getManagerIndexField")
+	}
 
-// 	err = suite.reconciler.SetupWithManager(context.Background(), mgr, limiter, 1)
-// 	suite.Error(err)
-// }
+	err = suite.reconciler.SetupWithManager(context.Background(), mgr, limiter, 1)
+	suite.Error(err)
+}
 
 // func (suite *PersistentVolumeControllerTestSuite) TestPVSetupWithManager() {
 // 	ctx := context.Background()
@@ -506,4 +508,32 @@ func (suite *PersistentVolumeControllerTestSuite) TestCreateProtectionGroupAndRG
 
 	_, err = suite.reconciler.createProtectionGroupAndRG(ctx, "", map[string]string{})
 	suite.NoError(err)
+}
+
+func TestGetProtectionGroupID(t *testing.T) {
+	tests := []struct {
+		name             string
+		replicationGroup *repv1.DellCSIReplicationGroup
+		expectedIDs      []string
+	}{
+		{
+			name:             "ReplicationGroup with non-empty ProtectionGroupID",
+			replicationGroup: &repv1.DellCSIReplicationGroup{Spec: repv1.DellCSIReplicationGroupSpec{ProtectionGroupID: "protection-group-id"}},
+			expectedIDs:      []string{"protection-group-id"},
+		},
+		{
+			name:             "ReplicationGroup with empty ProtectionGroupID",
+			replicationGroup: &repv1.DellCSIReplicationGroup{Spec: repv1.DellCSIReplicationGroupSpec{ProtectionGroupID: ""}},
+			expectedIDs:      nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			protectionGroupIDs := getProtectionGroupID(tt.replicationGroup)
+			if !reflect.DeepEqual(protectionGroupIDs, tt.expectedIDs) {
+				t.Errorf("Expected protectionGroupIDs to be %v, got %v", tt.expectedIDs, protectionGroupIDs)
+			}
+		})
+	}
 }

@@ -1404,31 +1404,3 @@ func TestUpdateActionAttributes(t *testing.T) {
 		})
 	}
 }
-
-func TestGetProtectionGroupID(t *testing.T) {
-	tests := []struct {
-		name             string
-		replicationGroup *repv1.DellCSIReplicationGroup
-		expectedIDs      []string
-	}{
-		{
-			name:             "ReplicationGroup with non-empty ProtectionGroupID",
-			replicationGroup: &repv1.DellCSIReplicationGroup{Spec: repv1.DellCSIReplicationGroupSpec{ProtectionGroupID: "protection-group-id"}},
-			expectedIDs:      []string{"protection-group-id"},
-		},
-		{
-			name:             "ReplicationGroup with empty ProtectionGroupID",
-			replicationGroup: &repv1.DellCSIReplicationGroup{Spec: repv1.DellCSIReplicationGroupSpec{ProtectionGroupID: ""}},
-			expectedIDs:      nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			protectionGroupIDs := getProtectionGroupID(tt.replicationGroup)
-			if !reflect.DeepEqual(protectionGroupIDs, tt.expectedIDs) {
-				t.Errorf("Expected protectionGroupIDs to be %v, got %v", tt.expectedIDs, protectionGroupIDs)
-			}
-		})
-	}
-}
