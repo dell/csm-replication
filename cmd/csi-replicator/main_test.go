@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"reflect"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	repcnf "github.com/dell/csm-replication/pkg/config"
 	"github.com/go-logr/logr"
 	"github.com/go-logr/logr/funcr"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -290,6 +292,57 @@ func Test_getClusterUID(t *testing.T) {
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("getClusterUID() = %v, want %v", got, tt.want)
 			}
+		})
+	}
+}
+
+func TestProcessConfigMapChanges(t *testing.T) {
+	tests := []struct {
+		name          string
+		config        *repcnf.Config
+		loggerConfig  *logrus.Logger
+		expectedLevel logrus.Level
+		expectedError error
+	}{
+		{
+			name: "success",
+			config: &repcnf.Config{
+				LogLevel: "info",
+			},
+			loggerConfig: &logrus.Logger{
+				Level: logrus.InfoLevel,
+			},
+			expectedLevel: logrus.InfoLevel,
+			expectedError: nil,
+		},
+		{
+			name: "error parsing config",
+			config: &repcnf.Config{
+				LogLevel: "invalid",
+			},
+			loggerConfig: &logrus.Logger{
+				Level: logrus.InfoLevel,
+			},
+			expectedLevel: logrus.InfoLevel,
+			expectedError: fmt.Errorf("error parsing the config: unable to parse log level"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			// Create a mock ReplicatorManager
+			mgr := &ReplicatorManager{
+				Opts:    repcnf.ControllerManagerOpts{},
+				Manager: &mockManager{},
+				config:  tt.config,
+			}
+
+			// Call the function under test
+			mgr.processConfigMapChanges(tt.loggerConfig)
+
+			// Assert the expected log level
+			assert.Equal(t, tt.expectedLevel, tt.loggerConfig.Level)
 		})
 	}
 }
