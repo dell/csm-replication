@@ -35,22 +35,22 @@ func (m *mockManager) GetLogger() logr.Logger {
 	return m.logger
 }
 
-func (m *mockManager) Add(runnable manager.Runnable) error {
+func (m *mockManager) Add(_ manager.Runnable) error {
 	// Implement the method as needed for your mock
 	return nil
 }
 
-func (m *mockManager) AddHealthzCheck(name string, check healthz.Checker) error {
+func (m *mockManager) AddHealthzCheck(_ string, _ healthz.Checker) error {
 	// Implement the method as needed for your mock
 	return nil
 }
 
-func (m *mockManager) AddMetricsServerExtraHandler(path string, handler http.Handler) error {
+func (m *mockManager) AddMetricsServerExtraHandler(_ string, _ http.Handler) error {
 	// Implement the method as needed for your mock
 	return nil
 }
 
-func (m *mockManager) AddReadyzCheck(name string, check healthz.Checker) error {
+func (m *mockManager) AddReadyzCheck(_ string, _ healthz.Checker) error {
 	// Implement the method as needed for your mock
 	return nil
 }
@@ -80,7 +80,7 @@ func (m *mockServer) Register(path string, hook http.Handler) {
 	m.mux.Handle(path, hook)
 }
 
-func (m *mockServer) Start(ctx context.Context) error {
+func (m *mockServer) Start(_ context.Context) error {
 	// Implement the method as needed for your mock
 	return nil
 }
@@ -98,7 +98,7 @@ func (m *mockManager) GetWebhookServer() webhook.Server {
 	return &mockServer{}
 }
 
-func (m *mockManager) Start(ctx context.Context) error {
+func (m *mockManager) Start(_ context.Context) error {
 	// Implement the method as needed for your mock
 	return nil
 }
@@ -123,7 +123,7 @@ func (m *mockManager) GetClient() client.Client {
 	return nil
 }
 
-func (m *mockManager) GetEventRecorderFor(name string) record.EventRecorder {
+func (m *mockManager) GetEventRecorderFor(_ string) record.EventRecorder {
 	// Implement the method as needed for your mock
 	return nil
 }
@@ -180,7 +180,7 @@ func TestCreateReplicatorManager(t *testing.T) {
 				getControllerManagerOpts = func() repcnf.ControllerManagerOpts {
 					return repcnf.ControllerManagerOpts{}
 				}
-				getConfig = func(ctx context.Context, client client.Client, opts repcnf.ControllerManagerOpts, recorder record.EventRecorder, log logr.Logger) (*repcnf.Config, error) {
+				getConfig = func(_ context.Context, _ client.Client, _ repcnf.ControllerManagerOpts, _ record.EventRecorder, _ logr.Logger) (*repcnf.Config, error) {
 					return &repcnf.Config{}, nil
 				}
 			},
@@ -199,7 +199,7 @@ func TestCreateReplicatorManager(t *testing.T) {
 				getControllerManagerOpts = func() repcnf.ControllerManagerOpts {
 					return repcnf.ControllerManagerOpts{}
 				}
-				getConfig = func(ctx context.Context, client client.Client, opts repcnf.ControllerManagerOpts, recorder record.EventRecorder, log logr.Logger) (*repcnf.Config, error) {
+				getConfig = func(_ context.Context, _ client.Client, _ repcnf.ControllerManagerOpts, _ record.EventRecorder, _ logr.Logger) (*repcnf.Config, error) {
 					return nil, assert.AnError
 				}
 			},
