@@ -19,20 +19,26 @@ import (
 	"fmt"
 	"path"
 	"testing"
+	"time"
 
 	"github.com/dell/csm-replication/controllers"
 	constants "github.com/dell/csm-replication/pkg/common"
-	csimigration "github.com/dell/csm-replication/pkg/csi-clients/migration"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
+	csimigration "github.com/dell/csm-replication/test/mocks"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -751,4 +757,83 @@ func (e errorFakeCtrlRuntimeClient) Update(ctx context.Context, obj client.Objec
 		return fmt.Errorf("Update method error")
 	}
 	return e.Client.Update(ctx, obj, opts...)
+}
+
+func (suite *PersistentVolumeControllerTestSuite) TestSetupWithManagerPv() {
+	suite.Init()
+	mgr := manager.Manager(nil)
+	expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second)
+	err := suite.reconciler.SetupWithManager(context.Background(), mgr, expRateLimiter, 1)
+	suite.Error(err, "Setup should fail when there is no manager")
+}
+
+type fakeClientObject struct {
+	client.Object
+	annotations map[string]string
+}
+
+func TestIsMigrationRequested(t *testing.T) {
+	originalNewPredicateFuncs := newPredicateFuncs
+	originalGetAnnotations := getAnnotations
+
+	defer func() {
+		newPredicateFuncs = originalNewPredicateFuncs
+		getAnnotations = originalGetAnnotations
+	}()
+
+	type testCase struct {
+		name        string
+		annotations map[string]string
+		setupMocks  func()
+		expected    bool
+	}
+
+	testCases := []testCase{
+		{
+			name: "MigrationRequested annotation exists",
+			annotations: map[string]string{
+				controllers.MigrationRequested: "true",
+			},
+			setupMocks: func() {
+				getAnnotations = func(_ client.Object) map[string]string {
+					return map[string]string{
+						controllers.MigrationRequested: "true",
+					}
+				}
+			},
+			expected: true,
+		},
+		{
+			name:        "MigrationRequested annotation does not exist",
+			annotations: map[string]string{},
+			setupMocks: func() {
+				getAnnotations = func(_ client.Object) map[string]string {
+					return map[string]string{}
+				}
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setupMocks != nil {
+				tt.setupMocks()
+			}
+
+			meta := &fakeClientObject{
+				annotations: tt.annotations,
+			}
+			newPredicateFuncs = func(f func(client.Object) bool) predicate.Funcs {
+				return predicate.Funcs{
+					GenericFunc: func(e event.GenericEvent) bool {
+						return f(e.Object)
+					},
+				}
+			}
+			predicateFunc := isMigrationRequested()
+			result := predicateFunc.Generic(event.GenericEvent{Object: meta})
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }

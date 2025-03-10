@@ -244,8 +244,8 @@ func (r *PersistentVolumeClaimReconciler) SetupWithManager(mgr ctrl.Manager, lim
 }
 
 func pvcProtectionIsComplete() predicate.Predicate {
-	return predicate.NewPredicateFuncs(func(meta client.Object) bool {
-		a := meta.GetAnnotations()
+	return newPredicateFuncs(func(meta client.Object) bool {
+		a := getAnnotations(meta)
 		return a != nil && a[controller.PVCProtectionComplete] == "yes"
 	})
 }

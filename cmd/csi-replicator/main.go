@@ -96,19 +96,29 @@ func (mgr *ReplicatorManager) processConfigMapChanges(loggerConfig *logrus.Logge
 	loggerConfig.SetLevel(level)
 }
 
+var (
+	watchConfig    = viper.WatchConfig
+	onConfigChange = viper.OnConfigChange
+)
+
 func (mgr *ReplicatorManager) setupConfigMapWatcher(loggerConfig *logrus.Logger) {
 	log.Println("Started ConfigMap Watcher")
-	viper.WatchConfig()
-	viper.OnConfigChange(func(_ fsnotify.Event) {
+	watchConfig()
+	onConfigChange(func(_ fsnotify.Event) {
 		mgr.processConfigMapChanges(loggerConfig)
 	})
 }
 
+var (
+	getControllerManagerOpts = config.GetControllerManagerOpts
+	getConfig                = config.GetConfig
+)
+
 func createReplicatorManager(ctx context.Context, mgr ctrl.Manager) (*ReplicatorManager, error) {
-	opts := config.GetControllerManagerOpts()
+	opts := getControllerManagerOpts()
 	opts.Mode = "sidecar"
 	mgrLogger := mgr.GetLogger()
-	repConfig, err := config.GetConfig(ctx, nil, opts, nil, mgrLogger)
+	repConfig, err := getConfig(ctx, nil, opts, nil, mgrLogger)
 	if err != nil {
 		return nil, err
 	}
@@ -316,14 +326,19 @@ func main() {
 	}
 }
 
+var (
+	getControllerClient = connection.GetControllerClient
+	kubeSystemNamespace = controllers.KubeSystemNamespace
+)
+
 func getClusterUID(ctx context.Context) (*v1.Namespace, error) {
-	client, err := connection.GetControllerClient(nil, scheme)
+	client, err := getControllerClient(nil, scheme)
 	if err != nil {
 		return nil, err
 	}
 
 	ns := new(v1.Namespace)
-	err = client.Get(ctx, types.NamespacedName{Name: controllers.KubeSystemNamespace}, ns)
+	err = client.Get(ctx, types.NamespacedName{Name: kubeSystemNamespace}, ns)
 	if err != nil {
 		return nil, err
 	}
