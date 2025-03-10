@@ -401,7 +401,7 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVCExistsScenario() {
 	suite.NoError(err, "No error")
 }
 
-func (suite *PersistentVolumeControllerTestSuite) TestPVProtectionCompleteAnnotationNotFound() {
+func (suite *PersistentVolumeControllerTestSuite) TestPVProtectionCompleteAnnotationFound() {
 	pvName := utils.FakePVName
 	pvObj := suite.getFakePV(pvName)
 
@@ -419,6 +419,24 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVProtectionCompleteAnnota
 
 	_, err = suite.reconciler.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error")
+}
+
+func (suite *PersistentVolumeControllerTestSuite) TestPVCreatedBySyncController() {
+	pvName := utils.FakePVName
+	pvObj := suite.getFakePV(pvName)
+
+	annotations := map[string]string{}
+	annotations[controllers.CreatedBy] = "dell-csi-replicator"
+
+	pvObj.Annotations = annotations
+
+	err := suite.client.Create(context.Background(), pvObj)
+	suite.NoError(err)
+
+	req := suite.getTypicalReconcileRequest(pvName)
+
+	_, err = suite.reconciler.Reconcile(context.Background(), req)
+	suite.NoError(err)
 }
 
 func (suite *PersistentVolumeControllerTestSuite) getParams() map[string]string {
