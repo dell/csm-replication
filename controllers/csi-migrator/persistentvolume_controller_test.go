@@ -795,7 +795,7 @@ func TestIsMigrationRequested(t *testing.T) {
 				controllers.MigrationRequested: "true",
 			},
 			setupMocks: func() {
-				getAnnotations = func(meta client.Object) map[string]string {
+				getAnnotations = func(_ client.Object) map[string]string {
 					return map[string]string{
 						controllers.MigrationRequested: "true",
 					}
@@ -807,7 +807,7 @@ func TestIsMigrationRequested(t *testing.T) {
 			name:        "MigrationRequested annotation does not exist",
 			annotations: map[string]string{},
 			setupMocks: func() {
-				getAnnotations = func(meta client.Object) map[string]string {
+				getAnnotations = func(_ client.Object) map[string]string {
 					return map[string]string{}
 				}
 			},

@@ -536,7 +536,7 @@ func TestPvProtectionIsComplete(t *testing.T) {
 				controllers.PVProtectionComplete: "yes",
 			},
 			setupMocks: func() {
-				getAnnotations = func(meta client.Object) map[string]string {
+				getAnnotations = func(_ client.Object) map[string]string {
 					return map[string]string{
 						controllers.PVProtectionComplete: "yes",
 					}
@@ -550,7 +550,7 @@ func TestPvProtectionIsComplete(t *testing.T) {
 				controllers.PVProtectionComplete: "no",
 			},
 			setupMocks: func() {
-				getAnnotations = func(meta client.Object) map[string]string {
+				getAnnotations = func(_ client.Object) map[string]string {
 					return map[string]string{
 						controllers.PVProtectionComplete: "no",
 					}
@@ -562,7 +562,7 @@ func TestPvProtectionIsComplete(t *testing.T) {
 			name:        "No PVProtectionComplete annotation",
 			annotations: map[string]string{},
 			setupMocks: func() {
-				getAnnotations = func(meta client.Object) map[string]string {
+				getAnnotations = func(_ client.Object) map[string]string {
 					return map[string]string{}
 				}
 			},
@@ -616,7 +616,7 @@ func TestIsDeletionRequested(t *testing.T) {
 				controllers.DeletionRequested: "yes",
 			},
 			setupMocks: func() {
-				getAnnotations = func(meta client.Object) map[string]string {
+				getAnnotations = func(_ client.Object) map[string]string {
 					return map[string]string{
 						controllers.DeletionRequested: "yes",
 					}
@@ -630,7 +630,7 @@ func TestIsDeletionRequested(t *testing.T) {
 				controllers.DeletionRequested: "no",
 			},
 			setupMocks: func() {
-				getAnnotations = func(meta client.Object) map[string]string {
+				getAnnotations = func(_ client.Object) map[string]string {
 					return map[string]string{
 						controllers.DeletionRequested: "no",
 					}
@@ -642,7 +642,7 @@ func TestIsDeletionRequested(t *testing.T) {
 			name:        "No DeletionRequested annotation",
 			annotations: map[string]string{},
 			setupMocks: func() {
-				getAnnotations = func(meta client.Object) map[string]string {
+				getAnnotations = func(_ client.Object) map[string]string {
 					return map[string]string{}
 				}
 			},
@@ -697,7 +697,7 @@ func TestHasDeletionTimestamp(t *testing.T) {
 				return &t
 			}(),
 			setupMocks: func() {
-				getDeletionTimestamp = func(meta client.Object) *metav1.Time {
+				getDeletionTimestamp = func(_ client.Object) *metav1.Time {
 					t := metav1.NewTime(time.Now())
 					return &t
 				}
@@ -708,7 +708,7 @@ func TestHasDeletionTimestamp(t *testing.T) {
 			name:              "No deletion timestamp",
 			deletionTimestamp: nil,
 			setupMocks: func() {
-				getDeletionTimestamp = func(meta client.Object) *metav1.Time {
+				getDeletionTimestamp = func(_ client.Object) *metav1.Time {
 					return nil
 				}
 			},
