@@ -23,8 +23,8 @@ import (
 
 	"github.com/dell/csm-replication/controllers"
 	constants "github.com/dell/csm-replication/pkg/common"
-	csimigration "github.com/dell/csm-replication/pkg/csi-clients/migration"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
+	csimigration "github.com/dell/csm-replication/test/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"
