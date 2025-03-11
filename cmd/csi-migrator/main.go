@@ -25,6 +25,7 @@ import (
 
 	"github.com/dell/dell-csi-extensions/migration"
 	"github.com/go-logr/logr"
+	"google.golang.org/grpc"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
@@ -41,6 +42,7 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	controller "github.com/dell/csm-replication/controllers/csi-migrator"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsServer "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -132,9 +134,36 @@ func createMigratorManager(ctx context.Context, mgr ctrl.Manager) (*MigratorMana
 	return &controllerManager, nil
 }
 
+var getConnectToCsiFunc = func(csiAddress string, setupLog logr.Logger) (*grpc.ClientConn, error) {
+	return connection.Connect(csiAddress, setupLog)
+}
+
+var getProbeForeverFunc = func(ctx context.Context, identityClient csiidentity.Identity) (string, error) {
+	return identityClient.ProbeForever(ctx)
+}
+
+var getMigrationCapabilitiesFunc = func(ctx context.Context, identityClient csiidentity.Identity) (csiidentity.MigrationCapabilitySet, error) {
+	return identityClient.GetMigrationCapabilities(ctx)
+}
+
+var getcreateMigratorManagerFunc = func(ctx context.Context, mgr manager.Manager, logrusLog *logrus.Logger) (*MigratorManager, error) {
+	migratorMgr, err := createMigratorManager(ctx, mgr)
+	if err != nil {
+		setupLog.Error(err, "failed to configure the migrator manager")
+		os.Exit(1)
+	}
+	//Start the watch on configmap
+	migratorMgr.setupConfigMapWatcher(logrusLog)
+
+	return migratorMgr, err
+}
+
+var getParseLevelFunc = func(level string) (logrus.Level, error) {
+	return common.ParseLevel(level)
+}
+
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;watch;list;delete;update;create
-
 func main() {
 	var (
 		metricsAddr                string
@@ -178,7 +207,7 @@ func main() {
 	ctx := context.Background()
 
 	// Connect to csi
-	csiConn, err := connection.Connect(csiAddress, setupLog)
+	csiConn, err := getConnectToCsiFunc(csiAddress, setupLog)
 	if err != nil {
 		setupLog.Error(err, "failed to connect to CSI driver")
 		os.Exit(1)
@@ -186,14 +215,14 @@ func main() {
 
 	identityClient := csiidentity.New(csiConn, ctrl.Log.WithName("identity-client"), operationTimeout, probeFrequency)
 
-	driverName, err := identityClient.ProbeForever(ctx)
+	driverName, err := getProbeForeverFunc(ctx, identityClient)
 	if err != nil {
 		setupLog.Error(err, "error waiting for the CSI driver to be ready")
 		os.Exit(1)
 	}
 	setupLog.V(1).Info("CSI driver name", "driverName", driverName)
 
-	capabilitySet, err := identityClient.GetMigrationCapabilities(ctx)
+	capabilitySet, err := getMigrationCapabilitiesFunc(ctx, identityClient)
 	if err != nil {
 		setupLog.Error(err, "error fetching migration capabilities")
 		os.Exit(1)
@@ -224,16 +253,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	MigratorMgr, err := createMigratorManager(ctx, mgr)
+	MigratorMgr, err := getcreateMigratorManagerFunc(ctx, mgr, logrusLog)
 	if err != nil {
 		setupLog.Error(err, "failed to configure the migrator manager")
 		os.Exit(1)
 	}
-	// Start the watch on configmap
-	MigratorMgr.setupConfigMapWatcher(logrusLog)
 
 	// Process the config. Get initial log level
-	level, err := common.ParseLevel(MigratorMgr.config.LogLevel)
+	level, err := getParseLevelFunc(MigratorMgr.config.LogLevel)
 	if err != nil {
 		log.Println("Unable to parse ", err)
 	}

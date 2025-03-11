@@ -16,16 +16,24 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
+	"net"
 	"net/http"
 	"testing"
 
+	controller "github.com/dell/csm-replication/controllers/csi-migrator"
 	"github.com/dell/csm-replication/pkg/config"
+	csiidentity "github.com/dell/csm-replication/pkg/csi-clients/identity"
+	"github.com/dell/dell-csi-extensions/migration"
 	"github.com/go-logr/logr"
 	"github.com/go-logr/logr/funcr"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/singleflight"
+	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -36,97 +44,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
-// // Mock types for testing
-// type MockCSIConnection struct{}
-// type MockIdentityClient struct{}
-// type MockMigrationClient struct{}
-// type MockMigratorManager struct{}
-
-// func TestMainFunction(t *testing.T) {
-// 	// Set up flags (using default test values)
-// 	metricsAddr := ":8001"
-// 	enableLeaderElection := false
-// 	workerThreads := 2
-// 	retryIntervalStart := time.Second
-// 	retryIntervalMax := 5 * time.Minute
-// 	operationTimeout := 300 * time.Second
-// 	probeFrequency := 5 * time.Second
-// 	domain := "default-domain"
-// 	replicationDomain := "default-repl-domain"
-// 	maxRetryDurationForActions := 10 * time.Minute
-
-// 	// Mock context
-// 	ctx := context.Background()
-
-// 	// Mock CSI connection
-// 	csiConn := &MockCSIConnection{}
-// 	identityClient := &MockIdentityClient{}
-// 	migrationClient := &MockMigrationClient{}
-
-// 	// Mock manager setup
-// 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-// 		Scheme:                     nil, // Provide a mock or actual scheme here if needed
-// 		Metrics:                    server.Options{BindAddress: metricsAddr},
-// 		WebhookServer:              webhook.NewServer(webhook.Options{Port: 8443}),
-// 		LeaderElection:             enableLeaderElection,
-// 		LeaderElectionResourceLock: "leases",
-// 		LeaderElectionID:           "test-leader-election-id",
-// 	})
-// 	require.NoError(t, err)
-
-// 	// Mock Migrator Manager
-// 	migratorMgr := &MockMigratorManager{}
-
-// 	// Initialize components
-// 	err = initializeComponents(ctx, mgr, csiConn, identityClient, migrationClient, migratorMgr, "info", domain, replicationDomain, workerThreads, retryIntervalStart, retryIntervalMax, operationTimeout, probeFrequency, maxRetryDurationForActions)
-// 	require.NoError(t, err)
-
-// 	// Verify initialization
-// 	assert.NotNil(t, mgr)
-// 	assert.NotNil(t, csiConn)
-// 	assert.NotNil(t, identityClient)
-// 	assert.NotNil(t, migrationClient)
-// 	assert.NotNil(t, migratorMgr)
-// }
-
-// func initializeComponents(ctx context.Context, mgr ctrl.Manager, csiConn *MockCSIConnection, identityClient *MockIdentityClient, migrationClient *MockMigrationClient, migratorMgr *MockMigratorManager, logLevel, domain, replicationDomain string, workerThreads int, retryIntervalStart, retryIntervalMax, operationTimeout, probeFrequency, maxRetryDurationForActions time.Duration) error {
-// 	// Simulate initialization logic
-// 	// If any error occurs here, we can check it against specific mock expectations
-// 	return nil
-// }
-
-// // Mock function implementations for the mock types
-// func (m *MockCSIConnection) Connect(address string) error {
-// 	// Simulate a successful connection
-// 	return nil
-// }
-
-// func (m *MockIdentityClient) ProbeForever(ctx context.Context) (string, error) {
-// 	// Simulate a successful probe
-// 	return "mock-driver", nil
-// }
-
-// func (m *MockIdentityClient) GetMigrationCapabilities(ctx context.Context) (map[string]bool, error) {
-// 	// Simulate returning migration capabilities
-// 	return map[string]bool{"migrator": true}, nil
-// }
-
-// func (m *MockMigrationClient) Migrate(ctx context.Context) error {
-// 	// Simulate a migration operation
-// 	return nil
-// }
-
-// func (m *MockMigratorManager) SetupConfigMapWatcher(logger logrus.Logger) {
-// 	// Simulate setting up a config map watcher
-// }
-
-// func (m *MockMigratorManager) Config() *Config {
-// 	// Simulate fetching a config
-// 	return &Config{LogLevel: "info"}
-// }
-
 type mockManager struct {
-	logger logr.Logger
+	logger              logr.Logger
+	client              client.Client
+	scheme              *runtime.Scheme
+	eventRec            record.EventRecorder
+	config              *config.Config
+	singleflight        singleflight.Group
+	controllerName      string
+	controllerGroupName string
+	reconciler          *controller.PersistentVolumeReconciler
 }
 
 func (m *mockManager) GetLogger() logr.Logger {
@@ -398,4 +325,149 @@ func TestSetupConfigMapWatcher(t *testing.T) {
 		config:  &config.Config{},
 	}
 	migrator.setupConfigMapWatcher(loggerConfig)
+}
+
+// Mock implementation of the client interface
+type mockClient struct{}
+
+func (m *mockClient) Get(context.Context, client.ObjectKey, client.Object, ...client.GetOption) error {
+	return nil
+}
+
+func (m *mockClient) Create(context.Context, client.Object, ...client.CreateOption) error {
+	return nil
+}
+
+func (m *mockClient) Update(context.Context, client.Object, ...client.UpdateOption) error {
+	return nil
+}
+
+// Mock implementation of the rest.Config interface
+type mockRestConfig struct{}
+
+func (m *mockRestConfig) Host() string {
+	return ""
+}
+
+func (m *mockRestConfig) UserAgent() string {
+	return ""
+}
+
+func (m *mockRestConfig) Wrap(rt http.RoundTripper) http.RoundTripper {
+	return nil
+}
+
+func (m *mockRestConfig) WrapTransport(rt http.RoundTripper) http.RoundTripper {
+	return nil
+}
+
+func (m *mockRestConfig) Dial(network, addr string) (net.Conn, error) {
+	return nil, nil
+}
+
+func (m *mockRestConfig) TLSClientConfig() *tls.Config {
+	return nil
+}
+
+func (m *mockRestConfig) QPS() float32 {
+	return 0
+}
+
+func (m *mockRestConfig) Burst() int {
+	return 0
+}
+
+func (m *mockClient) Delete(context.Context, client.Object, ...client.DeleteOption) error {
+	return nil
+}
+
+func (m *mockClient) DeleteAllOf(_ context.Context, _ client.Object, opts ...client.DeleteAllOfOption) error {
+	// Implement the DeleteAllOf method here
+	return nil
+}
+
+func (m *mockClient) GroupVersionKindFor(obj runtime.Object) (schema.GroupVersionKind, error) {
+	// Implement the GroupVersionKindFor method here
+	return schema.GroupVersionKind{}, nil
+}
+
+func (m *mockClient) IsObjectNamespaced(obj runtime.Object) (bool, error) {
+	// Implement the IsObjectNamespaced method here
+	return false, nil
+}
+
+func (m *mockClient) List(context.Context, client.ObjectList, ...client.ListOption) error {
+	// Implement the List method here
+	return nil
+}
+
+func (m *mockClient) Patch(context.Context, client.Object, client.Patch, ...client.PatchOption) error {
+	// Implement the Patch method here
+	return nil
+}
+
+func (m *mockClient) RESTMapper() meta.RESTMapper {
+	// Implement the RESTMapper method here
+	return nil
+}
+
+func (m *mockClient) Scheme() *runtime.Scheme {
+	// Implement the Scheme method here
+	return nil
+}
+
+func (m *mockClient) Status() client.StatusWriter {
+	return nil
+}
+
+func (m *mockClient) SubResource(subResource string) client.SubResourceClient {
+	return nil
+}
+
+func TestMain(t *testing.T) {
+	defaultGetConnectToCsiFunc := getConnectToCsiFunc
+	defaultGetProbeForeverFunc := getProbeForeverFunc
+	defaultGetMigrationCapabilitiesFunc := getMigrationCapabilitiesFunc
+	defaultGetcreateMigratorManagerFunc := getcreateMigratorManagerFunc
+	defaultGetParseLevelFunc := getParseLevelFunc
+
+	defer func() {
+		// Restore the original function after the test
+		getConnectToCsiFunc = defaultGetConnectToCsiFunc
+		getProbeForeverFunc = defaultGetProbeForeverFunc
+		getMigrationCapabilitiesFunc = defaultGetMigrationCapabilitiesFunc
+		getcreateMigratorManagerFunc = defaultGetcreateMigratorManagerFunc
+		getParseLevelFunc = defaultGetParseLevelFunc
+	}()
+
+	// Mock the getConnectToCsiFunc to return a successful connection
+	getConnectToCsiFunc = func(_ string, _ logr.Logger) (*grpc.ClientConn, error) {
+		// Return a mock *grpc.ClientConn
+		return &grpc.ClientConn{}, nil
+	}
+
+	getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
+		return "csi-driver", nil
+	}
+
+	getMigrationCapabilitiesFunc = func(_ context.Context, _ csiidentity.Identity) (csiidentity.MigrationCapabilitySet, error) {
+		// Populate the MigrationCapabilitySet with mock data (map with MigrateTypes as keys and bool as values)
+		capabilitySet := csiidentity.MigrationCapabilitySet{
+			migration.MigrateTypes(migration.MigrateTypes_VERSION_UPGRADE):  true,
+			migration.MigrateTypes(migration.MigrateTypes_REPL_TO_NON_REPL): true,
+		}
+
+		return capabilitySet, nil
+	}
+
+	getcreateMigratorManagerFunc = func(ctx context.Context, mgr manager.Manager, logrusLog *logrus.Logger) (*MigratorManager, error) {
+		return &MigratorManager{}, nil
+	}
+
+	getParseLevelFunc = func(level string) (logrus.Level, error) {
+		return logrus.Level(0), fmt.Errorf("unable to parse log level: %s", level)
+	}
+
+	main()
+
 }
