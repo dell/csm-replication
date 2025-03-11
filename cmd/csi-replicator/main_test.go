@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 
 	repcnf "github.com/dell/csm-replication/pkg/config"
@@ -343,6 +346,39 @@ func TestProcessConfigMapChanges(t *testing.T) {
 
 			// Assert the expected log level
 			assert.Equal(t, tt.expectedLevel, tt.loggerConfig.Level)
+		})
+	}
+}
+
+func TestSetupConfigMapWatcher(t *testing.T) {
+	tests := []struct {
+		name           string
+		loggerConfig   *logrus.Logger
+		expectedOutput string
+	}{
+		{
+			name:           "Test with valid loggerConfig",
+			loggerConfig:   &logrus.Logger{},
+			expectedOutput: "Started ConfigMap Watcher",
+		},
+		{
+			name:           "Test with nil loggerConfig",
+			loggerConfig:   nil,
+			expectedOutput: "Started ConfigMap Watcher",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var output bytes.Buffer
+			log.SetOutput(&output)
+
+			mgr := &ReplicatorManager{}
+			mgr.setupConfigMapWatcher(tt.loggerConfig)
+
+			if !strings.Contains(output.String(), tt.expectedOutput) {
+				t.Errorf("Expected output: %s, but got: %s", tt.expectedOutput, output.String())
+			}
 		})
 	}
 }
