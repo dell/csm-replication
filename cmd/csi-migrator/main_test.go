@@ -247,7 +247,6 @@ func (m *mockManager) GetScheme() *runtime.Scheme {
 }
 
 func TestProcessConfigMapChanges(t *testing.T) {
-
 	defaultGetUpdateConfigMapFunc := getUpdateConfigMapFunc
 	defer func() {
 		getUpdateConfigMapFunc = defaultGetUpdateConfigMapFunc
@@ -269,7 +268,7 @@ func TestProcessConfigMapChanges(t *testing.T) {
 		config:  &config.Config{},
 	}
 
-	t.Run("Success Test Case", func(t *testing.T) {
+	t.Run("Success Test Case", func(_ *testing.T) {
 		migrator.processConfigMapChanges(loggerConfig)
 	})
 
@@ -278,7 +277,7 @@ func TestProcessConfigMapChanges(t *testing.T) {
 		return fmt.Errorf("config update error")
 	}
 
-	t.Run("Error in getUpdateConfigMapFunc", func(t *testing.T) {
+	t.Run("Error in getUpdateConfigMapFunc", func(_ *testing.T) {
 		migrator.processConfigMapChanges(loggerConfig)
 	})
 
@@ -289,7 +288,7 @@ func TestProcessConfigMapChanges(t *testing.T) {
 
 	migrator.config.LogLevel = "invalid-log-level" // Set an invalid log level
 
-	t.Run("Error in ParseLevel", func(t *testing.T) {
+	t.Run("Error in ParseLevel", func(_ *testing.T) {
 		migrator.processConfigMapChanges(loggerConfig)
 	})
 
@@ -316,7 +315,7 @@ func TestCreateMigratorManager(t *testing.T) {
 	}()
 
 	// Test case 1: Successful creation of MigratorManager
-	getConfigFunc = func(ctx context.Context, opts config.ControllerManagerOpts, mgrLogr logr.Logger) (*config.Config, error) {
+	getConfigFunc = func(_ context.Context, _ config.ControllerManagerOpts, _ logr.Logger) (*config.Config, error) {
 		// Mock the successful config return
 		return &config.Config{LogLevel: "info"}, nil
 	}
@@ -337,7 +336,7 @@ func TestCreateMigratorManager(t *testing.T) {
 	})
 
 	// Test case 2: Error in getConfigFunc
-	getConfigFunc = func(ctx context.Context, opts config.ControllerManagerOpts, mgrLogr logr.Logger) (*config.Config, error) {
+	getConfigFunc = func(_ context.Context, _ config.ControllerManagerOpts, _ logr.Logger) (*config.Config, error) {
 		// Mock an error return from getConfigFunc
 		return nil, fmt.Errorf("failed to get config")
 	}
@@ -368,7 +367,7 @@ func TestCreateMigratorManager(t *testing.T) {
 
 	// Test case 4: Check if the correct mode is set in options
 	t.Run("Correct Mode Set", func(t *testing.T) {
-		getConfigFunc = func(ctx context.Context, opts config.ControllerManagerOpts, mgrLogr logr.Logger) (*config.Config, error) {
+		getConfigFunc = func(_ context.Context, _ config.ControllerManagerOpts, _ logr.Logger) (*config.Config, error) {
 			// Return config with any log level
 			return &config.Config{LogLevel: "info"}, nil
 		}
