@@ -77,9 +77,13 @@ type MigratorManager struct {
 	config  *config.Config
 }
 
+var getUpdateConfigMapFunc = func(mgr *MigratorManager, ctx context.Context) error {
+	return mgr.config.UpdateConfigMap(ctx, nil, mgr.Opts, nil, mgr.Manager.GetLogger())
+}
+
 func (mgr *MigratorManager) processConfigMapChanges(loggerConfig *logrus.Logger) {
 	log.Println("Received a config change event")
-	err := mgr.config.UpdateConfigMap(context.Background(), nil, mgr.Opts, nil, mgr.Manager.GetLogger())
+	err := getUpdateConfigMapFunc(mgr, context.Background())
 	if err != nil {
 		log.Printf("Error parsing the config: %v\n", err)
 		return

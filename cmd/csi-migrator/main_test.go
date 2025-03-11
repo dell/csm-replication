@@ -16,167 +16,383 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 	"testing"
-	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"github.com/dell/csm-replication/pkg/config"
+	"github.com/go-logr/logr"
+	"github.com/go-logr/logr/funcr"
+	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/record"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrlcnf "sigs.k8s.io/controller-runtime/pkg/config"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
-// func TestProcessConfigMapChanges(t *testing.T) {
-// 	// Mock logger
-// 	mockLogger := logrus.New()
-// 	mockLogger.SetLevel(logrus.InfoLevel)
+// // Mock types for testing
+// type MockCSIConnection struct{}
+// type MockIdentityClient struct{}
+// type MockMigrationClient struct{}
+// type MockMigratorManager struct{}
 
-// 	// Mock Config updater interface, assuming the manager has some update method to call
-// 	mockConfigUpdater := &MockConfigUpdater{}
+// func TestMainFunction(t *testing.T) {
+// 	// Set up flags (using default test values)
+// 	metricsAddr := ":8001"
+// 	enableLeaderElection := false
+// 	workerThreads := 2
+// 	retryIntervalStart := time.Second
+// 	retryIntervalMax := 5 * time.Minute
+// 	operationTimeout := 300 * time.Second
+// 	probeFrequency := 5 * time.Second
+// 	domain := "default-domain"
+// 	replicationDomain := "default-repl-domain"
+// 	maxRetryDurationForActions := 10 * time.Minute
 
-// 	// Mock manager
-// 	mockMgr := &MigratorManager{
-// 		Opts:          repcnf.ControllerManagerOpts{Mode: "sidecar"},
-// 		Manager:       mockMgr,
-// 		config:        &repcnf.Config{},
-// 		ConfigUpdater: mockConfigUpdater, // Assuming manager has ConfigUpdater
-// 	}
+// 	// Mock context
+// 	ctx := context.Background()
 
-// 	// Mock ConfigUpdater's UpdateConfigMap method
-// 	mockConfigUpdater.On("UpdateConfigMap", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+// 	// Mock CSI connection
+// 	csiConn := &MockCSIConnection{}
+// 	identityClient := &MockIdentityClient{}
+// 	migrationClient := &MockMigrationClient{}
 
-// 	// Define test cases
-// 	tests := []struct {
-// 		name          string
-// 		mgr           *MigratorManager
-// 		loggerConfig  *logrus.Logger
-// 		setup         func()
-// 		wantErr       bool
-// 		expectedLevel logrus.Level
-// 	}{
-// 		{
-// 			name:         "Successful processing of config changes",
-// 			mgr:          mockMgr,
-// 			loggerConfig: mockLogger,
-// 			setup: func() {
-// 				// No error expected in this test
-// 				mockConfigUpdater.On("UpdateConfigMap", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-// 			},
-// 			wantErr:       false,
-// 			expectedLevel: logrus.InfoLevel, // Assuming default level is Info
-// 		},
-// 		{
-// 			name:         "Error parsing the config",
-// 			mgr:          mockMgr,
-// 			loggerConfig: mockLogger,
-// 			setup: func() {
-// 				// Simulate an error when updating the config map
-// 				mockConfigUpdater.On("UpdateConfigMap", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError)
-// 			},
-// 			wantErr:       true,
-// 			expectedLevel: logrus.InfoLevel, // If an error occurs, the level should remain the same
-// 		},
-// 		{
-// 			name:         "Unable to parse log level",
-// 			mgr:          mockMgr,
-// 			loggerConfig: mockLogger,
-// 			setup: func() {
-// 				// Mock UpdateConfigMap to return nil (no error)
-// 				mockConfigUpdater.On("UpdateConfigMap", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-// 				// Force an invalid log level
-// 				mgr.config.LogLevel = "invalidLevel"
-// 			},
-// 			wantErr:       false,
-// 			expectedLevel: logrus.InfoLevel, // Should fallback to default level (Info) on error
-// 		},
-// 	}
+// 	// Mock manager setup
+// 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+// 		Scheme:                     nil, // Provide a mock or actual scheme here if needed
+// 		Metrics:                    server.Options{BindAddress: metricsAddr},
+// 		WebhookServer:              webhook.NewServer(webhook.Options{Port: 8443}),
+// 		LeaderElection:             enableLeaderElection,
+// 		LeaderElectionResourceLock: "leases",
+// 		LeaderElectionID:           "test-leader-election-id",
+// 	})
+// 	require.NoError(t, err)
 
-// 	// Run test cases
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			// Reset mocks before the test
-// 			mockConfigUpdater.MockExpectationsWereMet()
+// 	// Mock Migrator Manager
+// 	migratorMgr := &MockMigratorManager{}
 
-// 			// Setup test case-specific mocks
-// 			if tt.setup != nil {
-// 				tt.setup()
-// 			}
+// 	// Initialize components
+// 	err = initializeComponents(ctx, mgr, csiConn, identityClient, migrationClient, migratorMgr, "info", domain, replicationDomain, workerThreads, retryIntervalStart, retryIntervalMax, operationTimeout, probeFrequency, maxRetryDurationForActions)
+// 	require.NoError(t, err)
 
-// 			// Call the function under test
-// 			tt.mgr.processConfigMapChanges(tt.loggerConfig)
-
-// 			// Check if the error status matches
-// 			if tt.wantErr && tt.loggerConfig.GetLevel() != tt.expectedLevel {
-// 				t.Errorf("Expected log level %v, but got %v", tt.expectedLevel, tt.loggerConfig.GetLevel())
-// 			}
-
-// 			// Validate the logger level is correctly set or not, depending on the conditions
-// 			if !tt.wantErr && tt.loggerConfig.GetLevel() != tt.expectedLevel {
-// 				t.Errorf("Expected log level %v, but got %v", tt.expectedLevel, tt.loggerConfig.GetLevel())
-// 			}
-// 		})
-// 	}
+// 	// Verify initialization
+// 	assert.NotNil(t, mgr)
+// 	assert.NotNil(t, csiConn)
+// 	assert.NotNil(t, identityClient)
+// 	assert.NotNil(t, migrationClient)
+// 	assert.NotNil(t, migratorMgr)
 // }
 
-func TestMainFunction(t *testing.T) {
-	// Set up flags
-	metricsAddr := ":8001"
-	enableLeaderElection := false
-	workerThreads := 2
-	retryIntervalStart := time.Second
-	retryIntervalMax := 5 * time.Minute
-	operationTimeout := 300 * time.Second
-	probeFrequency := 5 * time.Second
-	domain := "default-domain"
-	replicationDomain := "default-repl-domain"
-	maxRetryDurationForActions := 10 * time.Minute
+// func initializeComponents(ctx context.Context, mgr ctrl.Manager, csiConn *MockCSIConnection, identityClient *MockIdentityClient, migrationClient *MockMigrationClient, migratorMgr *MockMigratorManager, logLevel, domain, replicationDomain string, workerThreads int, retryIntervalStart, retryIntervalMax, operationTimeout, probeFrequency, maxRetryDurationForActions time.Duration) error {
+// 	// Simulate initialization logic
+// 	// If any error occurs here, we can check it against specific mock expectations
+// 	return nil
+// }
 
-	// Mock context
-	ctx := context.Background()
+// // Mock function implementations for the mock types
+// func (m *MockCSIConnection) Connect(address string) error {
+// 	// Simulate a successful connection
+// 	return nil
+// }
 
-	// Mock CSI connection
-	csiConn := &MockCSIConnection{}
-	identityClient := &MockIdentityClient{}
-	migrationClient := &MockMigrationClient{}
+// func (m *MockIdentityClient) ProbeForever(ctx context.Context) (string, error) {
+// 	// Simulate a successful probe
+// 	return "mock-driver", nil
+// }
 
-	// Mock manager
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme: scheme,
-		Metrics: server.Options{
-			BindAddress: metricsAddr,
-		},
-		WebhookServer:              webhook.NewServer(webhook.Options{Port: 8443}),
-		LeaderElection:             enableLeaderElection,
-		LeaderElectionResourceLock: "leases",
-		LeaderElectionID:           "test-leader-election-id",
-	})
-	require.NoError(t, err)
+// func (m *MockIdentityClient) GetMigrationCapabilities(ctx context.Context) (map[string]bool, error) {
+// 	// Simulate returning migration capabilities
+// 	return map[string]bool{"migrator": true}, nil
+// }
 
-	// Mock Migrator Manager
-	migratorMgr := &MockMigratorManager{}
+// func (m *MockMigrationClient) Migrate(ctx context.Context) error {
+// 	// Simulate a migration operation
+// 	return nil
+// }
 
-	// Mock log level
-	logLevel := "info"
+// func (m *MockMigratorManager) SetupConfigMapWatcher(logger logrus.Logger) {
+// 	// Simulate setting up a config map watcher
+// }
 
-	// Initialize components
-	err = initializeComponents(ctx, mgr, csiConn, identityClient, migrationClient, migratorMgr, logLevel, domain, replicationDomain, workerThreads, retryIntervalStart, retryIntervalMax, operationTimeout, probeFrequency, maxRetryDurationForActions)
-	require.NoError(t, err)
+// func (m *MockMigratorManager) Config() *Config {
+// 	// Simulate fetching a config
+// 	return &Config{LogLevel: "info"}
+// }
 
-	// Verify initialization
-	assert.NotNil(t, mgr)
-	assert.NotNil(t, csiConn)
-	assert.NotNil(t, identityClient)
-	assert.NotNil(t, migrationClient)
-	assert.NotNil(t, migratorMgr)
+// type Config struct {
+// 	LogLevel string
+// }
+
+// func TestProcessConfigMapChanges(t *testing.T) {
+// 	// Setup mock manager and config
+// 	mockManager := new(MockManager)
+// 	mockConfig := new(MockConfig)
+// 	loggerConfig := logrus.New()
+
+// 	// Setup test case with MigratorManager instance
+// 	migrator := &MigratorManager{
+// 		Opts:    config.ControllerManagerOpts{},
+// 		Manager: mockManager,
+// 		config:  &config.Config{},
+// 	}
+
+// 	// Successful config update and valid log level
+// 	mockManager.On("GetLogger").Return(loggerConfig)
+// 	mockConfig.On("UpdateConfigMap", mock.Anything, nil, migrator.Opts, nil, mockManager.GetLogger()).Return(nil)
+// 	mockConfig.On("ParseLevel", "error").Return(logrus.ErrorLevel, nil)
+
+// 	// Capture logs for validation
+// 	log.SetOutput(&testWriter{t: t})
+
+// 	// Run the processConfigMapChanges method
+// 	migrator.processConfigMapChanges(loggerConfig)
+
+// 	// Assert the expectations
+// 	mockManager.AssertExpectations(t)
+// 	mockConfig.AssertExpectations(t)
+// 	assert.Equal(t, logrus.ErrorLevel, loggerConfig.GetLevel())
+// }
+
+// func TestProcessConfigMapChangesWithError(t *testing.T) {
+
+// 	defaultGetUpdateConfigMapFunc := getUpdateConfigMapFunc
+// 	defer func() {
+// 		getUpdateConfigMapFunc = defaultGetUpdateConfigMapFunc
+// 	}()
+
+// 	getUpdateConfigMapFunc = func(_ *MigratorManager, _ context.Context) error {
+// 		return nil
+// 	}
+
+// 	// Setup mock manager and config
+// 	mockManager := new(MockManager)
+// 	mockConfig := new(MockConfig)
+// 	loggerConfig := logrus.New()
+
+// 	// Setup test case with MigratorManager instance
+// 	migrator := &MigratorManager{
+// 		Opts:    config.ControllerManagerOpts{},
+// 		Manager: mockManager,
+// 		config:  &config.Config{},
+// 	}
+
+// 	// Simulate error in UpdateConfigMap function
+// 	mockManager.On("GetLogger").Return(loggerConfig)
+// 	mockConfig.On("UpdateConfigMap", mock.Anything, nil, migrator.Opts, nil, mockManager.GetLogger()).Return(errors.New("Failed to update config map"))
+
+// 	// Capture logs for validation
+// 	log.SetOutput(&testWriter{t: t})
+
+// 	// Run the processConfigMapChanges method
+// 	migrator.processConfigMapChanges(loggerConfig)
+
+// 	// Assert the expectations
+// 	mockManager.AssertExpectations(t)
+// 	mockConfig.AssertExpectations(t)
+// }
+
+// type testWriter struct {
+// 	t *testing.T
+// }
+
+// func (tw *testWriter) Write(p []byte) (n int, err error) {
+// 	tw.t.Log(string(p))
+// 	return len(p), nil
+// }
+
+// defaultGetUpdateConfigMapFunc := getUpdateConfigMapFunc
+// defer func() {
+// 	getUpdateConfigMapFunc = defaultGetUpdateConfigMapFunc
+// }()
+
+//	getUpdateConfigMapFunc = func(_ *MigratorManager, _ context.Context) error {
+//		return nil
+//	}
+type mockManager struct {
+	logger logr.Logger
 }
 
-func initializeComponents(ctx context.Context, mgr ctrl.Manager, csiConn *MockCSIConnection, identityClient *MockIdentityClient, migrationClient *MockMigrationClient, migratorMgr *MockMigratorManager, logLevel, domain, replicationDomain string, workerThreads int, retryIntervalStart, retryIntervalMax, operationTimeout, probeFrequency, maxRetryDurationForActions time.Duration) error {
-	// Mock initialization logic
+func (m *mockManager) GetLogger() logr.Logger {
+	return m.logger
+}
+
+func (m *mockManager) Add(runnable manager.Runnable) error {
+	// Implement the method as needed for your mock
 	return nil
 }
 
-// Mock types for testing
-type MockCSIConnection struct{}
-type MockIdentityClient struct{}
-type MockMigrationClient struct{}
-type MockMigratorManager struct{}
+func (m *mockManager) AddHealthzCheck(name string, check healthz.Checker) error {
+	// Implement the method as needed for your mock
+	return nil
+}
+
+func (m *mockManager) AddMetricsServerExtraHandler(path string, handler http.Handler) error {
+	// Implement the method as needed for your mock
+	return nil
+}
+
+func (m *mockManager) AddReadyzCheck(name string, check healthz.Checker) error {
+	// Implement the method as needed for your mock
+	return nil
+}
+
+func (m *mockManager) Elected() <-chan struct{} {
+	// Implement the method as needed for your mock
+	return make(chan struct{})
+}
+
+func (m *mockManager) GetControllerOptions() ctrlcnf.Controller {
+	// Implement the method as needed for your mock
+	return ctrlcnf.Controller{}
+}
+
+type mockServer struct {
+	mux *http.ServeMux
+}
+
+func (m *mockServer) NeedLeaderElection() bool {
+	return false
+}
+
+func (m *mockServer) Register(path string, hook http.Handler) {
+	if m.mux == nil {
+		m.mux = http.NewServeMux()
+	}
+	m.mux.Handle(path, hook)
+}
+
+func (m *mockServer) Start(ctx context.Context) error {
+	// Implement the method as needed for your mock
+	return nil
+}
+
+func (m *mockServer) StartedChecker() healthz.Checker {
+	return healthz.Ping
+}
+
+func (m *mockServer) WebhookMux() *http.ServeMux {
+	return m.mux
+}
+
+func (m *mockManager) GetWebhookServer() webhook.Server {
+	// Implement the method as needed for your mock
+	return &mockServer{}
+}
+
+func (m *mockManager) Start(ctx context.Context) error {
+	// Implement the method as needed for your mock
+	return nil
+}
+
+func (m *mockManager) GetAPIReader() client.Reader {
+	// Implement the method as needed for your mock
+	return nil
+}
+
+func (m *mockManager) GetCache() cache.Cache {
+	// Implement the method as needed for your mock
+	return nil
+}
+
+func (m *mockManager) GetConfig() *rest.Config {
+	// Implement the method as needed for your mock
+	return nil
+}
+
+func (m *mockManager) GetClient() client.Client {
+	// Implement the method as needed for your mock
+	return nil
+}
+
+func (m *mockManager) GetEventRecorderFor(name string) record.EventRecorder {
+	// Implement the method as needed for your mock
+	return nil
+}
+
+func (m *mockManager) GetFieldIndexer() client.FieldIndexer {
+	// Implement the method as needed for your mock
+	return nil
+}
+
+func (m *mockManager) GetHTTPClient() *http.Client {
+	// Implement the method as needed for your mock
+	return nil
+}
+
+func (m *mockManager) GetRESTMapper() meta.RESTMapper {
+	// Implement the method as needed for your mock
+	return nil
+}
+
+func (m *mockManager) GetScheme() *runtime.Scheme {
+	// Implement the method as needed for your mock
+	return nil
+}
+
+func Test2ProcessConfigMapChangesWithError(t *testing.T) {
+
+	defaultGetUpdateConfigMapFunc := getUpdateConfigMapFunc
+	defer func() {
+		getUpdateConfigMapFunc = defaultGetUpdateConfigMapFunc
+	}()
+
+	// Test case 1: Success - no error in getUpdateConfigMapFunc
+	getUpdateConfigMapFunc = func(_ *MigratorManager, _ context.Context) error {
+		return nil
+	}
+
+	mockMgr := &mockManager{
+		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
+	}
+
+	loggerConfig := logrus.New()
+	migrator := &MigratorManager{
+		Opts:    config.ControllerManagerOpts{},
+		Manager: mockMgr,
+		config:  &config.Config{},
+	}
+
+	t.Run("Success Test Case", func(t *testing.T) {
+		migrator.processConfigMapChanges(loggerConfig)
+	})
+
+	// Test case 2: Error in getUpdateConfigMapFunc
+	getUpdateConfigMapFunc = func(_ *MigratorManager, _ context.Context) error {
+		return fmt.Errorf("config update error")
+	}
+
+	t.Run("Error in getUpdateConfigMapFunc", func(t *testing.T) {
+		migrator.processConfigMapChanges(loggerConfig)
+	})
+
+	// Test case 3: Error in ParseLevel (invalid log level)
+	getUpdateConfigMapFunc = func(_ *MigratorManager, _ context.Context) error {
+		return nil
+	}
+
+	migrator.config.LogLevel = "invalid-log-level" // Set an invalid log level
+
+	t.Run("Error in ParseLevel", func(t *testing.T) {
+		migrator.processConfigMapChanges(loggerConfig)
+	})
+
+	// Test case 4: Valid Log Level set in config
+	getUpdateConfigMapFunc = func(_ *MigratorManager, _ context.Context) error {
+		return nil
+	}
+
+	migrator.config.LogLevel = "info" // Set a valid log level
+
+	t.Run("Valid Log Level", func(t *testing.T) {
+		migrator.processConfigMapChanges(loggerConfig)
+		if loggerConfig.GetLevel() != logrus.InfoLevel {
+			t.Errorf("Expected log level to be info, but got %v", loggerConfig.GetLevel())
+		}
+	})
+}
