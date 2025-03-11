@@ -339,7 +339,7 @@ func TestPvcProtectionIsComplete(t *testing.T) {
 				controllers.PVCProtectionComplete: "yes",
 			},
 			setupMocks: func() {
-				getAnnotations = func(meta client.Object) map[string]string {
+				getAnnotations = func(_ client.Object) map[string]string {
 					return map[string]string{
 						controllers.PVCProtectionComplete: "yes",
 					}
@@ -353,7 +353,7 @@ func TestPvcProtectionIsComplete(t *testing.T) {
 				controllers.PVCProtectionComplete: "no",
 			},
 			setupMocks: func() {
-				getAnnotations = func(meta client.Object) map[string]string {
+				getAnnotations = func(_ client.Object) map[string]string {
 					return map[string]string{
 						controllers.PVCProtectionComplete: "no",
 					}
@@ -365,7 +365,7 @@ func TestPvcProtectionIsComplete(t *testing.T) {
 			name:        "No PVCProtectionComplete annotation",
 			annotations: map[string]string{},
 			setupMocks: func() {
-				getAnnotations = func(meta client.Object) map[string]string {
+				getAnnotations = func(_ client.Object) map[string]string {
 					return map[string]string{}
 				}
 			},

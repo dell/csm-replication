@@ -23,8 +23,8 @@ import (
 
 	"github.com/dell/csm-replication/controllers"
 	constants "github.com/dell/csm-replication/pkg/common"
-	csimigration "github.com/dell/csm-replication/pkg/csi-clients/migration"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
+	csimigration "github.com/dell/csm-replication/test/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"
@@ -795,7 +795,7 @@ func TestIsMigrationRequested(t *testing.T) {
 				controllers.MigrationRequested: "true",
 			},
 			setupMocks: func() {
-				getAnnotations = func(meta client.Object) map[string]string {
+				getAnnotations = func(_ client.Object) map[string]string {
 					return map[string]string{
 						controllers.MigrationRequested: "true",
 					}
@@ -807,7 +807,7 @@ func TestIsMigrationRequested(t *testing.T) {
 			name:        "MigrationRequested annotation does not exist",
 			annotations: map[string]string{},
 			setupMocks: func() {
-				getAnnotations = func(meta client.Object) map[string]string {
+				getAnnotations = func(_ client.Object) map[string]string {
 					return map[string]string{}
 				}
 			},

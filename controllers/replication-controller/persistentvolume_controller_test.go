@@ -822,3 +822,104 @@ func TestGetDeletionTimestamp(t *testing.T) {
 		})
 	}
 }
+
+func (suite *PVReconcileSuite) TestRemoteClientGetConnectionError() {
+	volAttributes := make(map[string]string)
+	pvObj := utils.GetPVObj("fake-pv-conn-err", "fakeHandle", suite.driver.DriverName, suite.driver.StorageClass, volAttributes)
+
+	annotations := make(map[string]string)
+	annotations[controllers.RemoteClusterID] = "nonexistent-cluster" // Use a cluster ID that will fail
+	pvObj.Annotations = annotations
+
+	err := suite.client.Create(context.Background(), pvObj)
+	suite.NoError(err)
+
+	req := suite.getTypicalRequest("fake-pv-conn-err")
+
+	_, err = suite.reconciler.Reconcile(context.Background(), req)
+	suite.Error(err, "should fail to get remote client")
+}
+
+func (suite *PVReconcileSuite) TestReconcilePVRemotePVNameEmpty() {
+	fakeConfig := config.New("sourceCluster", "remote-123")
+	_, err := fakeConfig.GetConnection("remote-123")
+	suite.NoError(err)
+
+	ctx := context.Background()
+	pvObj := utils.GetPVObj("fake-pv-nopv", "fakeHandle", suite.driver.DriverName, suite.driver.StorageClass, map[string]string{})
+	annotations := make(map[string]string)
+	annotations[controllers.RemoteClusterID] = "remote-123"
+	annotations[controllers.PVProtectionComplete] = "yes"
+	annotations[controllers.RemoteVolumeAnnotation] = `{"capacity_bytes":5369364480,"volume_id":"csi-KPC-pmax-a28d2d04ae-000000000001","volume_context":{"CapacityGB":"5.00","RdfGroup":"4","RemoteRDFGroup":"4","ServiceLevel":"Bronze","StorageGroup":"csi-no-srp-sg-test-4-ASYNC","powermax/RdfMode":"ASYNC","powermax/RemoteSYMID":"000000000001","powermax/SYMID":"000000000001"}}`
+	annotations[controllers.ReplicationGroup] = suite.driver.RGName
+	annotations[controllers.RemoteStorageClassAnnotation] = suite.driver.RemoteSCName
+	annotations[controllers.RemotePV] = ""
+
+	pvObj.Annotations = annotations
+
+	err = suite.mockUtils.FakeClient.Create(ctx, pvObj)
+	suite.NoError(err)
+	req := suite.getTypicalRequest("fake-pv-nopv")
+
+	_, err = suite.reconciler.Reconcile(ctx, req)
+	suite.NoError(err)
+}
+
+func TestPersistentVolumeReconciler_processRemotePV(t *testing.T) {
+	type args struct {
+		ctx          context.Context
+		rClient      connection.RemoteClusterClient
+		remotePV     *corev1.PersistentVolume
+		remoteRGName string
+	}
+	tests := []struct {
+		name    string
+		r       *PersistentVolumeReconciler
+		args    args
+		want    bool
+		wantErr bool
+	}{
+		{
+			name: "Remote RG name is empty",
+			r:    &PersistentVolumeReconciler{},
+			args: args{
+				ctx:          context.TODO(),
+				rClient:      nil,
+				remotePV:     &corev1.PersistentVolume{},
+				remoteRGName: "",
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "Remote RG annotation already set",
+			r:    &PersistentVolumeReconciler{},
+			args: args{
+				ctx:     context.TODO(),
+				rClient: nil,
+				remotePV: &corev1.PersistentVolume{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							controller.ReplicationGroup: "rg1",
+						},
+					},
+				},
+				remoteRGName: "rg1",
+			},
+			want:    false,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.r.processRemotePV(tt.args.ctx, tt.args.rClient, tt.args.remotePV, tt.args.remoteRGName)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("PersistentVolumeReconciler.processRemotePV() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("PersistentVolumeReconciler.processRemotePV() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

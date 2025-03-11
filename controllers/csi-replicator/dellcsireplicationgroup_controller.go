@@ -63,6 +63,12 @@ const (
 	MaxNumberOfConditions = 20
 )
 
+var (
+	getReplicationGroupRecouncilerUpdate = func(r *ReplicationGroupReconciler, ctx context.Context, obj client.Object) error {
+		return r.Update(ctx, obj)
+	}
+)
+
 // ActionType represent replication action (FAILOVER, REPROTECT and etc.)
 type ActionType string
 
@@ -423,7 +429,7 @@ func (r *ReplicationGroupReconciler) addFinalizer(ctx context.Context, rg *repv1
 
 	ok := controllers.AddFinalizerIfNotExist(rg, controllers.ReplicationFinalizer)
 	if ok {
-		if err := r.Update(ctx, rg); err != nil {
+		if err := getReplicationGroupRecouncilerUpdate(r, ctx, rg); err != nil {
 			log.Error(err, "Failed to add finalizer", "rg", rg)
 			return ok, err
 		}

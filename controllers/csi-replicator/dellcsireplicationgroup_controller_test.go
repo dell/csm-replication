@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -34,6 +35,7 @@ import (
 	csiidentity "github.com/dell/csm-replication/pkg/csi-clients/identity"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
 	csireplication "github.com/dell/csm-replication/test/mocks"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -41,7 +43,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -1193,11 +1194,114 @@ func (suite *RGControllerTestSuite) TestNoDeletionTimeStamp() {
 	suite.Nil(err, "This should reconcile successfully")
 }
 
-func (suite *RGControllerTestSuite) TestSetupWithManagerRg() {
-	mgr := manager.Manager(nil)
-	expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second)
-	err := suite.rgReconcile.SetupWithManager(mgr, expRateLimiter, 1)
-	suite.Error(err, "Setup should fail when there is no manager")
+func TestSetupWithManagerRg(t *testing.T) {
+	tests := []struct {
+		name                       string
+		MaxRetryDurationForActions time.Duration
+		manager                    ctrl.Manager
+		limiter                    workqueue.TypedRateLimiter[reconcile.Request]
+		maxReconcilers             int
+		wantError                  bool
+	}{
+		{
+			name:                       "Manager is nil AND MaxRetryDurationForActions is zero",
+			MaxRetryDurationForActions: 0,
+			manager:                    nil,
+			limiter:                    nil,
+			maxReconcilers:             0,
+			wantError:                  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &ReplicationGroupReconciler{
+				MaxRetryDurationForActions: tt.MaxRetryDurationForActions,
+			}
+			err := r.SetupWithManager(tt.manager, tt.limiter, tt.maxReconcilers)
+			if (err != nil) != tt.wantError {
+				t.Errorf("SetupWithManager() error = %v, wantError %v", err, tt.wantError)
+			}
+		})
+	}
+}
+
+func TestReplicationGroupReconciler_getAction(t *testing.T) {
+	tests := []struct {
+		name       string
+		actionType ActionType
+		wantAction *csiext.ExecuteActionRequest_Action
+		wantErr    bool
+	}{
+		{
+			name:       "supportedAction is nil",
+			actionType: ActionType("InvalidAction"),
+			wantAction: nil,
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &ReplicationGroupReconciler{
+				SupportedActions: []*csiext.SupportedActions{
+					nil,
+				},
+			}
+
+			gotAction, err := r.getAction(tt.actionType)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ReplicationGroupReconciler.getAction() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(gotAction, tt.wantAction) {
+				t.Errorf("ReplicationGroupReconciler.getAction() = %v, want %v", gotAction, tt.wantAction)
+			}
+		})
+	}
+}
+
+func TestReplicationGroupReconciler_addFinalizer(t *testing.T) {
+	originalGetReplicationGroupRecouncilerUpdate := getReplicationGroupRecouncilerUpdate
+
+	after := func() {
+		getReplicationGroupRecouncilerUpdate = originalGetReplicationGroupRecouncilerUpdate
+	}
+
+	tests := []struct {
+		name    string
+		setup   func()
+		rg      *repv1.DellCSIReplicationGroup
+		wantErr bool
+	}{
+		{
+			name: "Add finalizer with error",
+			setup: func() {
+				getReplicationGroupRecouncilerUpdate = func(_ *ReplicationGroupReconciler, _ context.Context, _ client.Object) error {
+					return errors.New("Failed to add finalizer")
+				}
+			},
+			rg:      &repv1.DellCSIReplicationGroup{},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer after()
+			tt.setup()
+			ctx := context.Background()
+			r := &ReplicationGroupReconciler{}
+
+			ok, err := r.addFinalizer(ctx, tt.rg)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ReplicationGroupReconciler.addFinalizer() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err == nil {
+				assert.True(t, ok, "Finalizer should be added")
+			}
+		})
+	}
 }
 
 func TestActionType_Equals(t *testing.T) {
