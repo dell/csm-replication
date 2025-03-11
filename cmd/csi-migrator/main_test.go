@@ -125,95 +125,6 @@ import (
 // 	return &Config{LogLevel: "info"}
 // }
 
-// type Config struct {
-// 	LogLevel string
-// }
-
-// func TestProcessConfigMapChanges(t *testing.T) {
-// 	// Setup mock manager and config
-// 	mockManager := new(MockManager)
-// 	mockConfig := new(MockConfig)
-// 	loggerConfig := logrus.New()
-
-// 	// Setup test case with MigratorManager instance
-// 	migrator := &MigratorManager{
-// 		Opts:    config.ControllerManagerOpts{},
-// 		Manager: mockManager,
-// 		config:  &config.Config{},
-// 	}
-
-// 	// Successful config update and valid log level
-// 	mockManager.On("GetLogger").Return(loggerConfig)
-// 	mockConfig.On("UpdateConfigMap", mock.Anything, nil, migrator.Opts, nil, mockManager.GetLogger()).Return(nil)
-// 	mockConfig.On("ParseLevel", "error").Return(logrus.ErrorLevel, nil)
-
-// 	// Capture logs for validation
-// 	log.SetOutput(&testWriter{t: t})
-
-// 	// Run the processConfigMapChanges method
-// 	migrator.processConfigMapChanges(loggerConfig)
-
-// 	// Assert the expectations
-// 	mockManager.AssertExpectations(t)
-// 	mockConfig.AssertExpectations(t)
-// 	assert.Equal(t, logrus.ErrorLevel, loggerConfig.GetLevel())
-// }
-
-// func TestProcessConfigMapChangesWithError(t *testing.T) {
-
-// 	defaultGetUpdateConfigMapFunc := getUpdateConfigMapFunc
-// 	defer func() {
-// 		getUpdateConfigMapFunc = defaultGetUpdateConfigMapFunc
-// 	}()
-
-// 	getUpdateConfigMapFunc = func(_ *MigratorManager, _ context.Context) error {
-// 		return nil
-// 	}
-
-// 	// Setup mock manager and config
-// 	mockManager := new(MockManager)
-// 	mockConfig := new(MockConfig)
-// 	loggerConfig := logrus.New()
-
-// 	// Setup test case with MigratorManager instance
-// 	migrator := &MigratorManager{
-// 		Opts:    config.ControllerManagerOpts{},
-// 		Manager: mockManager,
-// 		config:  &config.Config{},
-// 	}
-
-// 	// Simulate error in UpdateConfigMap function
-// 	mockManager.On("GetLogger").Return(loggerConfig)
-// 	mockConfig.On("UpdateConfigMap", mock.Anything, nil, migrator.Opts, nil, mockManager.GetLogger()).Return(errors.New("Failed to update config map"))
-
-// 	// Capture logs for validation
-// 	log.SetOutput(&testWriter{t: t})
-
-// 	// Run the processConfigMapChanges method
-// 	migrator.processConfigMapChanges(loggerConfig)
-
-// 	// Assert the expectations
-// 	mockManager.AssertExpectations(t)
-// 	mockConfig.AssertExpectations(t)
-// }
-
-// type testWriter struct {
-// 	t *testing.T
-// }
-
-// func (tw *testWriter) Write(p []byte) (n int, err error) {
-// 	tw.t.Log(string(p))
-// 	return len(p), nil
-// }
-
-// defaultGetUpdateConfigMapFunc := getUpdateConfigMapFunc
-// defer func() {
-// 	getUpdateConfigMapFunc = defaultGetUpdateConfigMapFunc
-// }()
-
-//	getUpdateConfigMapFunc = func(_ *MigratorManager, _ context.Context) error {
-//		return nil
-//	}
 type mockManager struct {
 	logger logr.Logger
 }
@@ -335,7 +246,7 @@ func (m *mockManager) GetScheme() *runtime.Scheme {
 	return nil
 }
 
-func Test2ProcessConfigMapChangesWithError(t *testing.T) {
+func TestProcessConfigMapChanges(t *testing.T) {
 
 	defaultGetUpdateConfigMapFunc := getUpdateConfigMapFunc
 	defer func() {
@@ -393,6 +304,85 @@ func Test2ProcessConfigMapChangesWithError(t *testing.T) {
 		migrator.processConfigMapChanges(loggerConfig)
 		if loggerConfig.GetLevel() != logrus.InfoLevel {
 			t.Errorf("Expected log level to be info, but got %v", loggerConfig.GetLevel())
+		}
+	})
+}
+
+func TestCreateMigratorManager(t *testing.T) {
+	// Define a default function for getConfigFunc
+	defaultGetConfigFunc := getConfigFunc
+	defer func() {
+		getConfigFunc = defaultGetConfigFunc
+	}()
+
+	// Test case 1: Successful creation of MigratorManager
+	getConfigFunc = func(ctx context.Context, opts config.ControllerManagerOpts, mgrLogr logr.Logger) (*config.Config, error) {
+		// Mock the successful config return
+		return &config.Config{LogLevel: "info"}, nil
+	}
+
+	mockMgr := &mockManager{
+		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
+	}
+
+	t.Run("Success Test Case", func(t *testing.T) {
+		migratorManager, err := createMigratorManager(context.Background(), mockMgr)
+		if err != nil {
+			t.Fatalf("Expected no error, got %v", err)
+		}
+		if migratorManager == nil {
+			t.Fatalf("Expected MigratorManager to be non-nil")
+		}
+		// You can add more assertions here if needed
+	})
+
+	// Test case 2: Error in getConfigFunc
+	getConfigFunc = func(ctx context.Context, opts config.ControllerManagerOpts, mgrLogr logr.Logger) (*config.Config, error) {
+		// Mock an error return from getConfigFunc
+		return nil, fmt.Errorf("failed to get config")
+	}
+
+	t.Run("Error in getConfigFunc", func(t *testing.T) {
+		migratorManager, err := createMigratorManager(context.Background(), mockMgr)
+		if err == nil {
+			t.Fatalf("Expected error, got nil")
+		}
+		if migratorManager != nil {
+			t.Fatalf("Expected MigratorManager to be nil, but got non-nil")
+		}
+		if err.Error() != "failed to get config" {
+			t.Fatalf("Expected error 'failed to get config', got %v", err)
+		}
+	})
+
+	// Test case 3: Nil Manager passed to createMigratorManager
+	t.Run("Nil Manager", func(t *testing.T) {
+		migratorManager, err := createMigratorManager(context.Background(), nil)
+		if err == nil {
+			t.Fatalf("Expected error when manager is nil, got nil")
+		}
+		if migratorManager != nil {
+			t.Fatalf("Expected MigratorManager to be nil, but got non-nil")
+		}
+	})
+
+	// Test case 4: Check if the correct mode is set in options
+	t.Run("Correct Mode Set", func(t *testing.T) {
+		getConfigFunc = func(ctx context.Context, opts config.ControllerManagerOpts, mgrLogr logr.Logger) (*config.Config, error) {
+			// Return config with any log level
+			return &config.Config{LogLevel: "info"}, nil
+		}
+
+		mockMgr := &mockManager{
+			logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
+		}
+
+		migratorManager, err := createMigratorManager(context.Background(), mockMgr)
+		if err != nil {
+			t.Fatalf("Expected no error, got %v", err)
+		}
+		if migratorManager.Opts.Mode != "sidecar" {
+			t.Fatalf("Expected mode to be 'sidecar', got %s", migratorManager.Opts.Mode)
 		}
 	})
 }

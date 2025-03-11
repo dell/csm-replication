@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/dell/dell-csi-extensions/migration"
+	"github.com/go-logr/logr"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
@@ -81,6 +82,10 @@ var getUpdateConfigMapFunc = func(mgr *MigratorManager, ctx context.Context) err
 	return mgr.config.UpdateConfigMap(ctx, nil, mgr.Opts, nil, mgr.Manager.GetLogger())
 }
 
+var getConfigFunc = func(ctx context.Context, opts config.ControllerManagerOpts, mgrLogr logr.Logger) (*config.Config, error) {
+	return config.GetConfig(ctx, nil, opts, nil, mgrLogr)
+}
+
 func (mgr *MigratorManager) processConfigMapChanges(loggerConfig *logrus.Logger) {
 	log.Println("Received a config change event")
 	err := getUpdateConfigMapFunc(mgr, context.Background())
@@ -107,10 +112,14 @@ func (mgr *MigratorManager) setupConfigMapWatcher(loggerConfig *logrus.Logger) {
 }
 
 func createMigratorManager(ctx context.Context, mgr ctrl.Manager) (*MigratorManager, error) {
+	// Check if the manager is nil
+	if mgr == nil {
+		return nil, fmt.Errorf("manager cannot be nil")
+	}
 	opts := config.GetControllerManagerOpts()
 	opts.Mode = "sidecar"
 	mgrLogger := mgr.GetLogger()
-	repConfig, err := config.GetConfig(ctx, nil, opts, nil, mgrLogger)
+	repConfig, err := getConfigFunc(ctx, opts, mgrLogger)
 	if err != nil {
 		return nil, err
 	}
