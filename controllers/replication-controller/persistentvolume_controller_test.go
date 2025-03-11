@@ -923,3 +923,56 @@ func TestPersistentVolumeReconciler_processRemotePV(t *testing.T) {
 		})
 	}
 }
+
+func TestProcessLocalPV(t *testing.T) {
+	originalGetPersistentVolumeReconcilerUpdate := getPersistentVolumeReconcilerUpdate
+	originalGetPersistentVolumeReconcilerEventf := getPersistentVolumeReconcilerEventf
+
+	defer func() {
+		getPersistentVolumeReconcilerUpdate = originalGetPersistentVolumeReconcilerUpdate
+		getPersistentVolumeReconcilerEventf = originalGetPersistentVolumeReconcilerEventf
+	}()
+
+	getPersistentVolumeReconcilerUpdate = func(_ *PersistentVolumeReconciler, _ context.Context, _ client.Object) error {
+		// return errors.New("error in getPersistentVolumeReconcilerUpdate")
+		return nil
+	}
+
+	getPersistentVolumeReconcilerEventf = func(_ *PersistentVolumeReconciler, _ runtime.Object, _ string, _ string, _ string, _ ...interface{}) {
+	}
+
+	tests := []struct {
+		name            string
+		localPV         *corev1.PersistentVolume
+		remotePVName    string
+		remoteClusterID string
+		wantErr         bool
+	}{
+		{
+			name: "PV sync already complete",
+			localPV: &corev1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						controller.PVSyncComplete: "no",
+						controller.RemotePV:       "",
+					},
+				},
+			},
+			remotePVName:    "remote-pv-name",
+			remoteClusterID: "remote-cluster-id",
+			wantErr:         false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &PersistentVolumeReconciler{}
+			err := r.processLocalPV(context.Background(), tt.localPV, tt.remotePVName, tt.remoteClusterID)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("PersistentVolumeReconciler.processLocalPV() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+		})
+	}
+}

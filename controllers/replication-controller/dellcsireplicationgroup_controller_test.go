@@ -23,11 +23,13 @@ import (
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
+
 	csireplicator "github.com/dell/csm-replication/controllers/csi-replicator"
 	constants "github.com/dell/csm-replication/pkg/common"
 	"github.com/dell/csm-replication/pkg/config"
 	"github.com/dell/csm-replication/pkg/connection"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
+	"github.com/go-logr/logr"
 	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	"github.com/stretchr/testify/suite"
 	v1 "k8s.io/api/core/v1"
@@ -693,4 +695,72 @@ func (suite *RGControllerTestSuite) TestProcessSnapshotEvent() {
 
 	err = suite.reconciler.processSnapshotEvent(context.Background(), rg, remoteClient, suite.reconciler.Log)
 	suite.NoError(err, "processSnapshotEvent should succeed when a valid snapshot class and action attributes are provided")
+}
+
+func TestReplicationGroupReconciler_SetupWithManager(t *testing.T) {
+	tests := []struct {
+		name           string
+		manager        ctrl.Manager
+		limiter        workqueue.TypedRateLimiter[reconcile.Request]
+		maxReconcilers int
+		wantError      bool
+	}{
+		{
+			name:           "Manager is nil",
+			manager:        nil,
+			limiter:        nil,
+			maxReconcilers: 0,
+			wantError:      true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &ReplicationGroupReconciler{}
+			err := r.SetupWithManager(tt.manager, tt.limiter, tt.maxReconcilers)
+			if (err != nil) != tt.wantError {
+				t.Errorf("SetupWithManager() error = %v, wantError %v", err, tt.wantError)
+			}
+		})
+	}
+}
+
+func TestReplicationGroupReconciler_processLastActionResult(t *testing.T) {
+	type args struct {
+		ctx          context.Context
+		group        *repv1.DellCSIReplicationGroup
+		remoteClient connection.RemoteClusterClient
+		log          logr.Logger
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "Test case: Last action failed",
+			args: args{
+				ctx: context.Background(),
+				group: &repv1.DellCSIReplicationGroup{
+					Status: repv1.DellCSIReplicationGroupStatus{
+						Conditions: []repv1.LastAction{repv1.LastAction{}},
+						LastAction: repv1.LastAction{
+							Time:         &metav1.Time{Time: time.Date(2022, time.January, 1, 0, 0, 0, 0, time.UTC)},
+							ErrorMessage: "error msg",
+						},
+					},
+				},
+				remoteClient: nil,
+				log:          logr.Discard(),
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &ReplicationGroupReconciler{}
+			if err := r.processLastActionResult(tt.args.ctx, tt.args.group, tt.args.remoteClient, tt.args.log); (err != nil) != tt.wantErr {
+				t.Errorf("ReplicationGroupReconciler.processLastActionResult() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
 }

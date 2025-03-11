@@ -49,6 +49,18 @@ const (
 	eventReasonUpdated = "Updated"
 )
 
+var (
+	getDellCsiReplicationGroupGetSnapshotClass = func(r connection.RemoteClusterClient, ctx context.Context, snapClassName string) (*s1.VolumeSnapshotClass, error) {
+		return r.GetSnapshotClass(ctx, snapClassName)
+	}
+	getDellCsiReplicationGroupGetNamespace = func(r connection.RemoteClusterClient, ctx context.Context, namespace string) (*v1.Namespace, error) {
+		return r.GetNamespace(ctx, namespace)
+	}
+	getDellCsiReplicationGroupCreateNamespace = func(r connection.RemoteClusterClient, ctx context.Context, content *v1.Namespace) error {
+		return r.CreateNamespace(ctx, content)
+	}
+)
+
 // ReplicationGroupReconciler reconciles a ReplicationGroup object
 type ReplicationGroupReconciler struct {
 	client.Client
@@ -366,16 +378,16 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 		return err
 	}
 
-	if _, err := remoteClient.GetSnapshotClass(ctx, actionAnnotation.SnapshotClass); err != nil {
+	if _, err := getDellCsiReplicationGroupGetSnapshotClass(remoteClient, ctx, actionAnnotation.SnapshotClass); err != nil {
 		log.Error(err, "Snapshot class does not exist on remote cluster. Not creating the remote snapshots.")
 		return err
 	}
 
-	if _, err := remoteClient.GetNamespace(ctx, actionAnnotation.SnapshotNamespace); err != nil {
+	if _, err := getDellCsiReplicationGroupGetNamespace(remoteClient, ctx, actionAnnotation.SnapshotNamespace); err != nil {
 		log.V(common.InfoLevel).Info("Namespace - " + actionAnnotation.SnapshotNamespace + " not found, creating it.")
 		nsRef := makeNamespaceReference(actionAnnotation.SnapshotNamespace)
 
-		err = remoteClient.CreateNamespace(ctx, nsRef)
+		err = getDellCsiReplicationGroupCreateNamespace(remoteClient, ctx, nsRef)
 		if err != nil {
 			msg := "unable to create the desired namespace" + actionAnnotation.SnapshotNamespace
 			log.V(common.ErrorLevel).Error(err, msg)
