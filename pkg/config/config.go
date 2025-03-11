@@ -186,6 +186,12 @@ func (config *replicationConfig) Print(log logr.Logger) {
 	}
 }
 
+var (
+	Verify = func(config *replicationConfig, ctx context.Context) error {
+		return config.Verify(ctx)
+	}
+)
+
 // VerifyConfig verifies correctness of replication config
 func (config *replicationConfig) VerifyConfig(ctx context.Context) error {
 	if config.ClusterID == "" {
@@ -201,7 +207,8 @@ func (config *replicationConfig) VerifyConfig(ctx context.Context) error {
 		}
 		targetMap[target.ClusterID] = ""
 	}
-	err := config.Verify(ctx)
+	// err := config.Verify(ctx)
+	err := Verify(config, ctx)
 	return err
 }
 
