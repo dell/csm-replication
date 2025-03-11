@@ -54,6 +54,9 @@ var (
 	getClientGetMigrationCapabilities = func(client migration.MigrationClient, ctx context.Context, in *migration.GetMigrationCapabilityRequest, opts ...grpc.CallOption) (*migration.GetMigrationCapabilityResponse, error) {
 		return client.GetMigrationCapabilities(ctx, in, opts...)
 	}
+	getProbeController = func(r *identity, ctx context.Context) (string, bool, error) {
+		return r.ProbeController(ctx)
+	}
 )
 
 // New return new Identity interface implementation
@@ -99,7 +102,7 @@ func (r *identity) ProbeController(ctx context.Context) (string, bool, error) {
 func (r *identity) ProbeForever(ctx context.Context) (string, error) {
 	for {
 		r.log.V(common.DebugLevel).Info("Probing driver for readiness")
-		driverName, ready, err := r.ProbeController(ctx)
+		driverName, ready, err := getProbeController(r, ctx)
 		if err != nil {
 			st, ok := status.FromError(err)
 			if !ok {
