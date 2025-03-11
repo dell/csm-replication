@@ -82,10 +82,107 @@ func TestNew(t *testing.T) {
 	}
 }
 
-func Test_identity_ProbeForever(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
+func Test_identity_ProbeController(t *testing.T) {
+	originalGetClientProbeController := getClientProbeController
 
+	after := func() {
+		getClientProbeController = originalGetClientProbeController
+	}
+
+	type fields struct {
+		conn      *grpc.ClientConn
+		log       logr.Logger
+		timeout   time.Duration
+		frequency time.Duration
+	}
+	type args struct {
+		ctx context.Context
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		setup   func()
+		want    string
+		want1   bool
+		wantErr bool
+	}{
+		{
+			name:   "ProbeController Failed",
+			fields: fields{createFakeConnection(), ctrl.Log.WithName("identity.v1.Identity/ProbeController"), 10, 10},
+			args:   args{context.Background()},
+			setup: func() {
+				getClientProbeController = func(client replication.ReplicationClient, ctx context.Context, in *commonext.ProbeControllerRequest, opts ...grpc.CallOption) (*commonext.ProbeControllerResponse, error) {
+					return nil, errors.New("error")
+				}
+			},
+			want:    "",
+			want1:   false,
+			wantErr: true,
+		},
+		{
+			name:   "ProbeController Success",
+			fields: fields{createFakeConnection(), ctrl.Log.WithName("identity.v1.Identity/ProbeController"), 10, 10},
+			args:   args{context.Background()},
+			setup: func() {
+				getClientProbeController = func(client replication.ReplicationClient, ctx context.Context, in *commonext.ProbeControllerRequest, opts ...grpc.CallOption) (*commonext.ProbeControllerResponse, error) {
+					return &commonext.ProbeControllerResponse{
+						Name: "test",
+						Ready: &wrapperspb.BoolValue{
+							Value: true,
+						},
+					}, nil
+				}
+			},
+			want:    "test",
+			want1:   true,
+			wantErr: false,
+		},
+		{
+			name:   "ProbeController Success (ready = nil)",
+			fields: fields{createFakeConnection(), ctrl.Log.WithName("identity.v1.Identity/ProbeController"), 10, 10},
+			args:   args{context.Background()},
+			setup: func() {
+				getClientProbeController = func(client replication.ReplicationClient, ctx context.Context, in *commonext.ProbeControllerRequest, opts ...grpc.CallOption) (*commonext.ProbeControllerResponse, error) {
+					return &commonext.ProbeControllerResponse{
+						Name:  "test",
+						Ready: nil,
+					}, nil
+				}
+			},
+			want:    "test",
+			want1:   true,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer after()
+			if tt.setup != nil {
+				tt.setup()
+			}
+			r := &identity{
+				conn:      tt.fields.conn,
+				log:       tt.fields.log,
+				timeout:   tt.fields.timeout,
+				frequency: tt.fields.frequency,
+			}
+			got, got1, err := r.ProbeController(tt.args.ctx)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("identity.ProbeController() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("identity.ProbeController() got = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.want1 {
+				t.Errorf("identity.ProbeController() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
+func Test_identity_ProbeForever(t *testing.T) {
 	type args struct {
 		ctx context.Context
 	}
@@ -98,8 +195,8 @@ func Test_identity_ProbeForever(t *testing.T) {
 	}{
 		{
 			name:    "ProbeForever Failed",
-			r:       &identity{conn: createFakeConnection(), log: ctrl.Log.WithName("identity.v1.Identity/ProbeForever"), timeout: 10, frequency: 10},
-			args:    args{ctx},
+			r:       &identity{conn: createFakeConnection(), log: logr.Discard(), timeout: 10, frequency: 5},
+			args:    args{context.Background()},
 			want:    "",
 			wantErr: true,
 		},
@@ -314,107 +411,6 @@ func Test_identity_GetMigrationCapabilities(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("identity.GetMigrationCapabilities() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_identity_ProbeController(t *testing.T) {
-	originalGetClientProbeController := getClientProbeController
-
-	after := func() {
-		getClientProbeController = originalGetClientProbeController
-	}
-
-	type fields struct {
-		conn      *grpc.ClientConn
-		log       logr.Logger
-		timeout   time.Duration
-		frequency time.Duration
-	}
-	type args struct {
-		ctx context.Context
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		setup   func()
-		want    string
-		want1   bool
-		wantErr bool
-	}{
-		{
-			name:   "ProbeController Failed",
-			fields: fields{createFakeConnection(), ctrl.Log.WithName("identity.v1.Identity/ProbeController"), 10, 10},
-			args:   args{context.Background()},
-			setup: func() {
-				getClientProbeController = func(client replication.ReplicationClient, ctx context.Context, in *commonext.ProbeControllerRequest, opts ...grpc.CallOption) (*commonext.ProbeControllerResponse, error) {
-					return nil, errors.New("error")
-				}
-			},
-			want:    "",
-			want1:   false,
-			wantErr: true,
-		},
-		{
-			name:   "ProbeController Success",
-			fields: fields{createFakeConnection(), ctrl.Log.WithName("identity.v1.Identity/ProbeController"), 10, 10},
-			args:   args{context.Background()},
-			setup: func() {
-				getClientProbeController = func(client replication.ReplicationClient, ctx context.Context, in *commonext.ProbeControllerRequest, opts ...grpc.CallOption) (*commonext.ProbeControllerResponse, error) {
-					return &commonext.ProbeControllerResponse{
-						Name: "test",
-						Ready: &wrapperspb.BoolValue{
-							Value: true,
-						},
-					}, nil
-				}
-			},
-			want:    "test",
-			want1:   true,
-			wantErr: false,
-		},
-		{
-			name:   "ProbeController Success (ready = nil)",
-			fields: fields{createFakeConnection(), ctrl.Log.WithName("identity.v1.Identity/ProbeController"), 10, 10},
-			args:   args{context.Background()},
-			setup: func() {
-				getClientProbeController = func(client replication.ReplicationClient, ctx context.Context, in *commonext.ProbeControllerRequest, opts ...grpc.CallOption) (*commonext.ProbeControllerResponse, error) {
-					return &commonext.ProbeControllerResponse{
-						Name:  "test",
-						Ready: nil,
-					}, nil
-				}
-			},
-			want:    "test",
-			want1:   true,
-			wantErr: false,
-		},
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			defer after()
-			if tt.setup != nil {
-				tt.setup()
-			}
-			r := &identity{
-				conn:      tt.fields.conn,
-				log:       tt.fields.log,
-				timeout:   tt.fields.timeout,
-				frequency: tt.fields.frequency,
-			}
-			got, got1, err := r.ProbeController(tt.args.ctx)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("identity.ProbeController() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("identity.ProbeController() got = %v, want %v", got, tt.want)
-			}
-			if got1 != tt.want1 {
-				t.Errorf("identity.ProbeController() got1 = %v, want %v", got1, tt.want1)
 			}
 		})
 	}
