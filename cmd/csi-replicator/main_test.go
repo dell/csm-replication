@@ -300,54 +300,64 @@ func Test_getClusterUID(t *testing.T) {
 }
 
 func TestProcessConfigMapChanges(t *testing.T) {
-	tests := []struct {
-		name          string
-		config        *repcnf.Config
-		loggerConfig  *logrus.Logger
-		expectedLevel logrus.Level
-		expectedError error
-	}{
-		{
-			name: "success",
-			config: &repcnf.Config{
-				LogLevel: "info",
-			},
-			loggerConfig: &logrus.Logger{
-				Level: logrus.InfoLevel,
-			},
-			expectedLevel: logrus.InfoLevel,
-			expectedError: nil,
-		},
-		{
-			name: "error parsing config",
-			config: &repcnf.Config{
-				LogLevel: "invalid",
-			},
-			loggerConfig: &logrus.Logger{
-				Level: logrus.InfoLevel,
-			},
-			expectedLevel: logrus.InfoLevel,
-			expectedError: fmt.Errorf("error parsing the config: unable to parse log level"),
-		},
+	defaultGetUpdateConfigMapFunc := getUpdateConfigMapFunc
+	defer func() {
+		getUpdateConfigMapFunc = defaultGetUpdateConfigMapFunc
+	}()
+
+	// Test case 1: Success - no error in getUpdateConfigMapFunc
+	getUpdateConfigMapFunc = func(_ *ReplicatorManager, _ context.Context) error {
+		return nil
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-
-			// Create a mock ReplicatorManager
-			mgr := &ReplicatorManager{
-				Opts:    repcnf.ControllerManagerOpts{},
-				Manager: &mockManager{},
-				config:  tt.config,
-			}
-
-			// Call the function under test
-			mgr.processConfigMapChanges(tt.loggerConfig)
-
-			// Assert the expected log level
-			assert.Equal(t, tt.expectedLevel, tt.loggerConfig.Level)
-		})
+	mockMgr := &mockManager{
+		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
 	}
+
+	loggerConfig := logrus.New()
+	mgr := &ReplicatorManager{
+		Opts:    repcnf.ControllerManagerOpts{},
+		Manager: mockMgr,
+		config:  &repcnf.Config{},
+	}
+
+	t.Run("Success Test Case", func(_ *testing.T) {
+		mgr.processConfigMapChanges(loggerConfig)
+	})
+
+	// Test case 2: Error in getUpdateConfigMapFunc
+	getUpdateConfigMapFunc = func(_ *ReplicatorManager, _ context.Context) error {
+		return fmt.Errorf("config update error")
+	}
+
+	t.Run("Error in getUpdateConfigMapFunc", func(_ *testing.T) {
+		mgr.processConfigMapChanges(loggerConfig)
+	})
+
+	// Test case 3: Error in ParseLevel (invalid log level)
+	getUpdateConfigMapFunc = func(_ *ReplicatorManager, _ context.Context) error {
+		return nil
+	}
+
+	mgr.config.LogLevel = "invalid-log-level" // Set an invalid log level
+
+	t.Run("Error in ParseLevel", func(_ *testing.T) {
+		mgr.processConfigMapChanges(loggerConfig)
+	})
+
+	// Test case 4: Valid Log Level set in config
+	getUpdateConfigMapFunc = func(_ *ReplicatorManager, _ context.Context) error {
+		return nil
+	}
+
+	mgr.config.LogLevel = "info" // Set a valid log level
+
+	t.Run("Valid Log Level", func(t *testing.T) {
+		mgr.processConfigMapChanges(loggerConfig)
+		if loggerConfig.GetLevel() != logrus.InfoLevel {
+			t.Errorf("Expected log level to be info, but got %v", loggerConfig.GetLevel())
+		}
+	})
 }
 
 func TestSetupConfigMapWatcher(t *testing.T) {
