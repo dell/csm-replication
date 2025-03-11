@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -21,12 +21,16 @@ import (
 	"testing"
 	"time"
 
+	commonext "github.com/dell/dell-csi-extensions/common"
+	"github.com/dell/dell-csi-extensions/migration"
 	"github.com/dell/dell-csi-extensions/replication"
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -81,208 +85,104 @@ func TestNew(t *testing.T) {
 	}
 }
 
-func Test_identity_ProbeForever(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
+func Test_identity_ProbeController(t *testing.T) {
+	originalGetClientProbeController := getClientProbeController
 
+	after := func() {
+		getClientProbeController = originalGetClientProbeController
+	}
+
+	type fields struct {
+		conn      *grpc.ClientConn
+		log       logr.Logger
+		timeout   time.Duration
+		frequency time.Duration
+	}
 	type args struct {
 		ctx context.Context
 	}
 	tests := []struct {
 		name    string
-		r       *identity
+		fields  fields
 		args    args
+		setup   func()
 		want    string
+		want1   bool
 		wantErr bool
 	}{
 		{
-			name:    "ProbeForever Failed",
-			r:       &identity{conn: createFakeConnection(), log: ctrl.Log.WithName("identity.v1.Identity/ProbeForever"), timeout: 10, frequency: 10},
-			args:    args{ctx},
+			name:   "ProbeController Failed",
+			fields: fields{createFakeConnection(), ctrl.Log.WithName("identity.v1.Identity/ProbeController"), time.Second, time.Second},
+			args:   args{context.Background()},
+			setup: func() {
+				getClientProbeController = func(client replication.ReplicationClient, ctx context.Context, in *commonext.ProbeControllerRequest, opts ...grpc.CallOption) (*commonext.ProbeControllerResponse, error) {
+					return nil, errors.New("error")
+				}
+			},
 			want:    "",
+			want1:   false,
 			wantErr: true,
 		},
-		// TODO: Add test cases.
+		{
+			name:   "ProbeController Success",
+			fields: fields{createFakeConnection(), ctrl.Log.WithName("identity.v1.Identity/ProbeController"), time.Second, time.Second},
+			args:   args{context.Background()},
+			setup: func() {
+				getClientProbeController = func(client replication.ReplicationClient, ctx context.Context, in *commonext.ProbeControllerRequest, opts ...grpc.CallOption) (*commonext.ProbeControllerResponse, error) {
+					return &commonext.ProbeControllerResponse{
+						Name: "test",
+						Ready: &wrapperspb.BoolValue{
+							Value: true,
+						},
+					}, nil
+				}
+			},
+			want:    "test",
+			want1:   true,
+			wantErr: false,
+		},
+		{
+			name:   "ProbeController Success (ready = nil)",
+			fields: fields{createFakeConnection(), ctrl.Log.WithName("identity.v1.Identity/ProbeController"), time.Second, time.Second},
+			args:   args{context.Background()},
+			setup: func() {
+				getClientProbeController = func(client replication.ReplicationClient, ctx context.Context, in *commonext.ProbeControllerRequest, opts ...grpc.CallOption) (*commonext.ProbeControllerResponse, error) {
+					return &commonext.ProbeControllerResponse{
+						Name:  "test",
+						Ready: nil,
+					}, nil
+				}
+			},
+			want:    "test",
+			want1:   true,
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.r.ProbeForever(tt.args.ctx)
+			defer after()
+			if tt.setup != nil {
+				tt.setup()
+			}
+			r := &identity{
+				conn:      tt.fields.conn,
+				log:       tt.fields.log,
+				timeout:   tt.fields.timeout,
+				frequency: tt.fields.frequency,
+			}
+			got, got1, err := r.ProbeController(tt.args.ctx)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("identity.ProbeForever() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("identity.ProbeController() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("identity.ProbeForever() = %v, want %v", got, tt.want)
+				t.Errorf("identity.ProbeController() got = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.want1 {
+				t.Errorf("identity.ProbeController() got1 = %v, want %v", got1, tt.want1)
 			}
 		})
 	}
-}
-
-func TestProbeController(t *testing.T) {
-	mockIdentity := &MockIdentity{}
-	mockIdentity.On("ProbeController", mock.Anything).Return("mock-driver-name", true, nil)
-
-	// Call the function you want to test
-	driverName, ready, err := mockIdentity.ProbeController(context.Background())
-
-	// Assert that the function returned the expected result
-	assert.NoError(t, err)
-	assert.Equal(t, "mock-driver-name", driverName)
-	assert.Equal(t, true, ready)
-
-	// Assert that the mock object was called as expected
-	mockIdentity.AssertExpectations(t)
-}
-
-type MockIdentity struct {
-	mock.Mock
-}
-
-// GetMigrationCapabilities provides a mock function with given fields: ctx
-func (_m *MockIdentity) GetMigrationCapabilities(ctx context.Context) (MigrationCapabilitySet, error) {
-	ret := _m.Called(ctx)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetMigrationCapabilities")
-	}
-
-	var r0 MigrationCapabilitySet
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (MigrationCapabilitySet, error)); ok {
-		return rf(ctx)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context) MigrationCapabilitySet); ok {
-		r0 = rf(ctx)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(MigrationCapabilitySet)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetReplicationCapabilities provides a mock function with given fields: ctx
-func (_m *MockIdentity) GetReplicationCapabilities(ctx context.Context) (ReplicationCapabilitySet, []*replication.SupportedActions, error) {
-	ret := _m.Called(ctx)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetReplicationCapabilities")
-	}
-
-	var r0 ReplicationCapabilitySet
-	var r1 []*replication.SupportedActions
-	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context) (ReplicationCapabilitySet, []*replication.SupportedActions, error)); ok {
-		return rf(ctx)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context) ReplicationCapabilitySet); ok {
-		r0 = rf(ctx)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(ReplicationCapabilitySet)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context) []*replication.SupportedActions); ok {
-		r1 = rf(ctx)
-	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).([]*replication.SupportedActions)
-		}
-	}
-
-	if rf, ok := ret.Get(2).(func(context.Context) error); ok {
-		r2 = rf(ctx)
-	} else {
-		r2 = ret.Error(2)
-	}
-
-	return r0, r1, r2
-}
-
-// ProbeController provides a mock function with given fields: ctx
-func (_m *MockIdentity) ProbeController(ctx context.Context) (string, bool, error) {
-	ret := _m.Called(ctx)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ProbeController")
-	}
-
-	var r0 string
-	var r1 bool
-	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context) (string, bool, error)); ok {
-		return rf(ctx)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context) string); ok {
-		r0 = rf(ctx)
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context) bool); ok {
-		r1 = rf(ctx)
-	} else {
-		r1 = ret.Get(1).(bool)
-	}
-
-	if rf, ok := ret.Get(2).(func(context.Context) error); ok {
-		r2 = rf(ctx)
-	} else {
-		r2 = ret.Error(2)
-	}
-
-	return r0, r1, r2
-}
-
-// ProbeForever provides a mock function with given fields: ctx
-func (_m *MockIdentity) ProbeForever(ctx context.Context) (string, error) {
-	ret := _m.Called(ctx)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ProbeForever")
-	}
-
-	var r0 string
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (string, error)); ok {
-		return rf(ctx)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context) string); ok {
-		r0 = rf(ctx)
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// NewIdentity creates a new instance of MockIdentity. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
-// The first argument is typically a *testing.T value.
-func NewIdentity(t interface {
-	mock.TestingT
-	Cleanup(func())
-},
-) *MockIdentity {
-	mock := &MockIdentity{}
-	mock.Mock.Test(t)
-
-	t.Cleanup(func() { mock.AssertExpectations(t) })
-
-	return mock
 }
 
 func Test_identity_GetReplicationCapabilities(t *testing.T) {
@@ -312,7 +212,7 @@ func Test_identity_GetReplicationCapabilities(t *testing.T) {
 	}{
 		{
 			name:   "GetReplicationCapabilities Failed",
-			fields: fields{createFakeConnection(), ctrl.Log.WithName("identity.v1.Identity/GetReplicationCapabilities"), 10, 10},
+			fields: fields{createFakeConnection(), ctrl.Log.WithName("identity.v1.Identity/GetReplicationCapabilities"), time.Second, time.Second},
 			args:   args{context.Background()},
 			setup: func() {
 				getClientGetReplicationCapabilities = func(client replication.ReplicationClient, ctx context.Context, in *replication.GetReplicationCapabilityRequest, opts ...grpc.CallOption) (*replication.GetReplicationCapabilityResponse, error) {
@@ -325,12 +225,18 @@ func Test_identity_GetReplicationCapabilities(t *testing.T) {
 		},
 		{
 			name:   "GetReplicationCapabilities Passed",
-			fields: fields{createFakeConnection(), ctrl.Log.WithName("identity.v1.Identity/GetReplicationCapabilities"), 10, 10},
+			fields: fields{createFakeConnection(), ctrl.Log.WithName("identity.v1.Identity/GetReplicationCapabilities"), time.Second, time.Second},
 			args:   args{context.Background()},
 			setup: func() {
 				getClientGetReplicationCapabilities = func(client replication.ReplicationClient, ctx context.Context, in *replication.GetReplicationCapabilityRequest, opts ...grpc.CallOption) (*replication.GetReplicationCapabilityResponse, error) {
 					return &replication.GetReplicationCapabilityResponse{
 						Capabilities: []*replication.ReplicationCapability{
+							nil,
+							{
+								Type: &replication.ReplicationCapability_Rpc{
+									Rpc: nil,
+								},
+							},
 							{
 								Type: &replication.ReplicationCapability_Rpc{
 									Rpc: &replication.ReplicationCapability_RPC{
@@ -388,4 +294,178 @@ func Test_identity_GetReplicationCapabilities(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_identity_GetMigrationCapabilities(t *testing.T) {
+	originalGetClientGetMigrationCapabilities := getClientGetMigrationCapabilities
+	after := func() {
+		getClientGetMigrationCapabilities = originalGetClientGetMigrationCapabilities
+	}
+	type fields struct {
+		conn      *grpc.ClientConn
+		log       logr.Logger
+		timeout   time.Duration
+		frequency time.Duration
+	}
+	type args struct {
+		ctx context.Context
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		setup   func()
+		want    MigrationCapabilitySet
+		wantErr bool
+	}{
+		{
+			name:   "GetMigrationCapabilities Failed",
+			fields: fields{createFakeConnection(), ctrl.Log.WithName("identity.v1.Identity/GetMigrationCapabilities"), time.Second, time.Second},
+			args:   args{context.Background()},
+			setup: func() {
+				getClientGetMigrationCapabilities = func(client migration.MigrationClient, ctx context.Context, in *migration.GetMigrationCapabilityRequest, opts ...grpc.CallOption) (*migration.GetMigrationCapabilityResponse, error) {
+					return nil, errors.New("error")
+				}
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:   "GetMigrationCapabilities Failed",
+			fields: fields{createFakeConnection(), ctrl.Log.WithName("identity.v1.Identity/GetMigrationCapabilities"), time.Second, time.Second},
+			args:   args{context.Background()},
+			setup: func() {
+				getClientGetMigrationCapabilities = func(client migration.MigrationClient, ctx context.Context, in *migration.GetMigrationCapabilityRequest, opts ...grpc.CallOption) (*migration.GetMigrationCapabilityResponse, error) {
+					return &migration.GetMigrationCapabilityResponse{
+						Capabilities: []*migration.MigrationCapability{
+							nil,
+							{
+								Type: &migration.MigrationCapability_Rpc{
+									Rpc: nil,
+								},
+							},
+							{
+								Type: &migration.MigrationCapability_Rpc{
+									Rpc: &migration.MigrationCapability_RPC{
+										Type: migration.MigrateTypes_NON_REPL_TO_REPL,
+									},
+								},
+							},
+						},
+					}, nil
+				}
+			},
+			want: MigrationCapabilitySet{
+				migration.MigrateTypes_NON_REPL_TO_REPL: true,
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer after()
+			if tt.setup != nil {
+				tt.setup()
+			}
+			r := &identity{
+				conn:      tt.fields.conn,
+				log:       tt.fields.log,
+				timeout:   tt.fields.timeout,
+				frequency: tt.fields.frequency,
+			}
+			got, err := r.GetMigrationCapabilities(tt.args.ctx)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("identity.GetMigrationCapabilities() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("identity.GetMigrationCapabilities() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestProbeForever(t *testing.T) {
+	// Create a mock gRPC connection
+	mockConn := createFakeConnection()
+
+	// Create a mock getProbeController function
+	mockGetProbeController := func(r *identity, ctx context.Context) (string, bool, error) {
+		return "test-driver", true, nil
+	}
+
+	// Create a new identity instance
+	r := &identity{
+		conn:      mockConn,
+		log:       ctrl.Log.WithName("identity.v1.Identity/ProbeForever"),
+		timeout:   time.Second,
+		frequency: time.Second,
+	}
+
+	// Set the getProbeController function to the mock function
+	getProbeController = mockGetProbeController
+
+	// Call the ProbeForever method
+	driverName, err := r.ProbeForever(context.Background())
+
+	// Assert the result
+	assert.NoError(t, err)
+	assert.Equal(t, "test-driver", driverName)
+}
+
+func TestProbeForever_Failure(t *testing.T) {
+	// Create a mock gRPC connection
+	mockConn := createFakeConnection()
+
+	// Create a mock getProbeController function
+	mockGetProbeController := func(r *identity, ctx context.Context) (string, bool, error) {
+		return "", false, errors.New("failed to get probe controller")
+	}
+
+	// Create a new identity instance
+	r := &identity{
+		conn:      mockConn,
+		log:       ctrl.Log.WithName("identity.v1.Identity/ProbeForever"),
+		timeout:   time.Second,
+		frequency: time.Second,
+	}
+
+	// Set the getProbeController function to the mock function
+	getProbeController = mockGetProbeController
+
+	// Call the ProbeForever method
+	driverName, err := r.ProbeForever(context.Background())
+
+	// Assert the result
+	assert.Error(t, err)
+	assert.Equal(t, "", driverName)
+}
+
+func TestProbeForever_FailureStatus(t *testing.T) {
+	// Create a mock gRPC connection
+	mockConn := createFakeConnection()
+
+	// Create a mock getProbeController function
+	mockGetProbeController := func(r *identity, ctx context.Context) (string, bool, error) {
+		return "", false, status.Error(codes.FailedPrecondition, "failed to probe controller")
+	}
+
+	// Create a new identity instance
+	r := &identity{
+		conn:      mockConn,
+		log:       ctrl.Log.WithName("identity.v1.Identity/ProbeForever"),
+		timeout:   time.Second,
+		frequency: time.Second,
+	}
+
+	// Set the getProbeController function to the mock function
+	getProbeController = mockGetProbeController
+
+	// Call the ProbeForever method
+	driverName, err := r.ProbeForever(context.Background())
+
+	// Assert the result
+	assert.Error(t, err)
+	assert.Equal(t, "", driverName)
+	assert.Equal(t, "rpc error: code = FailedPrecondition desc = failed to probe controller", err.Error())
 }

@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -45,8 +45,17 @@ type Identity interface {
 }
 
 var (
+	getClientProbeController = func(client replication.ReplicationClient, ctx context.Context, in *commonext.ProbeControllerRequest, opts ...grpc.CallOption) (*commonext.ProbeControllerResponse, error) {
+		return client.ProbeController(ctx, in, opts...)
+	}
 	getClientGetReplicationCapabilities = func(client replication.ReplicationClient, ctx context.Context, in *replication.GetReplicationCapabilityRequest, opts ...grpc.CallOption) (*replication.GetReplicationCapabilityResponse, error) {
 		return client.GetReplicationCapabilities(ctx, in, opts...)
+	}
+	getClientGetMigrationCapabilities = func(client migration.MigrationClient, ctx context.Context, in *migration.GetMigrationCapabilityRequest, opts ...grpc.CallOption) (*migration.GetMigrationCapabilityResponse, error) {
+		return client.GetMigrationCapabilities(ctx, in, opts...)
+	}
+	getProbeController = func(r *identity, ctx context.Context) (string, bool, error) {
+		return r.ProbeController(ctx)
 	}
 )
 
@@ -75,7 +84,7 @@ func (r *identity) ProbeController(ctx context.Context) (string, bool, error) {
 
 	client := replication.NewReplicationClient(r.conn)
 
-	response, err := client.ProbeController(tctx, &commonext.ProbeControllerRequest{})
+	response, err := getClientProbeController(client, tctx, &commonext.ProbeControllerRequest{})
 	if err != nil {
 		return "", false, err
 	}
@@ -93,7 +102,7 @@ func (r *identity) ProbeController(ctx context.Context) (string, bool, error) {
 func (r *identity) ProbeForever(ctx context.Context) (string, error) {
 	for {
 		r.log.V(common.DebugLevel).Info("Probing driver for readiness")
-		driverName, ready, err := r.ProbeController(ctx)
+		driverName, ready, err := getProbeController(r, ctx)
 		if err != nil {
 			st, ok := status.FromError(err)
 			if !ok {
@@ -150,7 +159,7 @@ func (r *identity) GetMigrationCapabilities(ctx context.Context) (MigrationCapab
 
 	client := migration.NewMigrationClient(r.conn)
 
-	response, err := client.GetMigrationCapabilities(tctx, &migration.GetMigrationCapabilityRequest{})
+	response, err := getClientGetMigrationCapabilities(client, tctx, &migration.GetMigrationCapabilityRequest{})
 	if err != nil {
 		return nil, err
 	}
