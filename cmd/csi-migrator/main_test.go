@@ -323,6 +323,103 @@ func TestSetupConfigMapWatcher(t *testing.T) {
 	migrator.setupConfigMapWatcher(loggerConfig)
 }
 
+// // Mock implementation of the client interface
+// type mockClient struct{}
+
+// func (m *mockClient) Get(context.Context, client.ObjectKey, client.Object, ...client.GetOption) error {
+// 	return nil
+// }
+
+// func (m *mockClient) Create(context.Context, client.Object, ...client.CreateOption) error {
+// 	return nil
+// }
+
+// func (m *mockClient) Update(context.Context, client.Object, ...client.UpdateOption) error {
+// 	return nil
+// }
+
+// // Mock implementation of the rest.Config interface
+// type mockRestConfig struct{}
+
+// func (m *mockRestConfig) Host() string {
+// 	return ""
+// }
+
+// func (m *mockRestConfig) UserAgent() string {
+// 	return ""
+// }
+
+// func (m *mockRestConfig) Wrap(rt http.RoundTripper) http.RoundTripper {
+// 	return nil
+// }
+
+// func (m *mockRestConfig) WrapTransport(rt http.RoundTripper) http.RoundTripper {
+// 	return nil
+// }
+
+// func (m *mockRestConfig) Dial(network, addr string) (net.Conn, error) {
+// 	return nil, nil
+// }
+
+// func (m *mockRestConfig) TLSClientConfig() *tls.Config {
+// 	return nil
+// }
+
+// func (m *mockRestConfig) QPS() float32 {
+// 	return 0
+// }
+
+// func (m *mockRestConfig) Burst() int {
+// 	return 0
+// }
+
+// func (m *mockClient) Delete(context.Context, client.Object, ...client.DeleteOption) error {
+// 	return nil
+// }
+
+// func (m *mockClient) DeleteAllOf(_ context.Context, _ client.Object, opts ...client.DeleteAllOfOption) error {
+// 	// Implement the DeleteAllOf method here
+// 	return nil
+// }
+
+// func (m *mockClient) GroupVersionKindFor(obj runtime.Object) (schema.GroupVersionKind, error) {
+// 	// Implement the GroupVersionKindFor method here
+// 	return schema.GroupVersionKind{}, nil
+// }
+
+// func (m *mockClient) IsObjectNamespaced(obj runtime.Object) (bool, error) {
+// 	// Implement the IsObjectNamespaced method here
+// 	return false, nil
+// }
+
+// func (m *mockClient) List(context.Context, client.ObjectList, ...client.ListOption) error {
+// 	// Implement the List method here
+// 	return nil
+// }
+
+// func (m *mockClient) Patch(context.Context, client.Object, client.Patch, ...client.PatchOption) error {
+// 	// Implement the Patch method here
+// 	return nil
+// }
+
+// func (m *mockClient) RESTMapper() meta.RESTMapper {
+// 	// Implement the RESTMapper method here
+// 	return nil
+// }
+
+// func (m *mockClient) Scheme() *runtime.Scheme {
+// 	// Implement the Scheme method here
+// 	return nil
+// }
+
+// func (m *mockClient) Status() client.StatusWriter {
+// 	return nil
+// }
+
+// func (m *mockClient) SubResource(subResource string) client.SubResourceClient {
+// 	return nil
+// }
+
 func TestMain(t *testing.T) {
 	defaultGetConnectToCsiFunc := getConnectToCsiFunc
 	defaultGetProbeForeverFunc := getProbeForeverFunc
@@ -342,11 +439,53 @@ func TestMain(t *testing.T) {
 	}
 
 	tests := []struct {
-		name  string
-		setup func()
+		name          string
+		setup         func()
+		panicExpected bool
 	}{
+		// {
+		// 	name: "Problem running manager",
+		// 	setup: func() {
+		// 		// // Mock the getConnectToCsiFunc to return a successful connection
+		// 		// getConnectToCsiFunc = func(_ string, _ logr.Logger) (*grpc.ClientConn, error) {
+		// 		// 	// Return a mock *grpc.ClientConn
+		// 		// 	return &grpc.ClientConn{}, nil
+		// 		// }
+
+		// 		getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
+		// 			return "csi-driver", nil
+		// 		}
+
+		// 		getMigrationCapabilitiesFunc = func(_ context.Context, _ csiidentity.Identity) (csiidentity.MigrationCapabilitySet, error) {
+		// 			// Populate the MigrationCapabilitySet with mock data (map with MigrateTypes as keys and bool as values)
+		// 			capabilitySet := csiidentity.MigrationCapabilitySet{
+		// 				migration.MigrateTypes(migration.MigrateTypes_VERSION_UPGRADE):  true,
+		// 				migration.MigrateTypes(migration.MigrateTypes_REPL_TO_NON_REPL): true,
+		// 			}
+
+		// 			return capabilitySet, nil
+		// 		}
+
+		// 		getcreateMigratorManagerFunc = func(ctx context.Context, mgr manager.Manager) (*MigratorManager, error) {
+		// 			return &MigratorManager{
+		// 				config: &config.Config{
+		// 					LogLevel: "info",
+		// 				},
+		// 			}, nil
+		// 		}
+
+		// 		getParseLevelFunc = func(level string) (logrus.Level, error) {
+		// 			return logrus.Level(0), fmt.Errorf("unable to parse log level: %s", level)
+		// 		}
+
+		// 		getManagerStart = func(_ manager.Manager) error {
+		// 			return errors.New("problem running manager")
+		// 		}
+		// 	},
+		// 	panicExpected: true,
+		// },
 		{
-			name: "Testcase 1",
+			name: "Successful run of main function",
 			setup: func() {
 				// // Mock the getConnectToCsiFunc to return a successful connection
 				// getConnectToCsiFunc = func(_ string, _ logr.Logger) (*grpc.ClientConn, error) {
@@ -368,7 +507,7 @@ func TestMain(t *testing.T) {
 					return capabilitySet, nil
 				}
 
-				getcreateMigratorManagerFunc = func(ctx context.Context, mgr manager.Manager, logrusLog *logrus.Logger) (*MigratorManager, error) {
+				getcreateMigratorManagerFunc = func(ctx context.Context, mgr manager.Manager) (*MigratorManager, error) {
 					return &MigratorManager{
 						config: &config.Config{
 							LogLevel: "info",
@@ -384,6 +523,7 @@ func TestMain(t *testing.T) {
 					return nil
 				}
 			},
+			panicExpected: false,
 		},
 	}
 
@@ -393,6 +533,12 @@ func TestMain(t *testing.T) {
 			tt.setup()
 			main()
 		})
+		panicCaught := recover()
+		if panicCaught == nil && tt.panicExpected {
+			t.Errorf("Expected code to panic, but got panic: nil")
+		} else if panicCaught != nil && !tt.panicExpected {
+			t.Errorf("Expected code to not panic, but got panic: %v", panicCaught)
+		}
 	}
 
 }
