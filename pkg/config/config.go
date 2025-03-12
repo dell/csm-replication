@@ -273,6 +273,12 @@ func getReplicationConfig(ctx context.Context, client ctrlClient.Client, opts Co
 	return configMap, nil, nil
 }
 
+var (
+	InClusterConfig = func() (*rest.Config, error) {
+		return rest.InClusterConfig()
+	}
+)
+
 // Returns a connection handler for the remote clusters
 // Currently only returns the k8s conn handler
 func getConnHandler(ctx context.Context, targets []target, client ctrlClient.Client, opts ControllerManagerOpts, log logr.Logger) (connection.ConnHandler, error) {
@@ -300,7 +306,7 @@ func getConnHandler(ctx context.Context, targets []target, client ctrlClient.Cli
 	inCluster, _ := strconv.ParseBool(getEnv(common.EnvInClusterConfig, "false"))
 
 	if inCluster {
-		restConfig, err = rest.InClusterConfig()
+		restConfig, err = InClusterConfig()
 		if err != nil {
 			return nil, err
 		}

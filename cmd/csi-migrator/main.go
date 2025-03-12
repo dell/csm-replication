@@ -80,13 +80,39 @@ type MigratorManager struct {
 	config  *config.Config
 }
 
-var getUpdateConfigMapFunc = func(mgr *MigratorManager, ctx context.Context) error {
-	return mgr.config.UpdateConfigMap(ctx, nil, mgr.Opts, nil, mgr.Manager.GetLogger())
-}
+var (
+	getUpdateConfigMapFunc = func(mgr *MigratorManager, ctx context.Context) error {
+		return mgr.config.UpdateConfigMap(ctx, nil, mgr.Opts, nil, mgr.Manager.GetLogger())
+	}
 
-var getConfigFunc = func(ctx context.Context, opts config.ControllerManagerOpts, mgrLogr logr.Logger) (*config.Config, error) {
-	return config.GetConfig(ctx, nil, opts, nil, mgrLogr)
-}
+	getConfigFunc = func(ctx context.Context, opts config.ControllerManagerOpts, mgrLogr logr.Logger) (*config.Config, error) {
+		return config.GetConfig(ctx, nil, opts, nil, mgrLogr)
+	}
+
+	getConnectToCsiFunc = func(csiAddress string, setupLog logr.Logger) (*grpc.ClientConn, error) {
+		return connection.Connect(csiAddress, setupLog)
+	}
+
+	getProbeForeverFunc = func(ctx context.Context, identityClient csiidentity.Identity) (string, error) {
+		return identityClient.ProbeForever(ctx)
+	}
+
+	getMigrationCapabilitiesFunc = func(ctx context.Context, identityClient csiidentity.Identity) (csiidentity.MigrationCapabilitySet, error) {
+		return identityClient.GetMigrationCapabilities(ctx)
+	}
+
+	getcreateMigratorManagerFunc = func(ctx context.Context, mgr manager.Manager) (*MigratorManager, error) {
+		return createMigratorManager(ctx, mgr)
+	}
+
+	getParseLevelFunc = func(level string) (logrus.Level, error) {
+		return common.ParseLevel(level)
+	}
+
+	getManagerStart = func(mgr manager.Manager) error {
+		return mgr.Start(ctrl.SetupSignalHandler())
+	}
+)
 
 func (mgr *MigratorManager) processConfigMapChanges(loggerConfig *logrus.Logger) {
 	log.Println("Received a config change event")
@@ -132,34 +158,6 @@ func createMigratorManager(ctx context.Context, mgr ctrl.Manager) (*MigratorMana
 		config:  repConfig,
 	}
 	return &controllerManager, nil
-}
-
-var getConnectToCsiFunc = func(csiAddress string, setupLog logr.Logger) (*grpc.ClientConn, error) {
-	return connection.Connect(csiAddress, setupLog)
-}
-
-var getProbeForeverFunc = func(ctx context.Context, identityClient csiidentity.Identity) (string, error) {
-	return identityClient.ProbeForever(ctx)
-}
-
-var getMigrationCapabilitiesFunc = func(ctx context.Context, identityClient csiidentity.Identity) (csiidentity.MigrationCapabilitySet, error) {
-	return identityClient.GetMigrationCapabilities(ctx)
-}
-
-var getcreateMigratorManagerFunc = func(ctx context.Context, mgr manager.Manager, logrusLog *logrus.Logger) (*MigratorManager, error) {
-	migratorMgr, err := createMigratorManager(ctx, mgr)
-	if err != nil {
-		setupLog.Error(err, "failed to configure the migrator manager")
-		os.Exit(1)
-	}
-	//Start the watch on configmap
-	migratorMgr.setupConfigMapWatcher(logrusLog)
-
-	return migratorMgr, err
-}
-
-var getParseLevelFunc = func(level string) (logrus.Level, error) {
-	return common.ParseLevel(level)
 }
 
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
@@ -253,11 +251,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	MigratorMgr, err := getcreateMigratorManagerFunc(ctx, mgr, logrusLog)
+	MigratorMgr, err := getcreateMigratorManagerFunc(ctx, mgr)
 	if err != nil {
 		setupLog.Error(err, "failed to configure the migrator manager")
 		os.Exit(1)
 	}
+
+	//Start the watch on configmap
+	MigratorMgr.setupConfigMapWatcher(logrusLog)
 
 	// Process the config. Get initial log level
 	level, err := getParseLevelFunc(MigratorMgr.config.LogLevel)
@@ -299,7 +300,7 @@ func main() {
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := getManagerStart(mgr); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
