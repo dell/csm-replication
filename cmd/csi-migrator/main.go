@@ -147,19 +147,15 @@ var getMigrationCapabilitiesFunc = func(ctx context.Context, identityClient csii
 }
 
 var getcreateMigratorManagerFunc = func(ctx context.Context, mgr manager.Manager, logrusLog *logrus.Logger) (*MigratorManager, error) {
-	migratorMgr, err := createMigratorManager(ctx, mgr)
-	if err != nil {
-		setupLog.Error(err, "failed to configure the migrator manager")
-		os.Exit(1)
-	}
-	//Start the watch on configmap
-	migratorMgr.setupConfigMapWatcher(logrusLog)
-
-	return migratorMgr, err
+	return createMigratorManager(ctx, mgr)
 }
 
 var getParseLevelFunc = func(level string) (logrus.Level, error) {
 	return common.ParseLevel(level)
+}
+
+var getManagerStart = func(mgr manager.Manager) error {
+	return mgr.Start(ctrl.SetupSignalHandler())
 }
 
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
@@ -259,6 +255,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	//Start the watch on configmap
+	MigratorMgr.setupConfigMapWatcher(logrusLog)
+
 	// Process the config. Get initial log level
 	level, err := getParseLevelFunc(MigratorMgr.config.LogLevel)
 	if err != nil {
@@ -299,7 +298,7 @@ func main() {
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := getManagerStart(mgr); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}

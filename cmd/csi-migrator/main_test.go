@@ -16,9 +16,7 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
-	"net"
 	"net/http"
 	"testing"
 
@@ -30,10 +28,8 @@ import (
 	"github.com/go-logr/logr/funcr"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
-	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -327,147 +323,76 @@ func TestSetupConfigMapWatcher(t *testing.T) {
 	migrator.setupConfigMapWatcher(loggerConfig)
 }
 
-// Mock implementation of the client interface
-type mockClient struct{}
-
-func (m *mockClient) Get(context.Context, client.ObjectKey, client.Object, ...client.GetOption) error {
-	return nil
-}
-
-func (m *mockClient) Create(context.Context, client.Object, ...client.CreateOption) error {
-	return nil
-}
-
-func (m *mockClient) Update(context.Context, client.Object, ...client.UpdateOption) error {
-	return nil
-}
-
-// Mock implementation of the rest.Config interface
-type mockRestConfig struct{}
-
-func (m *mockRestConfig) Host() string {
-	return ""
-}
-
-func (m *mockRestConfig) UserAgent() string {
-	return ""
-}
-
-func (m *mockRestConfig) Wrap(rt http.RoundTripper) http.RoundTripper {
-	return nil
-}
-
-func (m *mockRestConfig) WrapTransport(rt http.RoundTripper) http.RoundTripper {
-	return nil
-}
-
-func (m *mockRestConfig) Dial(network, addr string) (net.Conn, error) {
-	return nil, nil
-}
-
-func (m *mockRestConfig) TLSClientConfig() *tls.Config {
-	return nil
-}
-
-func (m *mockRestConfig) QPS() float32 {
-	return 0
-}
-
-func (m *mockRestConfig) Burst() int {
-	return 0
-}
-
-func (m *mockClient) Delete(context.Context, client.Object, ...client.DeleteOption) error {
-	return nil
-}
-
-func (m *mockClient) DeleteAllOf(_ context.Context, _ client.Object, opts ...client.DeleteAllOfOption) error {
-	// Implement the DeleteAllOf method here
-	return nil
-}
-
-func (m *mockClient) GroupVersionKindFor(obj runtime.Object) (schema.GroupVersionKind, error) {
-	// Implement the GroupVersionKindFor method here
-	return schema.GroupVersionKind{}, nil
-}
-
-func (m *mockClient) IsObjectNamespaced(obj runtime.Object) (bool, error) {
-	// Implement the IsObjectNamespaced method here
-	return false, nil
-}
-
-func (m *mockClient) List(context.Context, client.ObjectList, ...client.ListOption) error {
-	// Implement the List method here
-	return nil
-}
-
-func (m *mockClient) Patch(context.Context, client.Object, client.Patch, ...client.PatchOption) error {
-	// Implement the Patch method here
-	return nil
-}
-
-func (m *mockClient) RESTMapper() meta.RESTMapper {
-	// Implement the RESTMapper method here
-	return nil
-}
-
-func (m *mockClient) Scheme() *runtime.Scheme {
-	// Implement the Scheme method here
-	return nil
-}
-
-func (m *mockClient) Status() client.StatusWriter {
-	return nil
-}
-
-func (m *mockClient) SubResource(subResource string) client.SubResourceClient {
-	return nil
-}
-
 func TestMain(t *testing.T) {
 	defaultGetConnectToCsiFunc := getConnectToCsiFunc
 	defaultGetProbeForeverFunc := getProbeForeverFunc
 	defaultGetMigrationCapabilitiesFunc := getMigrationCapabilitiesFunc
 	defaultGetcreateMigratorManagerFunc := getcreateMigratorManagerFunc
 	defaultGetParseLevelFunc := getParseLevelFunc
+	defaultGetManagerStart := getManagerStart
 
-	defer func() {
+	after := func() {
 		// Restore the original function after the test
 		getConnectToCsiFunc = defaultGetConnectToCsiFunc
 		getProbeForeverFunc = defaultGetProbeForeverFunc
 		getMigrationCapabilitiesFunc = defaultGetMigrationCapabilitiesFunc
 		getcreateMigratorManagerFunc = defaultGetcreateMigratorManagerFunc
 		getParseLevelFunc = defaultGetParseLevelFunc
-	}()
-
-	// Mock the getConnectToCsiFunc to return a successful connection
-	getConnectToCsiFunc = func(_ string, _ logr.Logger) (*grpc.ClientConn, error) {
-		// Return a mock *grpc.ClientConn
-		return &grpc.ClientConn{}, nil
+		getManagerStart = defaultGetManagerStart
 	}
 
-	getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
-		return "csi-driver", nil
+	tests := []struct {
+		name  string
+		setup func()
+	}{
+		{
+			name: "Testcase 1",
+			setup: func() {
+				// // Mock the getConnectToCsiFunc to return a successful connection
+				// getConnectToCsiFunc = func(_ string, _ logr.Logger) (*grpc.ClientConn, error) {
+				// 	// Return a mock *grpc.ClientConn
+				// 	return &grpc.ClientConn{}, nil
+				// }
+
+				getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
+					return "csi-driver", nil
+				}
+
+				getMigrationCapabilitiesFunc = func(_ context.Context, _ csiidentity.Identity) (csiidentity.MigrationCapabilitySet, error) {
+					// Populate the MigrationCapabilitySet with mock data (map with MigrateTypes as keys and bool as values)
+					capabilitySet := csiidentity.MigrationCapabilitySet{
+						migration.MigrateTypes(migration.MigrateTypes_VERSION_UPGRADE):  true,
+						migration.MigrateTypes(migration.MigrateTypes_REPL_TO_NON_REPL): true,
+					}
+
+					return capabilitySet, nil
+				}
+
+				getcreateMigratorManagerFunc = func(ctx context.Context, mgr manager.Manager, logrusLog *logrus.Logger) (*MigratorManager, error) {
+					return &MigratorManager{
+						config: &config.Config{
+							LogLevel: "info",
+						},
+					}, nil
+				}
+
+				getParseLevelFunc = func(level string) (logrus.Level, error) {
+					return logrus.Level(0), fmt.Errorf("unable to parse log level: %s", level)
+				}
+
+				getManagerStart = func(_ manager.Manager) error {
+					return nil
+				}
+			},
+		},
 	}
 
-	getMigrationCapabilitiesFunc = func(_ context.Context, _ csiidentity.Identity) (csiidentity.MigrationCapabilitySet, error) {
-		// Populate the MigrationCapabilitySet with mock data (map with MigrateTypes as keys and bool as values)
-		capabilitySet := csiidentity.MigrationCapabilitySet{
-			migration.MigrateTypes(migration.MigrateTypes_VERSION_UPGRADE):  true,
-			migration.MigrateTypes(migration.MigrateTypes_REPL_TO_NON_REPL): true,
-		}
-
-		return capabilitySet, nil
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer after()
+			tt.setup()
+			main()
+		})
 	}
-
-	getcreateMigratorManagerFunc = func(ctx context.Context, mgr manager.Manager, logrusLog *logrus.Logger) (*MigratorManager, error) {
-		return &MigratorManager{}, nil
-	}
-
-	getParseLevelFunc = func(level string) (logrus.Level, error) {
-		return logrus.Level(0), fmt.Errorf("unable to parse log level: %s", level)
-	}
-
-	main()
 
 }
