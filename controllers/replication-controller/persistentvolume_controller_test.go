@@ -938,7 +938,7 @@ func TestProcessLocalPV(t *testing.T) {
 		return nil
 	}
 
-	getPersistentVolumeReconcilerEventf = func(_ *PersistentVolumeReconciler, _ runtime.Object, _ string, _ string, _ string, _ ...interface{}) {
+	getPersistentVolumeReconcilerEventf = func(_ *PersistentVolumeReconciler, _ runtime.Object, _ string, _ string, _ string, _ string) {
 	}
 
 	tests := []struct {
