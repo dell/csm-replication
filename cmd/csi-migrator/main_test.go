@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	controller "github.com/dell/csm-replication/controllers/csi-migrator"
 	"github.com/dell/csm-replication/pkg/config"
@@ -32,11 +33,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlcnf "sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
@@ -427,6 +431,10 @@ func TestMain(t *testing.T) {
 	defaultGetcreateMigratorManagerFunc := getcreateMigratorManagerFunc
 	defaultGetParseLevelFunc := getParseLevelFunc
 	defaultGetManagerStart := getManagerStart
+	defaultGetCtrlNewManager := getCtrlNewManager
+	defaultGetWorkqueueReconcileRequest := getWorkqueueReconcileRequest
+	defaultGetPersistentVolumeReconcilerSetupWithManager := getPersistentVolumeReconcilerSetupWithManager
+	defaultGetMigrationGroupReconcilerSetupWithManager := getMigrationGroupReconcilerSetupWithManager
 
 	after := func() {
 		// Restore the original function after the test
@@ -436,6 +444,10 @@ func TestMain(t *testing.T) {
 		getcreateMigratorManagerFunc = defaultGetcreateMigratorManagerFunc
 		getParseLevelFunc = defaultGetParseLevelFunc
 		getManagerStart = defaultGetManagerStart
+		getCtrlNewManager = defaultGetCtrlNewManager
+		getWorkqueueReconcileRequest = defaultGetWorkqueueReconcileRequest
+		getPersistentVolumeReconcilerSetupWithManager = defaultGetPersistentVolumeReconcilerSetupWithManager
+		getMigrationGroupReconcilerSetupWithManager = defaultGetMigrationGroupReconcilerSetupWithManager
 	}
 
 	tests := []struct {
@@ -457,13 +469,16 @@ func TestMain(t *testing.T) {
 		// 		}
 
 		// 		getMigrationCapabilitiesFunc = func(_ context.Context, _ csiidentity.Identity) (csiidentity.MigrationCapabilitySet, error) {
-		// 			// Populate the MigrationCapabilitySet with mock data (map with MigrateTypes as keys and bool as values)
 		// 			capabilitySet := csiidentity.MigrationCapabilitySet{
 		// 				migration.MigrateTypes(migration.MigrateTypes_VERSION_UPGRADE):  true,
 		// 				migration.MigrateTypes(migration.MigrateTypes_REPL_TO_NON_REPL): true,
 		// 			}
 
 		// 			return capabilitySet, nil
+		// 		}
+
+		// 		getCtrlNewManager = func(_ manager.Options) (manager.Manager, error) {
+		// 			return &mockManager{}, nil
 		// 		}
 
 		// 		getcreateMigratorManagerFunc = func(ctx context.Context, mgr manager.Manager) (*MigratorManager, error) {
@@ -476,6 +491,18 @@ func TestMain(t *testing.T) {
 
 		// 		getParseLevelFunc = func(level string) (logrus.Level, error) {
 		// 			return logrus.Level(0), fmt.Errorf("unable to parse log level: %s", level)
+		// 		}
+
+		// 		getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+		// 			return nil
+		// 		}
+
+		// 		getPersistentVolumeReconcilerSetupWithManager = func(_ *controller.PersistentVolumeReconciler, _ context.Context, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+		// 			return nil
+		// 		}
+
+		// 		getMigrationGroupReconcilerSetupWithManager = func(_ *controller.MigrationGroupReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+		// 			return nil
 		// 		}
 
 		// 		getManagerStart = func(_ manager.Manager) error {
@@ -498,13 +525,16 @@ func TestMain(t *testing.T) {
 				}
 
 				getMigrationCapabilitiesFunc = func(_ context.Context, _ csiidentity.Identity) (csiidentity.MigrationCapabilitySet, error) {
-					// Populate the MigrationCapabilitySet with mock data (map with MigrateTypes as keys and bool as values)
 					capabilitySet := csiidentity.MigrationCapabilitySet{
 						migration.MigrateTypes(migration.MigrateTypes_VERSION_UPGRADE):  true,
 						migration.MigrateTypes(migration.MigrateTypes_REPL_TO_NON_REPL): true,
 					}
 
 					return capabilitySet, nil
+				}
+
+				getCtrlNewManager = func(_ manager.Options) (manager.Manager, error) {
+					return &mockManager{}, nil
 				}
 
 				getcreateMigratorManagerFunc = func(ctx context.Context, mgr manager.Manager) (*MigratorManager, error) {
@@ -517,6 +547,18 @@ func TestMain(t *testing.T) {
 
 				getParseLevelFunc = func(level string) (logrus.Level, error) {
 					return logrus.Level(0), fmt.Errorf("unable to parse log level: %s", level)
+				}
+
+				getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+					return nil
+				}
+
+				getPersistentVolumeReconcilerSetupWithManager = func(_ *controller.PersistentVolumeReconciler, _ context.Context, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getMigrationGroupReconcilerSetupWithManager = func(_ *controller.MigrationGroupReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
 				}
 
 				getManagerStart = func(_ manager.Manager) error {
