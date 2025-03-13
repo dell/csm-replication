@@ -370,12 +370,6 @@ func TestMain(t *testing.T) {
 		{
 			name: "Successful run of main function",
 			setup: func() {
-				// // Mock the getConnectToCsiFunc to return a successful connection
-				// getConnectToCsiFunc = func(_ string, _ logr.Logger) (*grpc.ClientConn, error) {
-				// 	// Return a mock *grpc.ClientConn
-				// 	return &grpc.ClientConn{}, nil
-				// }
-
 				getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
 					return "csi-driver", nil
 				}
@@ -393,7 +387,7 @@ func TestMain(t *testing.T) {
 					return &mockManager{}, nil
 				}
 
-				getcreateMigratorManagerFunc = func(ctx context.Context, _ manager.Manager) (*MigratorManager, error) {
+				getcreateMigratorManagerFunc = func(_ context.Context, _ manager.Manager) (*MigratorManager, error) {
 					return &MigratorManager{
 						config: &config.Config{
 							LogLevel: "info",
@@ -405,7 +399,7 @@ func TestMain(t *testing.T) {
 					return logrus.Level(0), fmt.Errorf("unable to parse log level: %s", level)
 				}
 
-				getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 					return nil
 				}
 
@@ -460,7 +454,7 @@ func TestMain(t *testing.T) {
 					return logrus.InfoLevel, nil
 				}
 
-				getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 					return nil
 				}
 
@@ -526,7 +520,7 @@ func TestMain(t *testing.T) {
 					return logrus.InfoLevel, nil
 				}
 
-				getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 					return nil
 				}
 
@@ -592,7 +586,7 @@ func TestMain(t *testing.T) {
 					return logrus.InfoLevel, nil
 				}
 
-				getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 					return nil
 				}
 
@@ -658,7 +652,7 @@ func TestMain(t *testing.T) {
 					return logrus.InfoLevel, nil
 				}
 
-				getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 					return nil
 				}
 
@@ -726,7 +720,7 @@ func TestMain(t *testing.T) {
 					return logrus.InfoLevel, nil
 				}
 
-				getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 					return nil
 				}
 
@@ -795,7 +789,7 @@ func TestMain(t *testing.T) {
 					return logrus.InfoLevel, nil
 				}
 
-				getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 					return nil
 				}
 
@@ -864,7 +858,7 @@ func TestMain(t *testing.T) {
 					return logrus.Level(0), fmt.Errorf("unable to parse log level")
 				}
 
-				getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 					return nil
 				}
 
@@ -933,7 +927,7 @@ func TestMain(t *testing.T) {
 					return logrus.InfoLevel, nil
 				}
 
-				getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 					return nil
 				}
 
@@ -1002,7 +996,7 @@ func TestMain(t *testing.T) {
 					return logrus.Level(0), nil
 				}
 
-				getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 					return nil
 				}
 
@@ -1060,7 +1054,7 @@ func TestMain(t *testing.T) {
 					return logrus.Level(0), nil
 				}
 
-				getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 					return nil
 				}
 
