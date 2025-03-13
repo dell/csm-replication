@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dell/csm-replication/pkg/config"
 	repcnf "github.com/dell/csm-replication/pkg/config"
 	csiidentity "github.com/dell/csm-replication/pkg/csi-clients/identity"
 	"github.com/dell/dell-csi-extensions/replication"
@@ -414,7 +413,19 @@ func TestMain(t *testing.T) {
 		getParseLevelFunc = defaultGetParseLevelFunc
 		getManagerStart = defaultGetManagerStart
 	}
-
+	originalValue := repcnf.InClusterConfig
+	defer func() {
+		repcnf.InClusterConfig = originalValue
+	}()
+	repcnf.InClusterConfig = func() (*rest.Config, error) {
+		return &rest.Config{
+			Host: "https://localhost",
+			TLSClientConfig: rest.TLSClientConfig{
+				CAData:  []byte("test-ca"),
+				KeyData: []byte("test-key"),
+			},
+		}, nil
+	}
 	tests := []struct {
 		name  string
 		setup func()
@@ -441,7 +452,7 @@ func TestMain(t *testing.T) {
 				}
 				getcreateReplicatorManagerFunc = func(ctx context.Context, mgr manager.Manager) (*ReplicatorManager, error) {
 					return &ReplicatorManager{
-						config: &config.Config{
+						config: &repcnf.Config{
 							LogLevel: "info",
 						},
 					}, nil
