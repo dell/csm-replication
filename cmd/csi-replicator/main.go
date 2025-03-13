@@ -26,8 +26,10 @@ import (
 	"github.com/bombsimon/logrusr/v4"
 	"github.com/dell/csm-replication/pkg/config"
 	"github.com/fsnotify/fsnotify"
+	"github.com/go-logr/logr"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"google.golang.org/grpc"
 
 	"github.com/dell/csm-replication/controllers"
 	"github.com/dell/csm-replication/pkg/common"
@@ -51,6 +53,7 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsServer "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -135,6 +138,30 @@ func createReplicatorManager(ctx context.Context, mgr ctrl.Manager) (*Replicator
 	return &controllerManager, nil
 }
 
+var getConnectToCsiFunc = func(csiAddress string, setupLog logr.Logger) (*grpc.ClientConn, error) {
+	return connection.Connect(csiAddress, setupLog)
+}
+
+var getProbeForeverFunc = func(ctx context.Context, identityClient csiidentity.Identity) (string, error) {
+	return identityClient.ProbeForever(ctx)
+}
+
+var getReplicationCapabilitiesFunc = func(ctx context.Context, identityClient csiidentity.Identity) (csiidentity.ReplicationCapabilitySet, []*replication.SupportedActions, error) {
+	return identityClient.GetReplicationCapabilities(ctx)
+}
+
+var getcreateReplicatorManagerFunc = func(ctx context.Context, mgr ctrl.Manager) (*ReplicatorManager, error) {
+	return createReplicatorManager(ctx, mgr)
+}
+
+var getParseLevelFunc = func(level string) (logrus.Level, error) {
+	return common.ParseLevel(level)
+}
+
+var getManagerStart = func(mgr manager.Manager) error {
+	return mgr.Start(ctrl.SetupSignalHandler())
+}
+
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;watch;list;delete;update;create
 
@@ -184,7 +211,7 @@ func main() {
 	ctx := context.Background()
 
 	// Connect to csi
-	csiConn, err := connection.Connect(csiAddress, setupLog)
+	csiConn, err := getConnectToCsiFunc(csiAddress, setupLog)
 	if err != nil {
 		setupLog.Error(err, "failed to connect to CSI driver")
 		os.Exit(1)
@@ -192,14 +219,14 @@ func main() {
 
 	identityClient := csiidentity.New(csiConn, ctrl.Log.WithName("identity-client"), operationTimeout, probeFrequency)
 
-	driverName, err := identityClient.ProbeForever(ctx)
+	driverName, err := getProbeForeverFunc(ctx, identityClient)
 	if err != nil {
 		setupLog.Error(err, "error waiting for the CSI driver to be ready")
 		os.Exit(1)
 	}
 	setupLog.V(1).Info("CSI driver name", "driverName", driverName)
 
-	capabilitySet, supportedActions, err := identityClient.GetReplicationCapabilities(ctx)
+	capabilitySet, supportedActions, err := getReplicationCapabilitiesFunc(ctx, identityClient)
 	if err != nil {
 		setupLog.Error(err, "error fetching replication capabilities")
 		os.Exit(1)
@@ -232,7 +259,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	controllerMgr, err := createReplicatorManager(ctx, mgr)
+	controllerMgr, err := getcreateReplicatorManagerFunc(ctx, mgr)
 	if err != nil {
 		setupLog.Error(err, "failed to configure the controller manager")
 		os.Exit(1)
@@ -241,7 +268,7 @@ func main() {
 	controllerMgr.setupConfigMapWatcher(logrusLog)
 
 	// Process the config. Get initial log level
-	level, err := common.ParseLevel(controllerMgr.config.LogLevel)
+	level, err := getParseLevelFunc(controllerMgr.config.LogLevel)
 	if err != nil {
 		log.Println("Unable to parse ", err)
 	}
@@ -324,7 +351,7 @@ func main() {
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := getManagerStart(mgr); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}

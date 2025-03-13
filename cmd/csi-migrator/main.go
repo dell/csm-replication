@@ -80,13 +80,55 @@ type MigratorManager struct {
 	config  *config.Config
 }
 
-var getUpdateConfigMapFunc = func(mgr *MigratorManager, ctx context.Context) error {
-	return mgr.config.UpdateConfigMap(ctx, nil, mgr.Opts, nil, mgr.Manager.GetLogger())
-}
+var (
+	getUpdateConfigMapFunc = func(mgr *MigratorManager, ctx context.Context) error {
+		return mgr.config.UpdateConfigMap(ctx, nil, mgr.Opts, nil, mgr.Manager.GetLogger())
+	}
 
-var getConfigFunc = func(ctx context.Context, opts config.ControllerManagerOpts, mgrLogr logr.Logger) (*config.Config, error) {
-	return config.GetConfig(ctx, nil, opts, nil, mgrLogr)
-}
+	getConfigFunc = func(ctx context.Context, opts config.ControllerManagerOpts, mgrLogr logr.Logger) (*config.Config, error) {
+		return config.GetConfig(ctx, nil, opts, nil, mgrLogr)
+	}
+
+	getConnectToCsiFunc = func(csiAddress string, setupLog logr.Logger) (*grpc.ClientConn, error) {
+		return connection.Connect(csiAddress, setupLog)
+	}
+
+	getProbeForeverFunc = func(ctx context.Context, identityClient csiidentity.Identity) (string, error) {
+		return identityClient.ProbeForever(ctx)
+	}
+
+	getMigrationCapabilitiesFunc = func(ctx context.Context, identityClient csiidentity.Identity) (csiidentity.MigrationCapabilitySet, error) {
+		return identityClient.GetMigrationCapabilities(ctx)
+	}
+
+	getCtrlNewManager = func(options manager.Options) (manager.Manager, error) {
+		return ctrl.NewManager(ctrl.GetConfigOrDie(), options)
+	}
+
+	getcreateMigratorManagerFunc = func(ctx context.Context, mgr manager.Manager) (*MigratorManager, error) {
+		return createMigratorManager(ctx, mgr)
+	}
+
+	getParseLevelFunc = func(level string) (logrus.Level, error) {
+		return common.ParseLevel(level)
+	}
+
+	getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+		return workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](retryIntervalStart, retryIntervalMax)
+	}
+
+	getPersistentVolumeReconcilerSetupWithManager = func(r *controller.PersistentVolumeReconciler, ctx context.Context, mgr ctrl.Manager, limiter workqueue.TypedRateLimiter[reconcile.Request], maxReconcilers int) error {
+		return r.SetupWithManager(ctx, mgr, limiter, maxReconcilers)
+	}
+
+	getMigrationGroupReconcilerSetupWithManager = func(r *controller.MigrationGroupReconciler, mgr ctrl.Manager, limiter workqueue.TypedRateLimiter[reconcile.Request], maxReconcilers int) error {
+		return r.SetupWithManager(mgr, limiter, maxReconcilers)
+	}
+
+	getManagerStart = func(mgr manager.Manager) error {
+		return mgr.Start(ctrl.SetupSignalHandler())
+	}
+)
 
 func (mgr *MigratorManager) processConfigMapChanges(loggerConfig *logrus.Logger) {
 	log.Println("Received a config change event")
@@ -134,32 +176,9 @@ func createMigratorManager(ctx context.Context, mgr ctrl.Manager) (*MigratorMana
 	return &controllerManager, nil
 }
 
-var getConnectToCsiFunc = func(csiAddress string, setupLog logr.Logger) (*grpc.ClientConn, error) {
-	return connection.Connect(csiAddress, setupLog)
-}
-
-var getProbeForeverFunc = func(ctx context.Context, identityClient csiidentity.Identity) (string, error) {
-	return identityClient.ProbeForever(ctx)
-}
-
-var getMigrationCapabilitiesFunc = func(ctx context.Context, identityClient csiidentity.Identity) (csiidentity.MigrationCapabilitySet, error) {
-	return identityClient.GetMigrationCapabilities(ctx)
-}
-
-var getcreateMigratorManagerFunc = func(ctx context.Context, mgr manager.Manager, logrusLog *logrus.Logger) (*MigratorManager, error) {
-	return createMigratorManager(ctx, mgr)
-}
-
-var getParseLevelFunc = func(level string) (logrus.Level, error) {
-	return common.ParseLevel(level)
-}
-
-var getManagerStart = func(mgr manager.Manager) error {
-	return mgr.Start(ctrl.SetupSignalHandler())
-}
-
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;watch;list;delete;update;create
+
 func main() {
 	var (
 		metricsAddr                string
@@ -234,7 +253,7 @@ func main() {
 		}
 	}
 	leaderElectionID := common.DellCSIMigrator + strings.ReplaceAll(driverName, ".", "-")
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	mgr, err := getCtrlNewManager(ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsServer.Options{
 			BindAddress: metricsAddr,
@@ -249,13 +268,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	MigratorMgr, err := getcreateMigratorManagerFunc(ctx, mgr, logrusLog)
+	MigratorMgr, err := getcreateMigratorManagerFunc(ctx, mgr)
 	if err != nil {
 		setupLog.Error(err, "failed to configure the migrator manager")
 		os.Exit(1)
 	}
-
-	//Start the watch on configmap
+	// Start the watch on configmap
 	MigratorMgr.setupConfigMapWatcher(logrusLog)
 
 	// Process the config. Get initial log level
@@ -266,9 +284,9 @@ func main() {
 	log.Println("set level to", level)
 	logrusLog.SetLevel(level)
 
-	expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](retryIntervalStart, retryIntervalMax)
+	expRateLimiter := getWorkqueueReconcileRequest(retryIntervalStart, retryIntervalMax)
 
-	if err = (&controller.PersistentVolumeReconciler{
+	if err = getPersistentVolumeReconcilerSetupWithManager(&controller.PersistentVolumeReconciler{
 		Client:            mgr.GetClient(),
 		Log:               ctrl.Log.WithName("controllers").WithName("PersistentVolume"),
 		Scheme:            mgr.GetScheme(),
@@ -279,12 +297,12 @@ func main() {
 		SingleFlightGroup: singleflight.Group{},
 		Domain:            domain,
 		ReplDomain:        replicationDomain,
-	}).SetupWithManager(ctx, mgr, expRateLimiter, workerThreads); err != nil {
+	}, ctx, mgr, expRateLimiter, workerThreads); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PersistentVolume")
 		os.Exit(1)
 	}
 
-	if err = (&controller.MigrationGroupReconciler{
+	if err = getMigrationGroupReconcilerSetupWithManager(&controller.MigrationGroupReconciler{
 		Client:                     mgr.GetClient(),
 		Log:                        ctrl.Log.WithName("controllers").WithName("DellCSIMigrationGroup"),
 		Scheme:                     mgr.GetScheme(),
@@ -292,7 +310,7 @@ func main() {
 		DriverName:                 driverName,
 		MigrationClient:            csimigration.New(csiConn, ctrl.Log.WithName("migration-client"), operationTimeout),
 		MaxRetryDurationForActions: maxRetryDurationForActions,
-	}).SetupWithManager(mgr, expRateLimiter, workerThreads); err != nil {
+	}, mgr, expRateLimiter, workerThreads); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "DellCSIMigrationGroup")
 		os.Exit(1)
 	}

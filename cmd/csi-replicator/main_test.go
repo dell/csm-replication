@@ -11,10 +11,13 @@ import (
 	"testing"
 
 	repcnf "github.com/dell/csm-replication/pkg/config"
+	csiidentity "github.com/dell/csm-replication/pkg/csi-clients/identity"
+	"github.com/dell/dell-csi-extensions/replication"
 	"github.com/go-logr/logr"
 	"github.com/go-logr/logr/funcr"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/grpc"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -389,6 +392,95 @@ func TestSetupConfigMapWatcher(t *testing.T) {
 			if !strings.Contains(output.String(), tt.expectedOutput) {
 				t.Errorf("Expected output: %s, but got: %s", tt.expectedOutput, output.String())
 			}
+		})
+	}
+}
+
+func TestMain(t *testing.T) {
+	defaultGetConnectToCsiFunc := getConnectToCsiFunc
+	defaultGetProbeForeverFunc := getProbeForeverFunc
+	defaultGetReplicationCapabilitiesFunc := getReplicationCapabilitiesFunc
+	defaultGetcreateReplicatorManagerFunc := getcreateReplicatorManagerFunc
+	defaultGetParseLevelFunc := getParseLevelFunc
+	defaultGetManagerStart := getManagerStart
+
+	after := func() {
+		// Restore the original functions after the test
+		getConnectToCsiFunc = defaultGetConnectToCsiFunc
+		getProbeForeverFunc = defaultGetProbeForeverFunc
+		getReplicationCapabilitiesFunc = defaultGetReplicationCapabilitiesFunc
+		getcreateReplicatorManagerFunc = defaultGetcreateReplicatorManagerFunc
+		getParseLevelFunc = defaultGetParseLevelFunc
+		getManagerStart = defaultGetManagerStart
+	}
+	originalValue := repcnf.InClusterConfig
+	defer func() {
+		repcnf.InClusterConfig = originalValue
+	}()
+	repcnf.InClusterConfig = func() (*rest.Config, error) {
+		return &rest.Config{
+			Host: "https://localhost",
+			TLSClientConfig: rest.TLSClientConfig{
+				CAData:  []byte("test-ca"),
+				KeyData: []byte("test-key"),
+			},
+		}, nil
+	}
+	tests := []struct {
+		name  string
+		setup func()
+	}{
+		{
+			name: "Successful execution",
+			setup: func() {
+				getConnectToCsiFunc = func(_ string, _ logr.Logger) (*grpc.ClientConn, error) {
+					return &grpc.ClientConn{}, nil
+				}
+				getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
+					return "csi-driver", nil
+				}
+				getReplicationCapabilitiesFunc = func(_ context.Context, _ csiidentity.Identity) (csiidentity.ReplicationCapabilitySet, []*replication.SupportedActions, error) {
+					capabilitySet := csiidentity.ReplicationCapabilitySet{
+						replication.ReplicationCapability_RPC_CREATE_REMOTE_VOLUME:         true,
+						replication.ReplicationCapability_RPC_CREATE_PROTECTION_GROUP:      true,
+						replication.ReplicationCapability_RPC_DELETE_PROTECTION_GROUP:      true,
+						replication.ReplicationCapability_RPC_MONITOR_PROTECTION_GROUP:     true,
+						replication.ReplicationCapability_RPC_REPLICATION_ACTION_EXECUTION: true,
+					}
+					supportedActions := []*replication.SupportedActions{}
+					return capabilitySet, supportedActions, nil
+				}
+				getcreateReplicatorManagerFunc = func(ctx context.Context, mgr manager.Manager) (*ReplicatorManager, error) {
+					return &ReplicatorManager{
+						config: &repcnf.Config{
+							LogLevel: "info",
+						},
+					}, nil
+				}
+				getParseLevelFunc = func(level string) (logrus.Level, error) {
+					return logrus.InfoLevel, nil
+				}
+				getManagerStart = func(_ manager.Manager) error {
+					return nil
+				}
+			},
+		},
+		// {
+		// 	name: "CSI connection failure",
+		// 	setup: func() {
+		// 		getConnectToCsiFunc = func(_ string, _ logr.Logger) (*grpc.ClientConn, error) {
+		// 			return nil, fmt.Errorf("connection error")
+		// 		}
+		// 	},
+		// },
+		// Add more test cases as needed
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer after()
+			tt.setup()
+			main()
 		})
 	}
 }

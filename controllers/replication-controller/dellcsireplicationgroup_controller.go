@@ -59,6 +59,18 @@ var (
 	getDellCsiReplicationGroupCreateNamespace = func(r connection.RemoteClusterClient, ctx context.Context, content *v1.Namespace) error {
 		return r.CreateNamespace(ctx, content)
 	}
+	getDellCsiReplicationGroupCreateSnapshotContent = func(r connection.RemoteClusterClient, ctx context.Context, snapContent *s1.VolumeSnapshotContent) error {
+		return r.CreateSnapshotContent(ctx, snapContent)
+	}
+	getDellCsiReplicationGroupCreateSnapshotObject = func(remoteClient connection.RemoteClusterClient, ctx context.Context, snapshot *s1.VolumeSnapshot) error {
+		return remoteClient.CreateSnapshotObject(ctx, snapshot)
+	}
+	getDellCsiReplicationGroupProcessSnapshotEvent = func(r *ReplicationGroupReconciler, ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
+		return r.processSnapshotEvent(ctx, group, remoteClient, log)
+	}
+	getDellCsiReplicationGroupUpdate = func(r *ReplicationGroupReconciler, ctx context.Context, group *repv1.DellCSIReplicationGroup) error {
+		return r.Update(ctx, group)
+	}
 )
 
 // ReplicationGroupReconciler reconciles a ReplicationGroup object
@@ -351,7 +363,7 @@ func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context
 	}
 
 	if strings.Contains(group.Status.LastAction.Condition, "CREATE_SNAPSHOT") {
-		if err := r.processSnapshotEvent(ctx, group, remoteClient, log); err != nil {
+		if err := getDellCsiReplicationGroupProcessSnapshotEvent(r, ctx, group, remoteClient, log); err != nil {
 			return err
 		}
 	}
@@ -359,7 +371,7 @@ func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context
 	// Informing the RG that the last action has been processed.
 	controller.AddAnnotation(group, controller.ActionProcessedTime, group.Status.LastAction.Time.GoString())
 
-	return r.Update(ctx, group)
+	return getDellCsiReplicationGroupUpdate(r, ctx, group)
 }
 
 func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
@@ -403,14 +415,14 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 		sc := makeStorageClassContent(group.Labels[controller.DriverName], actionAnnotation.SnapshotClass)
 		snapContent := makeVolSnapContent(snapshotHandle, volumeHandle, *snapRef, sc)
 
-		err = remoteClient.CreateSnapshotContent(ctx, snapContent)
+		err = getDellCsiReplicationGroupCreateSnapshotContent(remoteClient, ctx, snapContent)
 		if err != nil {
 			log.Error(err, "unable to create snapshot content")
 			return err
 		}
 
 		snapshot := makeSnapshotObject(snapRef.Name, snapContent.Name, sc.ObjectMeta.Name, actionAnnotation.SnapshotNamespace)
-		err = remoteClient.CreateSnapshotObject(ctx, snapshot)
+		err = getDellCsiReplicationGroupCreateSnapshotObject(remoteClient, ctx, snapshot)
 		if err != nil {
 			log.Error(err, "unable to create snapshot object")
 			return err
