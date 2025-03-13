@@ -15,6 +15,7 @@
 package config
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -30,6 +31,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
@@ -487,8 +489,6 @@ func TestBuildRestConfigFromSecretConfFileFormat(t *testing.T) {
 		secretName := "valid-secret"
 		namespace := "default"
 
-		// secret := new(v1.Secret)
-
 		kubeconfig := `
 apiVersion: v1
 clusters:
@@ -508,7 +508,7 @@ users:
   user:
     token: test-token
 `
-		secret1 := &v1.Secret{
+		secret := &v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      secretName,
 				Namespace: namespace,
@@ -518,9 +518,10 @@ users:
 			},
 		}
 
-		clinet := fake.NewClientBuilder().WithObjects(secret1).Build()
+		clinet := fake.NewClientBuilder().WithObjects(secret).Build()
 		// Test the function
-		_, err := buildRestConfigFromSecretConfFileFormat(context.Background(), secretName, namespace, clinet)
+		got, err := buildRestConfigFromSecretConfFileFormat(context.Background(), secretName, namespace, clinet)
+		fmt.Print(got, err)
 		assert.NoError(t, err)
 
 	})
@@ -648,6 +649,87 @@ func Test_getConnHandler(t *testing.T) {
 		log     logr.Logger
 	}
 
+	t.Run("SecretFoundAndValidDataWithTargets", func(t *testing.T) {
+		os.Setenv(common.EnvInClusterConfig, "true")
+		secretName := "valid-secret"
+		namespace := "default"
+
+		kubeconfig := `
+apiVersion: v1
+clusters:
+- cluster:
+    server: https://test-server.com
+  name: test-cluster
+contexts:
+- context:
+    cluster: test-cluster
+    user: test-user
+  name: test-context
+current-context: test-context
+kind: Config
+preferences: {}
+users:
+- name: test-user
+  user:
+    token: test-token
+`
+		secret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: namespace,
+			},
+			Data: map[string][]byte{
+				"data": []byte(kubeconfig),
+			},
+		}
+
+		clinet1 := fake.NewClientBuilder().WithObjects(secret).Build()
+		args := args{
+			ctx: context.Background(),
+			targets: []target{
+				{
+					ClusterID: "test-cluster", SecretRef: "valid-secret",
+				}},
+			client: clinet1,
+			opts: ControllerManagerOpts{
+				UseConfFileFormat: true,
+				WatchNamespace:    "dell-replication-controller",
+				ConfigDir:         "../../deploy",
+				ConfigFileName:    "config",
+				InCluster:         true,
+				Mode:              "",
+			},
+			log: mockManager.GetLogger(),
+		}
+
+		_, err := getConnHandler(args.ctx, args.targets, args.client, args.opts, args.log)
+		assert.Error(t, err)
+	})
+	t.Run("SecretFoundAndValidDataWithTargetsUseConfFileFormatToFalse", func(t *testing.T) {
+		os.Setenv(common.EnvInClusterConfig, "true")
+
+		args := args{
+			ctx: context.Background(),
+			targets: []target{
+				{
+					ClusterID: "target-id",
+				}},
+			client: fake.NewClientBuilder().Build(),
+			opts: ControllerManagerOpts{
+				UseConfFileFormat: false,
+				WatchNamespace:    "dell-replication-controller",
+				ConfigDir:         "../../deploy",
+				ConfigFileName:    "config",
+				InCluster:         true,
+				Mode:              "",
+			},
+			log: mockManager.GetLogger(),
+		}
+
+		_, err := getConnHandler(args.ctx, args.targets, args.client, args.opts, args.log)
+		assert.Error(t, err)
+		fmt.Println("dasda", err.Error())
+	})
 	t.Run("SecretFoundAndValidData", func(t *testing.T) {
 		os.Setenv(common.EnvInClusterConfig, "true")
 
@@ -692,7 +774,58 @@ func Test_getConnHandler(t *testing.T) {
 	})
 }
 
-///////////////////////////////////////
+func Test_buildRestConfigFromCustomFormat(t *testing.T) {
+	// Test case: Secret not found
+	t.Run("SecretNotFound", func(t *testing.T) {
+		secretName := "invalid-secret"
+		namespace := "default"
+		client := fake.NewClientBuilder().Build()
+
+		_, err := buildRestConfigFromCustomFormat(context.Background(), secretName, namespace, client)
+
+		if err == nil {
+			t.Error("Expected an error, but got nil")
+		}
+	})
+
+	// Test case: Secret found and valid data
+	t.Run("SecretFoundAndValidData", func(t *testing.T) {
+		secretName := "valid-secret"
+		namespace := "default"
+		secretData := map[string][]byte{
+			"server":     []byte("https://example.com"),
+			"ca":         []byte("test-ca"),
+			"clientkey":  []byte("test-clientkey"),
+			"clientcert": []byte("test-clientcert"),
+		}
+		secret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: namespace,
+			},
+			Data: secretData,
+		}
+		client := fake.NewClientBuilder().WithObjects(secret).Build()
+
+		config, err := buildRestConfigFromCustomFormat(context.Background(), secretName, namespace, client)
+
+		if err != nil {
+			t.Errorf("Expected no error, but got %v", err)
+		}
+		if config.Host != "https://example.com" {
+			t.Errorf("Expected host to be 'https://example.com', but got %s", config.Host)
+		}
+		if !bytes.Equal(config.TLSClientConfig.CAData, secretData["ca"]) {
+			t.Errorf("Expected CA data to be %s, but got %s", secretData["ca"], config.TLSClientConfig.CAData)
+		}
+		if !bytes.Equal(config.TLSClientConfig.KeyData, secretData["clientkey"]) {
+			t.Errorf("Expected client key data to be %s, but got %s", secretData["clientkey"], config.TLSClientConfig.KeyData)
+		}
+		if !bytes.Equal(config.TLSClientConfig.CertData, secretData["clientcert"]) {
+			t.Errorf("Expected client cert data to be %s, but got %s", secretData["clientcert"], config.TLSClientConfig.CertData)
+		}
+	})
+}
 
 // func Test_getReplicationConfig(t *testing.T) {
 // 	originalValue := InClusterConfig
