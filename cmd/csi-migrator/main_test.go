@@ -992,7 +992,7 @@ func TestMain(t *testing.T) {
 					}, nil
 				}
 
-				getParseLevelFunc = func(level string) (logrus.Level, error) {
+				getParseLevelFunc = func(_ string) (logrus.Level, error) {
 					return logrus.Level(0), nil
 				}
 
@@ -1050,7 +1050,7 @@ func TestMain(t *testing.T) {
 					}, nil
 				}
 
-				getParseLevelFunc = func(level string) (logrus.Level, error) {
+				getParseLevelFunc = func(_ string) (logrus.Level, error) {
 					return logrus.Level(0), nil
 				}
 
