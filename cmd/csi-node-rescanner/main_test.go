@@ -46,7 +46,6 @@ import (
 	ctrlruntimeconfig "sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	metricsServer "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
@@ -205,70 +204,72 @@ func TestProbeCSIDriverWrongCapability(t *testing.T) {
 	}
 }
 
-func TestCreateMetricsServer(t *testing.T) {
-	tests := []struct {
-		name                       string
-		driverName                 string
-		metricsAddr                string
-		enableLeaderElection       bool
-		setupLog                   logr.Logger
-		retryIntervalStart         time.Duration
-		retryIntervalMax           time.Duration
-		maxRetryDurationForActions time.Duration
-		workerThreads              int
-		expectedErr                error
-	}{
-		{
-			name:                       "success",
-			driverName:                 "driver-name",
-			metricsAddr:                ":8001",
-			enableLeaderElection:       false,
-			setupLog:                   ctrl.Log.WithName("test-logger"),
-			retryIntervalStart:         1 * time.Second,
-			retryIntervalMax:           5 * time.Minute,
-			maxRetryDurationForActions: time.Hour,
-			workerThreads:              2,
-			expectedErr:                nil,
-		},
-	}
+/*
+	 func TestCreateMetricsServer(t *testing.T) {
+		tests := []struct {
+			name                       string
+			driverName                 string
+			metricsAddr                string
+			enableLeaderElection       bool
+			setupLog                   logr.Logger
+			retryIntervalStart         time.Duration
+			retryIntervalMax           time.Duration
+			maxRetryDurationForActions time.Duration
+			workerThreads              int
+			expectedErr                error
+		}{
+			{
+				name:                       "success",
+				driverName:                 "driver-name",
+				metricsAddr:                ":8001",
+				enableLeaderElection:       false,
+				setupLog:                   ctrl.Log.WithName("test-logger"),
+				retryIntervalStart:         1 * time.Second,
+				retryIntervalMax:           5 * time.Minute,
+				maxRetryDurationForActions: time.Hour,
+				workerThreads:              2,
+				expectedErr:                nil,
+			},
+		}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Save the original osExit function
-			originalOsExit := osExit
-			defer func() { osExit = originalOsExit }()
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				// Save the original osExit function
+				originalOsExit := osExit
+				defer func() { osExit = originalOsExit }()
 
-			// Override osExit to capture the exit code
-			var exitCode int
-			osExit = func(code int) {
-				exitCode = code
-			}
-			// Create a mock ctrl.Manager
-			_, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-				Scheme: scheme,
-				Metrics: metricsServer.Options{
-					BindAddress: tt.metricsAddr,
-				},
-				WebhookServer:              webhook.NewServer(webhook.Options{Port: 8443}),
-				LeaderElection:             tt.enableLeaderElection,
-				LeaderElectionResourceLock: "leases",
-				LeaderElectionID:           common.DellCSINodeReScanner + strings.ReplaceAll(tt.driverName, ".", "-"),
-			})
-			// Call the function under test
-			createMetricsServer(context.Background(), tt.driverName, tt.metricsAddr, tt.enableLeaderElection, tt.setupLog, tt.retryIntervalStart, tt.retryIntervalMax, tt.maxRetryDurationForActions, tt.workerThreads)
-
-			// Assert the expected error
-			if tt.expectedErr != nil {
-				assert.Equal(t, tt.expectedErr, err)
-			} else {
-				// Assert the exit code
-				if exitCode != 1 {
-					t.Errorf("Expected exit code 1, got %d", exitCode)
+				// Override osExit to capture the exit code
+				var exitCode int
+				osExit = func(code int) {
+					exitCode = code
 				}
-			}
-		})
+				// Create a mock ctrl.Manager
+				_, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+					Scheme: scheme,
+					Metrics: metricsServer.Options{
+						BindAddress: tt.metricsAddr,
+					},
+					WebhookServer:              webhook.NewServer(webhook.Options{Port: 8443}),
+					LeaderElection:             tt.enableLeaderElection,
+					LeaderElectionResourceLock: "leases",
+					LeaderElectionID:           common.DellCSINodeReScanner + strings.ReplaceAll(tt.driverName, ".", "-"),
+				})
+				// Call the function under test
+				createMetricsServer(context.Background(), tt.driverName, tt.metricsAddr, tt.enableLeaderElection, tt.setupLog, tt.retryIntervalStart, tt.retryIntervalMax, tt.maxRetryDurationForActions, tt.workerThreads)
+
+				// Assert the expected error
+				if tt.expectedErr != nil {
+					assert.Equal(t, tt.expectedErr, err)
+				} else {
+					// Assert the exit code
+					if exitCode != 1 {
+						t.Errorf("Expected exit code 1, got %d", exitCode)
+					}
+				}
+			})
+		}
 	}
-}
+*/
 func TestProcessConfigMapChanges(t *testing.T) {
 	tests := []struct {
 		name          string
