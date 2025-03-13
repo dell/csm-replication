@@ -128,6 +128,38 @@ var (
 	getManagerStart = func(mgr manager.Manager) error {
 		return mgr.Start(ctrl.SetupSignalHandler())
 	}
+
+	osExit = os.Exit
+
+	setupFlags = func() (flags, *logrus.Logger) {
+		flags := flags{}
+		flag.StringVar(&flags.metricsAddr, "metrics-addr", ":8001", "The address the metric endpoint binds to.")
+		flag.BoolVar(&flags.enableLeaderElection, "leader-election", false,
+			"Enable leader election for controller manager. "+
+				"Enabling this will ensure there is only one active controller manager.")
+		flag.StringVar(&flags.csiAddress, "csi-address", "/var/run/csi.sock", "Address for the csi driver socket")
+		flag.StringVar(&flags.domain, "prefix", common.DefaultMigrationDomain, "Prefix used for creating labels/annotations")
+		flag.StringVar(&flags.replicationDomain, "repl-prefix", common.DefaultDomain, "Replication prefix used for creating labels/annotations")
+		flag.IntVar(&flags.workerThreads, "worker-threads", 2, "Number of concurrent reconcilers for each of the controllers")
+		flag.DurationVar(&flags.retryIntervalStart, "retry-interval-start", time.Second, "Initial retry interval of failed reconcile request. It doubles with each failure, upto retry-interval-max")
+		flag.DurationVar(&flags.retryIntervalMax, "retry-interval-max", 5*time.Minute, "Maximum retry interval of failed reconcile request")
+		flag.DurationVar(&flags.operationTimeout, "timeout", 300*time.Second, "Timeout of waiting for response for CSI Driver")
+		flag.DurationVar(&flags.probeFrequency, "probe-frequency", 5*time.Second, "Time between identity ProbeController calls")
+		flag.Parse()
+		controllers.InitLabelsAndAnnotations(flags.domain)
+		logrusLog := logrus.New()
+		logrusLog.SetFormatter(&logrus.JSONFormatter{
+			TimestampFormat: time.RFC3339Nano,
+		})
+
+		logger := logrusr.New(logrusLog)
+		ctrl.SetLogger(logger)
+
+		setupLog.V(1).Info("Prefix", "Domain", flags.domain)
+		setupLog.V(1).Info(common.DellCSIMigrator, "Version", core.SemVer, "Commit ID", core.CommitSha32, "Commit SHA", core.CommitTime.Format(time.RFC1123))
+
+		return flags, logrusLog
+	}
 )
 
 func (mgr *MigratorManager) processConfigMapChanges(loggerConfig *logrus.Logger) {
@@ -179,99 +211,77 @@ func createMigratorManager(ctx context.Context, mgr ctrl.Manager) (*MigratorMana
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;watch;list;delete;update;create
 
+type flags struct {
+	metricsAddr                string
+	enableLeaderElection       bool
+	csiAddress                 string
+	workerThreads              int
+	retryIntervalStart         time.Duration
+	retryIntervalMax           time.Duration
+	operationTimeout           time.Duration
+	pgContextKeyPrefix         string
+	domain                     string
+	replicationDomain          string
+	probeFrequency             time.Duration
+	maxRetryDurationForActions time.Duration
+}
+
 func main() {
-	var (
-		metricsAddr                string
-		enableLeaderElection       bool
-		csiAddress                 string
-		workerThreads              int
-		retryIntervalStart         time.Duration
-		retryIntervalMax           time.Duration
-		operationTimeout           time.Duration
-		pgContextKeyPrefix         string
-		domain                     string
-		replicationDomain          string
-		probeFrequency             time.Duration
-		maxRetryDurationForActions time.Duration
-	)
-	flag.StringVar(&metricsAddr, "metrics-addr", ":8001", "The address the metric endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "leader-election", false,
-		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&csiAddress, "csi-address", "/var/run/csi.sock", "Address for the csi driver socket")
-	flag.StringVar(&domain, "prefix", common.DefaultMigrationDomain, "Prefix used for creating labels/annotations")
-	flag.StringVar(&replicationDomain, "repl-prefix", common.DefaultDomain, "Replication prefix used for creating labels/annotations")
-	flag.IntVar(&workerThreads, "worker-threads", 2, "Number of concurrent reconcilers for each of the controllers")
-	flag.DurationVar(&retryIntervalStart, "retry-interval-start", time.Second, "Initial retry interval of failed reconcile request. It doubles with each failure, upto retry-interval-max")
-	flag.DurationVar(&retryIntervalMax, "retry-interval-max", 5*time.Minute, "Maximum retry interval of failed reconcile request")
-	flag.DurationVar(&operationTimeout, "timeout", 300*time.Second, "Timeout of waiting for response for CSI Driver")
-	flag.DurationVar(&probeFrequency, "probe-frequency", 5*time.Second, "Time between identity ProbeController calls")
-	flag.Parse()
-	controllers.InitLabelsAndAnnotations(domain)
-	logrusLog := logrus.New()
-	logrusLog.SetFormatter(&logrus.JSONFormatter{
-		TimestampFormat: time.RFC3339Nano,
-	})
-
-	logger := logrusr.New(logrusLog)
-	ctrl.SetLogger(logger)
-
-	setupLog.V(1).Info("Prefix", "Domain", domain)
-	setupLog.V(1).Info(common.DellCSIMigrator, "Version", core.SemVer, "Commit ID", core.CommitSha32, "Commit SHA", core.CommitTime.Format(time.RFC1123))
+	flags, logrusLog := setupFlags()
 
 	ctx := context.Background()
 
 	// Connect to csi
-	csiConn, err := getConnectToCsiFunc(csiAddress, setupLog)
+	csiConn, err := getConnectToCsiFunc(flags.csiAddress, setupLog)
 	if err != nil {
 		setupLog.Error(err, "failed to connect to CSI driver")
-		os.Exit(1)
+		osExit(1)
 	}
 
-	identityClient := csiidentity.New(csiConn, ctrl.Log.WithName("identity-client"), operationTimeout, probeFrequency)
+	identityClient := csiidentity.New(csiConn, ctrl.Log.WithName("identity-client"), flags.operationTimeout, flags.probeFrequency)
 
 	driverName, err := getProbeForeverFunc(ctx, identityClient)
 	if err != nil {
 		setupLog.Error(err, "error waiting for the CSI driver to be ready")
-		os.Exit(1)
+		osExit(1)
 	}
 	setupLog.V(1).Info("CSI driver name", "driverName", driverName)
 
 	capabilitySet, err := getMigrationCapabilitiesFunc(ctx, identityClient)
 	if err != nil {
 		setupLog.Error(err, "error fetching migration capabilities")
-		os.Exit(1)
+		osExit(1)
 	}
 	if len(capabilitySet) == 0 {
 		setupLog.Error(fmt.Errorf("driver doesn't support migration"), "migration not supported")
-		os.Exit(1)
+		osExit(1)
 	}
 	for types := range capabilitySet {
 		if _, ok := currentSupportedCapabilities[types]; !ok {
 			setupLog.Error(err, "unknown capability advertised")
-			os.Exit(1)
+			osExit(1)
 		}
 	}
 	leaderElectionID := common.DellCSIMigrator + strings.ReplaceAll(driverName, ".", "-")
 	mgr, err := getCtrlNewManager(ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsServer.Options{
-			BindAddress: metricsAddr,
+			BindAddress: flags.metricsAddr,
 		},
 		WebhookServer:              webhook.NewServer(webhook.Options{Port: 8443}),
-		LeaderElection:             enableLeaderElection,
+		LeaderElection:             flags.enableLeaderElection,
 		LeaderElectionResourceLock: "leases",
 		LeaderElectionID:           leaderElectionID,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
-		os.Exit(1)
+		osExit(1)
 	}
 
 	MigratorMgr, err := getcreateMigratorManagerFunc(ctx, mgr)
 	if err != nil {
 		setupLog.Error(err, "failed to configure the migrator manager")
-		os.Exit(1)
+		osExit(1)
 	}
 	// Start the watch on configmap
 	MigratorMgr.setupConfigMapWatcher(logrusLog)
@@ -284,7 +294,7 @@ func main() {
 	log.Println("set level to", level)
 	logrusLog.SetLevel(level)
 
-	expRateLimiter := getWorkqueueReconcileRequest(retryIntervalStart, retryIntervalMax)
+	expRateLimiter := getWorkqueueReconcileRequest(flags.retryIntervalStart, flags.retryIntervalMax)
 
 	if err = getPersistentVolumeReconcilerSetupWithManager(&controller.PersistentVolumeReconciler{
 		Client:            mgr.GetClient(),
@@ -292,14 +302,14 @@ func main() {
 		Scheme:            mgr.GetScheme(),
 		EventRecorder:     mgr.GetEventRecorderFor(common.DellCSIReplicator),
 		DriverName:        driverName,
-		MigrationClient:   csimigration.New(csiConn, ctrl.Log.WithName("migration-client"), operationTimeout),
-		ContextPrefix:     pgContextKeyPrefix,
+		MigrationClient:   csimigration.New(csiConn, ctrl.Log.WithName("migration-client"), flags.operationTimeout),
+		ContextPrefix:     flags.pgContextKeyPrefix,
 		SingleFlightGroup: singleflight.Group{},
-		Domain:            domain,
-		ReplDomain:        replicationDomain,
-	}, ctx, mgr, expRateLimiter, workerThreads); err != nil {
+		Domain:            flags.domain,
+		ReplDomain:        flags.replicationDomain,
+	}, ctx, mgr, expRateLimiter, flags.workerThreads); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PersistentVolume")
-		os.Exit(1)
+		osExit(1)
 	}
 
 	if err = getMigrationGroupReconcilerSetupWithManager(&controller.MigrationGroupReconciler{
@@ -308,16 +318,16 @@ func main() {
 		Scheme:                     mgr.GetScheme(),
 		EventRecorder:              mgr.GetEventRecorderFor(common.DellCSIMigrator),
 		DriverName:                 driverName,
-		MigrationClient:            csimigration.New(csiConn, ctrl.Log.WithName("migration-client"), operationTimeout),
-		MaxRetryDurationForActions: maxRetryDurationForActions,
-	}, mgr, expRateLimiter, workerThreads); err != nil {
+		MigrationClient:            csimigration.New(csiConn, ctrl.Log.WithName("migration-client"), flags.operationTimeout),
+		MaxRetryDurationForActions: flags.maxRetryDurationForActions,
+	}, mgr, expRateLimiter, flags.workerThreads); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "DellCSIMigrationGroup")
-		os.Exit(1)
+		osExit(1)
 	}
 
 	setupLog.Info("starting manager")
 	if err := getManagerStart(mgr); err != nil {
 		setupLog.Error(err, "problem running manager")
-		os.Exit(1)
+		osExit(1)
 	}
 }
