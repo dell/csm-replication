@@ -23,6 +23,7 @@ import (
 	"time"
 
 	controller "github.com/dell/csm-replication/controllers/csi-migrator"
+	"github.com/dell/csm-replication/pkg/common"
 	"github.com/dell/csm-replication/pkg/config"
 	csiidentity "github.com/dell/csm-replication/pkg/csi-clients/identity"
 	"github.com/dell/dell-csi-extensions/migration"
@@ -30,6 +31,7 @@ import (
 	"github.com/go-logr/logr/funcr"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
+	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
@@ -357,7 +359,6 @@ func TestMain(t *testing.T) {
 		getPersistentVolumeReconcilerSetupWithManager = defaultGetPersistentVolumeReconcilerSetupWithManager
 		getMigrationGroupReconcilerSetupWithManager = defaultGetMigrationGroupReconcilerSetupWithManager
 		osExit = defaultOSExit
-		osExitCode = 0
 		setupFlags = defaultSetupFlags
 	}
 
@@ -427,14 +428,482 @@ func TestMain(t *testing.T) {
 			expectedOsExitCode: 0,
 		},
 		{
+			name: "failed to connect to CSI driver",
+			setup: func() {
+				getConnectToCsiFunc = func(_ string, _ logr.Logger) (*grpc.ClientConn, error) {
+					return &grpc.ClientConn{}, errors.New("error connecting to CSI driver")
+				}
+
+				getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
+					return "csi-driver", errors.New("error waiting for the CSI driver to be ready")
+				}
+
+				getMigrationCapabilitiesFunc = func(_ context.Context, _ csiidentity.Identity) (csiidentity.MigrationCapabilitySet, error) {
+					capabilitySet := csiidentity.MigrationCapabilitySet{}
+
+					return capabilitySet, nil
+				}
+
+				getCtrlNewManager = func(_ manager.Options) (manager.Manager, error) {
+					return &mockManager{}, nil
+				}
+
+				getcreateMigratorManagerFunc = func(_ context.Context, _ manager.Manager) (*MigratorManager, error) {
+					return &MigratorManager{
+						config: &config.Config{
+							LogLevel: "info",
+						},
+					}, nil
+				}
+
+				getParseLevelFunc = func(_ string) (logrus.Level, error) {
+					return logrus.InfoLevel, nil
+				}
+
+				getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+					return nil
+				}
+
+				getPersistentVolumeReconcilerSetupWithManager = func(_ *controller.PersistentVolumeReconciler, _ context.Context, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getMigrationGroupReconcilerSetupWithManager = func(_ *controller.MigrationGroupReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getManagerStart = func(_ manager.Manager) error {
+					return nil
+				}
+
+				osExit = func(code int) {
+					osExitCode = code
+				}
+
+				setupFlags = func() flags {
+					return flags{
+						metricsAddr:          ":8001",
+						enableLeaderElection: false,
+						csiAddress:           "/var/run/csi.sock",
+						workerThreads:        2,
+						retryIntervalStart:   time.Second,
+						retryIntervalMax:     5 * time.Minute,
+						operationTimeout:     300 * time.Second,
+						domain:               common.DefaultMigrationDomain,
+						replicationDomain:    common.DefaultDomain,
+						probeFrequency:       5 * time.Second,
+					}
+				}
+			},
+			expectedOsExitCode: 1,
+		},
+		{
+			name: "error waiting for the CSI driver to be ready",
+			setup: func() {
+				getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
+					return "csi-driver", errors.New("error waiting for the CSI driver to be ready")
+				}
+
+				getMigrationCapabilitiesFunc = func(_ context.Context, _ csiidentity.Identity) (csiidentity.MigrationCapabilitySet, error) {
+					capabilitySet := csiidentity.MigrationCapabilitySet{}
+
+					return capabilitySet, nil
+				}
+
+				getCtrlNewManager = func(_ manager.Options) (manager.Manager, error) {
+					return &mockManager{}, nil
+				}
+
+				getcreateMigratorManagerFunc = func(_ context.Context, _ manager.Manager) (*MigratorManager, error) {
+					return &MigratorManager{
+						config: &config.Config{
+							LogLevel: "info",
+						},
+					}, nil
+				}
+
+				getParseLevelFunc = func(_ string) (logrus.Level, error) {
+					return logrus.InfoLevel, nil
+				}
+
+				getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+					return nil
+				}
+
+				getPersistentVolumeReconcilerSetupWithManager = func(_ *controller.PersistentVolumeReconciler, _ context.Context, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getMigrationGroupReconcilerSetupWithManager = func(_ *controller.MigrationGroupReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getManagerStart = func(_ manager.Manager) error {
+					return nil
+				}
+
+				osExit = func(code int) {
+					osExitCode = code
+				}
+
+				setupFlags = func() flags {
+					return flags{
+						metricsAddr:          ":8001",
+						enableLeaderElection: false,
+						csiAddress:           "/var/run/csi.sock",
+						workerThreads:        2,
+						retryIntervalStart:   time.Second,
+						retryIntervalMax:     5 * time.Minute,
+						operationTimeout:     300 * time.Second,
+						domain:               common.DefaultMigrationDomain,
+						replicationDomain:    common.DefaultDomain,
+						probeFrequency:       5 * time.Second,
+					}
+				}
+			},
+			expectedOsExitCode: 1,
+		},
+		{
+			name: "error fetching migration capabilities",
+			setup: func() {
+				getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
+					return "csi-driver", nil
+				}
+
+				getMigrationCapabilitiesFunc = func(_ context.Context, _ csiidentity.Identity) (csiidentity.MigrationCapabilitySet, error) {
+					capabilitySet := csiidentity.MigrationCapabilitySet{}
+
+					return capabilitySet, errors.New("error fetching migration capabilities")
+				}
+
+				getCtrlNewManager = func(_ manager.Options) (manager.Manager, error) {
+					return &mockManager{}, nil
+				}
+
+				getcreateMigratorManagerFunc = func(_ context.Context, _ manager.Manager) (*MigratorManager, error) {
+					return &MigratorManager{
+						config: &config.Config{
+							LogLevel: "info",
+						},
+					}, nil
+				}
+
+				getParseLevelFunc = func(_ string) (logrus.Level, error) {
+					return logrus.InfoLevel, nil
+				}
+
+				getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+					return nil
+				}
+
+				getPersistentVolumeReconcilerSetupWithManager = func(_ *controller.PersistentVolumeReconciler, _ context.Context, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getMigrationGroupReconcilerSetupWithManager = func(_ *controller.MigrationGroupReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getManagerStart = func(_ manager.Manager) error {
+					return nil
+				}
+
+				osExit = func(code int) {
+					osExitCode = code
+				}
+
+				setupFlags = func() flags {
+					return flags{
+						metricsAddr:          ":8001",
+						enableLeaderElection: false,
+						csiAddress:           "/var/run/csi.sock",
+						workerThreads:        2,
+						retryIntervalStart:   time.Second,
+						retryIntervalMax:     5 * time.Minute,
+						operationTimeout:     300 * time.Second,
+						domain:               common.DefaultMigrationDomain,
+						replicationDomain:    common.DefaultDomain,
+						probeFrequency:       5 * time.Second,
+					}
+				}
+			},
+			expectedOsExitCode: 1,
+		},
+		{
+			name: "driver doesn't support migration",
+			setup: func() {
+				getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
+					return "csi-driver", nil
+				}
+
+				getMigrationCapabilitiesFunc = func(_ context.Context, _ csiidentity.Identity) (csiidentity.MigrationCapabilitySet, error) {
+					capabilitySet := csiidentity.MigrationCapabilitySet{}
+
+					return capabilitySet, nil
+				}
+
+				getCtrlNewManager = func(_ manager.Options) (manager.Manager, error) {
+					return &mockManager{}, nil
+				}
+
+				getcreateMigratorManagerFunc = func(_ context.Context, _ manager.Manager) (*MigratorManager, error) {
+					return &MigratorManager{
+						config: &config.Config{
+							LogLevel: "info",
+						},
+					}, nil
+				}
+
+				getParseLevelFunc = func(_ string) (logrus.Level, error) {
+					return logrus.InfoLevel, nil
+				}
+
+				getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+					return nil
+				}
+
+				getPersistentVolumeReconcilerSetupWithManager = func(_ *controller.PersistentVolumeReconciler, _ context.Context, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getMigrationGroupReconcilerSetupWithManager = func(_ *controller.MigrationGroupReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getManagerStart = func(_ manager.Manager) error {
+					return nil
+				}
+
+				osExit = func(code int) {
+					osExitCode = code
+				}
+
+				setupFlags = func() flags {
+					return flags{
+						metricsAddr:          ":8001",
+						enableLeaderElection: false,
+						csiAddress:           "/var/run/csi.sock",
+						workerThreads:        2,
+						retryIntervalStart:   time.Second,
+						retryIntervalMax:     5 * time.Minute,
+						operationTimeout:     300 * time.Second,
+						domain:               common.DefaultMigrationDomain,
+						replicationDomain:    common.DefaultDomain,
+						probeFrequency:       5 * time.Second,
+					}
+				}
+			},
+			expectedOsExitCode: 1,
+		},
+		{
+			name: "unknown capability advertised",
+			setup: func() {
+				getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
+					return "csi-driver", nil
+				}
+
+				getMigrationCapabilitiesFunc = func(_ context.Context, _ csiidentity.Identity) (csiidentity.MigrationCapabilitySet, error) {
+					capabilitySet := csiidentity.MigrationCapabilitySet{
+						migration.MigrateTypes_UNKNOWN_MIGRATE: true,
+					}
+
+					return capabilitySet, nil
+				}
+
+				getCtrlNewManager = func(_ manager.Options) (manager.Manager, error) {
+					return &mockManager{}, nil
+				}
+
+				getcreateMigratorManagerFunc = func(_ context.Context, _ manager.Manager) (*MigratorManager, error) {
+					return &MigratorManager{
+						config: &config.Config{
+							LogLevel: "info",
+						},
+					}, nil
+				}
+
+				getParseLevelFunc = func(_ string) (logrus.Level, error) {
+					return logrus.InfoLevel, nil
+				}
+
+				getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+					return nil
+				}
+
+				getPersistentVolumeReconcilerSetupWithManager = func(_ *controller.PersistentVolumeReconciler, _ context.Context, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getMigrationGroupReconcilerSetupWithManager = func(_ *controller.MigrationGroupReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getManagerStart = func(_ manager.Manager) error {
+					return nil
+				}
+
+				osExit = func(code int) {
+					osExitCode = code
+				}
+
+				setupFlags = func() flags {
+					return flags{
+						metricsAddr:          ":8001",
+						enableLeaderElection: false,
+						csiAddress:           "/var/run/csi.sock",
+						workerThreads:        2,
+						retryIntervalStart:   time.Second,
+						retryIntervalMax:     5 * time.Minute,
+						operationTimeout:     300 * time.Second,
+						domain:               common.DefaultMigrationDomain,
+						replicationDomain:    common.DefaultDomain,
+						probeFrequency:       5 * time.Second,
+					}
+				}
+			},
+			expectedOsExitCode: 1,
+		},
+		{
+			name: "unable to start manager",
+			setup: func() {
+				getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
+					return "csi-driver", nil
+				}
+
+				getMigrationCapabilitiesFunc = func(_ context.Context, _ csiidentity.Identity) (csiidentity.MigrationCapabilitySet, error) {
+					capabilitySet := csiidentity.MigrationCapabilitySet{
+						migration.MigrateTypes(migration.MigrateTypes_VERSION_UPGRADE):  true,
+						migration.MigrateTypes(migration.MigrateTypes_REPL_TO_NON_REPL): true,
+					}
+
+					return capabilitySet, nil
+				}
+
+				getCtrlNewManager = func(_ manager.Options) (manager.Manager, error) {
+					return &mockManager{}, errors.New("unable to start manager")
+				}
+
+				getcreateMigratorManagerFunc = func(_ context.Context, _ manager.Manager) (*MigratorManager, error) {
+					return &MigratorManager{
+						config: &config.Config{
+							LogLevel: "info",
+						},
+					}, nil
+				}
+
+				getParseLevelFunc = func(_ string) (logrus.Level, error) {
+					return logrus.InfoLevel, nil
+				}
+
+				getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+					return nil
+				}
+
+				getPersistentVolumeReconcilerSetupWithManager = func(_ *controller.PersistentVolumeReconciler, _ context.Context, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getMigrationGroupReconcilerSetupWithManager = func(_ *controller.MigrationGroupReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getManagerStart = func(_ manager.Manager) error {
+					return nil
+				}
+
+				osExit = func(code int) {
+					osExitCode = code
+				}
+
+				setupFlags = func() flags {
+					return flags{
+						metricsAddr:          ":8001",
+						enableLeaderElection: false,
+						csiAddress:           "/var/run/csi.sock",
+						workerThreads:        2,
+						retryIntervalStart:   time.Second,
+						retryIntervalMax:     5 * time.Minute,
+						operationTimeout:     300 * time.Second,
+						domain:               common.DefaultMigrationDomain,
+						replicationDomain:    common.DefaultDomain,
+						probeFrequency:       5 * time.Second,
+					}
+				}
+			},
+			expectedOsExitCode: 1,
+		},
+		{
+			name: "failed to configure the migrator manager",
+			setup: func() {
+				getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
+					return "csi-driver", nil
+				}
+
+				getMigrationCapabilitiesFunc = func(_ context.Context, _ csiidentity.Identity) (csiidentity.MigrationCapabilitySet, error) {
+					capabilitySet := csiidentity.MigrationCapabilitySet{
+						migration.MigrateTypes(migration.MigrateTypes_VERSION_UPGRADE):  true,
+						migration.MigrateTypes(migration.MigrateTypes_REPL_TO_NON_REPL): true,
+					}
+
+					return capabilitySet, nil
+				}
+
+				getCtrlNewManager = func(_ manager.Options) (manager.Manager, error) {
+					return &mockManager{}, nil
+				}
+
+				getcreateMigratorManagerFunc = func(_ context.Context, _ manager.Manager) (*MigratorManager, error) {
+					return &MigratorManager{
+						config: &config.Config{
+							LogLevel: "info",
+						},
+					}, errors.New("failed to configure the migrator manager")
+				}
+
+				getParseLevelFunc = func(_ string) (logrus.Level, error) {
+					return logrus.Level(0), fmt.Errorf("unable to parse log level")
+				}
+
+				getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+					return nil
+				}
+
+				getPersistentVolumeReconcilerSetupWithManager = func(_ *controller.PersistentVolumeReconciler, _ context.Context, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getMigrationGroupReconcilerSetupWithManager = func(_ *controller.MigrationGroupReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getManagerStart = func(_ manager.Manager) error {
+					return nil
+				}
+
+				osExit = func(code int) {
+					osExitCode = code
+				}
+
+				setupFlags = func() flags {
+					return flags{
+						metricsAddr:          ":8001",
+						enableLeaderElection: false,
+						csiAddress:           "/var/run/csi.sock",
+						workerThreads:        2,
+						retryIntervalStart:   time.Second,
+						retryIntervalMax:     5 * time.Minute,
+						operationTimeout:     300 * time.Second,
+						domain:               common.DefaultMigrationDomain,
+						replicationDomain:    common.DefaultDomain,
+						probeFrequency:       5 * time.Second,
+					}
+				}
+			},
+			expectedOsExitCode: 1,
+		},
+		{
 			name: "PersistentVolumeReconciler - unable to create controller",
 			setup: func() {
-				// // Mock the getConnectToCsiFunc to return a successful connection
-				// getConnectToCsiFunc = func(_ string, _ logr.Logger) (*grpc.ClientConn, error) {
-				// 	// Return a mock *grpc.ClientConn
-				// 	return &grpc.ClientConn{}, nil
-				// }
-
 				getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
 					return "csi-driver", nil
 				}
@@ -460,8 +929,8 @@ func TestMain(t *testing.T) {
 					}, nil
 				}
 
-				getParseLevelFunc = func(level string) (logrus.Level, error) {
-					return logrus.Level(0), fmt.Errorf("unable to parse log level: %s", level)
+				getParseLevelFunc = func(_ string) (logrus.Level, error) {
+					return logrus.InfoLevel, nil
 				}
 
 				getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
@@ -484,8 +953,19 @@ func TestMain(t *testing.T) {
 					osExitCode = code
 				}
 
-				setupFlags = func() (flags, *logrus.Logger) {
-					return flags{}, logrus.New()
+				setupFlags = func() flags {
+					return flags{
+						metricsAddr:          ":8001",
+						enableLeaderElection: false,
+						csiAddress:           "/var/run/csi.sock",
+						workerThreads:        2,
+						retryIntervalStart:   time.Second,
+						retryIntervalMax:     5 * time.Minute,
+						operationTimeout:     300 * time.Second,
+						domain:               common.DefaultMigrationDomain,
+						replicationDomain:    common.DefaultDomain,
+						probeFrequency:       5 * time.Second,
+					}
 				}
 			},
 			expectedOsExitCode: 1,
@@ -493,12 +973,6 @@ func TestMain(t *testing.T) {
 		{
 			name: "MigrationGroupReconciler - unable to create controller",
 			setup: func() {
-				// // Mock the getConnectToCsiFunc to return a successful connection
-				// getConnectToCsiFunc = func(_ string, _ logr.Logger) (*grpc.ClientConn, error) {
-				// 	// Return a mock *grpc.ClientConn
-				// 	return &grpc.ClientConn{}, nil
-				// }
-
 				getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
 					return "csi-driver", nil
 				}
@@ -525,7 +999,7 @@ func TestMain(t *testing.T) {
 				}
 
 				getParseLevelFunc = func(level string) (logrus.Level, error) {
-					return logrus.Level(0), fmt.Errorf("unable to parse log level: %s", level)
+					return logrus.Level(0), nil
 				}
 
 				getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
@@ -548,8 +1022,8 @@ func TestMain(t *testing.T) {
 					osExitCode = code
 				}
 
-				setupFlags = func() (flags, *logrus.Logger) {
-					return flags{}, logrus.New()
+				setupFlags = func() flags {
+					return flags{}
 				}
 			},
 			expectedOsExitCode: 1,
@@ -557,12 +1031,6 @@ func TestMain(t *testing.T) {
 		{
 			name: "Problem running manager",
 			setup: func() {
-				// // Mock the getConnectToCsiFunc to return a successful connection
-				// getConnectToCsiFunc = func(_ string, _ logr.Logger) (*grpc.ClientConn, error) {
-				// 	// Return a mock *grpc.ClientConn
-				// 	return &grpc.ClientConn{}, nil
-				// }
-
 				getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
 					return "csi-driver", nil
 				}
@@ -589,7 +1057,7 @@ func TestMain(t *testing.T) {
 				}
 
 				getParseLevelFunc = func(level string) (logrus.Level, error) {
-					return logrus.Level(0), fmt.Errorf("unable to parse log level: %s", level)
+					return logrus.Level(0), nil
 				}
 
 				getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
@@ -612,8 +1080,8 @@ func TestMain(t *testing.T) {
 					osExitCode = code
 				}
 
-				setupFlags = func() (flags, *logrus.Logger) {
-					return flags{}, logrus.New()
+				setupFlags = func() flags {
+					return flags{}
 				}
 			},
 			expectedOsExitCode: 1,
@@ -629,5 +1097,6 @@ func TestMain(t *testing.T) {
 		if osExitCode != tt.expectedOsExitCode {
 			t.Errorf("Expected osExitCode: %v, but got osExitCode: %v", tt.expectedOsExitCode, osExitCode)
 		}
+		osExitCode = 0
 	}
 }

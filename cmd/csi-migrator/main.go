@@ -131,7 +131,7 @@ var (
 
 	osExit = os.Exit
 
-	setupFlags = func() (flags, *logrus.Logger) {
+	setupFlags = func() flags {
 		flags := flags{}
 		flag.StringVar(&flags.metricsAddr, "metrics-addr", ":8001", "The address the metric endpoint binds to.")
 		flag.BoolVar(&flags.enableLeaderElection, "leader-election", false,
@@ -147,18 +147,8 @@ var (
 		flag.DurationVar(&flags.probeFrequency, "probe-frequency", 5*time.Second, "Time between identity ProbeController calls")
 		flag.Parse()
 		controllers.InitLabelsAndAnnotations(flags.domain)
-		logrusLog := logrus.New()
-		logrusLog.SetFormatter(&logrus.JSONFormatter{
-			TimestampFormat: time.RFC3339Nano,
-		})
 
-		logger := logrusr.New(logrusLog)
-		ctrl.SetLogger(logger)
-
-		setupLog.V(1).Info("Prefix", "Domain", flags.domain)
-		setupLog.V(1).Info(common.DellCSIMigrator, "Version", core.SemVer, "Commit ID", core.CommitSha32, "Commit SHA", core.CommitTime.Format(time.RFC1123))
-
-		return flags, logrusLog
+		return flags
 	}
 )
 
@@ -227,7 +217,18 @@ type flags struct {
 }
 
 func main() {
-	flags, logrusLog := setupFlags()
+	flags := setupFlags()
+
+	logrusLog := logrus.New()
+	logrusLog.SetFormatter(&logrus.JSONFormatter{
+		TimestampFormat: time.RFC3339Nano,
+	})
+
+	logger := logrusr.New(logrusLog)
+	ctrl.SetLogger(logger)
+
+	setupLog.V(1).Info("Prefix", "Domain", flags.domain)
+	setupLog.V(1).Info(common.DellCSIMigrator, "Version", core.SemVer, "Commit ID", core.CommitSha32, "Commit SHA", core.CommitTime.Format(time.RFC1123))
 
 	ctx := context.Background()
 
