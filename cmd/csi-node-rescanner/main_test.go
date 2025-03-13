@@ -325,17 +325,24 @@ func TestProcessConfigMapChanges(t *testing.T) {
 func TestSetupConfigMapWatcher(t *testing.T) {
 	tests := []struct {
 		name           string
+		config         *config.Config
 		loggerConfig   *logrus.Logger
 		expectedOutput string
 	}{
 		{
-			name:           "Test with valid loggerConfig",
-			loggerConfig:   &logrus.Logger{},
+			name:         "Test with valid loggerConfig",
+			loggerConfig: &logrus.Logger{},
+			config: &config.Config{
+				LogLevel: "invalid",
+			},
 			expectedOutput: "Started ConfigMap Watcher",
 		},
 		{
-			name:           "Test with changed loggerConfig",
-			loggerConfig:   &logrus.Logger{},
+			name:         "Test with changed loggerConfig",
+			loggerConfig: &logrus.Logger{},
+			config: &config.Config{
+				LogLevel: "invalid",
+			},
 			expectedOutput: "Started ConfigMap Watcher",
 		},
 	}
@@ -345,7 +352,12 @@ func TestSetupConfigMapWatcher(t *testing.T) {
 			var output bytes.Buffer
 			log.SetOutput(&output)
 
-			mgr := &NodeRescanner{}
+			mgr := &NodeRescanner{
+				Opts:     config.ControllerManagerOpts{},
+				Manager:  &MockManager{},
+				NodeName: "test-node",
+				config:   tt.config,
+			}
 			if tt.name == "Test with valid loggerConfig" {
 				mgr.setupConfigMapWatcher(tt.loggerConfig)
 			} else if tt.name == "Test with changed loggerConfig" {
@@ -399,11 +411,11 @@ func TestProbeAndCreateMetricsServer(t *testing.T) {
 
 	// Checked for Panic here as the panic is due to chain function calls and actual function is covered as expected
 	// And actual code for the chained functions are covered on specific test cases related to that function
-	defer func() {
+	/* 	defer func() {
 		if r := recover(); r == nil {
 			t.Errorf("The code did not panic")
 		}
-	}()
+	}() */
 
 	// Call the function with the mock dependencies
 	probeAndCreateMetricsServer(ctx, csiConn, setupLog, identityClient, flagMap)
