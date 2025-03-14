@@ -23,6 +23,7 @@ import (
 	"github.com/dell/csm-replication/pkg/config"
 	"github.com/go-logr/logr"
 	"github.com/go-logr/logr/funcr"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/sync/singleflight"
@@ -269,9 +270,7 @@ func TestControllerManager_reconcileSecretUpdates(t *testing.T) {
 }
 
 func TestControllerManager_startSecretController(t *testing.T) {
-	after := func() {
-
-	}
+	after := func() {}
 
 	tests := []struct {
 		name        string
@@ -308,6 +307,68 @@ func TestControllerManager_startSecretController(t *testing.T) {
 			err := mgr.startSecretController()
 
 			assert.Equal(t, tt.expectedErr, err != nil)
+		})
+	}
+}
+
+func TestControllerManager_processConfigMapChanges(t *testing.T) {
+	defaultGetUpdateConfigMap := getUpdateConfigMap
+
+	after := func() {
+		getUpdateConfigMap = defaultGetUpdateConfigMap
+	}
+
+	tests := []struct {
+		name          string
+		setup         func()
+		loggerConfig  *logrus.Logger
+		expectedLevel logrus.Level
+		expectedError error
+	}{
+		{
+			name:  "Error parsing the config",
+			setup: func() {},
+			loggerConfig: &logrus.Logger{
+				Level: logrus.InfoLevel,
+			},
+			expectedLevel: logrus.InfoLevel,
+		},
+		{
+			name: "Success",
+			setup: func() {
+				getUpdateConfigMap = func(_ *ControllerManager, _ context.Context, _ record.EventRecorder) error {
+					return nil
+				}
+			},
+			loggerConfig: &logrus.Logger{
+				Level: logrus.InfoLevel,
+			},
+			expectedLevel: logrus.InfoLevel,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockMgr := &mockManager{
+				logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
+			}
+
+			mockSecretController := &mockSecretController{
+				logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
+			}
+
+			tt.setup()
+			defer after()
+
+			mgr := &ControllerManager{
+				Manager:          mockMgr,
+				config:           &config.Config{},
+				SecretController: mockSecretController,
+			}
+
+			mgr.processConfigMapChanges(tt.loggerConfig)
+
+			assert.Equal(t, tt.expectedLevel, tt.loggerConfig.GetLevel())
 		})
 	}
 }

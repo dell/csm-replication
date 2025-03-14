@@ -64,6 +64,9 @@ var (
 	getUpdateConfigOnSecretEvent = func(mgr *ControllerManager, ctx context.Context, request reconcile.Request, er record.EventRecorder, secretLog logr.Logger) error {
 		return mgr.config.UpdateConfigOnSecretEvent(ctx, mgr.Manager.GetClient(), mgr.Opts, request.Name, er, secretLog)
 	}
+	getUpdateConfigMap = func(mgr *ControllerManager, ctx context.Context, er record.EventRecorder) error {
+		return mgr.config.UpdateConfigMap(ctx, mgr.Manager.GetClient(), mgr.Opts, er, mgr.Manager.GetLogger())
+	}
 )
 
 func init() {
@@ -111,7 +114,8 @@ func (mgr *ControllerManager) startSecretController() error {
 func (mgr *ControllerManager) processConfigMapChanges(loggerConfig *logrus.Logger) {
 	log.Println("Received a config change event")
 	er := mgr.Manager.GetEventRecorderFor(common.DellReplicationController)
-	err := mgr.config.UpdateConfigMap(context.Background(), mgr.Manager.GetClient(), mgr.Opts, er, mgr.Manager.GetLogger())
+	// err := mgr.config.UpdateConfigMap(context.Background(), mgr.Manager.GetClient(), mgr.Opts, er, mgr.Manager.GetLogger())
+	err := getUpdateConfigMap(mgr, context.Background(), er)
 	if err != nil {
 		log.Printf("Error parsing the config: %v\n", err)
 		return
