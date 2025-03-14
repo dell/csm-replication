@@ -36,6 +36,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	metricsServer "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -66,6 +67,12 @@ var (
 	}
 	getUpdateConfigMap = func(mgr *ControllerManager, ctx context.Context, er record.EventRecorder) error {
 		return mgr.config.UpdateConfigMap(ctx, mgr.Manager.GetClient(), mgr.Opts, er, mgr.Manager.GetLogger())
+	}
+	getConfig = func(ctx context.Context, client client.Client, opts config.ControllerManagerOpts, er record.EventRecorder, mgrLogger logr.Logger) (*config.Config, error) {
+		return config.GetConfig(ctx, client, opts, er, mgrLogger)
+	}
+	getConfigPrintConfig = func(config *config.Config, logger logr.Logger) {
+		config.PrintConfig(logger)
 	}
 )
 
@@ -148,11 +155,11 @@ func createControllerManager(ctx context.Context, mgr ctrl.Manager) (*Controller
 	mgrLogger := mgr.GetLogger()
 
 	er := mgr.GetEventRecorderFor(common.DellReplicationController)
-	repConfig, err := config.GetConfig(ctx, client, opts, er, mgrLogger)
+	repConfig, err := getConfig(ctx, client, opts, er, mgrLogger)
 	if err != nil {
 		return nil, err
 	}
-	repConfig.PrintConfig(mgrLogger)
+	getConfigPrintConfig(repConfig, mgrLogger)
 	controllerManager := ControllerManager{
 		Opts:    opts,
 		Manager: mgr,

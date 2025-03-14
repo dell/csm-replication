@@ -417,3 +417,72 @@ func TestControllerManager_setupConfigMapWatcher(t *testing.T) {
 		})
 	}
 }
+
+func TestControllerManager_createControllerManager(t *testing.T) {
+	defaultGetConfig := getConfig
+	defaultGetConfigPrintConfig := getConfigPrintConfig
+
+	after := func() {
+		getConfig = defaultGetConfig
+		getConfigPrintConfig = defaultGetConfigPrintConfig
+	}
+
+	tests := []struct {
+		name                      string
+		setup                     func()
+		expectedControllerManager *ControllerManager
+		expectedError             bool
+	}{
+		{
+			name: "Success createControllerManager",
+			setup: func() {
+				getConfig = func(_ context.Context, _ client.Client, _ config.ControllerManagerOpts, _ record.EventRecorder, _ logr.Logger) (*config.Config, error) {
+					return &config.Config{}, nil
+				}
+				getConfigPrintConfig = func(__ *config.Config, _ logr.Logger) {}
+			},
+			expectedControllerManager: &ControllerManager{
+				Opts: config.ControllerManagerOpts{
+					UseConfFileFormat: true,
+					WatchNamespace:    "dell-replication-controller",
+					ConfigDir:         "deploy",
+					ConfigFileName:    "config",
+					InCluster:         false,
+					Mode:              "controller",
+				},
+				config: &config.Config{},
+			},
+			expectedError: false,
+		},
+		{
+			name: "Failed createControllerManager",
+			setup: func() {
+				getConfig = func(_ context.Context, _ client.Client, _ config.ControllerManagerOpts, _ record.EventRecorder, _ logr.Logger) (*config.Config, error) {
+					return &config.Config{}, errors.New("error getting config")
+				}
+			},
+			expectedControllerManager: nil,
+			expectedError:             true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockMgr := &mockManager{
+				logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
+			}
+
+			tt.setup()
+			defer after()
+
+			mgr, err := createControllerManager(context.Background(), mockMgr)
+
+			assert.Equal(t, tt.expectedError, err != nil)
+
+			if !tt.expectedError {
+				assert.Equal(t, tt.expectedControllerManager.Opts, mgr.Opts)
+				assert.Equal(t, tt.expectedControllerManager.config, mgr.config)
+			}
+		})
+	}
+}
