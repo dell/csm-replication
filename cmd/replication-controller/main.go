@@ -68,6 +68,9 @@ var (
 	getUpdateConfigMap = func(mgr *ControllerManager, ctx context.Context, er record.EventRecorder) error {
 		return mgr.config.UpdateConfigMap(ctx, mgr.Manager.GetClient(), mgr.Opts, er, mgr.Manager.GetLogger())
 	}
+	getConnectionControllerClient = func(scheme *runtime.Scheme) (client.Client, error) {
+		return connection.GetControllerClient(nil, scheme)
+	}
 	getConfig = func(ctx context.Context, client client.Client, opts config.ControllerManagerOpts, er record.EventRecorder, mgrLogger logr.Logger) (*config.Config, error) {
 		return config.GetConfig(ctx, client, opts, er, mgrLogger)
 	}
@@ -148,7 +151,7 @@ func createControllerManager(ctx context.Context, mgr ctrl.Manager) (*Controller
 	opts := config.GetControllerManagerOpts()
 	opts.Mode = "controller"
 	// We need to create a new client as the informer caches have not started yet
-	client, err := connection.GetControllerClient(nil, scheme)
+	client, err := getConnectionControllerClient(scheme)
 	if err != nil {
 		return nil, err
 	}

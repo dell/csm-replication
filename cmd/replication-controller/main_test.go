@@ -421,10 +421,12 @@ func TestControllerManager_setupConfigMapWatcher(t *testing.T) {
 func TestControllerManager_createControllerManager(t *testing.T) {
 	defaultGetConfig := getConfig
 	defaultGetConfigPrintConfig := getConfigPrintConfig
+	defaultGetConnectionControllerClient := getConnectionControllerClient
 
 	after := func() {
 		getConfig = defaultGetConfig
 		getConfigPrintConfig = defaultGetConfigPrintConfig
+		getConnectionControllerClient = defaultGetConnectionControllerClient
 	}
 
 	tests := []struct {
@@ -434,8 +436,34 @@ func TestControllerManager_createControllerManager(t *testing.T) {
 		expectedError             bool
 	}{
 		{
+			name: "Failed getConnectionControllerClient",
+			setup: func() {
+				getConnectionControllerClient = func(_ *runtime.Scheme) (client.Client, error) {
+					return nil, errors.New("error getting connection controller client")
+				}
+			},
+			expectedControllerManager: nil,
+			expectedError:             true,
+		},
+		{
+			name: "Failed createControllerManager",
+			setup: func() {
+				getConnectionControllerClient = func(_ *runtime.Scheme) (client.Client, error) {
+					return nil, nil
+				}
+				getConfig = func(_ context.Context, _ client.Client, _ config.ControllerManagerOpts, _ record.EventRecorder, _ logr.Logger) (*config.Config, error) {
+					return &config.Config{}, errors.New("error getting config")
+				}
+			},
+			expectedControllerManager: nil,
+			expectedError:             true,
+		},
+		{
 			name: "Success createControllerManager",
 			setup: func() {
+				getConnectionControllerClient = func(_ *runtime.Scheme) (client.Client, error) {
+					return nil, nil
+				}
 				getConfig = func(_ context.Context, _ client.Client, _ config.ControllerManagerOpts, _ record.EventRecorder, _ logr.Logger) (*config.Config, error) {
 					return &config.Config{}, nil
 				}
@@ -453,16 +481,6 @@ func TestControllerManager_createControllerManager(t *testing.T) {
 				config: &config.Config{},
 			},
 			expectedError: false,
-		},
-		{
-			name: "Failed createControllerManager",
-			setup: func() {
-				getConfig = func(_ context.Context, _ client.Client, _ config.ControllerManagerOpts, _ record.EventRecorder, _ logr.Logger) (*config.Config, error) {
-					return &config.Config{}, errors.New("error getting config")
-				}
-			},
-			expectedControllerManager: nil,
-			expectedError:             true,
 		},
 	}
 
