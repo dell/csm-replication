@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/go-logr/logr/funcr"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/sync/singleflight"
@@ -369,6 +371,49 @@ func TestControllerManager_processConfigMapChanges(t *testing.T) {
 			mgr.processConfigMapChanges(tt.loggerConfig)
 
 			assert.Equal(t, tt.expectedLevel, tt.loggerConfig.GetLevel())
+		})
+	}
+}
+
+func TestControllerManager_setupConfigMapWatcher(t *testing.T) {
+	tests := []struct {
+		name          string
+		setup         func()
+		expectedError error
+	}{
+		{
+			name: "Success",
+			setup: func() {
+				viper.Set("LogLevel", "info")
+			},
+			expectedError: nil,
+		},
+		{
+			name: "Error parsing log level",
+			setup: func() {
+				viper.Set("LogLevel", "info")
+				viper.Set("LogLevel", "invalid")
+			},
+			expectedError: fmt.Errorf("error parsing the config: unable to parse log level"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockMgr := &mockManager{
+				logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
+			}
+
+			loggerConfig := logrus.New()
+			mgr := &ControllerManager{
+				Opts:    config.ControllerManagerOpts{},
+				Manager: mockMgr,
+				config:  &config.Config{},
+			}
+
+			tt.setup()
+
+			mgr.setupConfigMapWatcher(loggerConfig)
 		})
 	}
 }
