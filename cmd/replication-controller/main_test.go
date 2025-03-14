@@ -182,10 +182,10 @@ func (m *mockSecretController) GetLogger() logr.Logger {
 	return m.logger
 }
 
-func (m *mockSecretController) Start(ctx context.Context) error {
+func (m *mockSecretController) Start(_ context.Context) error {
 	return nil
 }
-func (m *mockSecretController) Watch(src source.TypedSource[reconcile.Request]) error {
+func (m *mockSecretController) Watch(_ source.TypedSource[reconcile.Request]) error {
 	return nil
 }
 
@@ -414,6 +414,93 @@ func TestControllerManager_setupConfigMapWatcher(t *testing.T) {
 			tt.setup()
 
 			mgr.setupConfigMapWatcher(loggerConfig)
+		})
+	}
+}
+
+func TestControllerManager_createControllerManager(t *testing.T) {
+	defaultGetConfig := getConfig
+	defaultGetConfigPrintConfig := getConfigPrintConfig
+	defaultGetConnectionControllerClient := getConnectionControllerClient
+
+	after := func() {
+		getConfig = defaultGetConfig
+		getConfigPrintConfig = defaultGetConfigPrintConfig
+		getConnectionControllerClient = defaultGetConnectionControllerClient
+	}
+
+	tests := []struct {
+		name                      string
+		setup                     func()
+		expectedControllerManager *ControllerManager
+		expectedError             bool
+	}{
+		{
+			name: "Failed getConnectionControllerClient",
+			setup: func() {
+				getConnectionControllerClient = func(_ *runtime.Scheme) (client.Client, error) {
+					return nil, errors.New("error getting connection controller client")
+				}
+			},
+			expectedControllerManager: nil,
+			expectedError:             true,
+		},
+		{
+			name: "Failed createControllerManager",
+			setup: func() {
+				getConnectionControllerClient = func(_ *runtime.Scheme) (client.Client, error) {
+					return nil, nil
+				}
+				getConfig = func(_ context.Context, _ client.Client, _ config.ControllerManagerOpts, _ record.EventRecorder, _ logr.Logger) (*config.Config, error) {
+					return &config.Config{}, errors.New("error getting config")
+				}
+			},
+			expectedControllerManager: nil,
+			expectedError:             true,
+		},
+		{
+			name: "Success createControllerManager",
+			setup: func() {
+				getConnectionControllerClient = func(_ *runtime.Scheme) (client.Client, error) {
+					return nil, nil
+				}
+				getConfig = func(_ context.Context, _ client.Client, _ config.ControllerManagerOpts, _ record.EventRecorder, _ logr.Logger) (*config.Config, error) {
+					return &config.Config{}, nil
+				}
+				getConfigPrintConfig = func(__ *config.Config, _ logr.Logger) {}
+			},
+			expectedControllerManager: &ControllerManager{
+				Opts: config.ControllerManagerOpts{
+					UseConfFileFormat: true,
+					WatchNamespace:    "dell-replication-controller",
+					ConfigDir:         "deploy",
+					ConfigFileName:    "config",
+					InCluster:         false,
+					Mode:              "controller",
+				},
+				config: &config.Config{},
+			},
+			expectedError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockMgr := &mockManager{
+				logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
+			}
+
+			tt.setup()
+			defer after()
+
+			mgr, err := createControllerManager(context.Background(), mockMgr)
+
+			assert.Equal(t, tt.expectedError, err != nil)
+
+			if !tt.expectedError {
+				assert.Equal(t, tt.expectedControllerManager.Opts, mgr.Opts)
+				assert.Equal(t, tt.expectedControllerManager.config, mgr.config)
+			}
 		})
 	}
 }
