@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"reflect"
 	"testing"
@@ -34,6 +33,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/record"
 	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -363,7 +363,6 @@ func TestVerifyConfig(t *testing.T) {
 				},
 			},
 		}
-		fmt.Print("Config", config.ClusterID, config.Targets)
 
 		err := config.VerifyConfig(context.Background())
 
@@ -520,7 +519,7 @@ users:
 		clinet := fake.NewClientBuilder().WithObjects(secret).Build()
 		// Test the function
 		got, err := buildRestConfigFromSecretConfFileFormat(context.Background(), secretName, namespace, clinet)
-		fmt.Print(got, err)
+		assert.Equal(t, "https://test-server.com", got.Host)
 		assert.NoError(t, err)
 
 	})
@@ -727,7 +726,6 @@ users:
 
 		_, err := getConnHandler(args.ctx, args.targets, args.client, args.opts, args.log)
 		assert.Error(t, err)
-		fmt.Println("dasda", err.Error())
 	})
 	t.Run("SecretFoundAndValidData", func(t *testing.T) {
 		os.Setenv(common.EnvInClusterConfig, "true")
@@ -850,11 +848,9 @@ func Test_getReplicationConfig(t *testing.T) {
 	mockManager := new(MockManager)
 	mockManager.On("GetLogger").Return(logger)
 
-	// client1 := fake.NewClientBuilder().Build()
 	log := mockManager.GetLogger()
 	t.Run("SuccessModeEmpty", func(t *testing.T) {
 		ctx := context.Background()
-		// client := fake.NewClientBuilder().Build()
 		ConfgMap := &replicationConfigMap{
 			ClusterID: "",
 			Targets:   []target{},
@@ -866,10 +862,8 @@ func Test_getReplicationConfig(t *testing.T) {
 			ConfigDir:         "../../deploy",
 			ConfigFileName:    "config",
 			InCluster:         true,
-			Mode:              "",
+			Mode:              "controller",
 		}
-
-		// os.Setenv(common.EnvInClusterConfig, "true")
 
 		got, got1, err := getReplicationConfig(ctx, nil, opts, nil, log)
 		if (got1 == nil) && (err != nil) {
@@ -879,8 +873,6 @@ func Test_getReplicationConfig(t *testing.T) {
 		if !reflect.DeepEqual(got.ClusterID, ConfgMap.ClusterID) && !reflect.DeepEqual(got.LogLevel, ConfgMap.LogLevel) {
 			t.Errorf("getReplicationConfig() got = %v, want %v", got, ConfgMap)
 		}
-		fmt.Println(ConfgMap)
-		fmt.Println(got)
 
 	})
 	t.Run("ErrorWithZeroTargets", func(t *testing.T) {
@@ -909,38 +901,171 @@ func Test_getReplicationConfig(t *testing.T) {
 		}
 
 	})
+	t.Run("SuccessWithTargetsWithNoVerifyErr", func(t *testing.T) {
+		originalValue := Verify
+		defer func() {
+			Verify = originalValue
+		}()
 
-	// t.Run("SuccessModeIsController", func(t *testing.T) {
-	// 	ctx := context.Background()
-	// 	// client := fake.NewClientBuilder().Build()
-	// 	ConfgMap := &replicationConfigMap{
-	// 		ClusterID: "",
-	// 		Targets:   []target{},
-	// 		LogLevel:  "INFO",
-	// 	}
-	// 	opts := ControllerManagerOpts{
-	// 		UseConfFileFormat: true,
-	// 		WatchNamespace:    "dell-replication-controller",
-	// 		ConfigDir:         "../../deploy",
-	// 		ConfigFileName:    "config",
-	// 		InCluster:         true,
-	// 		Mode:              "",
-	// 	}
+		Verify = func(_ *replicationConfig, _ context.Context) error {
+			return errors.New("verification failed")
+		}
+		os.Setenv(common.EnvInClusterConfig, "true")
+		secretName := "valid-secret"
+		namespace := "default"
 
-	// 	os.Setenv(common.EnvInClusterConfig, "true")
+		kubeconfig := `
+apiVersion: v1
+clusters:
+- cluster:
+    server: https://test-server.com
+  name: test-cluster
+contexts:
+- context:
+    cluster: test-cluster
+    user: test-user
+  name: test-context
+current-context: test-context
+kind: Config
+preferences: {}
+users:
+- name: test-user
+  user:
+    token: test-token
+`
+		secret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: namespace,
+			},
+			Data: map[string][]byte{
+				"data": []byte(kubeconfig),
+			},
+		}
 
-	// 	got, got1, err := getReplicationConfig(ctx, nil, opts, nil, log)
-	// 	if (got1 == nil) && (err != nil) {
-	// 		t.Errorf("getReplicationConfig() error = %v and wantErr is ni, got1 = %v and wamt1= ", err, nil)
-	// 		return
-	// 	}
-	// 	if !reflect.DeepEqual(got.ClusterID, ConfgMap.ClusterID) && !reflect.DeepEqual(got.LogLevel, ConfgMap.LogLevel) {
-	// 		t.Errorf("getReplicationConfig() got = %v, want %v", got, ConfgMap)
-	// 	}
-	// 	fmt.Println(ConfgMap)
-	// 	fmt.Println(got)
+		client := fake.NewClientBuilder().WithObjects(secret).Build()
+		ctx := context.Background()
+		// ConfgMap := &replicationConfigMap{
+		// 	ClusterID: "test-cluster-id",
+		// 	Targets: []target{
+		// 		{ClusterID: "target-id", SecretRef: "secret1"},
+		// 		{ClusterID: "target-id2", SecretRef: "secret2"},
+		// 	},
+		// }
 
-	// })
+		opts := ControllerManagerOpts{
+			UseConfFileFormat: true,
+			WatchNamespace:    "dell-replication-controller",
+			ConfigDir:         "../../deploy",
+			ConfigFileName:    "config",
+			InCluster:         true,
+			Mode:              "controller",
+		}
+		fakeRecorder := record.NewFakeRecorder(100)
+		os.Setenv(common.EnvInClusterConfig, "true")
+		got, got1, err := getReplicationConfig(ctx, client, opts, fakeRecorder, log)
+		assert.Error(t, err)
+		assert.Nil(t, got)
+		assert.Nil(t, got)
+		if (got != nil) && (got1 != nil) && (err != nil) {
+			t.Errorf("getReplicationConfig() error = %v and wantErr is ni, got1 = %v and wamt1= ", err, nil)
+			return
+		}
+
+	})
+	t.Run("SuccessWithTargetsWithElseCase", func(t *testing.T) {
+
+		configFilePath := "../../deploy/config.yaml"
+
+		// 1. Read the original content
+		originalContent, err := os.ReadFile(configFilePath)
+		if err != nil {
+			t.Fatalf("Failed to read original config file: %v", err)
+		}
+
+		// 2. Write the new content
+		newContent := []byte(`
+clusterId: "my-cluster"
+targets:
+CSI_LOG_LEVEL: "INFO"`)
+		err = os.WriteFile(configFilePath, newContent, 0644) // 0644: read/write for owner, read for others
+		if err != nil {
+			t.Fatalf("Failed to write new config content: %v", err)
+		}
+
+		// 3. Defer the restore operation
+		defer func() {
+			err := os.WriteFile(configFilePath, originalContent, 0644)
+			if err != nil {
+				t.Errorf("Failed to restore original config content: %v", err)
+			}
+		}()
+		originalValue := Verify
+		defer func() {
+			Verify = originalValue
+		}()
+
+		Verify = func(_ *replicationConfig, _ context.Context) error {
+			return nil
+		}
+		os.Setenv(common.EnvInClusterConfig, "true")
+		isInInvalidState = true
+		secretName := "valid-secret"
+		namespace := "default"
+
+		kubeconfig := `
+apiVersion: v1
+clusters:
+- cluster:
+    server: https://test-server.com
+  name: test-cluster
+contexts:
+- context:
+    cluster: test-cluster
+    user: test-user
+  name: test-context
+current-context: test-context
+kind: Config
+preferences: {}
+users:
+- name: test-user
+  user:
+    token: test-token
+`
+		secret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: namespace,
+			},
+			Data: map[string][]byte{
+				"data": []byte(kubeconfig),
+			},
+		}
+
+		client := fake.NewClientBuilder().WithObjects(secret).Build()
+		ctx := context.Background()
+
+		opts := ControllerManagerOpts{
+			UseConfFileFormat: true,
+			WatchNamespace:    "dell-replication-controller",
+			ConfigDir:         "../../deploy",
+			ConfigFileName:    "config",
+			InCluster:         true,
+			Mode:              "controller",
+		}
+		fakeRecorder := record.NewFakeRecorder(100)
+		os.Setenv(common.EnvInClusterConfig, "true")
+		got, got1, err := getReplicationConfig(ctx, client, opts, fakeRecorder, log)
+		assert.Error(t, err)
+		assert.Nil(t, got)
+		assert.Nil(t, got)
+		if (got != nil) && (got1 != nil) && (err != nil) {
+			t.Errorf("getReplicationConfig() error = %v and wantErr is ni, got1 = %v and wamt1= ", err, nil)
+			return
+		}
+
+	})
+
 }
 
 func TestConfig_updateConfig(t *testing.T) {
@@ -1186,7 +1311,6 @@ func TestConfig_GetConfig(t *testing.T) {
 	mockManager := new(MockManager)
 	mockManager.On("GetLogger").Return(logger)
 
-	// client1 := fake.NewClientBuilder().Build()
 	log := mockManager.GetLogger()
 
 	t.Run("Success", func(t *testing.T) {
@@ -1206,11 +1330,7 @@ func TestConfig_GetConfig(t *testing.T) {
 		if err != nil {
 			t.Errorf("Config.updateConfig() error = %v, wantErr nil", err)
 		}
-		fmt.Print("Dasdasfa", got.LogLevel)
-		// if got.LogLevel == "INFO" {
-		// 	t.Errorf("Config.updateConfig() got = %v %v %v, want INFO", got.repConfig.ClusterID, got.repConfig.Targets, got.LogLevel)
-
-		// }
+		assert.Equal(t, got.LogLevel, "INFO")
 
 	})
 	t.Run("ErrorCallingGetReplicationConfig", func(t *testing.T) {

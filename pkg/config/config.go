@@ -256,9 +256,9 @@ func getReplicationConfig(ctx context.Context, client ctrlClient.Client, opts Co
 			if err != nil {
 				return nil, nil, err
 			}
-
 		} else {
 			if isInInvalidState == true && opts.Mode == "controller" {
+
 				log.V(common.InfoLevel).Info("Correct config, publishing event. ")
 				err := controllers.PublishControllerEvent(ctx, client, recorder, "Normal", "Correct config applied", "Correct configuration has been applied to cluster.")
 				isInInvalidState = false
