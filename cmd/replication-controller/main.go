@@ -30,9 +30,11 @@ import (
 	"github.com/dell/csm-replication/pkg/config"
 	"github.com/dell/csm-replication/pkg/connection"
 	"github.com/fsnotify/fsnotify"
+	"github.com/go-logr/logr"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	metricsServer "sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -54,8 +56,14 @@ import (
 )
 
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	scheme                    = runtime.NewScheme()
+	setupLog                  = ctrl.Log.WithName("setup")
+	getSecretControllerLogger = func(mgr *ControllerManager, request reconcile.Request) logr.Logger {
+		return mgr.SecretController.GetLogger().WithName(request.Name)
+	}
+	getUpdateConfigOnSecretEvent = func(mgr *ControllerManager, ctx context.Context, request reconcile.Request, er record.EventRecorder, secretLog logr.Logger) error {
+		return mgr.config.UpdateConfigOnSecretEvent(ctx, mgr.Manager.GetClient(), mgr.Opts, request.Name, er, secretLog)
+	}
 )
 
 func init() {
@@ -74,9 +82,10 @@ type ControllerManager struct {
 }
 
 func (mgr *ControllerManager) reconcileSecretUpdates(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
-	secretLog := mgr.SecretController.GetLogger().WithName(request.Name)
+	secretLog := getSecretControllerLogger(mgr, request)
+
 	er := mgr.Manager.GetEventRecorderFor(common.DellReplicationController)
-	err := mgr.config.UpdateConfigOnSecretEvent(ctx, mgr.Manager.GetClient(), mgr.Opts, request.Name, er, secretLog)
+	err := getUpdateConfigOnSecretEvent(mgr, ctx, request, er, secretLog)
 	if err != nil {
 		secretLog.Error(err, "failed to update the configuration")
 	}
