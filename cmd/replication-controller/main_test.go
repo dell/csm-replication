@@ -182,10 +182,10 @@ func (m *mockSecretController) GetLogger() logr.Logger {
 	return m.logger
 }
 
-func (m *mockSecretController) Start(ctx context.Context) error {
+func (m *mockSecretController) Start(_ context.Context) error {
 	return nil
 }
-func (m *mockSecretController) Watch(src source.TypedSource[reconcile.Request]) error {
+func (m *mockSecretController) Watch(_ source.TypedSource[reconcile.Request]) error {
 	return nil
 }
 
