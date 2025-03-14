@@ -31,7 +31,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
@@ -827,81 +826,409 @@ func Test_buildRestConfigFromCustomFormat(t *testing.T) {
 	})
 }
 
-// func Test_getReplicationConfig(t *testing.T) {
-// 	originalValue := InClusterConfig
-// 	defer func() {
-// 		InClusterConfig = originalValue
-// 	}()
-// 	InClusterConfig = func() (*rest.Config, error) {
-// 		return &rest.Config{
-// 			Host: "https://localhost",
-// 			TLSClientConfig: rest.TLSClientConfig{
-// 				CAData:  []byte("test-ca"),  // Mocked return value"test-ca",
-// 				KeyData: []byte("test-key"), // Mocked return value"test-key",
-// 			},
-// 		}, nil
-// 	}
+func Test_getReplicationConfig(t *testing.T) {
+	originalValue := InClusterConfig
+	defer func() {
+		InClusterConfig = originalValue
+	}()
+	InClusterConfig = func() (*rest.Config, error) {
+		return &rest.Config{
+			Host: "https://localhost",
+			TLSClientConfig: rest.TLSClientConfig{
+				CAData:  []byte("test-ca"),  // Mocked return value"test-ca",
+				KeyData: []byte("test-key"), // Mocked return value"test-key",
+			},
+		}, nil
+	}
 
-// 	logrusLog := logrus.New()
-// 	logrusLog.SetFormatter(&logrus.JSONFormatter{
-// 		TimestampFormat: time.RFC3339Nano,
-// 	})
-// 	logger := logrusr.New(logrusLog)
+	logrusLog := logrus.New()
+	logrusLog.SetFormatter(&logrus.JSONFormatter{
+		TimestampFormat: time.RFC3339Nano,
+	})
+	logger := logrusr.New(logrusLog)
 
-// 	mockManager := new(MockManager)
-// 	mockManager.On("GetLogger").Return(logger)
+	mockManager := new(MockManager)
+	mockManager.On("GetLogger").Return(logger)
 
-// 	type args struct {
-// 		ctx      context.Context
-// 		client   ctrlClient.Client
-// 		opts     ControllerManagerOpts
-// 		recorder record.EventRecorder
-// 		log      logr.Logger
-// 	}
-// 	tests := []struct {
-// 		name    string
-// 		args    args
-// 		want    *replicationConfigMap
-// 		want1   *replicationConfig
-// 		wantErr bool
-// 	}{
-// 		{
-// 			name: "Success",
-// 			args: args{
-// 				ctx:    context.Background(),
-// 				client: fake.NewClientBuilder().Build(),
-// 				opts: ControllerManagerOpts{
-// 					UseConfFileFormat: true,
-// 					WatchNamespace:    "dell-replication-controller",
-// 					ConfigDir:         "../../deploy",
-// 					ConfigFileName:    "config",
-// 					InCluster:         true,
-// 					Mode:              "",
-// 				},
-// 				recorder: nil,
-// 				log:      mockManager.GetLogger(),
-// 			},
-// 			want:    &replicationConfigMap{},
-// 			want1:   &replicationConfig{},
-// 			wantErr: false,
-// 		},
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
+	// client1 := fake.NewClientBuilder().Build()
+	log := mockManager.GetLogger()
+	t.Run("SuccessModeEmpty", func(t *testing.T) {
+		ctx := context.Background()
+		// client := fake.NewClientBuilder().Build()
+		ConfgMap := &replicationConfigMap{
+			ClusterID: "",
+			Targets:   []target{},
+			LogLevel:  "INFO",
+		}
+		opts := ControllerManagerOpts{
+			UseConfFileFormat: true,
+			WatchNamespace:    "dell-replication-controller",
+			ConfigDir:         "../../deploy",
+			ConfigFileName:    "config",
+			InCluster:         true,
+			Mode:              "",
+		}
 
-// 			os.Setenv(common.EnvInClusterConfig, "true")
+		// os.Setenv(common.EnvInClusterConfig, "true")
 
-// 			got, got1, err := getReplicationConfig(tt.args.ctx, tt.args.client, tt.args.opts, tt.args.recorder, tt.args.log)
-// 			if (err != nil) != tt.wantErr {
-// 				t.Errorf("getReplicationConfig() error = %v, wantErr %v", err, tt.wantErr)
-// 				return
-// 			}
-// 			if !reflect.DeepEqual(got, tt.want) {
-// 				t.Errorf("getReplicationConfig() got = %v, want %v", got, tt.want)
-// 			}
-// 			if !reflect.DeepEqual(got1, tt.want1) {
-// 				t.Errorf("getReplicationConfig() got1 = %v, want %v", got1, tt.want1)
-// 			}
-// 		})
-// 	}
-// }
+		got, got1, err := getReplicationConfig(ctx, nil, opts, nil, log)
+		if (got1 == nil) && (err != nil) {
+			t.Errorf("getReplicationConfig() error = %v and wantErr is ni, got1 = %v and wamt1= ", err, nil)
+			return
+		}
+		if !reflect.DeepEqual(got.ClusterID, ConfgMap.ClusterID) && !reflect.DeepEqual(got.LogLevel, ConfgMap.LogLevel) {
+			t.Errorf("getReplicationConfig() got = %v, want %v", got, ConfgMap)
+		}
+		fmt.Println(ConfgMap)
+		fmt.Println(got)
+
+	})
+	t.Run("ErrorWithZeroTargets", func(t *testing.T) {
+		ctx := context.Background()
+		// client := fake.NewClientBuilder().Build()
+		// ConfgMap := &replicationConfigMap{
+		// 	ClusterID: "",
+		// 	Targets:   []target{},
+		// 	LogLevel:  "INFO",
+		// }
+		opts := ControllerManagerOpts{
+			UseConfFileFormat: true,
+			WatchNamespace:    "dell-replication-controller",
+			ConfigDir:         "../../deploy",
+			ConfigFileName:    "config",
+			InCluster:         true,
+			Mode:              "",
+		}
+
+		// os.Setenv(common.EnvInClusterConfig, "true")
+		client := fake.NewClientBuilder().Build()
+		got, got1, err := getReplicationConfig(ctx, client, opts, nil, log)
+		if (got != nil) && (got1 != nil) && (err == nil) {
+			t.Errorf("getReplicationConfig() error = %v and wantErr is ni, got1 = %v and wamt1= ", err, nil)
+			return
+		}
+
+	})
+
+	// t.Run("SuccessModeIsController", func(t *testing.T) {
+	// 	ctx := context.Background()
+	// 	// client := fake.NewClientBuilder().Build()
+	// 	ConfgMap := &replicationConfigMap{
+	// 		ClusterID: "",
+	// 		Targets:   []target{},
+	// 		LogLevel:  "INFO",
+	// 	}
+	// 	opts := ControllerManagerOpts{
+	// 		UseConfFileFormat: true,
+	// 		WatchNamespace:    "dell-replication-controller",
+	// 		ConfigDir:         "../../deploy",
+	// 		ConfigFileName:    "config",
+	// 		InCluster:         true,
+	// 		Mode:              "",
+	// 	}
+
+	// 	os.Setenv(common.EnvInClusterConfig, "true")
+
+	// 	got, got1, err := getReplicationConfig(ctx, nil, opts, nil, log)
+	// 	if (got1 == nil) && (err != nil) {
+	// 		t.Errorf("getReplicationConfig() error = %v and wantErr is ni, got1 = %v and wamt1= ", err, nil)
+	// 		return
+	// 	}
+	// 	if !reflect.DeepEqual(got.ClusterID, ConfgMap.ClusterID) && !reflect.DeepEqual(got.LogLevel, ConfgMap.LogLevel) {
+	// 		t.Errorf("getReplicationConfig() got = %v, want %v", got, ConfgMap)
+	// 	}
+	// 	fmt.Println(ConfgMap)
+	// 	fmt.Println(got)
+
+	// })
+}
+
+func TestConfig_updateConfig(t *testing.T) {
+	logrusLog := logrus.New()
+	logrusLog.SetFormatter(&logrus.JSONFormatter{
+		TimestampFormat: time.RFC3339Nano,
+	})
+	logger := logrusr.New(logrusLog)
+
+	mockManager := new(MockManager)
+	mockManager.On("GetLogger").Return(logger)
+
+	// client1 := fake.NewClientBuilder().Build()
+	log := mockManager.GetLogger()
+
+	t.Run("Success", func(t *testing.T) {
+		opts := ControllerManagerOpts{
+			UseConfFileFormat: true,
+			WatchNamespace:    "dell-replication-controller",
+			ConfigDir:         "../../deploy",
+			ConfigFileName:    "config",
+			InCluster:         true,
+			Mode:              "",
+		}
+		c := &Config{
+			repConfig: &replicationConfig{
+				ClusterID: "test-cluster-id",
+				Targets: []target{
+					{ClusterID: "target-id", SecretRef: "secret1"},
+					{ClusterID: "target-id2", SecretRef: "secret2"},
+				},
+			},
+		}
+		ctx := context.Background()
+
+		err := c.updateConfig(ctx, nil, opts, nil, log)
+
+		if err != nil {
+			t.Errorf("Config.updateConfig() error = %v, wantErr nil", err)
+		}
+	})
+	t.Run("ErrorCallingGetReplicationConfig", func(t *testing.T) {
+		opts := ControllerManagerOpts{
+			UseConfFileFormat: true,
+			WatchNamespace:    "default",
+			ConfigDir:         "testdata",
+			ConfigFileName:    "config_not_found",
+			InCluster:         true,
+			Mode:              "",
+		}
+		c := &Config{
+			repConfig: &replicationConfig{
+				ClusterID: "test-cluster-id",
+				Targets: []target{
+					{ClusterID: "target-id", SecretRef: "secret1"},
+					{ClusterID: "target-id2", SecretRef: "secret2"},
+				},
+			},
+		}
+		ctx := context.Background()
+
+		err := c.updateConfig(ctx, nil, opts, nil, log)
+
+		if err == nil {
+			t.Errorf("Config.updateConfig() error = %v, wantErr nil", err)
+		}
+	})
+}
+
+func TestConfig_UpdateConfigMap(t *testing.T) {
+	logrusLog := logrus.New()
+	logrusLog.SetFormatter(&logrus.JSONFormatter{
+		TimestampFormat: time.RFC3339Nano,
+	})
+	logger := logrusr.New(logrusLog)
+
+	mockManager := new(MockManager)
+	mockManager.On("GetLogger").Return(logger)
+
+	log := mockManager.GetLogger()
+
+	t.Run("Success", func(t *testing.T) {
+		opts := ControllerManagerOpts{
+			UseConfFileFormat: true,
+			WatchNamespace:    "dell-replication-controller",
+			ConfigDir:         "../../deploy",
+			ConfigFileName:    "config",
+			InCluster:         true,
+			Mode:              "",
+		}
+		c := &Config{
+			repConfig: &replicationConfig{
+				ClusterID: "test-cluster-id",
+				Targets: []target{
+					{ClusterID: "target-id", SecretRef: "secret1"},
+					{ClusterID: "target-id2", SecretRef: "secret2"},
+				},
+			},
+		}
+		ctx := context.Background()
+
+		err := c.UpdateConfigMap(ctx, nil, opts, nil, log)
+
+		if err != nil {
+			t.Errorf("Config.UpdateConfigMap() error = %v, wantErr nil", err)
+		}
+	})
+
+	t.Run("ErrorCallingUpdateConfig", func(t *testing.T) {
+		opts := ControllerManagerOpts{
+			UseConfFileFormat: true,
+			WatchNamespace:    "default",
+			ConfigDir:         "testdata",
+			ConfigFileName:    "config_not_found",
+			InCluster:         true,
+			Mode:              "",
+		}
+		c := &Config{
+			repConfig: &replicationConfig{
+				ClusterID: "test-cluster-id",
+				Targets: []target{
+					{ClusterID: "target-id", SecretRef: "secret1"},
+					{ClusterID: "target-id2", SecretRef: "secret2"},
+				},
+			},
+		}
+		ctx := context.Background()
+
+		err := c.UpdateConfigMap(ctx, nil, opts, nil, log)
+
+		if err == nil {
+			t.Errorf("Config.UpdateConfigMap() error = %v, wantErr non-nil", err)
+		}
+	})
+
+}
+
+func TestConfig_UpdateConfigOnSecretEvent(t *testing.T) {
+	logrusLog := logrus.New()
+	logrusLog.SetFormatter(&logrus.JSONFormatter{
+		TimestampFormat: time.RFC3339Nano,
+	})
+	logger := logrusr.New(logrusLog)
+
+	mockManager := new(MockManager)
+	mockManager.On("GetLogger").Return(logger)
+
+	log := mockManager.GetLogger()
+
+	t.Run("RelevantSecret_UpdatesConfig", func(t *testing.T) {
+		opts := ControllerManagerOpts{
+			UseConfFileFormat: true,
+			WatchNamespace:    "dell-replication-controller",
+			ConfigDir:         "../../deploy",
+			ConfigFileName:    "config",
+			InCluster:         true,
+			Mode:              "",
+		}
+		c := &Config{
+			repConfig: &replicationConfig{
+				ClusterID: "test-cluster-id",
+				Targets: []target{
+					{ClusterID: "target-id", SecretRef: "secret1"},
+					{ClusterID: "target-id2", SecretRef: "secret2"},
+				},
+			},
+		}
+		ctx := context.Background()
+		secretName := "secret1"
+
+		err := c.UpdateConfigOnSecretEvent(ctx, nil, opts, secretName, nil, log)
+
+		if err != nil {
+			t.Errorf("Config.UpdateConfigOnSecretEvent() error = %v, wantErr nil", err)
+		}
+	})
+
+	t.Run("IrrelevantSecret_IgnoresEvent", func(t *testing.T) {
+		opts := ControllerManagerOpts{
+			UseConfFileFormat: true,
+			WatchNamespace:    "dell-replication-controller",
+			ConfigDir:         "../../deploy",
+			ConfigFileName:    "config",
+			InCluster:         true,
+			Mode:              "",
+		}
+		c := &Config{
+			repConfig: &replicationConfig{
+				ClusterID: "test-cluster-id",
+				Targets: []target{
+					{ClusterID: "target-id", SecretRef: "secret1"},
+					{ClusterID: "target-id2", SecretRef: "secret2"},
+				},
+			},
+		}
+		ctx := context.Background()
+		secretName := "secret3" // Secret not in targets
+
+		err := c.UpdateConfigOnSecretEvent(ctx, nil, opts, secretName, nil, log)
+
+		if err != nil {
+			t.Errorf("Config.UpdateConfigOnSecretEvent() error = %v, wantErr nil", err)
+		}
+	})
+
+	t.Run("ErrorInUpdateConfig_ReturnsError", func(t *testing.T) {
+		opts := ControllerManagerOpts{
+			UseConfFileFormat: true,
+			WatchNamespace:    "default",
+			ConfigDir:         "testdata",
+			ConfigFileName:    "config_not_found",
+			InCluster:         true,
+			Mode:              "",
+		}
+		c := &Config{
+			repConfig: &replicationConfig{
+				ClusterID: "test-cluster-id",
+				Targets: []target{
+					{ClusterID: "target-id", SecretRef: "secret1"},
+					{ClusterID: "target-id2", SecretRef: "secret2"},
+				},
+			},
+		}
+		ctx := context.Background()
+		secretName := "secret1"
+
+		err := c.UpdateConfigOnSecretEvent(ctx, nil, opts, secretName, nil, log)
+
+		if err == nil {
+			t.Errorf("Config.UpdateConfigOnSecretEvent() error = %v, wantErr non-nil", err)
+		}
+	})
+
+}
+
+func TestConfig_GetConfig(t *testing.T) {
+	logrusLog := logrus.New()
+	logrusLog.SetFormatter(&logrus.JSONFormatter{
+		TimestampFormat: time.RFC3339Nano,
+	})
+	logger := logrusr.New(logrusLog)
+
+	mockManager := new(MockManager)
+	mockManager.On("GetLogger").Return(logger)
+
+	// client1 := fake.NewClientBuilder().Build()
+	log := mockManager.GetLogger()
+
+	t.Run("Success", func(t *testing.T) {
+		opts := ControllerManagerOpts{
+			UseConfFileFormat: true,
+			WatchNamespace:    "dell-replication-controller",
+			ConfigDir:         "../../deploy",
+			ConfigFileName:    "config",
+			InCluster:         true,
+			Mode:              "",
+		}
+
+		ctx := context.Background()
+
+		got, err := GetConfig(ctx, nil, opts, nil, log)
+
+		if err != nil {
+			t.Errorf("Config.updateConfig() error = %v, wantErr nil", err)
+		}
+		fmt.Print("Dasdasfa", got.LogLevel)
+		// if got.LogLevel == "INFO" {
+		// 	t.Errorf("Config.updateConfig() got = %v %v %v, want INFO", got.repConfig.ClusterID, got.repConfig.Targets, got.LogLevel)
+
+		// }
+
+	})
+	t.Run("ErrorCallingGetReplicationConfig", func(t *testing.T) {
+		opts := ControllerManagerOpts{
+			UseConfFileFormat: true,
+			WatchNamespace:    "default",
+			ConfigDir:         "testdata",
+			ConfigFileName:    "config_not_found",
+			InCluster:         true,
+			Mode:              "",
+		}
+
+		ctx := context.Background()
+
+		_, err := GetConfig(ctx, nil, opts, nil, log)
+
+		if err == nil {
+			t.Errorf("Config.updateConfig() error = %v, wantErr nil", err)
+		}
+	})
+}
