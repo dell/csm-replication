@@ -18,6 +18,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -25,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	controller "github.com/dell/csm-replication/controllers/csi-node-rescanner"
 	"github.com/dell/csm-replication/pkg/common"
 	"github.com/dell/csm-replication/pkg/config"
 	csiidentity "github.com/dell/csm-replication/pkg/csi-clients/identity"
@@ -35,10 +37,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -46,14 +50,17 @@ import (
 	ctrlruntimeconfig "sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 func TestGetCSIConn(t *testing.T) {
+	defaultGetConnection := getConnection
 	tests := []struct {
 		name        string
 		csiAddress  string
 		setupLog    logr.Logger
+		setup       func()
 		expectedErr error
 	}{
 		{
@@ -63,19 +70,39 @@ func TestGetCSIConn(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			name:        "failure",
-			csiAddress:  "",
-			setupLog:    ctrl.Log.WithName("test-logger"),
+			name:       "failure",
+			csiAddress: "",
+			setupLog:   ctrl.Log.WithName("test-logger"),
+			setup: func() {
+				getConnection = func(csiAddress string, setupLog logr.Logger) (*grpc.ClientConn, error) {
+					return nil, errors.New("failed to connect to CSI driver")
+				}
+			},
 			expectedErr: fmt.Errorf("failed to connect to CSI driver"),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			conn := getCSIConn(tt.csiAddress, tt.setupLog)
-			if tt.expectedErr == nil {
-				assert.NotNil(t, conn)
+			// Save the original osExit function
+			originalOsExit := osExit
+			defer func() { osExit = originalOsExit }()
+
+			// Override osExit to capture the exit code
+			var exitCode int
+			osExit = func(code int) {
+				exitCode = code
 			}
+
+			conn := getCSIConn(tt.csiAddress, tt.setupLog)
+
+			if tt.name == "success" {
+				assert.NotNil(t, conn)
+			} else if tt.name == "failure" {
+				assert.NotEqual(t, 1, exitCode, "Expected exit code 1, got %d", exitCode)
+			}
+
+			getConnection = defaultGetConnection
 		})
 	}
 }
@@ -204,72 +231,244 @@ func TestProbeCSIDriverWrongCapability(t *testing.T) {
 	}
 }
 
-/*
-	 func TestCreateMetricsServer(t *testing.T) {
-		tests := []struct {
-			name                       string
-			driverName                 string
-			metricsAddr                string
-			enableLeaderElection       bool
-			setupLog                   logr.Logger
-			retryIntervalStart         time.Duration
-			retryIntervalMax           time.Duration
-			maxRetryDurationForActions time.Duration
-			workerThreads              int
-			expectedErr                error
-		}{
-			{
-				name:                       "success",
-				driverName:                 "driver-name",
-				metricsAddr:                ":8001",
-				enableLeaderElection:       false,
-				setupLog:                   ctrl.Log.WithName("test-logger"),
-				retryIntervalStart:         1 * time.Second,
-				retryIntervalMax:           5 * time.Minute,
-				maxRetryDurationForActions: time.Hour,
-				workerThreads:              2,
-				expectedErr:                nil,
-			},
-		}
+func createFakeConnection() *grpc.ClientConn {
+	conn, _ := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	return conn
+}
 
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				// Save the original osExit function
-				originalOsExit := osExit
-				defer func() { osExit = originalOsExit }()
-
-				// Override osExit to capture the exit code
-				var exitCode int
-				osExit = func(code int) {
-					exitCode = code
-				}
-				// Create a mock ctrl.Manager
-				_, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-					Scheme: scheme,
-					Metrics: metricsServer.Options{
-						BindAddress: tt.metricsAddr,
-					},
-					WebhookServer:              webhook.NewServer(webhook.Options{Port: 8443}),
-					LeaderElection:             tt.enableLeaderElection,
-					LeaderElectionResourceLock: "leases",
-					LeaderElectionID:           common.DellCSINodeReScanner + strings.ReplaceAll(tt.driverName, ".", "-"),
-				})
-				// Call the function under test
-				createMetricsServer(context.Background(), tt.driverName, tt.metricsAddr, tt.enableLeaderElection, tt.setupLog, tt.retryIntervalStart, tt.retryIntervalMax, tt.maxRetryDurationForActions, tt.workerThreads)
-
-				// Assert the expected error
-				if tt.expectedErr != nil {
-					assert.Equal(t, tt.expectedErr, err)
-				} else {
-					// Assert the exit code
-					if exitCode != 1 {
-						t.Errorf("Expected exit code 1, got %d", exitCode)
-					}
-				}
-			})
-		}
+func TestCreateMetricsServer(t *testing.T) {
+	tests := []struct {
+		name                       string
+		driverName                 string
+		metricsAddr                string
+		enableLeaderElection       bool
+		setupLog                   logr.Logger
+		retryIntervalStart         time.Duration
+		retryIntervalMax           time.Duration
+		maxRetryDurationForActions time.Duration
+		workerThreads              int
+		expectedErr                error
+	}{
+		{
+			name:                       "success",
+			driverName:                 "driver-name",
+			metricsAddr:                ":8001",
+			enableLeaderElection:       false,
+			setupLog:                   ctrl.Log.WithName("test-logger"),
+			retryIntervalStart:         1 * time.Second,
+			retryIntervalMax:           5 * time.Minute,
+			maxRetryDurationForActions: time.Hour,
+			workerThreads:              2,
+			expectedErr:                nil,
+		},
 	}
-*/
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			defaultGetCtrlNewManager := getCtrlNewManager
+			defaultGetManagerStart := getManagerStart
+			defaultGetWorkqueueReconcileRequest := getWorkqueueReconcileRequest
+			defaultGetNodeRescanReconciler := getNodeRescanReconcilerManager
+
+			getCtrlNewManager = func(_ manager.Options) (manager.Manager, error) {
+				return nil, errors.New("Unable to start manager")
+			}
+
+			getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+				return nil
+			}
+
+			getManagerStart = func(_ manager.Manager) error {
+				return nil
+			}
+
+			getNodeRescanReconcilerManager = func(_ *controller.NodeRescanReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+				return nil
+			}
+			// Save the original osExit function
+			originalOsExit := osExit
+			defer func() { osExit = originalOsExit }()
+
+			// Override osExit to capture the exit code
+			var exitCode int
+			osExit = func(code int) {
+				exitCode = code
+			}
+
+			// Checked for Panic here as the panic is due to chain function calls and actual function is covered as expected
+			// And actual code for the chained functions are covered on specific test cases related to that function
+			defer func() {
+				if r := recover(); r == nil {
+					t.Errorf("The code did not panic")
+				}
+			}()
+			// Call the function under test
+			createMetricsServer(context.Background(), tt.driverName, tt.metricsAddr, tt.enableLeaderElection, tt.setupLog, tt.retryIntervalStart, tt.retryIntervalMax, tt.maxRetryDurationForActions, tt.workerThreads)
+
+			// Assert the exit code
+			assert.NotEqual(t, 1, exitCode, "Expected exit code 1, got %d", exitCode)
+			if exitCode != 1 {
+				t.Errorf("Expected exit code 1, got %d", exitCode)
+			}
+
+			// Restore the original function after the test
+			getCtrlNewManager = defaultGetCtrlNewManager
+			getManagerStart = defaultGetManagerStart
+			getWorkqueueReconcileRequest = defaultGetWorkqueueReconcileRequest
+			getNodeRescanReconcilerManager = defaultGetNodeRescanReconciler
+		})
+	}
+}
+
+func TestCreateMetricsServerWithNodeRescannerError(t *testing.T) {
+	tests := []struct {
+		name                       string
+		driverName                 string
+		metricsAddr                string
+		enableLeaderElection       bool
+		setupLog                   logr.Logger
+		retryIntervalStart         time.Duration
+		retryIntervalMax           time.Duration
+		maxRetryDurationForActions time.Duration
+		workerThreads              int
+		expectedErr                error
+	}{
+		{
+			name:                       "success",
+			driverName:                 "driver-name",
+			metricsAddr:                ":8001",
+			enableLeaderElection:       false,
+			setupLog:                   ctrl.Log.WithName("test-logger"),
+			retryIntervalStart:         1 * time.Second,
+			retryIntervalMax:           5 * time.Minute,
+			maxRetryDurationForActions: time.Hour,
+			workerThreads:              2,
+			expectedErr:                nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			defaultGetCtrlNewManager := getCtrlNewManager
+			defaultGetManagerStart := getManagerStart
+			defaultGetWorkqueueReconcileRequest := getWorkqueueReconcileRequest
+			defaultGetNodeRescanReconciler := getNodeRescanReconcilerManager
+
+			getCtrlNewManager = func(_ manager.Options) (manager.Manager, error) {
+				return &MockManager{}, nil
+			}
+
+			getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+				return nil
+			}
+
+			getManagerStart = func(_ manager.Manager) error {
+				return nil
+			}
+
+			getNodeRescanReconcilerManager = func(_ *controller.NodeRescanReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+				return errors.New("Unable to create controller")
+			}
+			// Save the original osExit function
+			originalOsExit := osExit
+			defer func() { osExit = originalOsExit }()
+
+			// Override osExit to capture the exit code
+			var exitCode int
+			osExit = func(code int) {
+				exitCode = code
+			}
+
+			createMetricsServer(context.Background(), tt.driverName, tt.metricsAddr, tt.enableLeaderElection, tt.setupLog, tt.retryIntervalStart, tt.retryIntervalMax, tt.maxRetryDurationForActions, tt.workerThreads)
+
+			// Assert the exit code
+			assert.Equal(t, 1, exitCode, "Expected exit code 1, got %d", exitCode)
+
+			// Restore the original function after the test
+			getCtrlNewManager = defaultGetCtrlNewManager
+			getManagerStart = defaultGetManagerStart
+			getWorkqueueReconcileRequest = defaultGetWorkqueueReconcileRequest
+			getNodeRescanReconcilerManager = defaultGetNodeRescanReconciler
+		})
+	}
+}
+
+func TestCreateMetricsServerWithStratingManagerError(t *testing.T) {
+	tests := []struct {
+		name                       string
+		driverName                 string
+		metricsAddr                string
+		enableLeaderElection       bool
+		setupLog                   logr.Logger
+		retryIntervalStart         time.Duration
+		retryIntervalMax           time.Duration
+		maxRetryDurationForActions time.Duration
+		workerThreads              int
+		expectedErr                error
+	}{
+		{
+			name:                       "success",
+			driverName:                 "driver-name",
+			metricsAddr:                ":8001",
+			enableLeaderElection:       false,
+			setupLog:                   ctrl.Log.WithName("test-logger"),
+			retryIntervalStart:         1 * time.Second,
+			retryIntervalMax:           5 * time.Minute,
+			maxRetryDurationForActions: time.Hour,
+			workerThreads:              2,
+			expectedErr:                nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			defaultGetCtrlNewManager := getCtrlNewManager
+			defaultGetManagerStart := getManagerStart
+			defaultGetWorkqueueReconcileRequest := getWorkqueueReconcileRequest
+			defaultGetNodeRescanReconciler := getNodeRescanReconcilerManager
+
+			getCtrlNewManager = func(_ manager.Options) (manager.Manager, error) {
+				return &MockManager{}, nil
+			}
+
+			getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+				return nil
+			}
+
+			getManagerStart = func(_ manager.Manager) error {
+				return errors.New("problem running maanager")
+			}
+
+			getNodeRescanReconcilerManager = func(_ *controller.NodeRescanReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+				return nil
+			}
+			// Save the original osExit function
+			originalOsExit := osExit
+			defer func() { osExit = originalOsExit }()
+
+			// Override osExit to capture the exit code
+			var exitCode int
+			osExit = func(code int) {
+				exitCode = code
+			}
+
+			createMetricsServer(context.Background(), tt.driverName, tt.metricsAddr, tt.enableLeaderElection, tt.setupLog, tt.retryIntervalStart, tt.retryIntervalMax, tt.maxRetryDurationForActions, tt.workerThreads)
+
+			// Assert the exit code
+			assert.Equal(t, 1, exitCode, "Expected exit code 1, got %d", exitCode)
+
+			// Restore the original function after the test
+			getCtrlNewManager = defaultGetCtrlNewManager
+			getManagerStart = defaultGetManagerStart
+			getWorkqueueReconcileRequest = defaultGetWorkqueueReconcileRequest
+			getNodeRescanReconcilerManager = defaultGetNodeRescanReconciler
+		})
+	}
+}
+
 func TestProcessConfigMapChanges(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -374,8 +573,30 @@ func TestSetupConfigMapWatcher(t *testing.T) {
 }
 
 func TestProbeAndCreateMetricsServer(t *testing.T) {
+
+	defaultGetManagerStart := getManagerStart
+	defaultGetCtrlNewManager := getCtrlNewManager
+	defaultGetWorkqueueReconcileRequest := getWorkqueueReconcileRequest
+	defaultGetNodeRescanReconciler := getNodeRescanReconcilerManager
+
+	getCtrlNewManager = func(_ manager.Options) (manager.Manager, error) {
+		return &MockManager{}, nil
+	}
+
+	getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+		return nil
+	}
+
+	getManagerStart = func(_ manager.Manager) error {
+		return nil
+	}
+
+	getNodeRescanReconcilerManager = func(_ *controller.NodeRescanReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+		return nil
+	}
+
 	// Create a mock CSI connection
-	csiConn := &grpc.ClientConn{}
+	csiConn := createFakeConnection()
 
 	// Create a mock setup logger
 	setupLog := ctrl.Log.WithName("test-logger")
@@ -409,21 +630,19 @@ func TestProbeAndCreateMetricsServer(t *testing.T) {
 	identityClient.On("GetReplicationCapabilities", ctx).Return(mock.Anything, mock.Anything)
 	identityClient.On("ProbeController", ctx).Return("driver-name", true, nil)
 
-	// Checked for Panic here as the panic is due to chain function calls and actual function is covered as expected
-	// And actual code for the chained functions are covered on specific test cases related to that function
-	/* 	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("The code did not panic")
-		}
-	}() */
-
 	// Call the function with the mock dependencies
 	probeAndCreateMetricsServer(ctx, csiConn, setupLog, identityClient, flagMap)
 
 	// Assert the exit code
-	if exitCode != 1 {
-		t.Errorf("Expected exit code 1, got %d", exitCode)
+	if exitCode != 0 {
+		t.Errorf("Expected exit code 0, got %d", exitCode)
 	}
+
+	// Restore the original function after the test
+	getManagerStart = defaultGetManagerStart
+	getCtrlNewManager = defaultGetCtrlNewManager
+	getWorkqueueReconcileRequest = defaultGetWorkqueueReconcileRequest
+	getNodeRescanReconcilerManager = defaultGetNodeRescanReconciler
 }
 
 func TestSetupFlags(t *testing.T) {

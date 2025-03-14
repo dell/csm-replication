@@ -44,6 +44,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsServer "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -62,6 +63,32 @@ var (
 	}
 	// Added to improve UT coverage
 	osExit = os.Exit
+
+	// Create a new wrapper function
+	createNodeReScannerManagerWrapper = func(ctx context.Context, mgr ctrl.Manager) *NodeRescanner {
+		// Call the original createNodeReScannerManager function
+		return createNodeReScannerManager(ctx, mgr)
+	}
+
+	getCtrlNewManager = func(options manager.Options) (manager.Manager, error) {
+		return ctrl.NewManager(ctrl.GetConfigOrDie(), options)
+	}
+
+	getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+		return workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](retryIntervalStart, retryIntervalMax)
+	}
+
+	getNodeRescanReconcilerManager = func(r *controller.NodeRescanReconciler, mgr ctrl.Manager, limiter workqueue.TypedRateLimiter[reconcile.Request], maxReconcilers int) error {
+		return r.SetupWithManager(mgr, limiter, maxReconcilers)
+	}
+
+	getManagerStart = func(mgr manager.Manager) error {
+		return mgr.Start(ctrl.SetupSignalHandler())
+	}
+
+	getConnection = func(csiAddress string, setupLog logr.Logger) (*grpc.ClientConn, error) {
+		return connection.Connect(csiAddress, setupLog)
+	}
 )
 
 func init() {
@@ -101,12 +128,6 @@ func (mgr *NodeRescanner) setupConfigMapWatcher(loggerConfig *logrus.Logger) {
 	viper.OnConfigChange(func(_ fsnotify.Event) {
 		mgr.processConfigMapChanges(loggerConfig)
 	})
-}
-
-// Create a new wrapper function
-var createNodeReScannerManagerWrapper = func(ctx context.Context, mgr ctrl.Manager) *NodeRescanner {
-	// Call the original createNodeReScannerManager function
-	return createNodeReScannerManager(ctx, mgr)
 }
 
 func createNodeReScannerManager(_ context.Context, mgr ctrl.Manager) *NodeRescanner {
@@ -205,7 +226,7 @@ func setupFlags() (map[string]string, logr.Logger, context.Context) {
 }
 
 func getCSIConn(csiAddress string, setupLog logr.Logger) *grpc.ClientConn {
-	csiConn, err := connection.Connect(csiAddress, setupLog)
+	csiConn, err := getConnection(csiAddress, setupLog)
 	if err != nil {
 		setupLog.Error(err, "failed to connect to CSI driver")
 		osExit(1)
@@ -252,7 +273,7 @@ func createMetricsServer(ctx context.Context, driverName string, metricsAddr str
 
 	leaderElectionID := common.DellCSINodeReScanner + strings.ReplaceAll(driverName, ".", "-")
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	mgr, err := getCtrlNewManager(ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsServer.Options{
 			BindAddress: metricsAddr,
@@ -263,6 +284,7 @@ func createMetricsServer(ctx context.Context, driverName string, metricsAddr str
 		LeaderElectionID:           leaderElectionID,
 	})
 	if err != nil {
+		log.Println("Unable to start manager")
 		setupLog.Error(err, "unable to start manager")
 		osExit(1)
 	}
@@ -282,10 +304,10 @@ func createRescanManager(ctx context.Context, mgr ctrl.Manager, driverName strin
 	log.Println("set level to", level)
 	logrusLog.SetLevel(level)
 
-	expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](retryIntervalStart, retryIntervalMax)
+	expRateLimiter := getWorkqueueReconcileRequest(retryIntervalStart, retryIntervalMax)
 	log.Println("expRateLimiter", expRateLimiter)
 
-	if err = (&controller.NodeRescanReconciler{
+	if err = getNodeRescanReconcilerManager(&controller.NodeRescanReconciler{
 		Client:                     mgr.GetClient(),
 		Log:                        ctrl.Log.WithName("controllers").WithName("DellCSINodeReScanner"),
 		Scheme:                     mgr.GetScheme(),
@@ -293,13 +315,13 @@ func createRescanManager(ctx context.Context, mgr ctrl.Manager, driverName strin
 		DriverName:                 driverName,
 		NodeName:                   rescanMgr.NodeName,
 		MaxRetryDurationForActions: maxRetryDurationForActions,
-	}).SetupWithManager(mgr, expRateLimiter, workerThreads); err != nil {
+	}, mgr, expRateLimiter, workerThreads); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "DellCSINodeReScanner")
 		osExit(1)
 	}
 	log.Println("strating manager")
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := getManagerStart(mgr); err != nil {
 		log.Println("problem running manager")
 		setupLog.Error(err, "problem running manager")
 		osExit(1)
