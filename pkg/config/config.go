@@ -145,11 +145,17 @@ func (c *Config) updateConfig(ctx context.Context, client ctrlClient.Client, opt
 	return nil
 }
 
+var (
+	GetConnection = func(c *Config, clusterID string) (connection.RemoteClusterClient, error) {
+		return c.repConfig.GetConnection(clusterID)
+	}
+)
+
 // GetConnection returns cluster client for given cluster ID
 func (c *Config) GetConnection(clusterID string) (connection.RemoteClusterClient, error) {
 	c.Lock.Lock()
 	defer c.Lock.Unlock()
-	return c.repConfig.GetConnection(clusterID)
+	return GetConnection(c, clusterID)
 }
 
 // GetClusterID returns cluster ID for config instance
@@ -398,6 +404,7 @@ func buildRestConfigFromServiceAccountToken(ctx context.Context, secretName stri
 	}
 	tlsClientConfig := rest.TLSClientConfig{}
 	if _, err := certutil.NewPoolFromBytes(secret.Data["ca.crt"]); err != nil {
+
 		return nil, err
 	}
 	tlsClientConfig.CAData = secret.Data["ca.crt"]

@@ -428,46 +428,32 @@ func TestConfig_PrintConfig(t *testing.T) {
 		// Call the Print method with the mock logger
 		c.PrintConfig(mockManager.GetLogger())
 
-		// Assert that the expected Info calls were made
 	})
 }
+func TestGetConnection(t *testing.T) {
 
-// func TestConfig_GetConnection(t *testing.T) {
-// 	// Test case: Cluster ID is found in the replication config
-// 	t.Run("Cluster ID found", func(t *testing.T) {
-// 		c := &Config{
-// 			repConfig: &replicationConfig{
-// 				ClusterID: "test-cluster",
-// 			},
-// 		}
+	t.Run("Success", func(t *testing.T) {
+		originalValue := GetConnection
+		defer func() {
+			GetConnection = originalValue
+		}()
 
-// 		client, err := c.GetConnection("test-cluster")
+		GetConnection = func(_ *Config, _ string) (connection.RemoteClusterClient, error) {
+			return nil, errors.New("verification failed")
+		}
 
-// 		if err != nil {
-// 			t.Errorf("Expected no error, but got %v", err)
-// 		}
-// 		if client == nil {
-// 			t.Error("Expected a non-nil client, but got nil")
-// 		}
-// 	})
+		config := &Config{
+			repConfig: &replicationConfig{
+				ClusterID: "test-cluster",
+			},
+		}
+		_, err := config.GetConnection("test-cluster")
+		if err == nil {
+			t.Errorf("Expected error, got nil")
+		}
+	})
 
-// 	// Test case: Cluster ID is not found in the replication config
-// 	t.Run("Cluster ID not found", func(t *testing.T) {
-// 		c := &Config{
-// 			repConfig: &replicationConfig{
-// 				ClusterID: "test-cluster",
-// 			},
-// 		}
-
-// 		client, err := c.GetConnection("other-cluster")
-// 		if err == nil {
-// 			t.Error("Expected an error, but got nil")
-// 		}
-// 		if client != nil {
-// 			t.Error("Expected a nil client, but got a non-nil value")
-// 		}
-// 	})
-// }
+}
 
 type MockClient struct {
 	mock.Mock
@@ -531,7 +517,7 @@ func TestBuildRestConfigFromServiceAccountToken(t *testing.T) {
 	namespace := "test-ns"
 	secretName := "test-secret"
 	host := "test-host.com"
-	caCert := []byte("test-ca-cert")
+	invalidCert := []byte("test-ca-cert")
 	token := []byte("test-token")
 
 	validSecret := &v1.Secret{
@@ -540,7 +526,38 @@ func TestBuildRestConfigFromServiceAccountToken(t *testing.T) {
 			Namespace: namespace,
 		},
 		Data: map[string][]byte{
-			"ca.crt": caCert,
+			"ca.crt": invalidCert,
+			"token":  token,
+		},
+	}
+
+	var validCaCert = []byte(`-----BEGIN CERTIFICATE-----
+MIIDBTCCAe2gAwIBAgIIUvG0tSrxeiUwDQYJKoZIhvcNAQELBQAwFTETMBEGA1UE
+AxMKa3ViZXJuZXRlczAeFw0yNTAyMDQxMTA4MzRaFw0zNTAyMDIxMTEzMzRaMBUx
+EzARBgNVBAMTCmt1YmVybmV0ZXMwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK
+AoIBAQDHqyWictrHZ46mqDsqRfUAX4MdLINMv0NYr1NfFES7QderULRTttzaQGF3
+oXjVEU6lmP8hGYRbD9ItKehq3sFhiobOPH9kTQ4dKYRB76gAOfjxNCBfBhaTZG0S
+hkz8916u11eghH2dgXfa/s1TOcbxJXPJt8nXNbTFTEaKjB+DWRhBX/WfjN+faOVX
+b5HWJmDVIwlq7bxgrLk5WPkiQrsQshoij9YmgpuN5I0Y9xNymsWY1QHfM2wFeFEJ
+rDGlj6zuceyRkVboifD9R2A5eyS++xgRKIo/p6e8L/OLA+FfrUcdIksQ7sQ2eNl/
+Etc8ThOrgw2Yi5p5BgkrKUbMEZXnAgMBAAGjWTBXMA4GA1UdDwEB/wQEAwICpDAP
+BgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBSejZWfFjRx4XI2uwCiHt5LYS6G5DAV
+BgNVHREEDjAMggprdWJlcm5ldGVzMA0GCSqGSIb3DQEBCwUAA4IBAQDDmIuMHSR4
+MB9MsiLae2NN9rOdUjY8hKJ61VtMJJeP285JQhXJZcnzCEsRfnwJ1tellBSOOIwE
+H1E9vl0vKuKOgQxTjcxEHPEE3dKhbVB4/+UzNRfb8goCFerEWqsFbUAPmXKdWLhG
+s2Y3hDfHf5rcUWQmY4GgxIMBzaLMUUvscoLmSHw9tsxTlNb90XFjiGHc3r0Uml6S
+gxAiT89/TrtsQLUFzX3F1yVsBw/LatdpcIg/oeaQUa8J2CyLDuddA96XJdx/m00W
++iWkJlfBAs19qqaRj9E0jY//z/acMP2wq6Ed2vfDfSFHmYldpfLytmbs35HkcOkp
+ggcetQ4yvATR
+-----END CERTIFICATE-----`)
+
+	validSecret1 := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: namespace,
+		},
+		Data: map[string][]byte{
+			"ca.crt": validCaCert,
 			"token":  token,
 		},
 	}
@@ -555,7 +572,7 @@ func TestBuildRestConfigFromServiceAccountToken(t *testing.T) {
 		wantErr    bool
 	}{
 		{
-			name:       "valid secret",
+			name:       "valid secret with invalid ca cert",
 			secretName: secretName,
 			namespace:  namespace,
 			fakeClient: fake.NewClientBuilder().WithObjects(validSecret).Build(),
@@ -563,7 +580,7 @@ func TestBuildRestConfigFromServiceAccountToken(t *testing.T) {
 			wantConfig: &rest.Config{
 				Host: "https://" + host,
 				TLSClientConfig: rest.TLSClientConfig{
-					CAData:  caCert,
+					CAData:  invalidCert,
 					KeyData: token,
 				},
 				BearerToken: string(token),
@@ -597,6 +614,22 @@ func TestBuildRestConfigFromServiceAccountToken(t *testing.T) {
 			wantConfig: nil,
 			wantErr:    true,
 		},
+		{
+			name:       "valid secret",
+			secretName: secretName,
+			namespace:  namespace,
+			fakeClient: fake.NewClientBuilder().WithObjects(validSecret1).Build(),
+			host:       host,
+			wantConfig: &rest.Config{
+				Host: "https://" + host,
+				TLSClientConfig: rest.TLSClientConfig{
+					CAData:  validCaCert,
+					KeyData: token,
+				},
+				BearerToken: string(token),
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -614,21 +647,7 @@ func TestBuildRestConfigFromServiceAccountToken(t *testing.T) {
 	}
 }
 
-// /////////////////////////////////////////////
 func Test_getConnHandler(t *testing.T) {
-	originalValue := InClusterConfig
-	defer func() {
-		InClusterConfig = originalValue
-	}()
-	InClusterConfig = func() (*rest.Config, error) {
-		return &rest.Config{
-			Host: "https://localhost",
-			TLSClientConfig: rest.TLSClientConfig{
-				CAData:  []byte("test-ca"),
-				KeyData: []byte("test-key"),
-			},
-		}, nil
-	}
 	logrusLog := logrus.New()
 	logrusLog.SetFormatter(&logrus.JSONFormatter{
 		TimestampFormat: time.RFC3339Nano,
@@ -728,6 +747,19 @@ users:
 		assert.Error(t, err)
 	})
 	t.Run("SecretFoundAndValidData", func(t *testing.T) {
+		originalValue := InClusterConfig
+		defer func() {
+			InClusterConfig = originalValue
+		}()
+		InClusterConfig = func() (*rest.Config, error) {
+			return &rest.Config{
+				Host: "https://localhost",
+				TLSClientConfig: rest.TLSClientConfig{
+					CAData:  []byte("test-ca"),
+					KeyData: []byte("test-key"),
+				},
+			}, nil
+		}
 		os.Setenv(common.EnvInClusterConfig, "true")
 
 		args := args{
@@ -768,6 +800,57 @@ users:
 
 		_, err := getConnHandler(args.ctx, args.targets, args.client, args.opts, args.log)
 		assert.Equal(t, err.Error(), "failed to get kube config path")
+	})
+	t.Run("InCluster to false with kubeconfig path", func(t *testing.T) {
+		os.Setenv(common.EnvInClusterConfig, "false")
+		os.Setenv("X_CSI_KUBECONFIG_PATH", "/path/to/kubeconfig")
+
+		args := args{
+			ctx:     context.Background(),
+			targets: configMap.Targets,
+			client:  fake.NewClientBuilder().Build(),
+			opts: ControllerManagerOpts{
+				UseConfFileFormat: true,
+				WatchNamespace:    "dell-replication-controller",
+				ConfigDir:         "../../deploy",
+				ConfigFileName:    "config",
+				InCluster:         true,
+				Mode:              "",
+			},
+			log: mockManager.GetLogger(),
+		}
+
+		_, err := getConnHandler(args.ctx, args.targets, args.client, args.opts, args.log)
+		assert.Error(t, err)
+	})
+
+	t.Run("InCluster to true", func(t *testing.T) {
+		os.Setenv(common.EnvInClusterConfig, "true")
+		originalValue2 := InClusterConfig
+		defer func() {
+			InClusterConfig = originalValue2
+		}()
+		InClusterConfig = func() (*rest.Config, error) {
+			return nil, errors.New("verification failed")
+		}
+
+		args := args{
+			ctx:     context.Background(),
+			targets: []target{},
+			client:  fake.NewClientBuilder().Build(),
+			opts: ControllerManagerOpts{
+				UseConfFileFormat: true,
+				WatchNamespace:    "dell-replication-controller",
+				ConfigDir:         "../../deploy",
+				ConfigFileName:    "config",
+				InCluster:         true,
+				Mode:              "",
+			},
+			log: mockManager.GetLogger(),
+		}
+
+		_, err := getConnHandler(args.ctx, args.targets, args.client, args.opts, args.log)
+		assert.Error(t, err)
 	})
 }
 
@@ -825,20 +908,6 @@ func Test_buildRestConfigFromCustomFormat(t *testing.T) {
 }
 
 func Test_getReplicationConfig(t *testing.T) {
-	originalValue := InClusterConfig
-	defer func() {
-		InClusterConfig = originalValue
-	}()
-	InClusterConfig = func() (*rest.Config, error) {
-		return &rest.Config{
-			Host: "https://localhost",
-			TLSClientConfig: rest.TLSClientConfig{
-				CAData:  []byte("test-ca"),  // Mocked return value"test-ca",
-				KeyData: []byte("test-key"), // Mocked return value"test-key",
-			},
-		}, nil
-	}
-
 	logrusLog := logrus.New()
 	logrusLog.SetFormatter(&logrus.JSONFormatter{
 		TimestampFormat: time.RFC3339Nano,
@@ -877,12 +946,6 @@ func Test_getReplicationConfig(t *testing.T) {
 	})
 	t.Run("ErrorWithZeroTargets", func(t *testing.T) {
 		ctx := context.Background()
-		// client := fake.NewClientBuilder().Build()
-		// ConfgMap := &replicationConfigMap{
-		// 	ClusterID: "",
-		// 	Targets:   []target{},
-		// 	LogLevel:  "INFO",
-		// }
 		opts := ControllerManagerOpts{
 			UseConfFileFormat: true,
 			WatchNamespace:    "dell-replication-controller",
@@ -902,6 +965,19 @@ func Test_getReplicationConfig(t *testing.T) {
 
 	})
 	t.Run("SuccessWithTargetsWithNoVerifyErr", func(t *testing.T) {
+		originalValue1 := InClusterConfig
+		defer func() {
+			InClusterConfig = originalValue1
+		}()
+		InClusterConfig = func() (*rest.Config, error) {
+			return &rest.Config{
+				Host: "https://localhost",
+				TLSClientConfig: rest.TLSClientConfig{
+					CAData:  []byte("test-ca"),  // Mocked return value"test-ca",
+					KeyData: []byte("test-key"), // Mocked return value"test-key",
+				},
+			}, nil
+		}
 		originalValue := Verify
 		defer func() {
 			Verify = originalValue
@@ -974,6 +1050,19 @@ users:
 
 	})
 	t.Run("SuccessWithTargetsWithElseCase", func(t *testing.T) {
+		originalValue1 := InClusterConfig
+		defer func() {
+			InClusterConfig = originalValue1
+		}()
+		InClusterConfig = func() (*rest.Config, error) {
+			return &rest.Config{
+				Host: "https://localhost",
+				TLSClientConfig: rest.TLSClientConfig{
+					CAData:  []byte("test-ca"),  // Mocked return value"test-ca",
+					KeyData: []byte("test-key"), // Mocked return value"test-key",
+				},
+			}, nil
+		}
 
 		configFilePath := "../../deploy/config.yaml"
 
