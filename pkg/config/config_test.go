@@ -73,6 +73,24 @@ func TestGetControllerManagerOpts(t *testing.T) {
 				Mode:              "",
 			},
 		},
+		{
+			name: "Custom values EnvUseConfFileFormat false",
+			envVars: map[string]string{
+				common.EnvWatchNameSpace:    "default",
+				common.EnvConfigFileName:    "config.yaml",
+				common.EnvConfigDirName:     "config",
+				common.EnvInClusterConfig:   "true",
+				common.EnvUseConfFileFormat: "false",
+			},
+			wantOpts: ControllerManagerOpts{
+				UseConfFileFormat: false,
+				WatchNamespace:    "default",
+				ConfigDir:         "config",
+				ConfigFileName:    "config.yaml",
+				InCluster:         true,
+				Mode:              "",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -959,7 +977,7 @@ func Test_getReplicationConfig(t *testing.T) {
 		client := fake.NewClientBuilder().Build()
 		got, got1, err := getReplicationConfig(ctx, client, opts, nil, log)
 		if (got != nil) && (got1 != nil) && (err == nil) {
-			t.Errorf("getReplicationConfig() error = %v and wantErr is ni, got1 = %v and wamt1= ", err, nil)
+			t.Errorf("getReplicationConfig() error = %v and wantErr is nil, got1 = %v and wamt1= ", err, nil)
 			return
 		}
 
@@ -1152,6 +1170,79 @@ users:
 			t.Errorf("getReplicationConfig() error = %v and wantErr is ni, got1 = %v and wamt1= ", err, nil)
 			return
 		}
+
+	})
+
+	t.Run("SuccessWithTargetsNoControllerWithNoVerifyErr", func(t *testing.T) {
+		originalValue1 := InClusterConfig
+		defer func() {
+			InClusterConfig = originalValue1
+		}()
+		InClusterConfig = func() (*rest.Config, error) {
+			return &rest.Config{
+				Host: "https://localhost",
+				TLSClientConfig: rest.TLSClientConfig{
+					CAData:  []byte("test-ca"),  // Mocked return value"test-ca",
+					KeyData: []byte("test-key"), // Mocked return value"test-key",
+				},
+			}, nil
+		}
+		originalValue := Verify
+		defer func() {
+			Verify = originalValue
+		}()
+
+		Verify = func(_ *replicationConfig, _ context.Context) error {
+			return errors.New("verification failed")
+		}
+		os.Setenv(common.EnvInClusterConfig, "true")
+		secretName := "valid-secret"
+		namespace := "default"
+
+		kubeconfig := `
+apiVersion: v1
+clusters:
+- cluster:
+    server: https://test-server.com
+  name: test-cluster
+contexts:
+- context:
+    cluster: test-cluster
+    user: test-user
+  name: test-context
+current-context: test-context
+kind: Config
+preferences: {}
+users:
+- name: test-user
+  user:
+    token: test-token
+`
+		secret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: namespace,
+			},
+			Data: map[string][]byte{
+				"data": []byte(kubeconfig),
+			},
+		}
+
+		client := fake.NewClientBuilder().WithObjects(secret).Build()
+		ctx := context.Background()
+
+		opts := ControllerManagerOpts{
+			UseConfFileFormat: true,
+			WatchNamespace:    "dell-replication-controller",
+			ConfigDir:         "../../deploy",
+			ConfigFileName:    "config",
+			InCluster:         true,
+			Mode:              "",
+		}
+		fakeRecorder := record.NewFakeRecorder(100)
+		os.Setenv(common.EnvInClusterConfig, "true")
+		_, _, err := getReplicationConfig(ctx, client, opts, fakeRecorder, log)
+		assert.NoError(t, err)
 
 	})
 
