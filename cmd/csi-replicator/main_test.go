@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	controller "github.com/dell/csm-replication/controllers/csi-replicator"
+	"github.com/dell/csm-replication/pkg/common"
 	repcnf "github.com/dell/csm-replication/pkg/config"
 	csiidentity "github.com/dell/csm-replication/pkg/csi-clients/identity"
 	"github.com/dell/dell-csi-extensions/replication"
@@ -503,6 +505,658 @@ func TestMain(t *testing.T) {
 				}
 			},
 			expectedOsExitCode: 0,
+		},
+		{
+			name: "failed to connect to CSI driver",
+			setup: func() {
+				getConnectToCsiFunc = func(_ string, _ logr.Logger) (*grpc.ClientConn, error) {
+					return &grpc.ClientConn{}, errors.New("error connecting to CSI driver")
+				}
+
+				getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
+					return "csi-driver", errors.New("error waiting for the CSI driver to be ready")
+				}
+
+				getReplicationCapabilitiesFunc = func(_ context.Context, _ csiidentity.Identity) (csiidentity.ReplicationCapabilitySet, []*replication.SupportedActions, error) {
+					capabilitySet := csiidentity.ReplicationCapabilitySet{}
+					supportedActions := []*replication.SupportedActions{}
+					return capabilitySet, supportedActions, nil
+				}
+
+				getCtrlNewManager = func(_ manager.Options) (manager.Manager, error) {
+					return &mockManager{}, nil
+				}
+
+				getcreateReplicatorManagerFunc = func(_ context.Context, _ manager.Manager) (*ReplicatorManager, error) {
+					return &ReplicatorManager{
+						config: &repcnf.Config{
+							LogLevel: "info",
+						},
+					}, nil
+				}
+
+				getParseLevelFunc = func(_ string) (logrus.Level, error) {
+					return logrus.InfoLevel, nil
+				}
+
+				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+					return nil
+				}
+
+				getPersistentVolumeClaimReconcilerSetupWithManager = func(_ *controller.PersistentVolumeClaimReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getPersistentVolumeReconcilerSetupWithManager = func(_ *controller.PersistentVolumeReconciler, _ context.Context, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getReplicationGroupReconcilerSetupWithManager = func(_ *controller.ReplicationGroupReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getManagerStart = func(_ manager.Manager) error {
+					return nil
+				}
+
+				osExit = func(code int) {
+					osExitCode = code
+				}
+
+				setupFlags = func() flags {
+					return flags{
+						metricsAddr:                ":8001",
+						enableLeaderElection:       false,
+						csiAddress:                 "/var/run/csi.sock",
+						workerThreads:              2,
+						retryIntervalStart:         time.Second,
+						retryIntervalMax:           5 * time.Minute,
+						operationTimeout:           300 * time.Second,
+						pgContextKeyPrefix:         "prefix",
+						domain:                     common.DefaultDomain,
+						monitoringInterval:         10 * time.Second,
+						probeFrequency:             5 * time.Second,
+						maxRetryDurationForActions: 10 * time.Minute,
+					}
+				}
+			},
+			expectedOsExitCode: 1,
+		},
+		{
+			name: "error waiting for the CSI driver to be ready",
+			setup: func() {
+				getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
+					return "csi-driver", errors.New("error waiting for the CSI driver to be ready")
+				}
+
+				getReplicationCapabilitiesFunc = func(_ context.Context, _ csiidentity.Identity) (csiidentity.ReplicationCapabilitySet, []*replication.SupportedActions, error) {
+					capabilitySet := csiidentity.ReplicationCapabilitySet{}
+					supportedActions := []*replication.SupportedActions{}
+					return capabilitySet, supportedActions, nil
+				}
+
+				getCtrlNewManager = func(_ manager.Options) (manager.Manager, error) {
+					return &mockManager{}, nil
+				}
+
+				getcreateReplicatorManagerFunc = func(_ context.Context, _ manager.Manager) (*ReplicatorManager, error) {
+					return &ReplicatorManager{
+						config: &repcnf.Config{
+							LogLevel: "info",
+						},
+					}, nil
+				}
+
+				getParseLevelFunc = func(_ string) (logrus.Level, error) {
+					return logrus.InfoLevel, nil
+				}
+
+				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+					return nil
+				}
+
+				getPersistentVolumeClaimReconcilerSetupWithManager = func(_ *controller.PersistentVolumeClaimReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getPersistentVolumeReconcilerSetupWithManager = func(_ *controller.PersistentVolumeReconciler, _ context.Context, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getReplicationGroupReconcilerSetupWithManager = func(_ *controller.ReplicationGroupReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getManagerStart = func(_ manager.Manager) error {
+					return nil
+				}
+
+				osExit = func(code int) {
+					osExitCode = code
+				}
+
+				setupFlags = func() flags {
+					return flags{
+						metricsAddr:                ":8001",
+						enableLeaderElection:       false,
+						csiAddress:                 "/var/run/csi.sock",
+						workerThreads:              2,
+						retryIntervalStart:         time.Second,
+						retryIntervalMax:           5 * time.Minute,
+						operationTimeout:           300 * time.Second,
+						pgContextKeyPrefix:         "prefix",
+						domain:                     common.DefaultDomain,
+						monitoringInterval:         10 * time.Second,
+						probeFrequency:             5 * time.Second,
+						maxRetryDurationForActions: 10 * time.Minute,
+					}
+				}
+			},
+			expectedOsExitCode: 1,
+		},
+		{
+			name: "error fetching replication capabilities",
+			setup: func() {
+				getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
+					return "csi-driver", nil
+				}
+
+				getReplicationCapabilitiesFunc = func(_ context.Context, _ csiidentity.Identity) (csiidentity.ReplicationCapabilitySet, []*replication.SupportedActions, error) {
+					capabilitySet := csiidentity.ReplicationCapabilitySet{}
+					supportedActions := []*replication.SupportedActions{}
+					return capabilitySet, supportedActions, errors.New("error fetching replication capabilities")
+				}
+
+				getCtrlNewManager = func(_ manager.Options) (manager.Manager, error) {
+					return &mockManager{}, nil
+				}
+
+				getcreateReplicatorManagerFunc = func(_ context.Context, _ manager.Manager) (*ReplicatorManager, error) {
+					return &ReplicatorManager{
+						config: &repcnf.Config{
+							LogLevel: "info",
+						},
+					}, nil
+				}
+
+				getParseLevelFunc = func(_ string) (logrus.Level, error) {
+					return logrus.InfoLevel, nil
+				}
+
+				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+					return nil
+				}
+
+				getPersistentVolumeClaimReconcilerSetupWithManager = func(_ *controller.PersistentVolumeClaimReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getPersistentVolumeReconcilerSetupWithManager = func(_ *controller.PersistentVolumeReconciler, _ context.Context, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getReplicationGroupReconcilerSetupWithManager = func(_ *controller.ReplicationGroupReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getManagerStart = func(_ manager.Manager) error {
+					return nil
+				}
+
+				osExit = func(code int) {
+					osExitCode = code
+				}
+
+				setupFlags = func() flags {
+					return flags{
+						metricsAddr:                ":8001",
+						enableLeaderElection:       false,
+						csiAddress:                 "/var/run/csi.sock",
+						workerThreads:              2,
+						retryIntervalStart:         time.Second,
+						retryIntervalMax:           5 * time.Minute,
+						operationTimeout:           300 * time.Second,
+						pgContextKeyPrefix:         "prefix",
+						domain:                     common.DefaultDomain,
+						monitoringInterval:         10 * time.Second,
+						probeFrequency:             5 * time.Second,
+						maxRetryDurationForActions: 10 * time.Minute,
+					}
+				}
+			},
+			expectedOsExitCode: 1,
+		},
+		{
+			name: "ReplicationGroupReconciler - unable to create controller",
+			setup: func() {
+				getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
+					return "csi-driver", nil
+				}
+
+				getReplicationCapabilitiesFunc = func(_ context.Context, _ csiidentity.Identity) (csiidentity.ReplicationCapabilitySet, []*replication.SupportedActions, error) {
+					capabilitySet := csiidentity.ReplicationCapabilitySet{}
+					supportedActions := []*replication.SupportedActions{}
+					return capabilitySet, supportedActions, nil
+				}
+
+				getCtrlNewManager = func(_ manager.Options) (manager.Manager, error) {
+					return &mockManager{}, nil
+				}
+
+				getcreateReplicatorManagerFunc = func(_ context.Context, _ manager.Manager) (*ReplicatorManager, error) {
+					return &ReplicatorManager{
+						config: &repcnf.Config{
+							LogLevel: "info",
+						},
+					}, nil
+				}
+
+				getParseLevelFunc = func(_ string) (logrus.Level, error) {
+					return logrus.InfoLevel, nil
+				}
+
+				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+					return nil
+				}
+
+				getPersistentVolumeClaimReconcilerSetupWithManager = func(_ *controller.PersistentVolumeClaimReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getPersistentVolumeReconcilerSetupWithManager = func(_ *controller.PersistentVolumeReconciler, _ context.Context, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getReplicationGroupReconcilerSetupWithManager = func(_ *controller.ReplicationGroupReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return errors.New("ReplicationGroupReconciler - unable to create controller")
+				}
+
+				getManagerStart = func(_ manager.Manager) error {
+					return nil
+				}
+
+				osExit = func(code int) {
+					osExitCode = code
+				}
+
+				setupFlags = func() flags {
+					return flags{
+						metricsAddr:                ":8001",
+						enableLeaderElection:       false,
+						csiAddress:                 "/var/run/csi.sock",
+						workerThreads:              2,
+						retryIntervalStart:         time.Second,
+						retryIntervalMax:           5 * time.Minute,
+						operationTimeout:           300 * time.Second,
+						pgContextKeyPrefix:         "prefix",
+						domain:                     common.DefaultDomain,
+						monitoringInterval:         10 * time.Second,
+						probeFrequency:             5 * time.Second,
+						maxRetryDurationForActions: 10 * time.Minute,
+					}
+				}
+			},
+			expectedOsExitCode: 1,
+		},
+		{
+			name: "unable to parse log level",
+			setup: func() {
+				getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
+					return "csi-driver", nil
+				}
+
+				getReplicationCapabilitiesFunc = func(_ context.Context, _ csiidentity.Identity) (csiidentity.ReplicationCapabilitySet, []*replication.SupportedActions, error) {
+					capabilitySet := csiidentity.ReplicationCapabilitySet{}
+					supportedActions := []*replication.SupportedActions{}
+					return capabilitySet, supportedActions, errors.New("error fetching replication capabilities")
+				}
+
+				getCtrlNewManager = func(_ manager.Options) (manager.Manager, error) {
+					return &mockManager{}, nil
+				}
+
+				getcreateReplicatorManagerFunc = func(_ context.Context, _ manager.Manager) (*ReplicatorManager, error) {
+					return &ReplicatorManager{
+						config: &repcnf.Config{
+							LogLevel: "invalid",
+						},
+					}, nil
+				}
+
+				getParseLevelFunc = func(_ string) (logrus.Level, error) {
+					return logrus.Level(0), fmt.Errorf("unable to parse log level")
+				}
+
+				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+					return nil
+				}
+
+				getPersistentVolumeClaimReconcilerSetupWithManager = func(_ *controller.PersistentVolumeClaimReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getPersistentVolumeReconcilerSetupWithManager = func(_ *controller.PersistentVolumeReconciler, _ context.Context, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getReplicationGroupReconcilerSetupWithManager = func(_ *controller.ReplicationGroupReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getManagerStart = func(_ manager.Manager) error {
+					return nil
+				}
+
+				osExit = func(code int) {
+					osExitCode = code
+				}
+
+				setupFlags = func() flags {
+					return flags{
+						metricsAddr:                ":8001",
+						enableLeaderElection:       false,
+						csiAddress:                 "/var/run/csi.sock",
+						workerThreads:              2,
+						retryIntervalStart:         time.Second,
+						retryIntervalMax:           5 * time.Minute,
+						operationTimeout:           300 * time.Second,
+						pgContextKeyPrefix:         "prefix",
+						domain:                     common.DefaultDomain,
+						monitoringInterval:         10 * time.Second,
+						probeFrequency:             5 * time.Second,
+						maxRetryDurationForActions: 10 * time.Minute,
+					}
+				}
+			},
+			expectedOsExitCode: 1,
+		},
+		{
+			name: "Unable to start manager",
+			setup: func() {
+				getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
+					return "csi-driver", nil
+				}
+
+				getReplicationCapabilitiesFunc = func(_ context.Context, _ csiidentity.Identity) (csiidentity.ReplicationCapabilitySet, []*replication.SupportedActions, error) {
+					capabilitySet := csiidentity.ReplicationCapabilitySet{}
+					supportedActions := []*replication.SupportedActions{}
+					return capabilitySet, supportedActions, nil
+				}
+
+				getCtrlNewManager = func(_ manager.Options) (manager.Manager, error) {
+					return &mockManager{}, errors.New("unable to start manager")
+				}
+
+				getcreateReplicatorManagerFunc = func(_ context.Context, _ manager.Manager) (*ReplicatorManager, error) {
+					return &ReplicatorManager{
+						config: &repcnf.Config{
+							LogLevel: "info",
+						},
+					}, nil
+				}
+
+				getParseLevelFunc = func(_ string) (logrus.Level, error) {
+					return logrus.InfoLevel, nil
+				}
+
+				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+					return nil
+				}
+
+				getPersistentVolumeClaimReconcilerSetupWithManager = func(_ *controller.PersistentVolumeClaimReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getPersistentVolumeReconcilerSetupWithManager = func(_ *controller.PersistentVolumeReconciler, _ context.Context, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getReplicationGroupReconcilerSetupWithManager = func(_ *controller.ReplicationGroupReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return errors.New("ReplicationGroupReconciler - unable to create controller")
+				}
+
+				getManagerStart = func(_ manager.Manager) error {
+					return nil
+				}
+
+				osExit = func(code int) {
+					osExitCode = code
+				}
+
+				setupFlags = func() flags {
+					return flags{
+						metricsAddr:                ":8001",
+						enableLeaderElection:       false,
+						csiAddress:                 "/var/run/csi.sock",
+						workerThreads:              2,
+						retryIntervalStart:         time.Second,
+						retryIntervalMax:           5 * time.Minute,
+						operationTimeout:           300 * time.Second,
+						pgContextKeyPrefix:         "prefix",
+						domain:                     common.DefaultDomain,
+						monitoringInterval:         10 * time.Second,
+						probeFrequency:             5 * time.Second,
+						maxRetryDurationForActions: 10 * time.Minute,
+					}
+				}
+			},
+			expectedOsExitCode: 1,
+		},
+		{
+			name: "Failed to configure the controller manager",
+			setup: func() {
+				getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
+					return "csi-driver", nil
+				}
+
+				getReplicationCapabilitiesFunc = func(_ context.Context, _ csiidentity.Identity) (csiidentity.ReplicationCapabilitySet, []*replication.SupportedActions, error) {
+					capabilitySet := csiidentity.ReplicationCapabilitySet{}
+					supportedActions := []*replication.SupportedActions{}
+					return capabilitySet, supportedActions, nil
+				}
+
+				getCtrlNewManager = func(_ manager.Options) (manager.Manager, error) {
+					return &mockManager{}, errors.New("unable to start manager")
+				}
+
+				getcreateReplicatorManagerFunc = func(_ context.Context, _ manager.Manager) (*ReplicatorManager, error) {
+					return &ReplicatorManager{
+						config: &repcnf.Config{
+							LogLevel: "info",
+						},
+					}, errors.New("failed to configure the controller manager")
+				}
+
+				getParseLevelFunc = func(_ string) (logrus.Level, error) {
+					return logrus.InfoLevel, nil
+				}
+
+				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+					return nil
+				}
+
+				getPersistentVolumeClaimReconcilerSetupWithManager = func(_ *controller.PersistentVolumeClaimReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getPersistentVolumeReconcilerSetupWithManager = func(_ *controller.PersistentVolumeReconciler, _ context.Context, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getReplicationGroupReconcilerSetupWithManager = func(_ *controller.ReplicationGroupReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return errors.New("ReplicationGroupReconciler - unable to create controller")
+				}
+
+				getManagerStart = func(_ manager.Manager) error {
+					return nil
+				}
+
+				osExit = func(code int) {
+					osExitCode = code
+				}
+
+				setupFlags = func() flags {
+					return flags{
+						metricsAddr:                ":8001",
+						enableLeaderElection:       false,
+						csiAddress:                 "/var/run/csi.sock",
+						workerThreads:              2,
+						retryIntervalStart:         time.Second,
+						retryIntervalMax:           5 * time.Minute,
+						operationTimeout:           300 * time.Second,
+						pgContextKeyPrefix:         "prefix",
+						domain:                     common.DefaultDomain,
+						monitoringInterval:         10 * time.Second,
+						probeFrequency:             5 * time.Second,
+						maxRetryDurationForActions: 10 * time.Minute,
+					}
+				}
+			},
+			expectedOsExitCode: 1,
+		},
+		{
+			name: "Unable to create controller - PersistentVolumeClaim",
+			setup: func() {
+				getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
+					return "csi-driver", nil
+				}
+
+				getReplicationCapabilitiesFunc = func(_ context.Context, _ csiidentity.Identity) (csiidentity.ReplicationCapabilitySet, []*replication.SupportedActions, error) {
+					capabilitySet := csiidentity.ReplicationCapabilitySet{}
+					supportedActions := []*replication.SupportedActions{}
+					return capabilitySet, supportedActions, nil
+				}
+
+				getCtrlNewManager = func(_ manager.Options) (manager.Manager, error) {
+					return &mockManager{}, errors.New("unable to start manager")
+				}
+
+				getcreateReplicatorManagerFunc = func(_ context.Context, _ manager.Manager) (*ReplicatorManager, error) {
+					return &ReplicatorManager{
+						config: &repcnf.Config{
+							LogLevel: "info",
+						},
+					}, errors.New("failed to configure the controller manager")
+				}
+
+				getParseLevelFunc = func(_ string) (logrus.Level, error) {
+					return logrus.InfoLevel, nil
+				}
+
+				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+					return nil
+				}
+
+				getPersistentVolumeClaimReconcilerSetupWithManager = func(_ *controller.PersistentVolumeClaimReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return errors.New("unable to create controller PersistentVolumeClaim")
+				}
+
+				getPersistentVolumeReconcilerSetupWithManager = func(_ *controller.PersistentVolumeReconciler, _ context.Context, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getReplicationGroupReconcilerSetupWithManager = func(_ *controller.ReplicationGroupReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getManagerStart = func(_ manager.Manager) error {
+					return nil
+				}
+
+				osExit = func(code int) {
+					osExitCode = code
+				}
+
+				setupFlags = func() flags {
+					return flags{
+						metricsAddr:                ":8001",
+						enableLeaderElection:       false,
+						csiAddress:                 "/var/run/csi.sock",
+						workerThreads:              2,
+						retryIntervalStart:         time.Second,
+						retryIntervalMax:           5 * time.Minute,
+						operationTimeout:           300 * time.Second,
+						pgContextKeyPrefix:         "prefix",
+						domain:                     common.DefaultDomain,
+						monitoringInterval:         10 * time.Second,
+						probeFrequency:             5 * time.Second,
+						maxRetryDurationForActions: 10 * time.Minute,
+					}
+				}
+			},
+			expectedOsExitCode: 1,
+		},
+		{
+			name: "Unable to create controller - PersistentVolume",
+			setup: func() {
+				getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
+					return "csi-driver", nil
+				}
+
+				getReplicationCapabilitiesFunc = func(_ context.Context, _ csiidentity.Identity) (csiidentity.ReplicationCapabilitySet, []*replication.SupportedActions, error) {
+					capabilitySet := csiidentity.ReplicationCapabilitySet{}
+					supportedActions := []*replication.SupportedActions{}
+					return capabilitySet, supportedActions, nil
+				}
+
+				getCtrlNewManager = func(_ manager.Options) (manager.Manager, error) {
+					return &mockManager{}, errors.New("unable to start manager")
+				}
+
+				getcreateReplicatorManagerFunc = func(_ context.Context, _ manager.Manager) (*ReplicatorManager, error) {
+					return &ReplicatorManager{
+						config: &repcnf.Config{
+							LogLevel: "info",
+						},
+					}, nil
+				}
+
+				getParseLevelFunc = func(_ string) (logrus.Level, error) {
+					return logrus.InfoLevel, nil
+				}
+
+				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+					return nil
+				}
+
+				getPersistentVolumeClaimReconcilerSetupWithManager = func(_ *controller.PersistentVolumeClaimReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getPersistentVolumeReconcilerSetupWithManager = func(_ *controller.PersistentVolumeReconciler, _ context.Context, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return errors.New("unable to create controller PersistentVolume")
+				}
+
+				getReplicationGroupReconcilerSetupWithManager = func(_ *controller.ReplicationGroupReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getManagerStart = func(_ manager.Manager) error {
+					return errors.New("problem running manager")
+				}
+
+				osExit = func(code int) {
+					osExitCode = code
+				}
+
+				setupFlags = func() flags {
+					return flags{
+						metricsAddr:                ":8001",
+						enableLeaderElection:       false,
+						csiAddress:                 "/var/run/csi.sock",
+						workerThreads:              2,
+						retryIntervalStart:         time.Second,
+						retryIntervalMax:           5 * time.Minute,
+						operationTimeout:           300 * time.Second,
+						pgContextKeyPrefix:         "prefix",
+						domain:                     common.DefaultDomain,
+						monitoringInterval:         10 * time.Second,
+						probeFrequency:             5 * time.Second,
+						maxRetryDurationForActions: 10 * time.Minute,
+					}
+				}
+			},
+			expectedOsExitCode: 1,
 		},
 	}
 
