@@ -145,11 +145,9 @@ func (c *Config) updateConfig(ctx context.Context, client ctrlClient.Client, opt
 	return nil
 }
 
-var (
-	GetConnection = func(c *Config, clusterID string) (connection.RemoteClusterClient, error) {
-		return c.repConfig.GetConnection(clusterID)
-	}
-)
+var GetConnection = func(c *Config, clusterID string) (connection.RemoteClusterClient, error) {
+	return c.repConfig.GetConnection(clusterID)
+}
 
 // GetConnection returns cluster client for given cluster ID
 func (c *Config) GetConnection(clusterID string) (connection.RemoteClusterClient, error) {
@@ -192,11 +190,9 @@ func (config *replicationConfig) Print(log logr.Logger) {
 	}
 }
 
-var (
-	Verify = func(config *replicationConfig, ctx context.Context) error {
-		return config.Verify(ctx)
-	}
-)
+var Verify = func(config *replicationConfig, ctx context.Context) error {
+	return config.Verify(ctx)
+}
 
 // VerifyConfig verifies correctness of replication config
 func (config *replicationConfig) VerifyConfig(ctx context.Context) error {
@@ -279,11 +275,9 @@ func getReplicationConfig(ctx context.Context, client ctrlClient.Client, opts Co
 	return configMap, nil, nil
 }
 
-var (
-	InClusterConfig = func() (*rest.Config, error) {
-		return rest.InClusterConfig()
-	}
-)
+var InClusterConfig = func() (*rest.Config, error) {
+	return rest.InClusterConfig()
+}
 
 // Returns a connection handler for the remote clusters
 // Currently only returns the k8s conn handler
@@ -404,7 +398,6 @@ func buildRestConfigFromServiceAccountToken(ctx context.Context, secretName stri
 	}
 	tlsClientConfig := rest.TLSClientConfig{}
 	if _, err := certutil.NewPoolFromBytes(secret.Data["ca.crt"]); err != nil {
-
 		return nil, err
 	}
 	tlsClientConfig.CAData = secret.Data["ca.crt"]

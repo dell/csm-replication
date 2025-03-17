@@ -121,7 +121,6 @@ func TestGetClusterID(t *testing.T) {
 			t.Errorf("Expected clusterID to be 'test-cluster-id', but got '%s'", clusterID)
 		}
 	})
-
 }
 
 func Test_readConfigFile(t *testing.T) {
@@ -182,9 +181,7 @@ func Test_readConfigFile(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got.ClusterID, tt.want.ClusterID) && !reflect.DeepEqual(got.Targets, tt.want.Targets) && !reflect.DeepEqual(got.LogLevel, tt.want.LogLevel) {
 				t.Errorf("readConfigFile() = %v, want %v", got.ClusterID, tt.want.ClusterID)
-
 			}
-
 		})
 	}
 }
@@ -311,7 +308,6 @@ func TestGetEnv(t *testing.T) {
 }
 
 func TestVerifyConfig(t *testing.T) {
-
 	// Test case: Verify that an error is returned when config.ClusterID is empty
 	t.Run("EmptyClusterID", func(t *testing.T) {
 		config := &replicationConfig{
@@ -388,7 +384,6 @@ func TestVerifyConfig(t *testing.T) {
 		if err == nil || err.Error() != "verification failed" {
 			t.Errorf("Expected error 'verification failed', got %v", err)
 		}
-
 	})
 }
 
@@ -401,8 +396,8 @@ func (m *MockManager) GetLogger() logr.Logger {
 	args := m.Called()
 	return args.Get(0).(logr.Logger)
 }
-func TestPrint(t *testing.T) {
 
+func TestPrint(t *testing.T) {
 	t.Run("PrintTest", func(t *testing.T) {
 		logrusLog := logrus.New()
 		logrusLog.SetFormatter(&logrus.JSONFormatter{
@@ -445,11 +440,10 @@ func TestConfig_PrintConfig(t *testing.T) {
 
 		// Call the Print method with the mock logger
 		c.PrintConfig(mockManager.GetLogger())
-
 	})
 }
-func TestGetConnection(t *testing.T) {
 
+func TestGetConnection(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		originalValue := GetConnection
 		defer func() {
@@ -470,7 +464,6 @@ func TestGetConnection(t *testing.T) {
 			t.Errorf("Expected error, got nil")
 		}
 	})
-
 }
 
 type MockClient struct {
@@ -484,7 +477,6 @@ func (m *MockClient) Get(ctx context.Context, key ctrlClient.ObjectKey, obj ctrl
 }
 
 func TestBuildRestConfigFromSecretConfFileFormat(t *testing.T) {
-
 	// Test case 1: Secret found and valid kubeconfig data
 	t.Run("SecretFoundAndValidData", func(t *testing.T) {
 		// Prepare mock data
@@ -525,9 +517,7 @@ users:
 		got, err := buildRestConfigFromSecretConfFileFormat(context.Background(), secretName, namespace, clinet)
 		assert.Equal(t, "https://test-server.com", got.Host)
 		assert.NoError(t, err)
-
 	})
-
 }
 
 func TestBuildRestConfigFromServiceAccountToken(t *testing.T) {
@@ -549,7 +539,7 @@ func TestBuildRestConfigFromServiceAccountToken(t *testing.T) {
 		},
 	}
 
-	var validCaCert = []byte(`-----BEGIN CERTIFICATE-----
+	validCaCert := []byte(`-----BEGIN CERTIFICATE-----
 MIIDBTCCAe2gAwIBAgIIUvG0tSrxeiUwDQYJKoZIhvcNAQELBQAwFTETMBEGA1UE
 AxMKa3ViZXJuZXRlczAeFw0yNTAyMDQxMTA4MzRaFw0zNTAyMDIxMTEzMzRaMBUx
 EzARBgNVBAMTCmt1YmVybmV0ZXMwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK
@@ -660,7 +650,6 @@ ggcetQ4yvATR
 				t.Errorf("buildRestConfigFromServiceAccountToken() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-
 		})
 	}
 }
@@ -724,7 +713,8 @@ users:
 			targets: []target{
 				{
 					ClusterID: "test-cluster", SecretRef: "valid-secret",
-				}},
+				},
+			},
 			client: clinet1,
 			opts: ControllerManagerOpts{
 				UseConfFileFormat: true,
@@ -748,7 +738,8 @@ users:
 			targets: []target{
 				{
 					ClusterID: "target-id",
-				}},
+				},
+			},
 			client: fake.NewClientBuilder().Build(),
 			opts: ControllerManagerOpts{
 				UseConfFileFormat: false,
@@ -906,7 +897,6 @@ func Test_buildRestConfigFromCustomFormat(t *testing.T) {
 		client := fake.NewClientBuilder().WithObjects(secret).Build()
 
 		config, err := buildRestConfigFromCustomFormat(context.Background(), secretName, namespace, client)
-
 		if err != nil {
 			t.Errorf("Expected no error, but got %v", err)
 		}
@@ -960,7 +950,6 @@ func Test_getReplicationConfig(t *testing.T) {
 		if !reflect.DeepEqual(got.ClusterID, ConfgMap.ClusterID) && !reflect.DeepEqual(got.LogLevel, ConfgMap.LogLevel) {
 			t.Errorf("getReplicationConfig() got = %v, want %v", got, ConfgMap)
 		}
-
 	})
 	t.Run("ErrorWithZeroTargets", func(t *testing.T) {
 		ctx := context.Background()
@@ -980,7 +969,6 @@ func Test_getReplicationConfig(t *testing.T) {
 			t.Errorf("getReplicationConfig() error = %v and wantErr is nil, got1 = %v and wamt1= ", err, nil)
 			return
 		}
-
 	})
 	t.Run("SuccessWithTargetsWithNoVerifyErr", func(t *testing.T) {
 		originalValue1 := InClusterConfig
@@ -1065,7 +1053,6 @@ users:
 			t.Errorf("getReplicationConfig() error = %v and wantErr is ni, got1 = %v and wamt1= ", err, nil)
 			return
 		}
-
 	})
 	t.Run("SuccessWithTargetsWithElseCase", func(t *testing.T) {
 		originalValue1 := InClusterConfig
@@ -1095,14 +1082,14 @@ users:
 clusterId: "my-cluster"
 targets:
 CSI_LOG_LEVEL: "INFO"`)
-		err = os.WriteFile(configFilePath, newContent, 0644) // 0644: read/write for owner, read for others
+		err = os.WriteFile(configFilePath, newContent, 0o644) // 0644: read/write for owner, read for others
 		if err != nil {
 			t.Fatalf("Failed to write new config content: %v", err)
 		}
 
 		// 3. Defer the restore operation
 		defer func() {
-			err := os.WriteFile(configFilePath, originalContent, 0644)
+			err := os.WriteFile(configFilePath, originalContent, 0o644)
 			if err != nil {
 				t.Errorf("Failed to restore original config content: %v", err)
 			}
@@ -1170,7 +1157,6 @@ users:
 			t.Errorf("getReplicationConfig() error = %v and wantErr is ni, got1 = %v and wamt1= ", err, nil)
 			return
 		}
-
 	})
 
 	t.Run("SuccessWithTargetsNoControllerWithNoVerifyErr", func(t *testing.T) {
@@ -1243,9 +1229,7 @@ users:
 		os.Setenv(common.EnvInClusterConfig, "true")
 		_, _, err := getReplicationConfig(ctx, client, opts, fakeRecorder, log)
 		assert.NoError(t, err)
-
 	})
-
 }
 
 func TestConfig_updateConfig(t *testing.T) {
@@ -1282,7 +1266,6 @@ func TestConfig_updateConfig(t *testing.T) {
 		ctx := context.Background()
 
 		err := c.updateConfig(ctx, nil, opts, nil, log)
-
 		if err != nil {
 			t.Errorf("Config.updateConfig() error = %v, wantErr nil", err)
 		}
@@ -1348,7 +1331,6 @@ func TestConfig_UpdateConfigMap(t *testing.T) {
 		ctx := context.Background()
 
 		err := c.UpdateConfigMap(ctx, nil, opts, nil, log)
-
 		if err != nil {
 			t.Errorf("Config.UpdateConfigMap() error = %v, wantErr nil", err)
 		}
@@ -1380,7 +1362,6 @@ func TestConfig_UpdateConfigMap(t *testing.T) {
 			t.Errorf("Config.UpdateConfigMap() error = %v, wantErr non-nil", err)
 		}
 	})
-
 }
 
 func TestConfig_UpdateConfigOnSecretEvent(t *testing.T) {
@@ -1417,7 +1398,6 @@ func TestConfig_UpdateConfigOnSecretEvent(t *testing.T) {
 		secretName := "secret1"
 
 		err := c.UpdateConfigOnSecretEvent(ctx, nil, opts, secretName, nil, log)
-
 		if err != nil {
 			t.Errorf("Config.UpdateConfigOnSecretEvent() error = %v, wantErr nil", err)
 		}
@@ -1445,7 +1425,6 @@ func TestConfig_UpdateConfigOnSecretEvent(t *testing.T) {
 		secretName := "secret3" // Secret not in targets
 
 		err := c.UpdateConfigOnSecretEvent(ctx, nil, opts, secretName, nil, log)
-
 		if err != nil {
 			t.Errorf("Config.UpdateConfigOnSecretEvent() error = %v, wantErr nil", err)
 		}
@@ -1478,7 +1457,6 @@ func TestConfig_UpdateConfigOnSecretEvent(t *testing.T) {
 			t.Errorf("Config.UpdateConfigOnSecretEvent() error = %v, wantErr non-nil", err)
 		}
 	})
-
 }
 
 func TestConfig_GetConfig(t *testing.T) {
@@ -1506,12 +1484,10 @@ func TestConfig_GetConfig(t *testing.T) {
 		ctx := context.Background()
 
 		got, err := GetConfig(ctx, nil, opts, nil, log)
-
 		if err != nil {
 			t.Errorf("Config.updateConfig() error = %v, wantErr nil", err)
 		}
 		assert.Equal(t, got.LogLevel, "INFO")
-
 	})
 	t.Run("ErrorCallingGetReplicationConfig", func(t *testing.T) {
 		opts := ControllerManagerOpts{

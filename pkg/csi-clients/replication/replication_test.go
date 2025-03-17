@@ -27,7 +27,6 @@ type fields struct {
 }
 
 func Test_replication_CreateRemoteVolume(t *testing.T) {
-
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
@@ -66,7 +65,6 @@ func Test_replication_CreateRemoteVolume(t *testing.T) {
 }
 
 func Test_replication_DeleteLocalVolume(t *testing.T) {
-
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
@@ -105,7 +103,6 @@ func Test_replication_DeleteLocalVolume(t *testing.T) {
 }
 
 func Test_replication_CreateStorageProtectionGroup(t *testing.T) {
-
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	type args struct {
@@ -144,7 +141,6 @@ func Test_replication_CreateStorageProtectionGroup(t *testing.T) {
 }
 
 func Test_replication_DeleteStorageProtectionGroup(t *testing.T) {
-
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	groupID := "rg1"
@@ -181,7 +177,6 @@ func Test_replication_DeleteStorageProtectionGroup(t *testing.T) {
 }
 
 func Test_replication_GetStorageProtectionGroupStatus(t *testing.T) {
-
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	protectionGroupID := "rg1"
@@ -218,7 +213,6 @@ func Test_replication_GetStorageProtectionGroupStatus(t *testing.T) {
 }
 
 func Test_replication_ExecuteAction(t *testing.T) {
-
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	protectionGroupID := "rg1"

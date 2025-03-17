@@ -62,7 +62,6 @@ func TestWithoutMG(t *testing.T) {
 	_, err := reconciler.Reconcile(ctx, reconcile.Request{
 		NamespacedName: types.NamespacedName{Name: "test", Namespace: "default"},
 	})
-
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -135,7 +134,6 @@ func TestNodeRescanReconcilerDeleteState(t *testing.T) {
 		},
 	}
 	runTestCases(t, tests)
-
 }
 
 func TestNodeRescanReconcilerDeleteStateWithoutPod(t *testing.T) {
@@ -149,7 +147,6 @@ func TestNodeRescanReconcilerDeleteStateWithoutPod(t *testing.T) {
 		},
 	}
 	runTestCases(t, tests)
-
 }
 
 func TestNodeRescanReconcilerMigratedState(t *testing.T) {
