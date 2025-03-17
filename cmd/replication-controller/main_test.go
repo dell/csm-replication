@@ -468,7 +468,7 @@ func TestControllerManager_createControllerManager(t *testing.T) {
 				getConfig = func(_ context.Context, _ client.Client, _ config.ControllerManagerOpts, _ record.EventRecorder, _ logr.Logger) (*config.Config, error) {
 					return &config.Config{}, nil
 				}
-				getConfigPrintConfig = func(__ *config.Config, _ logr.Logger) {}
+				getConfigPrintConfig = func(_ *config.Config, _ logr.Logger) {}
 			},
 			expectedControllerManager: &ControllerManager{
 				Opts: config.ControllerManagerOpts{

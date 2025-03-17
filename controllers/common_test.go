@@ -62,18 +62,18 @@ func TestIgnoreIfFinalError(t *testing.T) {
 }
 
 func TestGetPodNameFromEnv(t *testing.T) {
-	os.Setenv(controllers.X_CSI_REPLICATION_POD_NAME, "test-pod")
+	os.Setenv(controllers.XCSIReplicationPodName, "test-pod")
 	assert.Equal(t, "test-pod", controllers.GetPodNameFromEnv())
 
-	os.Unsetenv(controllers.X_CSI_REPLICATION_POD_NAME)
+	os.Unsetenv(controllers.XCSIReplicationPodName)
 	assert.Equal(t, "", controllers.GetPodNameFromEnv())
 }
 
 func TestGetPodNamespaceFromEnv(t *testing.T) {
-	os.Setenv(controllers.X_CSI_REPLICATION_POD_NAMESPACE, "test-namespace")
+	os.Setenv(controllers.XCSIReplicationPodNamespace, "test-namespace")
 	assert.Equal(t, "test-namespace", controllers.GetPodNameSpaceFromEnv())
 
-	os.Unsetenv(controllers.X_CSI_REPLICATION_POD_NAMESPACE)
+	os.Unsetenv(controllers.XCSIReplicationPodNamespace)
 	assert.Equal(t, "", controllers.GetPodNameSpaceFromEnv())
 }
 
