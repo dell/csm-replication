@@ -22,10 +22,10 @@ import (
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
 	constants "github.com/dell/csm-replication/pkg/common"
-	"github.com/dell/csm-replication/pkg/config"
 	"github.com/dell/csm-replication/pkg/connection"
 	fakeclient "github.com/dell/csm-replication/test/e2e-framework/fake-client"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
+	"github.com/dell/csm-replication/test/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"
@@ -62,7 +62,7 @@ func (suite *PVControllerTestSuite) SetupSuite() {
 func (suite *PVControllerTestSuite) Init() {
 	suite.driver = utils.GetDefaultDriver()
 	suite.client = utils.GetFakeClient()
-	suite.fakeConfig = config.New("sourceCluster", "remote-123")
+	suite.fakeConfig = mocks.New("sourceCluster", "remote-123")
 }
 
 func (suite *PVControllerTestSuite) getPV() corev1.PersistentVolume {

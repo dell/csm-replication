@@ -24,10 +24,10 @@ import (
 	"github.com/dell/csm-replication/controllers"
 	controller "github.com/dell/csm-replication/controllers"
 	constants "github.com/dell/csm-replication/pkg/common"
-	"github.com/dell/csm-replication/pkg/config"
 	"github.com/dell/csm-replication/pkg/connection"
 	fakeclient "github.com/dell/csm-replication/test/e2e-framework/fake-client"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
+	"github.com/dell/csm-replication/test/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"
@@ -78,7 +78,7 @@ func (suite *PVReconcileSuite) Init() {
 
 	suite.driver = utils.GetDefaultDriver()
 	suite.client = utils.GetFakeClient()
-	suite.fakeConfig = config.New("sourceCluster", "remote-123")
+	suite.fakeConfig = mocks.New("sourceCluster", "remote-123")
 	suite.initReconciler(suite.fakeConfig)
 
 	// Initialize the annotations & labels
@@ -272,7 +272,7 @@ func (suite *PVReconcileSuite) runRemoteReplicationManager(fakeConfig connection
 }
 
 func (suite *PVReconcileSuite) TestReconcilePV() {
-	fakeConfig := config.New("sourceCluster", "remote-123")
+	fakeConfig := mocks.New("sourceCluster", "remote-123")
 	remoteClient, err := fakeConfig.GetConnection("remote-123")
 
 	ctx := context.Background()
@@ -841,7 +841,7 @@ func (suite *PVReconcileSuite) TestRemoteClientGetConnectionError() {
 }
 
 func (suite *PVReconcileSuite) TestReconcilePVRemotePVNameEmpty() {
-	fakeConfig := config.New("sourceCluster", "remote-123")
+	fakeConfig := mocks.New("sourceCluster", "remote-123")
 	_, err := fakeConfig.GetConnection("remote-123")
 	suite.NoError(err)
 

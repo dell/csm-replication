@@ -27,9 +27,9 @@ import (
 
 	csireplicator "github.com/dell/csm-replication/controllers/csi-replicator"
 	constants "github.com/dell/csm-replication/pkg/common"
-	"github.com/dell/csm-replication/pkg/config"
 	"github.com/dell/csm-replication/pkg/connection"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
+	"github.com/dell/csm-replication/test/mocks"
 	"github.com/go-logr/logr"
 	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	"github.com/stretchr/testify/suite"
@@ -70,7 +70,7 @@ func (suite *RGControllerTestSuite) Init() {
 	controllers.InitLabelsAndAnnotations(constants.DefaultDomain)
 	suite.driver = utils.GetDefaultDriver()
 	suite.client = utils.GetFakeClient()
-	fakeConfig := config.NewFakeConfig(suite.driver.SourceClusterID, suite.driver.RemoteClusterID)
+	fakeConfig := mocks.NewFakeConfig(suite.driver.SourceClusterID, suite.driver.RemoteClusterID)
 	suite.config = fakeConfig
 	suite.initReconciler(fakeConfig)
 }
@@ -292,7 +292,7 @@ func (suite *RGControllerTestSuite) TestReconcileRGWithAnnotations() {
 
 func (suite *RGControllerTestSuite) TestReconcileRGWithAnnotationsSingleCluster() {
 	// scenario: RG without sync complete
-	newConfig := config.NewFakeConfigForSingleCluster(suite.client,
+	newConfig := mocks.NewFakeConfigForSingleCluster(suite.client,
 		suite.driver.SourceClusterID, suite.driver.RemoteClusterID)
 	suite.config = newConfig
 	suite.reconciler.Config = newConfig
@@ -434,7 +434,7 @@ func (suite *RGControllerTestSuite) TestReconcileRGWithSyncCompleteWithError() {
 
 func (suite *RGControllerTestSuite) TestRGSyncDeletion() {
 	// scenario: Test Remote RG sync deletion
-	newConfig := config.NewFakeConfigForSingleCluster(suite.client,
+	newConfig := mocks.NewFakeConfigForSingleCluster(suite.client,
 		suite.driver.SourceClusterID, suite.driver.RemoteClusterID)
 	suite.config = newConfig
 	suite.reconciler.Config = newConfig
