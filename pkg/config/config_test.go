@@ -398,7 +398,7 @@ func (m *MockManager) GetLogger() logr.Logger {
 }
 
 func TestPrint(t *testing.T) {
-	t.Run("PrintTest", func(t *testing.T) {
+	t.Run("PrintTest", func(_ *testing.T) {
 		logrusLog := logrus.New()
 		logrusLog.SetFormatter(&logrus.JSONFormatter{
 			TimestampFormat: time.RFC3339Nano,
@@ -423,7 +423,7 @@ func TestPrint(t *testing.T) {
 }
 
 func TestConfig_PrintConfig(t *testing.T) {
-	t.Run("PrintConfigTest", func(t *testing.T) {
+	t.Run("PrintConfigTest", func(_ *testing.T) {
 		logrusLog := logrus.New()
 		logrusLog.SetFormatter(&logrus.JSONFormatter{
 			TimestampFormat: time.RFC3339Nano,
@@ -1082,14 +1082,14 @@ users:
 clusterId: "my-cluster"
 targets:
 CSI_LOG_LEVEL: "INFO"`)
-		err = os.WriteFile(configFilePath, newContent, 0o644) // 0644: read/write for owner, read for others
+		err = os.WriteFile(configFilePath, newContent, 0644) // 0644: read/write for owner, read for others
 		if err != nil {
 			t.Fatalf("Failed to write new config content: %v", err)
 		}
 
 		// 3. Defer the restore operation
 		defer func() {
-			err := os.WriteFile(configFilePath, originalContent, 0o644)
+			err := os.WriteFile(configFilePath, originalContent, 0644)
 			if err != nil {
 				t.Errorf("Failed to restore original config content: %v", err)
 			}
