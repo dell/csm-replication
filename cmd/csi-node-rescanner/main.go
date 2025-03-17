@@ -232,7 +232,7 @@ func getCSIConn(csiAddress string, setupLog logr.Logger) *grpc.ClientConn {
 	return csiConn
 }
 
-func probeCSIDriver(ctx context.Context, csiConn *grpc.ClientConn, setupLog logr.Logger, identityClient csiidentity.Identity) string {
+func probeCSIDriver(ctx context.Context, _ *grpc.ClientConn, setupLog logr.Logger, identityClient csiidentity.Identity) string {
 	driverName, err := identityClient.ProbeForever(ctx)
 	if err != nil {
 		setupLog.Error(err, "error waiting for the CSI driver to be ready")
