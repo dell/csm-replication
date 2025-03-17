@@ -78,7 +78,6 @@ func TestGetPodNamespaceFromEnv(t *testing.T) {
 }
 
 func TestUpdateConditions(t *testing.T) {
-
 	rg := &repv1.DellCSIReplicationGroup{
 		Status: repv1.DellCSIReplicationGroupStatus{
 			Conditions: []repv1.LastAction{},

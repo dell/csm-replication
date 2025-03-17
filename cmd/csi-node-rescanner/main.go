@@ -155,7 +155,6 @@ func createNodeReScannerManager(_ context.Context, mgr ctrl.Manager) *NodeRescan
 // +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;watch;list;delete;update;create
 
 func main() {
-
 	flagMap, setupLog, ctx := setupFlags()
 
 	// Connect to csi
@@ -222,7 +221,6 @@ func setupFlags() (map[string]string, logr.Logger, context.Context) {
 	flags["probe-frequency"] = probeFrequency.String()
 	flags["max-retry-action-duration"] = maxRetryDurationForActions.String()
 	return flags, setupLog, context.Background()
-
 }
 
 func getCSIConn(csiAddress string, setupLog logr.Logger) *grpc.ClientConn {
@@ -235,7 +233,6 @@ func getCSIConn(csiAddress string, setupLog logr.Logger) *grpc.ClientConn {
 }
 
 func probeCSIDriver(ctx context.Context, csiConn *grpc.ClientConn, setupLog logr.Logger, identityClient csiidentity.Identity) string {
-
 	driverName, err := identityClient.ProbeForever(ctx)
 	if err != nil {
 		setupLog.Error(err, "error waiting for the CSI driver to be ready")

@@ -185,6 +185,7 @@ func (m *mockSecretController) GetLogger() logr.Logger {
 func (m *mockSecretController) Start(_ context.Context) error {
 	return nil
 }
+
 func (m *mockSecretController) Watch(_ source.TypedSource[reconcile.Request]) error {
 	return nil
 }

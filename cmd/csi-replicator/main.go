@@ -223,7 +223,6 @@ func createReplicatorManager(ctx context.Context, mgr ctrl.Manager) (*Replicator
 // +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;watch;list;delete;update;create
 
 func main() {
-
 	flags := setupFlags()
 	logrusLog := logrus.New()
 	logrusLog.SetFormatter(&logrus.JSONFormatter{

@@ -63,11 +63,9 @@ const (
 	MaxNumberOfConditions = 20
 )
 
-var (
-	getReplicationGroupRecouncilerUpdate = func(r *ReplicationGroupReconciler, ctx context.Context, obj client.Object) error {
-		return r.Update(ctx, obj)
-	}
-)
+var getReplicationGroupRecouncilerUpdate = func(r *ReplicationGroupReconciler, ctx context.Context, obj client.Object) error {
+	return r.Update(ctx, obj)
+}
 
 // ActionType represent replication action (FAILOVER, REPROTECT and etc.)
 type ActionType string

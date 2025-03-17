@@ -136,7 +136,6 @@ func TestProbeCSIDriver(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			migrationCapabilities := getSampleMigrationCapabilities()
 
 			// Save the original osExit function
@@ -194,7 +193,6 @@ func TestProbeCSIDriverWrongCapability(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			migrationCapabilities := getSampleInavlidMigrationCapabilities()
 
 			// Save the original osExit function
@@ -265,7 +263,6 @@ func TestCreateMetricsServer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			defaultGetCtrlNewManager := getCtrlNewManager
 			defaultGetManagerStart := getManagerStart
 			defaultGetWorkqueueReconcileRequest := getWorkqueueReconcileRequest
@@ -350,7 +347,6 @@ func TestCreateMetricsServerWithNodeRescannerError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			defaultGetCtrlNewManager := getCtrlNewManager
 			defaultGetManagerStart := getManagerStart
 			defaultGetWorkqueueReconcileRequest := getWorkqueueReconcileRequest
@@ -424,7 +420,6 @@ func TestCreateMetricsServerWithStratingManagerError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			defaultGetCtrlNewManager := getCtrlNewManager
 			defaultGetManagerStart := getManagerStart
 			defaultGetWorkqueueReconcileRequest := getWorkqueueReconcileRequest
@@ -503,7 +498,6 @@ func TestProcessConfigMapChanges(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			// Create a mock NodeRescanner
 			mgr := &NodeRescanner{
 				Opts:     config.ControllerManagerOpts{},
@@ -573,7 +567,6 @@ func TestSetupConfigMapWatcher(t *testing.T) {
 }
 
 func TestProbeAndCreateMetricsServer(t *testing.T) {
-
 	defaultGetManagerStart := getManagerStart
 	defaultGetCtrlNewManager := getCtrlNewManager
 	defaultGetWorkqueueReconcileRequest := getWorkqueueReconcileRequest
@@ -646,7 +639,6 @@ func TestProbeAndCreateMetricsServer(t *testing.T) {
 }
 
 func TestSetupFlags(t *testing.T) {
-
 	// Call the setupFlags function
 	flags, setupLog, ctx := setupFlags()
 
@@ -926,5 +918,6 @@ type MockEventRecorder struct{}
 func (m *MockEventRecorder) Event(object runtime.Object, message, reason, type_ string) {}
 func (m *MockEventRecorder) Eventf(object runtime.Object, reason, messageFmt, type_ string, args ...interface{}) {
 }
+
 func (m *MockEventRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, reason, messageFmt, unknownvariable string, args ...interface{}) {
 }

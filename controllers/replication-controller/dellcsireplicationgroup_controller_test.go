@@ -759,7 +759,7 @@ func TestReplicationGroupReconciler_processLastActionResult(t *testing.T) {
 				ctx: context.Background(),
 				group: &repv1.DellCSIReplicationGroup{
 					Status: repv1.DellCSIReplicationGroupStatus{
-						Conditions: []repv1.LastAction{repv1.LastAction{}},
+						Conditions: []repv1.LastAction{{}},
 						LastAction: repv1.LastAction{
 							Time:         &metav1.Time{Time: time.Date(2022, time.January, 1, 0, 0, 0, 0, time.UTC)},
 							ErrorMessage: "error msg",
@@ -878,7 +878,7 @@ func TestReplicationGroupReconciler_processSnapshotEvent(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						csireplicator.Action: func() string {
-							var obj = csireplicator.ActionAnnotation{}
+							obj := csireplicator.ActionAnnotation{}
 							val, _ := json.Marshal(obj)
 							return string(val)
 						}(),
@@ -910,7 +910,7 @@ func TestReplicationGroupReconciler_processSnapshotEvent(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						csireplicator.Action: func() string {
-							var obj = csireplicator.ActionAnnotation{}
+							obj := csireplicator.ActionAnnotation{}
 							val, _ := json.Marshal(obj)
 							return string(val)
 						}(),
@@ -933,7 +933,6 @@ func TestReplicationGroupReconciler_processSnapshotEvent(t *testing.T) {
 				getDellCsiReplicationGroupCreateSnapshotContent = func(_ connection.RemoteClusterClient, _ context.Context, _ *s1.VolumeSnapshotContent) error {
 					return errors.New("error in getDellCsiReplicationGroupCreateSnapshotContent")
 				}
-
 			},
 			group: &repv1.DellCSIReplicationGroup{
 				Status: repv1.DellCSIReplicationGroupStatus{
@@ -950,7 +949,7 @@ func TestReplicationGroupReconciler_processSnapshotEvent(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						csireplicator.Action: func() string {
-							var obj = csireplicator.ActionAnnotation{}
+							obj := csireplicator.ActionAnnotation{}
 							val, _ := json.Marshal(obj)
 							return string(val)
 						}(),
@@ -976,7 +975,6 @@ func TestReplicationGroupReconciler_processSnapshotEvent(t *testing.T) {
 				getDellCsiReplicationGroupCreateSnapshotObject = func(_ connection.RemoteClusterClient, _ context.Context, _ *s1.VolumeSnapshot) error {
 					return errors.New("error in getDellCsiReplicationGroupCreateSnapshotObject")
 				}
-
 			},
 			group: &repv1.DellCSIReplicationGroup{
 				Status: repv1.DellCSIReplicationGroupStatus{
@@ -993,7 +991,7 @@ func TestReplicationGroupReconciler_processSnapshotEvent(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						csireplicator.Action: func() string {
-							var obj = csireplicator.ActionAnnotation{}
+							obj := csireplicator.ActionAnnotation{}
 							val, _ := json.Marshal(obj)
 							return string(val)
 						}(),
