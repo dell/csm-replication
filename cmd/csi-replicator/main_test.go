@@ -9,7 +9,9 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
+	controller "github.com/dell/csm-replication/controllers/csi-replicator"
 	repcnf "github.com/dell/csm-replication/pkg/config"
 	csiidentity "github.com/dell/csm-replication/pkg/csi-clients/identity"
 	"github.com/dell/dell-csi-extensions/replication"
@@ -25,6 +27,7 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,6 +35,7 @@ import (
 	ctrlcnf "sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
@@ -403,42 +407,49 @@ func TestMain(t *testing.T) {
 	defaultGetcreateReplicatorManagerFunc := getcreateReplicatorManagerFunc
 	defaultGetParseLevelFunc := getParseLevelFunc
 	defaultGetManagerStart := getManagerStart
+	defaultGetCtrlNewManager := getCtrlNewManager
+	defaultGetWorkqueueReconcileRequest := getWorkqueueReconcileRequest
+	defaultGetPersistentVolumeClaimReconcilerSetupWithManager := getPersistentVolumeClaimReconcilerSetupWithManager
+	defaultGetPersistentVolumeReconcilerSetupWithManager := getPersistentVolumeReconcilerSetupWithManager
+	defaultGetReplicationGroupReconcilerSetupWithManager := getReplicationGroupReconcilerSetupWithManager
+	defaultOSExit := osExit
+	defaultSetupFlags := setupFlags
+
+	osExitCode := 0
 
 	after := func() {
-		// Restore the original functions after the test
+		// Restore the original function after the test
 		getConnectToCsiFunc = defaultGetConnectToCsiFunc
 		getProbeForeverFunc = defaultGetProbeForeverFunc
 		getReplicationCapabilitiesFunc = defaultGetReplicationCapabilitiesFunc
 		getcreateReplicatorManagerFunc = defaultGetcreateReplicatorManagerFunc
 		getParseLevelFunc = defaultGetParseLevelFunc
 		getManagerStart = defaultGetManagerStart
+		getCtrlNewManager = defaultGetCtrlNewManager
+		getWorkqueueReconcileRequest = defaultGetWorkqueueReconcileRequest
+		getPersistentVolumeClaimReconcilerSetupWithManager = defaultGetPersistentVolumeClaimReconcilerSetupWithManager
+		getPersistentVolumeReconcilerSetupWithManager = defaultGetPersistentVolumeReconcilerSetupWithManager
+		getReplicationGroupReconcilerSetupWithManager = defaultGetReplicationGroupReconcilerSetupWithManager
+		osExit = defaultOSExit
+		setupFlags = defaultSetupFlags
 	}
-	originalValue := repcnf.InClusterConfig
-	defer func() {
-		repcnf.InClusterConfig = originalValue
-	}()
-	repcnf.InClusterConfig = func() (*rest.Config, error) {
-		return &rest.Config{
-			Host: "https://localhost",
-			TLSClientConfig: rest.TLSClientConfig{
-				CAData:  []byte("test-ca"),
-				KeyData: []byte("test-key"),
-			},
-		}, nil
-	}
+
 	tests := []struct {
-		name  string
-		setup func()
+		name               string
+		setup              func()
+		expectedOsExitCode int
 	}{
 		{
-			name: "Successful execution",
+			name: "Successful run of main function",
 			setup: func() {
 				getConnectToCsiFunc = func(_ string, _ logr.Logger) (*grpc.ClientConn, error) {
 					return &grpc.ClientConn{}, nil
 				}
+
 				getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
 					return "csi-driver", nil
 				}
+
 				getReplicationCapabilitiesFunc = func(_ context.Context, _ csiidentity.Identity) (csiidentity.ReplicationCapabilitySet, []*replication.SupportedActions, error) {
 					capabilitySet := csiidentity.ReplicationCapabilitySet{
 						replication.ReplicationCapability_RPC_CREATE_REMOTE_VOLUME:         true,
@@ -450,37 +461,60 @@ func TestMain(t *testing.T) {
 					supportedActions := []*replication.SupportedActions{}
 					return capabilitySet, supportedActions, nil
 				}
-				getcreateReplicatorManagerFunc = func(ctx context.Context, mgr manager.Manager) (*ReplicatorManager, error) {
+
+				getCtrlNewManager = func(_ manager.Options) (manager.Manager, error) {
+					return &mockManager{}, nil
+				}
+
+				getcreateReplicatorManagerFunc = func(_ context.Context, _ manager.Manager) (*ReplicatorManager, error) {
 					return &ReplicatorManager{
 						config: &repcnf.Config{
 							LogLevel: "info",
 						},
 					}, nil
 				}
+
 				getParseLevelFunc = func(level string) (logrus.Level, error) {
 					return logrus.InfoLevel, nil
 				}
+
+				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+					return nil
+				}
+
+				getPersistentVolumeClaimReconcilerSetupWithManager = func(_ *controller.PersistentVolumeClaimReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getPersistentVolumeReconcilerSetupWithManager = func(_ *controller.PersistentVolumeReconciler, _ context.Context, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getReplicationGroupReconcilerSetupWithManager = func(_ *controller.ReplicationGroupReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
 				getManagerStart = func(_ manager.Manager) error {
 					return nil
 				}
+
+				osExit = func(code int) {
+					osExitCode = code
+				}
 			},
+			expectedOsExitCode: 0,
 		},
-		// {
-		// 	name: "CSI connection failure",
-		// 	setup: func() {
-		// 		getConnectToCsiFunc = func(_ string, _ logr.Logger) (*grpc.ClientConn, error) {
-		// 			return nil, fmt.Errorf("connection error")
-		// 		}
-		// 	},
-		// },
-		// Add more test cases as needed
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(_ *testing.T) {
 			defer after()
 			tt.setup()
 			main()
 		})
+		if osExitCode != tt.expectedOsExitCode {
+			t.Errorf("Expected osExitCode: %v, but got osExitCode: %v", tt.expectedOsExitCode, osExitCode)
+		}
+		osExitCode = 0
 	}
 }
