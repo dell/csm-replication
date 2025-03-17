@@ -536,7 +536,7 @@ func TestPvProtectionIsComplete(t *testing.T) {
 				controllers.PVProtectionComplete: "yes",
 			},
 			setupMocks: func() {
-				getAnnotations = func(meta client.Object) map[string]string {
+				getAnnotations = func(_ client.Object) map[string]string {
 					return map[string]string{
 						controllers.PVProtectionComplete: "yes",
 					}

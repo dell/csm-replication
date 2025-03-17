@@ -127,6 +127,6 @@ func TestUpdateConditions(t *testing.T) {
 	assert.Equal(t, condition2, rg.Status.Conditions[1])
 }
 
-func TestInitLabelsAndAnnotations(t *testing.T) {
+func TestInitLabelsAndAnnotations(_ *testing.T) {
 	controllers.InitLabelsAndAnnotations("test-domain")
 }

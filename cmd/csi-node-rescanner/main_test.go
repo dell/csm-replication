@@ -882,7 +882,7 @@ func (m *MockManager) GetFieldIndexer() client.FieldIndexer {
 	return nil
 }
 
-func (m *MockManager) GetEventRecorderFor(name string) record.EventRecorder {
+func (m *MockManager) GetEventRecorderFor(_ string) record.EventRecorder {
 	// Implement the GetEventRecorderFor method logic
 	return &MockEventRecorder{}
 }
@@ -915,8 +915,8 @@ func (m *MockManager) GetWebhookServer() webhook.Server {
 // MockEventRecorder is a mock implementation of the record.EventRecorder interface
 type MockEventRecorder struct{}
 
-func (m *MockEventRecorder) Event(_ runtime.Object, _, _, type_ string) {}
-func (m *MockEventRecorder) Eventf(_ runtime.Object, _, _, type_ string, _ ...interface{}) {
+func (m *MockEventRecorder) Event(_ runtime.Object, _, _, _ string) {}
+func (m *MockEventRecorder) Eventf(_ runtime.Object, _, _, _ string, _ ...interface{}) {
 }
 
 func (m *MockEventRecorder) AnnotatedEventf(_ runtime.Object, _ map[string]string, _, _, _ string, _ ...interface{}) {
