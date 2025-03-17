@@ -297,14 +297,14 @@ func createRescanManager(ctx context.Context, mgr ctrl.Manager, driverName strin
 	// rescanMgr.setupConfigMapWatcher(logrusLog)
 
 	// Process the config. Get initial log level
-	level, err := common.ParseLevel("debug")
+	level, _ := common.ParseLevel("debug")
 	log.Println("set level to", level)
 	logrusLog.SetLevel(level)
 
 	expRateLimiter := getWorkqueueReconcileRequest(retryIntervalStart, retryIntervalMax)
 	log.Println("expRateLimiter", expRateLimiter)
 
-	if err = getNodeRescanReconcilerManager(&controller.NodeRescanReconciler{
+	if err := getNodeRescanReconcilerManager(&controller.NodeRescanReconciler{
 		Client:                     mgr.GetClient(),
 		Log:                        ctrl.Log.WithName("controllers").WithName("DellCSINodeReScanner"),
 		Scheme:                     mgr.GetScheme(),
