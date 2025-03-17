@@ -14,11 +14,11 @@ import (
 
 type mockMigrationClient struct{}
 
-func (m *mockMigrationClient) VolumeMigrate(ctx context.Context, req *csiext.VolumeMigrateRequest, opts ...grpc.CallOption) (*csiext.VolumeMigrateResponse, error) {
+func (m *mockMigrationClient) VolumeMigrate(_ context.Context, _ *csiext.VolumeMigrateRequest, _ ...grpc.CallOption) (*csiext.VolumeMigrateResponse, error) {
 	return &csiext.VolumeMigrateResponse{}, nil
 }
 
-func (m *mockMigrationClient) ArrayMigrate(ctx context.Context, req *csiext.ArrayMigrateRequest, opts ...grpc.CallOption) (*csiext.ArrayMigrateResponse, error) {
+func (m *mockMigrationClient) ArrayMigrate(_ context.Context, _ *csiext.ArrayMigrateRequest, _ ...grpc.CallOption) (*csiext.ArrayMigrateResponse, error) {
 	return &csiext.ArrayMigrateResponse{}, nil
 }
 
