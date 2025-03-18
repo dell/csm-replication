@@ -23,7 +23,7 @@ type fields struct {
 	conn           *grpc.ClientConn
 	log            logr.Logger
 	timeout        time.Duration
-	rgPendingState connection.PendingState
+	rgPendingState *connection.PendingState
 }
 
 func Test_replication_CreateRemoteVolume(t *testing.T) {
@@ -42,7 +42,7 @@ func Test_replication_CreateRemoteVolume(t *testing.T) {
 		want    *csiext.CreateRemoteVolumeResponse
 		wantErr bool
 	}{
-		{"CreateRemoteVolume Failed", fields{createFakeConnection(), ctrl.Log.WithName("/replication.v1.Replication/CreateRemoteVolume"), 10, connection.PendingState{}}, args{ctx, "csi-replicator-vol", map[string]string{"key1": "val1"}}, nil, true},
+		{"CreateRemoteVolume Failed", fields{createFakeConnection(), ctrl.Log.WithName("/replication.v1.Replication/CreateRemoteVolume"), 10, &connection.PendingState{}}, args{ctx, "csi-replicator-vol", map[string]string{"key1": "val1"}}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -80,7 +80,7 @@ func Test_replication_DeleteLocalVolume(t *testing.T) {
 		want    *csiext.DeleteLocalVolumeResponse
 		wantErr bool
 	}{
-		{"DeleteLocalVolume Failed", fields{createFakeConnection(), ctrl.Log.WithName("DeleteLocalVolume"), 10, connection.PendingState{}}, args{ctx, "csi-replicator-vol", map[string]string{"key1": "val1"}}, nil, true},
+		{"DeleteLocalVolume Failed", fields{createFakeConnection(), ctrl.Log.WithName("DeleteLocalVolume"), 10, &connection.PendingState{}}, args{ctx, "csi-replicator-vol", map[string]string{"key1": "val1"}}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -118,7 +118,7 @@ func Test_replication_CreateStorageProtectionGroup(t *testing.T) {
 		want    *csiext.CreateStorageProtectionGroupResponse
 		wantErr bool
 	}{
-		{"CreateStorageProtectionGroup Failed", fields{createFakeConnection(), ctrl.Log.WithName("CreateStorageProtectionGroup"), 10, connection.PendingState{}}, args{ctx, "csi-replicator-vol", map[string]string{"key1": "val1"}}, nil, true},
+		{"CreateStorageProtectionGroup Failed", fields{createFakeConnection(), ctrl.Log.WithName("CreateStorageProtectionGroup"), 10, &connection.PendingState{}}, args{ctx, "csi-replicator-vol", map[string]string{"key1": "val1"}}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -157,7 +157,7 @@ func Test_replication_DeleteStorageProtectionGroup(t *testing.T) {
 		want    error
 		wantErr bool
 	}{
-		{"DeleteStorageProtectionGroup Failed", fields{createFakeConnection(), ctrl.Log.WithName("DeleteStorageProtectionGroup"), 10, connection.PendingState{}}, args{ctx, groupID, map[string]string{"key1": "val1"}}, nil, true},
+		{"DeleteStorageProtectionGroup Failed", fields{createFakeConnection(), ctrl.Log.WithName("DeleteStorageProtectionGroup"), 10, &connection.PendingState{}}, args{ctx, groupID, map[string]string{"key1": "val1"}}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -193,7 +193,7 @@ func Test_replication_GetStorageProtectionGroupStatus(t *testing.T) {
 		want    *csiext.GetStorageProtectionGroupStatusResponse
 		wantErr bool
 	}{
-		{"GetStorageProtectionGroupStatus Failed", fields{createFakeConnection(), ctrl.Log.WithName("GetStorageProtectionGroupStatus"), 10, connection.PendingState{}}, args{ctx, protectionGroupID, map[string]string{"key1": "val1"}}, nil, true},
+		{"GetStorageProtectionGroupStatus Failed", fields{createFakeConnection(), ctrl.Log.WithName("GetStorageProtectionGroupStatus"), 10, &connection.PendingState{}}, args{ctx, protectionGroupID, map[string]string{"key1": "val1"}}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -234,7 +234,7 @@ func Test_replication_ExecuteAction(t *testing.T) {
 		want    *csiext.ExecuteActionResponse
 		wantErr bool
 	}{
-		{"ExecuteAction Failed", fields{createFakeConnection(), ctrl.Log.WithName("ExecuteAction"), 10, connection.PendingState{}}, args{ctx, protectionGroupID, nil, map[string]string{"key1": "val1"}, remoteProtectionGroupID, remoteAttributes}, nil, true},
+		{"ExecuteAction Failed", fields{createFakeConnection(), ctrl.Log.WithName("ExecuteAction"), 10, &connection.PendingState{}}, args{ctx, protectionGroupID, nil, map[string]string{"key1": "val1"}, remoteProtectionGroupID, remoteAttributes}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
