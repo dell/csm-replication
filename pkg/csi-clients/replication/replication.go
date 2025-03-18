@@ -41,7 +41,7 @@ func New(conn *grpc.ClientConn, log logr.Logger, timeout time.Duration) Replicat
 		conn:           conn,
 		log:            log,
 		timeout:        timeout,
-		rgPendingState: connection.PendingState{MaxPending: 50, Log: log},
+		rgPendingState: &connection.PendingState{MaxPending: 50, Log: log},
 	}
 }
 
@@ -49,7 +49,7 @@ type replication struct {
 	conn           *grpc.ClientConn
 	log            logr.Logger
 	timeout        time.Duration
-	rgPendingState connection.PendingState
+	rgPendingState *connection.PendingState
 }
 
 // GetStorageProtectionGroupStatus queries client for current status of protection group
@@ -68,7 +68,7 @@ func (r *replication) GetStorageProtectionGroupStatus(ctx context.Context, prote
 	if err != nil {
 		return nil, err
 	}
-	defer rgID.ClearPending(&r.rgPendingState)
+	defer rgID.ClearPending(r.rgPendingState)
 
 	res, err := client.GetStorageProtectionGroupStatus(tctx, req)
 
@@ -88,7 +88,7 @@ func (r *replication) ExecuteAction(ctx context.Context, protectionGroupID strin
 	if err != nil {
 		return nil, err
 	}
-	defer rgID.ClearPending(&r.rgPendingState)
+	defer rgID.ClearPending(r.rgPendingState)
 
 	req := &csiext.ExecuteActionRequest{
 		ProtectionGroupId:               protectionGroupID,
@@ -156,7 +156,7 @@ func (r *replication) DeleteStorageProtectionGroup(ctx context.Context, groupID 
 	if err != nil {
 		return err
 	}
-	defer rgID.ClearPending(&r.rgPendingState)
+	defer rgID.ClearPending(r.rgPendingState)
 
 	req := &csiext.DeleteStorageProtectionGroupRequest{
 		ProtectionGroupId:         groupID,
@@ -167,5 +167,5 @@ func (r *replication) DeleteStorageProtectionGroup(ctx context.Context, groupID 
 }
 
 func (r *replication) updatePendingState(rgID connection.RgIDType) error {
-	return rgID.CheckAndUpdatePendingState(&r.rgPendingState)
+	return rgID.CheckAndUpdatePendingState(r.rgPendingState)
 }
