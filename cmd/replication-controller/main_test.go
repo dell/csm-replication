@@ -473,7 +473,7 @@ func TestControllerManager_createControllerManager(t *testing.T) {
 				getConfig = func(_ context.Context, _ client.Client, _ config.ControllerManagerOpts, _ record.EventRecorder, _ logr.Logger) (*config.Config, error) {
 					return &config.Config{}, nil
 				}
-				getConfigPrintConfig = func(__ *config.Config, _ logr.Logger) {}
+				getConfigPrintConfig = func(_ *config.Config, _ logr.Logger) {}
 			},
 			expectedControllerManager: &ControllerManager{
 				Opts: config.ControllerManagerOpts{
@@ -1130,7 +1130,7 @@ func TestStartSecretController(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(_ *testing.T) {
 			if tt.setup != nil {
 				tt.setup()
 			}
@@ -1226,7 +1226,7 @@ func TestCreateManagerInstance(t *testing.T) {
 				getCtrlNewManager = originalGetCtrlNewManager
 			}
 
-			getCtrlNewManager = func(opts ctrl.Options) (manager.Manager, error) {
+			getCtrlNewManager = func(_ ctrl.Options) (manager.Manager, error) {
 				if tt.wantError {
 					return nil, errors.New("error getting manager")
 				}
@@ -1285,7 +1285,7 @@ func TestMain(t *testing.T) {
 					return flagMap, logr.Logger{}, logrus.New(), context.Background()
 				}
 
-				createManagerInstance = func(flagMap map[string]string) manager.Manager {
+				createManagerInstance = func(_ map[string]string) manager.Manager {
 					return nil
 				}
 
@@ -1306,11 +1306,11 @@ func TestMain(t *testing.T) {
 					logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
 				}
 
-				createManagerInstance = func(flagMap map[string]string) manager.Manager {
+				createManagerInstance = func(_ map[string]string) manager.Manager {
 					return mockMgr
 				}
 
-				setupControllerManager = func(ctx context.Context, mgr manager.Manager, setupLog logr.Logger) *ControllerManager {
+				setupControllerManager = func(_ context.Context, _ manager.Manager, _ logr.Logger) *ControllerManager {
 					return nil
 				}
 
