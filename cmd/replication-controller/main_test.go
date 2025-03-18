@@ -1262,6 +1262,9 @@ func TestMain(t *testing.T) {
 	defaultCreateManagerInstance := createManagerInstance
 	defaultOSExit := osExit
 	defaultSetupFlags := setupFlags
+	defaultGetCtrlNewManager := getCtrlNewManager
+	defaultSetupControllerManager := setupControllerManager
+	defaultGetManagerStart := getManagerStart
 
 	osExitCode := 0
 
@@ -1270,6 +1273,9 @@ func TestMain(t *testing.T) {
 		createManagerInstance = defaultCreateManagerInstance
 		osExit = defaultOSExit
 		setupFlags = defaultSetupFlags
+		getCtrlNewManager = defaultGetCtrlNewManager
+		setupControllerManager = defaultSetupControllerManager
+		getManagerStart = defaultGetManagerStart
 	}
 
 	tests := []struct {
@@ -1278,7 +1284,7 @@ func TestMain(t *testing.T) {
 		expectedOsExitCode int
 	}{
 		{
-			name: "Manager is nil",
+			name: "Manager instance is nil",
 			setup: func() {
 				setupFlags = func() (map[string]string, logr.Logger, *logrus.Logger, context.Context) {
 					flagMap := make(map[string]string)
@@ -1286,6 +1292,35 @@ func TestMain(t *testing.T) {
 				}
 
 				createManagerInstance = func(flagMap map[string]string) manager.Manager {
+					return nil
+				}
+
+				osExit = func(code int) {
+					osExitCode = code
+				}
+			},
+			expectedOsExitCode: 0,
+		},
+		{
+			name: "Manager is nil",
+			setup: func() {
+				setupFlags = func() (map[string]string, logr.Logger, *logrus.Logger, context.Context) {
+					return map[string]string{"metrics-addr": ":8080", "leader-election": "true"}, logr.Logger{}, logrus.New(), context.Background()
+				}
+
+				mockMgr := &mockManager{
+					logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
+				}
+
+				createManagerInstance = func(flagMap map[string]string) manager.Manager {
+					return mockMgr
+				}
+
+				setupControllerManager = func(ctx context.Context, mgr manager.Manager, setupLog logr.Logger) *ControllerManager {
+					return nil
+				}
+
+				getManagerStart = func(_ manager.Manager) error {
 					return nil
 				}
 

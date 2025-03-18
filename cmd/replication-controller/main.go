@@ -163,6 +163,16 @@ var (
 
 		return mgr
 	}
+
+	setupControllerManager = func(ctx context.Context, mgr manager.Manager, setupLog logr.Logger) *ControllerManager {
+		controllerMgr, err := createControllerManager(ctx, mgr)
+		if err != nil {
+			setupLog.Error(err, "failed to configure the controller manager")
+			osExit(1)
+		}
+
+		return controllerMgr
+	}
 )
 
 func init() {
@@ -371,16 +381,6 @@ func processLogLevel(logLevel string, logrusLog *logrus.Logger) {
 	}
 	log.Println("set level to", level)
 	logrusLog.SetLevel(level)
-}
-
-func setupControllerManager(ctx context.Context, mgr manager.Manager, setupLog logr.Logger) *ControllerManager {
-	controllerMgr, err := createControllerManager(ctx, mgr)
-	if err != nil {
-		setupLog.Error(err, "failed to configure the controller manager")
-		osExit(1)
-	}
-
-	return controllerMgr
 }
 
 func stringToTimeDuration(timeString string) time.Duration {
