@@ -62,11 +62,7 @@ var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
 
-	// Added to improve UT coverage
-	osExit                         = os.Exit
-	createControllerManagerWrapper = func(ctx context.Context, mgr manager.Manager) (*ControllerManager, error) {
-		return createControllerManager(ctx, mgr)
-	}
+	osExit = os.Exit
 
 	getSecretControllerLogger = func(mgr *ControllerManager, request reconcile.Request) logr.Logger {
 		return mgr.SecretController.GetLogger().WithName(request.Name)
@@ -315,7 +311,7 @@ func processLogLevel(logLevel string, logrusLog *logrus.Logger) {
 }
 
 func setupControllerManager(ctx context.Context, mgr manager.Manager, setupLog logr.Logger) *ControllerManager {
-	controllerMgr, err := createControllerManagerWrapper(ctx, mgr)
+	controllerMgr, err := createControllerManager(ctx, mgr)
 	if err != nil {
 		setupLog.Error(err, "failed to configure the controller manager")
 		osExit(1)

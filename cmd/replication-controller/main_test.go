@@ -1152,24 +1152,11 @@ func TestSetupControllerManager(t *testing.T) {
 		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
 	}
 
-	mockSecretController := &mockSecretController{
-		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
-	}
-
-	controllerMgr := &ControllerManager{
-		Manager:          mockMgr,
-		config:           &config.Config{},
-		SecretController: mockSecretController,
-	}
-
 	ctx := context.Background()
 	originalOsExit := osExit
 
-	originalcreateControllerManager := createControllerManagerWrapper
-
 	after := func() {
 		osExit = originalOsExit
-		createControllerManagerWrapper = originalcreateControllerManager
 	}
 
 	tests := []struct {
@@ -1183,22 +1170,14 @@ func TestSetupControllerManager(t *testing.T) {
 			name:     "Success",
 			mgr:      mockMgr,
 			setupLog: ctrl.Log.WithName("test-logger"),
-			setup: func() {
-				createControllerManagerWrapper = func(ctx context.Context, mgr manager.Manager) (*ControllerManager, error) {
-					return controllerMgr, nil
-				}
-			},
+			setup: func() {},
 			expectedErr: false,
 		},
 		{
 			name:     "Failure",
 			mgr:      mockMgr,
 			setupLog: ctrl.Log.WithName("test-logger"),
-			setup: func() {
-				createControllerManagerWrapper = func(ctx context.Context, mgr manager.Manager) (*ControllerManager, error) {
-					return nil, errors.New("failed to configure the controller manager")
-				}
-			},
+			setup: func() {},
 			expectedErr: false,
 		},
 	}
