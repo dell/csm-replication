@@ -20,7 +20,10 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
+	repController "github.com/dell/csm-replication/controllers/replication-controller"
+	"github.com/dell/csm-replication/pkg/common"
 	"github.com/dell/csm-replication/pkg/config"
 	"github.com/go-logr/logr"
 	"github.com/go-logr/logr/funcr"
@@ -34,6 +37,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlcnf "sigs.k8s.io/controller-runtime/pkg/config"
@@ -185,7 +190,6 @@ func (m *mockSecretController) GetLogger() logr.Logger {
 func (m *mockSecretController) Start(_ context.Context) error {
 	return nil
 }
-
 func (m *mockSecretController) Watch(_ source.TypedSource[reconcile.Request]) error {
 	return nil
 }
@@ -468,7 +472,7 @@ func TestControllerManager_createControllerManager(t *testing.T) {
 				getConfig = func(_ context.Context, _ client.Client, _ config.ControllerManagerOpts, _ record.EventRecorder, _ logr.Logger) (*config.Config, error) {
 					return &config.Config{}, nil
 				}
-				getConfigPrintConfig = func(_ *config.Config, _ logr.Logger) {}
+				getConfigPrintConfig = func(__ *config.Config, _ logr.Logger) {}
 			},
 			expectedControllerManager: &ControllerManager{
 				Opts: config.ControllerManagerOpts{
@@ -501,6 +505,775 @@ func TestControllerManager_createControllerManager(t *testing.T) {
 			if !tt.expectedError {
 				assert.Equal(t, tt.expectedControllerManager.Opts, mgr.Opts)
 				assert.Equal(t, tt.expectedControllerManager.config, mgr.config)
+			}
+		})
+	}
+}
+
+func TestSetupFlags(t *testing.T) {
+
+	// Call the setupFlags function
+	flags, setupLog, logrusLog, ctx := setupFlags()
+
+	// Assert the expected values
+	expected := map[string]string{
+		"metrics-addr":         ":8081",
+		"leader-election":      "false",
+		"prefix":               common.DefaultDomain,
+		"worker-threads":       "2",
+		"retry-interval-start": "1s",
+		"retry-interval-max":   "5m0s",
+	}
+
+	for key, expectedValue := range expected {
+		if flags[key] != expectedValue {
+			t.Errorf("Expected flag value for %s to be %s, but got %s", key, expectedValue, flags[key])
+		}
+	}
+
+	assert.NotNil(t, setupLog)
+	assert.NotNil(t, logrusLog)
+	assert.NotNil(t, ctx)
+}
+
+func TestProcessLogLevel(t *testing.T) {
+	tests := []struct {
+		name     string
+		logLevel string
+		expected logrus.Level
+	}{
+		{
+			name:     "Valid log level",
+			logLevel: "info",
+			expected: logrus.InfoLevel,
+		},
+		{
+			name:     "Invalid log level",
+			logLevel: "invalid",
+			expected: logrus.InfoLevel,
+		},
+		{
+			name:     "Empty log level",
+			logLevel: "",
+			expected: logrus.InfoLevel,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logrusLog := logrus.New()
+			processLogLevel(tt.logLevel, logrusLog)
+			actual := logrusLog.GetLevel()
+			if actual != tt.expected {
+				t.Errorf("Expected log level: %v, but got: %v", tt.expected, actual)
+			}
+		})
+	}
+}
+
+func TestStringToTimeDuration(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected time.Duration
+	}{
+		{
+			name:     "valid duration",
+			input:    "1h30m",
+			expected: time.Hour + time.Minute*30,
+		},
+		{
+			name:     "invalid duration",
+			input:    "invalid",
+			expected: time.Duration(0),
+		},
+		{
+			name:     "empty duration",
+			input:    "",
+			expected: time.Duration(0),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := stringToTimeDuration(tt.input)
+			if actual != tt.expected {
+				t.Errorf("Expected %v, but got %v", tt.expected, actual)
+			}
+		})
+	}
+}
+
+func TestStringToBoolean(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{
+			name:     "true",
+			input:    "true",
+			expected: true,
+		},
+		{
+			name:     "false",
+			input:    "false",
+			expected: false,
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: false,
+		},
+		{
+			name:     "invalid string",
+			input:    "invalid",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := stringToBoolean(tt.input)
+			if actual != tt.expected {
+				t.Errorf("Expected %v, but got %v", tt.expected, actual)
+			}
+		})
+	}
+}
+
+func TestStringToInt(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected int
+	}{
+		{
+			name:     "valid integer",
+			input:    "42",
+			expected: 42,
+		},
+		{
+			name:     "invalid integer",
+			input:    "invalid",
+			expected: 0,
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := stringToInt(tt.input)
+			if actual != tt.expected {
+				t.Errorf("Expected %v, but got %v", tt.expected, actual)
+			}
+		})
+	}
+}
+
+func TestStartManager(t *testing.T) {
+	originalGetManagerStart := getManagerStart
+	originalOsExit := osExit
+
+	after := func() {
+		getManagerStart = originalGetManagerStart
+		osExit = originalOsExit
+	}
+
+	tests := []struct {
+		name     string
+		manager  manager.Manager
+		setupLog logr.Logger
+		setup    func()
+		wantErr  bool
+	}{
+		{
+			name:     "Manager is nil",
+			manager:  nil,
+			setupLog: ctrl.Log.WithName("test-logger"),
+			wantErr:  true,
+		},
+		{
+			name:    "Manager is not nil",
+			manager: &mockManager{},
+			setup: func() {
+				getManagerStart = func(_ manager.Manager) error {
+					return errors.New("problem running manager")
+				}
+			},
+			setupLog: ctrl.Log.WithName("test-logger"),
+			wantErr:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer after()
+			if tt.setup != nil {
+				tt.setup()
+			}
+			// Override osExit to capture the exit code
+			var exitCode int
+			osExit = func(code int) {
+				exitCode = code
+			}
+			if tt.name == "Manager is nil" {
+				// Checked for Panic here as the panic is due to chain function calls and actual function is covered as expected
+				// And actual code for the chained functions are covered on specific test cases related to that function
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("The code did not panic")
+					}
+				}()
+			}
+			startManager(tt.manager, tt.setupLog)
+			if tt.name == "Manager is not nil" {
+				if exitCode != 1 {
+					t.Errorf("Expected exit code 1, but got %d", exitCode)
+				}
+			}
+
+		})
+	}
+}
+
+func TestCreatePersistentVolumeReconciler(t *testing.T) {
+	mockMgr := &mockManager{
+		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
+	}
+
+	mockSecretController := &mockSecretController{
+		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
+	}
+	originalGetPersistentVolumeReconciler := getPersistentVolumeReconciler
+	originalOsExit := osExit
+
+	after := func() {
+		getPersistentVolumeReconciler = originalGetPersistentVolumeReconciler
+		osExit = originalOsExit
+	}
+	tests := []struct {
+		name           string
+		manager        manager.Manager
+		controllerMgr  *ControllerManager
+		domain         string
+		workerThreads  int
+		expRateLimiter workqueue.TypedRateLimiter[reconcile.Request]
+		setupLog       logr.Logger
+		setup          func()
+		wantErr        bool
+	}{
+		{
+			name:           "Manager is nil",
+			manager:        nil,
+			controllerMgr:  nil,
+			domain:         "abc",
+			workerThreads:  2,
+			expRateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second),
+			setupLog:       ctrl.Log.WithName("test-logger"),
+			wantErr:        false,
+		},
+		{
+			name:    "Manager is not nil",
+			manager: &mockManager{},
+			controllerMgr: &ControllerManager{
+				Manager:          mockMgr,
+				config:           &config.Config{},
+				SecretController: mockSecretController,
+			},
+			domain:         "abc",
+			workerThreads:  2,
+			expRateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second),
+			setupLog:       ctrl.Log.WithName("test-logger"),
+			setup: func() {
+				getPersistentVolumeReconciler = func(_ *repController.PersistentVolumeReconciler, _ manager.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+			},
+			wantErr: false,
+		},
+		{
+			name:    "Manager is not nil and expected error",
+			manager: &mockManager{},
+			controllerMgr: &ControllerManager{
+				Manager:          mockMgr,
+				config:           &config.Config{},
+				SecretController: mockSecretController,
+			},
+			domain:         "abc",
+			workerThreads:  3,
+			expRateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second),
+			setupLog:       ctrl.Log.WithName("test-logger"),
+			setup: func() {
+				getPersistentVolumeReconciler = func(_ *repController.PersistentVolumeReconciler, _ manager.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return errors.New("problem running manager")
+				}
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer after()
+			if tt.setup != nil {
+				tt.setup()
+			}
+			// Override osExit to capture the exit code
+			var exitCode int
+			osExit = func(code int) {
+				exitCode = code
+			}
+			if tt.name == "Manager is nil" {
+				// Checked for Panic here as the panic is due to chain function calls and actual function is covered as expected
+				// And actual code for the chained functions are covered on specific test cases related to that function
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("The code did not panic")
+					}
+				}()
+			}
+			createPersistentVolumeReconciler(tt.manager, tt.controllerMgr, tt.domain, tt.workerThreads, tt.expRateLimiter, tt.setupLog)
+			if tt.name == "Manager is not nil" {
+				if exitCode != 0 {
+					t.Errorf("Expected exit code 0, but got %d", exitCode)
+				}
+			}
+			if tt.name == "Manager is not nil and expected error" {
+				if exitCode != 1 {
+					t.Errorf("Expected exit code 1, but got %d", exitCode)
+				}
+			}
+
+		})
+	}
+}
+
+func TestCreateReplicationGroupReconciler(t *testing.T) {
+	mockMgr := &mockManager{
+		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
+	}
+
+	mockSecretController := &mockSecretController{
+		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
+	}
+	originalGetReplicationGroupReconciler := getReplicationGroupReconciler
+	originalOsExit := osExit
+
+	after := func() {
+		getReplicationGroupReconciler = originalGetReplicationGroupReconciler
+		osExit = originalOsExit
+	}
+	tests := []struct {
+		name           string
+		manager        manager.Manager
+		controllerMgr  *ControllerManager
+		domain         string
+		workerThreads  int
+		expRateLimiter workqueue.TypedRateLimiter[reconcile.Request]
+		setupLog       logr.Logger
+		setup          func()
+		wantErr        bool
+	}{
+		{
+			name:           "Manager is nil",
+			manager:        nil,
+			controllerMgr:  nil,
+			domain:         "abc",
+			workerThreads:  2,
+			expRateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second),
+			setupLog:       ctrl.Log.WithName("test-logger"),
+			wantErr:        false,
+		},
+		{
+			name:    "Manager is not nil",
+			manager: &mockManager{},
+			controllerMgr: &ControllerManager{
+				Manager:          mockMgr,
+				config:           &config.Config{},
+				SecretController: mockSecretController,
+			},
+			domain:         "abc",
+			workerThreads:  2,
+			expRateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second),
+			setupLog:       ctrl.Log.WithName("test-logger"),
+			setup: func() {
+				getReplicationGroupReconciler = func(_ *repController.ReplicationGroupReconciler, _ manager.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+			},
+			wantErr: false,
+		},
+		{
+			name:    "Manager is not nil and expected error",
+			manager: &mockManager{},
+			controllerMgr: &ControllerManager{
+				Manager:          mockMgr,
+				config:           &config.Config{},
+				SecretController: mockSecretController,
+			},
+			domain:         "abc",
+			workerThreads:  3,
+			expRateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second),
+			setupLog:       ctrl.Log.WithName("test-logger"),
+			setup: func() {
+				getReplicationGroupReconciler = func(_ *repController.ReplicationGroupReconciler, _ manager.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return errors.New("problem running manager")
+				}
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer after()
+			if tt.setup != nil {
+				tt.setup()
+			}
+			// Override osExit to capture the exit code
+			var exitCode int
+			osExit = func(code int) {
+				exitCode = code
+			}
+			if tt.name == "Manager is nil" {
+				// Checked for Panic here as the panic is due to chain function calls and actual function is covered as expected
+				// And actual code for the chained functions are covered on specific test cases related to that function
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("The code did not panic")
+					}
+				}()
+			}
+			createReplicationGroupReconciler(tt.manager, tt.controllerMgr, tt.domain, tt.workerThreads, tt.expRateLimiter, tt.setupLog)
+			if tt.name == "Manager is not nil" {
+				if exitCode != 0 {
+					t.Errorf("Expected exit code 0, but got %d", exitCode)
+				}
+			}
+			if tt.name == "Manager is not nil and expected error" {
+				if exitCode != 1 {
+					t.Errorf("Expected exit code 1, but got %d", exitCode)
+				}
+			}
+		})
+	}
+}
+
+func TestCreatePersistentVolumeClaimReconciler(t *testing.T) {
+	mockMgr := &mockManager{
+		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
+	}
+
+	mockSecretController := &mockSecretController{
+		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
+	}
+	originalGetPersistentVolumeClaimReconciler := getPersistentVolumeClaimReconciler
+	originalOsExit := osExit
+
+	after := func() {
+		getPersistentVolumeClaimReconciler = originalGetPersistentVolumeClaimReconciler
+		osExit = originalOsExit
+	}
+	tests := []struct {
+		name           string
+		manager        manager.Manager
+		controllerMgr  *ControllerManager
+		domain         string
+		workerThreads  int
+		expRateLimiter workqueue.TypedRateLimiter[reconcile.Request]
+		setupLog       logr.Logger
+		setup          func()
+		wantErr        bool
+	}{
+		{
+			name:           "Manager is nil",
+			manager:        nil,
+			controllerMgr:  nil,
+			domain:         "abc",
+			workerThreads:  2,
+			expRateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second),
+			setupLog:       ctrl.Log.WithName("test-logger"),
+			wantErr:        false,
+		},
+		{
+			name:    "Manager is not nil",
+			manager: &mockManager{},
+			controllerMgr: &ControllerManager{
+				Manager:          mockMgr,
+				config:           &config.Config{},
+				SecretController: mockSecretController,
+			},
+			domain:         "abc",
+			workerThreads:  2,
+			expRateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second),
+			setupLog:       ctrl.Log.WithName("test-logger"),
+			setup: func() {
+				getPersistentVolumeClaimReconciler = func(_ *repController.PersistentVolumeClaimReconciler, _ manager.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+			},
+			wantErr: false,
+		},
+		{
+			name:    "Manager is not nil and expected error",
+			manager: &mockManager{},
+			controllerMgr: &ControllerManager{
+				Manager:          mockMgr,
+				config:           &config.Config{},
+				SecretController: mockSecretController,
+			},
+			domain:         "abc",
+			workerThreads:  3,
+			expRateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second),
+			setupLog:       ctrl.Log.WithName("test-logger"),
+			setup: func() {
+				getPersistentVolumeClaimReconciler = func(_ *repController.PersistentVolumeClaimReconciler, _ manager.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return errors.New("problem running manager")
+				}
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer after()
+			if tt.setup != nil {
+				tt.setup()
+			}
+			// Override osExit to capture the exit code
+			var exitCode int
+			osExit = func(code int) {
+				exitCode = code
+			}
+			if tt.name == "Manager is nil" {
+				// Checked for Panic here as the panic is due to chain function calls and actual function is covered as expected
+				// And actual code for the chained functions are covered on specific test cases related to that function
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("The code did not panic")
+					}
+				}()
+			}
+			createPersistentVolumeClaimReconciler(tt.manager, tt.controllerMgr, tt.domain, tt.workerThreads, tt.expRateLimiter, tt.setupLog)
+			if tt.name == "Manager is not nil" {
+				if exitCode != 0 {
+					t.Errorf("Expected exit code 0, but got %d", exitCode)
+				}
+			}
+			if tt.name == "Manager is not nil and expected error" {
+				if exitCode != 1 {
+					t.Errorf("Expected exit code 1, but got %d", exitCode)
+				}
+			}
+		})
+	}
+}
+
+func TestStartSecretController(t *testing.T) {
+	mockMgr := &mockManager{
+		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
+	}
+
+	mockSecretController := &mockSecretController{
+		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
+	}
+
+	originalgetSecretController := getSecretController
+	originalOsExit := osExit
+
+	after := func() {
+		getSecretController = originalgetSecretController
+		osExit = originalOsExit
+	}
+
+	tests := []struct {
+		name          string
+		controllerMgr *ControllerManager
+		setupLog      logr.Logger
+		setup         func()
+		expectedErr   bool
+	}{
+		{
+			name: "Success",
+			controllerMgr: &ControllerManager{
+				Manager:          mockMgr,
+				config:           &config.Config{},
+				SecretController: mockSecretController,
+			},
+			setupLog: ctrl.Log.WithName("test-logger"),
+			setup: func() {
+				getSecretController = func(_ *ControllerManager) error {
+					return nil
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name: "Error",
+			controllerMgr: &ControllerManager{
+				Manager:          mockMgr,
+				config:           &config.Config{},
+				SecretController: mockSecretController,
+			},
+			setupLog: ctrl.Log.WithName("test-logger"),
+			setup: func() {
+				getSecretController = func(_ *ControllerManager) error {
+					return errors.New("failed to setup secret controller. Continuing")
+				}
+			},
+			expectedErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			if tt.setup != nil {
+				tt.setup()
+			}
+			defer after()
+
+			startSecretController(tt.controllerMgr, tt.setupLog)
+		})
+	}
+}
+
+func TestSetupControllerManager(t *testing.T) {
+	mockMgr := &mockManager{
+		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
+	}
+
+	mockSecretController := &mockSecretController{
+		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
+	}
+
+	controllerMgr := &ControllerManager{
+		Manager:          mockMgr,
+		config:           &config.Config{},
+		SecretController: mockSecretController,
+	}
+
+	ctx := context.Background()
+	originalOsExit := osExit
+
+	originalcreateControllerManager := createControllerManagerWrapper
+
+	after := func() {
+		osExit = originalOsExit
+		createControllerManagerWrapper = originalcreateControllerManager
+	}
+
+	tests := []struct {
+		name        string
+		mgr         manager.Manager
+		setupLog    logr.Logger
+		setup       func()
+		expectedErr bool
+	}{
+		{
+			name:     "Success",
+			mgr:      mockMgr,
+			setupLog: ctrl.Log.WithName("test-logger"),
+			setup: func() {
+				createControllerManagerWrapper = func(ctx context.Context, mgr manager.Manager) (*ControllerManager, error) {
+					return controllerMgr, nil
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Failure",
+			mgr:      mockMgr,
+			setupLog: ctrl.Log.WithName("test-logger"),
+			setup: func() {
+				createControllerManagerWrapper = func(ctx context.Context, mgr manager.Manager) (*ControllerManager, error) {
+					return nil, errors.New("failed to configure the controller manager")
+				}
+			},
+			expectedErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer after()
+			if tt.setup != nil {
+				tt.setup()
+			}
+			// Override osExit to capture the exit code
+			var exitCode int
+			osExit = func(code int) {
+				exitCode = code
+			}
+
+			setupControllerManager(ctx, tt.mgr, tt.setupLog)
+
+			if tt.name == "Failure" {
+				if exitCode != 1 {
+					t.Errorf("Expected exit code 1, but got %d", exitCode)
+				}
+			}
+		})
+	}
+}
+
+func TestCreateManagerInstance(t *testing.T) {
+	tests := []struct {
+		name      string
+		flagMap   map[string]string
+		wantError bool
+	}{
+		{
+			name:      "Successful creation of manager.Manager",
+			flagMap:   map[string]string{"metrics-addr": ":8080", "leader-election": "true"},
+			wantError: false,
+		},
+		{
+			name:      "Error in getCtrlNewManager",
+			flagMap:   map[string]string{"metrics-addr": ":8080", "leader-election": "true"},
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			originalGetCtrlNewManager := getCtrlNewManager
+			originalOsExit := osExit
+			after := func() {
+				osExit = originalOsExit
+				getCtrlNewManager = originalGetCtrlNewManager
+			}
+
+			getCtrlNewManager = func(opts ctrl.Options) (manager.Manager, error) {
+				if tt.wantError {
+					return nil, errors.New("error getting manager")
+				}
+				return &mockManager{}, nil
+			}
+
+			// Override osExit to capture the exit code
+			var exitCode int
+			osExit = func(code int) {
+				exitCode = code
+			}
+
+			defer after()
+
+			_ = createManagerInstance(tt.flagMap)
+
+			if tt.wantError {
+				if exitCode != 1 {
+					t.Errorf("Expected exit code 1, but got %d", exitCode)
+				}
 			}
 		})
 	}
