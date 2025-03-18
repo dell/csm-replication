@@ -74,7 +74,7 @@ func TestGetCSIConn(t *testing.T) {
 			csiAddress: "",
 			setupLog:   ctrl.Log.WithName("test-logger"),
 			setup: func() {
-				getConnection = func(csiAddress string, setupLog logr.Logger) (*grpc.ClientConn, error) {
+				getConnection = func(_ string, _ logr.Logger) (*grpc.ClientConn, error) {
 					return nil, errors.New("failed to connect to CSI driver")
 				}
 			},
@@ -140,7 +140,6 @@ func TestProbeCSIDriver(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			migrationCapabilities := getSampleMigrationCapabilities()
 
 			// Save the original osExit function
@@ -198,7 +197,6 @@ func TestProbeCSIDriverWrongCapability(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			migrationCapabilities := getSampleInavlidMigrationCapabilities()
 
 			// Save the original osExit function
@@ -269,7 +267,6 @@ func TestCreateMetricsServer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			defaultGetCtrlNewManager := getCtrlNewManager
 			defaultGetManagerStart := getManagerStart
 			defaultGetWorkqueueReconcileRequest := getWorkqueueReconcileRequest
@@ -279,7 +276,7 @@ func TestCreateMetricsServer(t *testing.T) {
 				return nil, errors.New("Unable to start manager")
 			}
 
-			getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+			getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 				return nil
 			}
 
@@ -354,7 +351,6 @@ func TestCreateMetricsServerWithNodeRescannerError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			defaultGetCtrlNewManager := getCtrlNewManager
 			defaultGetManagerStart := getManagerStart
 			defaultGetWorkqueueReconcileRequest := getWorkqueueReconcileRequest
@@ -364,7 +360,7 @@ func TestCreateMetricsServerWithNodeRescannerError(t *testing.T) {
 				return &MockManager{}, nil
 			}
 
-			getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+			getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 				return nil
 			}
 
@@ -428,7 +424,6 @@ func TestCreateMetricsServerWithStratingManagerError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			defaultGetCtrlNewManager := getCtrlNewManager
 			defaultGetManagerStart := getManagerStart
 			defaultGetWorkqueueReconcileRequest := getWorkqueueReconcileRequest
@@ -438,7 +433,7 @@ func TestCreateMetricsServerWithStratingManagerError(t *testing.T) {
 				return &MockManager{}, nil
 			}
 
-			getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+			getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 				return nil
 			}
 
@@ -507,7 +502,6 @@ func TestProcessConfigMapChanges(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			// Create a mock NodeRescanner
 			mgr := &NodeRescanner{
 				Opts:     config.ControllerManagerOpts{},
@@ -577,7 +571,6 @@ func TestSetupConfigMapWatcher(t *testing.T) {
 }
 
 func TestProbeAndCreateMetricsServer(t *testing.T) {
-
 	defaultGetManagerStart := getManagerStart
 	defaultGetCtrlNewManager := getCtrlNewManager
 	defaultGetWorkqueueReconcileRequest := getWorkqueueReconcileRequest
@@ -587,7 +580,7 @@ func TestProbeAndCreateMetricsServer(t *testing.T) {
 		return &MockManager{}, nil
 	}
 
-	getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+	getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 		return nil
 	}
 
@@ -650,7 +643,6 @@ func TestProbeAndCreateMetricsServer(t *testing.T) {
 }
 
 func TestSetupFlags(t *testing.T) {
-
 	// Call the setupFlags function
 	flags, setupLog, ctx := setupFlags()
 
@@ -839,22 +831,22 @@ func (m *MockManager) Add(manager.Runnable) error {
 	return nil
 }
 
-func (m *MockManager) AddHealthzCheck(name string, check healthz.Checker) error {
+func (m *MockManager) AddHealthzCheck(_ string, _ healthz.Checker) error {
 	// Implement the AddHealthzCheck method logic
 	return nil
 }
 
-func (m *MockManager) AddMetricsExtraHandler(path string, handler http.Handler) error {
+func (m *MockManager) AddMetricsExtraHandler(_ string, _ http.Handler) error {
 	// Implement the AddMetricsExtraHandler method logic
 	return nil
 }
 
-func (m *MockManager) AddMetricsServerExtraHandler(path string, handler http.Handler) error {
+func (m *MockManager) AddMetricsServerExtraHandler(_ string, _ http.Handler) error {
 	// Implement the AddMetricsExtraHandler method logic
 	return nil
 }
 
-func (m *MockManager) AddReadyzCheck(name string, check healthz.Checker) error {
+func (m *MockManager) AddReadyzCheck(_ string, _ healthz.Checker) error {
 	// Implement the AddReadyzCheck method logic
 	return nil
 }
@@ -894,7 +886,7 @@ func (m *MockManager) GetFieldIndexer() client.FieldIndexer {
 	return nil
 }
 
-func (m *MockManager) GetEventRecorderFor(name string) record.EventRecorder {
+func (m *MockManager) GetEventRecorderFor(_ string) record.EventRecorder {
 	// Implement the GetEventRecorderFor method logic
 	return &MockEventRecorder{}
 }
@@ -927,8 +919,9 @@ func (m *MockManager) GetWebhookServer() webhook.Server {
 // MockEventRecorder is a mock implementation of the record.EventRecorder interface
 type MockEventRecorder struct{}
 
-func (m *MockEventRecorder) Event(object runtime.Object, message, reason, type_ string) {}
-func (m *MockEventRecorder) Eventf(object runtime.Object, reason, messageFmt, type_ string, args ...interface{}) {
+func (m *MockEventRecorder) Event(_ runtime.Object, _, _, _ string) {}
+func (m *MockEventRecorder) Eventf(_ runtime.Object, _, _, _ string, _ ...interface{}) {
 }
-func (m *MockEventRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, reason, messageFmt, unknownvariable string, args ...interface{}) {
+
+func (m *MockEventRecorder) AnnotatedEventf(_ runtime.Object, _ map[string]string, _, _, _ string, _ ...interface{}) {
 }
