@@ -100,6 +100,69 @@ var (
 	getCtrlNewManager = func(options manager.Options) (manager.Manager, error) {
 		return ctrl.NewManager(ctrl.GetConfigOrDie(), options)
 	}
+
+	setupFlags = func() (map[string]string, logr.Logger, *logrus.Logger, context.Context) {
+		var (
+			retryIntervalStart time.Duration
+			retryIntervalMax   time.Duration
+			workerThreads      int
+			domain             string
+		)
+
+		var metricsAddr string
+		var enableLeaderElection bool
+
+		flag.StringVar(&metricsAddr, "metrics-addr", ":8081", "The address the metric endpoint binds to.")
+		flag.StringVar(&domain, "prefix", common.DefaultDomain, "Prefix used for creating labels/annotations")
+		flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
+			"Enable leader election for dell-replication-controller manager. "+
+				"Enabling this will ensure there is only one active dell-replication-controller manager.")
+		flag.DurationVar(&retryIntervalStart, "retry-interval-start", time.Second, "Initial retry interval of failed reconcile request. It doubles with each failure, upto retry-interval-max")
+		flag.DurationVar(&retryIntervalMax, "retry-interval-max", 5*time.Minute, "Maximum retry interval of failed reconcile request")
+		flag.IntVar(&workerThreads, "worker-threads", 2, "Number of concurrent reconcilers for each of the controllers")
+		flag.Parse()
+
+		logrusLog := logrus.New()
+		logrusLog.SetFormatter(&logrus.JSONFormatter{
+			TimestampFormat: time.RFC3339Nano,
+		})
+
+		logger := logrusr.New(logrusLog)
+		ctrl.SetLogger(logger)
+		setupLog.V(common.InfoLevel).Info(common.DellReplicationController, "Version", core.SemVer, "Commit ID", core.CommitSha32, "Commit SHA", core.CommitTime.Format(time.RFC1123))
+
+		setupLog.V(common.InfoLevel).Info("Prefix", "Domain", domain)
+		controllers.InitLabelsAndAnnotations(domain)
+
+		flagMap := make(map[string]string)
+		flagMap["metrics-addr"] = metricsAddr
+		flagMap["leader-election"] = strconv.FormatBool(enableLeaderElection)
+		flagMap["prefix"] = domain
+		flagMap["retry-interval-start"] = retryIntervalStart.String()
+		flagMap["retry-interval-max"] = retryIntervalMax.String()
+		flagMap["worker-threads"] = strconv.Itoa(workerThreads)
+
+		return flagMap, setupLog, logrusLog, context.Background()
+	}
+
+	createManagerInstance = func(flagMap map[string]string) manager.Manager {
+		mgr, err := getCtrlNewManager(ctrl.Options{
+			Scheme: scheme,
+			Metrics: metricsServer.Options{
+				BindAddress: flagMap["metrics-addr"],
+			},
+			WebhookServer:              webhook.NewServer(webhook.Options{Port: 9443}),
+			LeaderElection:             stringToBoolean(flagMap["leader-election"]),
+			LeaderElectionResourceLock: "leases",
+			LeaderElectionID:           fmt.Sprintf("%s-manager", common.DellReplicationController),
+		})
+		if err != nil {
+			setupLog.Error(err, "unable to start manager")
+			osExit(1)
+		}
+
+		return mgr
+	}
 )
 
 func init() {
@@ -318,70 +381,6 @@ func setupControllerManager(ctx context.Context, mgr manager.Manager, setupLog l
 	}
 
 	return controllerMgr
-}
-
-func createManagerInstance(flagMap map[string]string) manager.Manager {
-	mgr, err := getCtrlNewManager(ctrl.Options{
-		Scheme: scheme,
-		Metrics: metricsServer.Options{
-			BindAddress: flagMap["metrics-addr"],
-		},
-		WebhookServer:              webhook.NewServer(webhook.Options{Port: 9443}),
-		LeaderElection:             stringToBoolean(flagMap["leader-election"]),
-		LeaderElectionResourceLock: "leases",
-		LeaderElectionID:           fmt.Sprintf("%s-manager", common.DellReplicationController),
-	})
-	if err != nil {
-		setupLog.Error(err, "unable to start manager")
-		osExit(1)
-	}
-
-	return mgr
-}
-
-func setupFlags() (map[string]string, logr.Logger, *logrus.Logger, context.Context) {
-	var (
-		retryIntervalStart time.Duration
-		retryIntervalMax   time.Duration
-		workerThreads      int
-		domain             string
-	)
-
-	var metricsAddr string
-	var enableLeaderElection bool
-
-	flag.StringVar(&metricsAddr, "metrics-addr", ":8081", "The address the metric endpoint binds to.")
-	flag.StringVar(&domain, "prefix", common.DefaultDomain, "Prefix used for creating labels/annotations")
-	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
-		"Enable leader election for dell-replication-controller manager. "+
-			"Enabling this will ensure there is only one active dell-replication-controller manager.")
-	flag.DurationVar(&retryIntervalStart, "retry-interval-start", time.Second, "Initial retry interval of failed reconcile request. It doubles with each failure, upto retry-interval-max")
-	flag.DurationVar(&retryIntervalMax, "retry-interval-max", 5*time.Minute, "Maximum retry interval of failed reconcile request")
-	flag.IntVar(&workerThreads, "worker-threads", 2, "Number of concurrent reconcilers for each of the controllers")
-	flag.Parse()
-
-	logrusLog := logrus.New()
-	logrusLog.SetFormatter(&logrus.JSONFormatter{
-		TimestampFormat: time.RFC3339Nano,
-	})
-
-	logger := logrusr.New(logrusLog)
-	ctrl.SetLogger(logger)
-	setupLog.V(common.InfoLevel).Info(common.DellReplicationController, "Version", core.SemVer, "Commit ID", core.CommitSha32, "Commit SHA", core.CommitTime.Format(time.RFC1123))
-
-	setupLog.V(common.InfoLevel).Info("Prefix", "Domain", domain)
-	controllers.InitLabelsAndAnnotations(domain)
-
-	flagMap := make(map[string]string)
-	flagMap["metrics-addr"] = metricsAddr
-	flagMap["leader-election"] = strconv.FormatBool(enableLeaderElection)
-	flagMap["prefix"] = domain
-	flagMap["retry-interval-start"] = retryIntervalStart.String()
-	flagMap["retry-interval-max"] = retryIntervalMax.String()
-	flagMap["worker-threads"] = strconv.Itoa(workerThreads)
-
-	return flagMap, setupLog, logrusLog, context.Background()
-
 }
 
 func stringToTimeDuration(timeString string) time.Duration {

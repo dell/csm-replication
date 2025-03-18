@@ -1167,17 +1167,17 @@ func TestSetupControllerManager(t *testing.T) {
 		expectedErr bool
 	}{
 		{
-			name:     "Success",
-			mgr:      mockMgr,
-			setupLog: ctrl.Log.WithName("test-logger"),
-			setup: func() {},
+			name:        "Success",
+			mgr:         mockMgr,
+			setupLog:    ctrl.Log.WithName("test-logger"),
+			setup:       func() {},
 			expectedErr: false,
 		},
 		{
-			name:     "Failure",
-			mgr:      mockMgr,
-			setupLog: ctrl.Log.WithName("test-logger"),
-			setup: func() {},
+			name:        "Failure",
+			mgr:         mockMgr,
+			setupLog:    ctrl.Log.WithName("test-logger"),
+			setup:       func() {},
 			expectedErr: false,
 		},
 	}
@@ -1255,5 +1255,57 @@ func TestCreateManagerInstance(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestMain(t *testing.T) {
+	defaultCreateManagerInstance := createManagerInstance
+	defaultOSExit := osExit
+	defaultSetupFlags := setupFlags
+
+	osExitCode := 0
+
+	after := func() {
+		// Restore the original function after the test
+		createManagerInstance = defaultCreateManagerInstance
+		osExit = defaultOSExit
+		setupFlags = defaultSetupFlags
+	}
+
+	tests := []struct {
+		name               string
+		setup              func()
+		expectedOsExitCode int
+	}{
+		{
+			name: "Manager is nil",
+			setup: func() {
+				setupFlags = func() (map[string]string, logr.Logger, *logrus.Logger, context.Context) {
+					flagMap := make(map[string]string)
+					return flagMap, logr.Logger{}, logrus.New(), context.Background()
+				}
+
+				createManagerInstance = func(flagMap map[string]string) manager.Manager {
+					return nil
+				}
+
+				osExit = func(code int) {
+					osExitCode = code
+				}
+			},
+			expectedOsExitCode: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(_ *testing.T) {
+			defer after()
+			tt.setup()
+			main()
+		})
+		if osExitCode != tt.expectedOsExitCode {
+			t.Errorf("Expected osExitCode: %v, but got osExitCode: %v", tt.expectedOsExitCode, osExitCode)
+		}
+		osExitCode = 0
 	}
 }
