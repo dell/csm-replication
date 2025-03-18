@@ -190,6 +190,7 @@ func (m *mockSecretController) GetLogger() logr.Logger {
 func (m *mockSecretController) Start(_ context.Context) error {
 	return nil
 }
+
 func (m *mockSecretController) Watch(_ source.TypedSource[reconcile.Request]) error {
 	return nil
 }
@@ -511,7 +512,6 @@ func TestControllerManager_createControllerManager(t *testing.T) {
 }
 
 func TestSetupFlags(t *testing.T) {
-
 	// Call the setupFlags function
 	flags, setupLog, logrusLog, ctx := setupFlags()
 
@@ -736,7 +736,6 @@ func TestStartManager(t *testing.T) {
 					t.Errorf("Expected exit code 1, but got %d", exitCode)
 				}
 			}
-
 		})
 	}
 }
@@ -793,7 +792,6 @@ func TestCreatePersistentVolumeReconciler(t *testing.T) {
 				getPersistentVolumeReconciler = func(_ *repController.PersistentVolumeReconciler, _ manager.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
 					return nil
 				}
-
 			},
 			wantErr: false,
 		},
@@ -849,7 +847,6 @@ func TestCreatePersistentVolumeReconciler(t *testing.T) {
 					t.Errorf("Expected exit code 1, but got %d", exitCode)
 				}
 			}
-
 		})
 	}
 }
@@ -906,7 +903,6 @@ func TestCreateReplicationGroupReconciler(t *testing.T) {
 				getReplicationGroupReconciler = func(_ *repController.ReplicationGroupReconciler, _ manager.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
 					return nil
 				}
-
 			},
 			wantErr: false,
 		},
@@ -1018,7 +1014,6 @@ func TestCreatePersistentVolumeClaimReconciler(t *testing.T) {
 				getPersistentVolumeClaimReconciler = func(_ *repController.PersistentVolumeClaimReconciler, _ manager.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
 					return nil
 				}
-
 			},
 			wantErr: false,
 		},
@@ -1136,7 +1131,6 @@ func TestStartSecretController(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			if tt.setup != nil {
 				tt.setup()
 			}
