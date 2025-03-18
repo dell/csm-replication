@@ -59,6 +59,17 @@ type PersistentVolumeReconciler struct {
 	Domain             string
 }
 
+var (
+	getPersistentVolumeReconcilerUpdate = func(r *PersistentVolumeReconciler, ctx context.Context, obj client.Object) error {
+		return r.Update(ctx, obj)
+	}
+	// getPersistentVolumeReconcilerEventf = func(r *PersistentVolumeReconciler, obj runtime.Object, eventtype string, reason string, messageFmt string, args ...interface{}) {
+	getPersistentVolumeReconcilerEventf = func(r *PersistentVolumeReconciler, obj runtime.Object, eventtype string, reason string, messageFmt string, remoteClusterID string) {
+		r.EventRecorder.Eventf(obj, eventtype, reason,
+			messageFmt, remoteClusterID)
+	}
+)
+
 // +kubebuilder:rbac:groups=core,resources=persistentvolumes,verbs=get;update;patch;list;watch;delete
 
 // Reconcile contains reconciliation logic that updates PersistentVolume depending on it's current state
@@ -459,12 +470,14 @@ func (r *PersistentVolumeReconciler) processLocalPV(ctx context.Context, localPV
 	if updatePV {
 		// Finally add the PV sync complete annotation
 		controller.AddAnnotation(localPV, controller.PVSyncComplete, "yes")
-		err := r.Update(ctx, localPV)
+		err := getPersistentVolumeReconcilerUpdate(r, ctx, localPV)
 		if err != nil {
 			return err
 		}
 		log.V(common.InfoLevel).Info("Successfully updated local PV with remote annotations")
-		r.EventRecorder.Eventf(localPV, eventTypeNormal, eventReasonUpdated,
+		// r.EventRecorder.Eventf(localPV, eventTypeNormal, eventReasonUpdated,
+		// 	"PV sync complete for ClusterId: %s", remoteClusterID)
+		getPersistentVolumeReconcilerEventf(r, localPV, eventTypeNormal, eventReasonUpdated,
 			"PV sync complete for ClusterId: %s", remoteClusterID)
 	}
 	return nil
@@ -486,22 +499,34 @@ func (r *PersistentVolumeReconciler) SetupWithManager(mgr ctrl.Manager, limiter 
 		Complete(r)
 }
 
+// External function variables
+var (
+	newPredicateFuncs = predicate.NewPredicateFuncs
+	getAnnotations    = func(meta client.Object) map[string]string {
+		return meta.GetAnnotations()
+	}
+	getDeletionTimestamp = func(meta client.Object) *metav1.Time {
+		return meta.GetDeletionTimestamp()
+	}
+)
+
+// pvProtectionIsComplete checks if the PV protection is complete based on annotations.
 func pvProtectionIsComplete() predicate.Predicate {
-	return predicate.NewPredicateFuncs(func(meta client.Object) bool {
-		a := meta.GetAnnotations()
+	return newPredicateFuncs(func(meta client.Object) bool {
+		a := getAnnotations(meta)
 		return a != nil && a[controller.PVProtectionComplete] == "yes"
 	})
 }
 
 func hasDeletionTimestamp() predicate.Predicate {
-	return predicate.NewPredicateFuncs(func(meta client.Object) bool {
-		return meta.GetDeletionTimestamp() != nil
+	return newPredicateFuncs(func(meta client.Object) bool {
+		return getDeletionTimestamp(meta) != nil
 	})
 }
 
 func isDeletionRequested() predicate.Predicate {
-	return predicate.NewPredicateFuncs(func(meta client.Object) bool {
-		a := meta.GetAnnotations()
+	return newPredicateFuncs(func(meta client.Object) bool {
+		a := getAnnotations(meta)
 		return a != nil && a[controller.DeletionRequested] == "yes"
 	})
 }

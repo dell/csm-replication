@@ -145,11 +145,15 @@ func (c *Config) updateConfig(ctx context.Context, client ctrlClient.Client, opt
 	return nil
 }
 
+var GetConnection = func(c *Config, clusterID string) (connection.RemoteClusterClient, error) {
+	return c.repConfig.GetConnection(clusterID)
+}
+
 // GetConnection returns cluster client for given cluster ID
 func (c *Config) GetConnection(clusterID string) (connection.RemoteClusterClient, error) {
 	c.Lock.Lock()
 	defer c.Lock.Unlock()
-	return c.repConfig.GetConnection(clusterID)
+	return GetConnection(c, clusterID)
 }
 
 // GetClusterID returns cluster ID for config instance
@@ -186,6 +190,10 @@ func (config *replicationConfig) Print(log logr.Logger) {
 	}
 }
 
+var Verify = func(config *replicationConfig, ctx context.Context) error {
+	return config.Verify(ctx)
+}
+
 // VerifyConfig verifies correctness of replication config
 func (config *replicationConfig) VerifyConfig(ctx context.Context) error {
 	if config.ClusterID == "" {
@@ -201,7 +209,8 @@ func (config *replicationConfig) VerifyConfig(ctx context.Context) error {
 		}
 		targetMap[target.ClusterID] = ""
 	}
-	err := config.Verify(ctx)
+	// err := config.Verify(ctx)
+	err := Verify(config, ctx)
 	return err
 }
 
@@ -249,9 +258,9 @@ func getReplicationConfig(ctx context.Context, client ctrlClient.Client, opts Co
 			if err != nil {
 				return nil, nil, err
 			}
-
 		} else {
 			if isInInvalidState == true && opts.Mode == "controller" {
+
 				log.V(common.InfoLevel).Info("Correct config, publishing event. ")
 				err := controllers.PublishControllerEvent(ctx, client, recorder, "Normal", "Correct config applied", "Correct configuration has been applied to cluster.")
 				isInInvalidState = false
@@ -264,6 +273,10 @@ func getReplicationConfig(ctx context.Context, client ctrlClient.Client, opts Co
 		return configMap, repConfig, nil
 	}
 	return configMap, nil, nil
+}
+
+var InClusterConfig = func() (*rest.Config, error) {
+	return rest.InClusterConfig()
 }
 
 // Returns a connection handler for the remote clusters
@@ -293,7 +306,7 @@ func getConnHandler(ctx context.Context, targets []target, client ctrlClient.Cli
 	inCluster, _ := strconv.ParseBool(getEnv(common.EnvInClusterConfig, "false"))
 
 	if inCluster {
-		restConfig, err = rest.InClusterConfig()
+		restConfig, err = InClusterConfig()
 		if err != nil {
 			return nil, err
 		}

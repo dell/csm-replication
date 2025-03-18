@@ -17,17 +17,20 @@ package replicationcontroller
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
+
 	csireplicator "github.com/dell/csm-replication/controllers/csi-replicator"
 	constants "github.com/dell/csm-replication/pkg/common"
-	"github.com/dell/csm-replication/pkg/config"
 	"github.com/dell/csm-replication/pkg/connection"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
+	"github.com/dell/csm-replication/test/mocks"
+	"github.com/go-logr/logr"
 	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	"github.com/stretchr/testify/suite"
 	v1 "k8s.io/api/core/v1"
@@ -67,7 +70,7 @@ func (suite *RGControllerTestSuite) Init() {
 	controllers.InitLabelsAndAnnotations(constants.DefaultDomain)
 	suite.driver = utils.GetDefaultDriver()
 	suite.client = utils.GetFakeClient()
-	fakeConfig := config.NewFakeConfig(suite.driver.SourceClusterID, suite.driver.RemoteClusterID)
+	fakeConfig := mocks.NewFakeConfig(suite.driver.SourceClusterID, suite.driver.RemoteClusterID)
 	suite.config = fakeConfig
 	suite.initReconciler(fakeConfig)
 }
@@ -289,7 +292,7 @@ func (suite *RGControllerTestSuite) TestReconcileRGWithAnnotations() {
 
 func (suite *RGControllerTestSuite) TestReconcileRGWithAnnotationsSingleCluster() {
 	// scenario: RG without sync complete
-	newConfig := config.NewFakeConfigForSingleCluster(suite.client,
+	newConfig := mocks.NewFakeConfigForSingleCluster(suite.client,
 		suite.driver.SourceClusterID, suite.driver.RemoteClusterID)
 	suite.config = newConfig
 	suite.reconciler.Config = newConfig
@@ -431,7 +434,7 @@ func (suite *RGControllerTestSuite) TestReconcileRGWithSyncCompleteWithError() {
 
 func (suite *RGControllerTestSuite) TestRGSyncDeletion() {
 	// scenario: Test Remote RG sync deletion
-	newConfig := config.NewFakeConfigForSingleCluster(suite.client,
+	newConfig := mocks.NewFakeConfigForSingleCluster(suite.client,
 		suite.driver.SourceClusterID, suite.driver.RemoteClusterID)
 	suite.config = newConfig
 	suite.reconciler.Config = newConfig
@@ -693,4 +696,322 @@ func (suite *RGControllerTestSuite) TestProcessSnapshotEvent() {
 
 	err = suite.reconciler.processSnapshotEvent(context.Background(), rg, remoteClient, suite.reconciler.Log)
 	suite.NoError(err, "processSnapshotEvent should succeed when a valid snapshot class and action attributes are provided")
+}
+
+func TestReplicationGroupReconciler_SetupWithManager(t *testing.T) {
+	tests := []struct {
+		name           string
+		manager        ctrl.Manager
+		limiter        workqueue.TypedRateLimiter[reconcile.Request]
+		maxReconcilers int
+		wantError      bool
+	}{
+		{
+			name:           "Manager is nil",
+			manager:        nil,
+			limiter:        nil,
+			maxReconcilers: 0,
+			wantError:      true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &ReplicationGroupReconciler{}
+			err := r.SetupWithManager(tt.manager, tt.limiter, tt.maxReconcilers)
+			if (err != nil) != tt.wantError {
+				t.Errorf("SetupWithManager() error = %v, wantError %v", err, tt.wantError)
+			}
+		})
+	}
+}
+
+func TestReplicationGroupReconciler_processLastActionResult(t *testing.T) {
+	originalGetDellCsiReplicationGroupProcessSnapshotEvent := getDellCsiReplicationGroupProcessSnapshotEvent
+	originalGetDellCsiReplicationGroupUpdate := getDellCsiReplicationGroupUpdate
+
+	defer func() {
+		getDellCsiReplicationGroupProcessSnapshotEvent = originalGetDellCsiReplicationGroupProcessSnapshotEvent
+		getDellCsiReplicationGroupUpdate = originalGetDellCsiReplicationGroupUpdate
+	}()
+
+	getDellCsiReplicationGroupProcessSnapshotEvent = func(_ *ReplicationGroupReconciler, _ context.Context, _ *repv1.DellCSIReplicationGroup, _ connection.RemoteClusterClient, _ logr.Logger) error {
+		return errors.New("error in getDellCsiReplicationGroupProcessSnapshotEvent()")
+	}
+
+	getDellCsiReplicationGroupUpdate = func(_ *ReplicationGroupReconciler, _ context.Context, _ *repv1.DellCSIReplicationGroup) error {
+		return nil
+	}
+
+	type args struct {
+		ctx          context.Context
+		group        *repv1.DellCSIReplicationGroup
+		remoteClient connection.RemoteClusterClient
+		log          logr.Logger
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "Test case: Last action failed",
+			args: args{
+				ctx: context.Background(),
+				group: &repv1.DellCSIReplicationGroup{
+					Status: repv1.DellCSIReplicationGroupStatus{
+						Conditions: []repv1.LastAction{{}},
+						LastAction: repv1.LastAction{
+							Time:         &metav1.Time{Time: time.Date(2022, time.January, 1, 0, 0, 0, 0, time.UTC)},
+							ErrorMessage: "error msg",
+						},
+					},
+				},
+				remoteClient: nil,
+				log:          logr.Discard(),
+			},
+			wantErr: true,
+		},
+		{
+			name: "Test case: Last action has already been processed",
+			args: args{
+				ctx: context.Background(),
+				group: &repv1.DellCSIReplicationGroup{
+					Status: repv1.DellCSIReplicationGroupStatus{
+						Conditions: []repv1.LastAction{
+							{
+								Condition: "successful condition",
+								Time:      &metav1.Time{Time: time.Now()},
+							},
+						}, LastAction: repv1.LastAction{
+							Time:         &metav1.Time{Time: time.Now()},
+							ErrorMessage: "",
+						},
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							controllers.ActionProcessedTime: time.Now().GoString(),
+						},
+					},
+				},
+				remoteClient: nil,
+				log:          logr.Discard(),
+			},
+			wantErr: false,
+		},
+		{
+			name: "Test case: Last action is a snapshot",
+			args: args{
+				ctx: context.Background(),
+				group: &repv1.DellCSIReplicationGroup{
+					Status: repv1.DellCSIReplicationGroupStatus{
+						Conditions: []repv1.LastAction{
+							{
+								Condition: "successful condition",
+							},
+						}, LastAction: repv1.LastAction{
+							Time:         &metav1.Time{Time: time.Date(2022, time.January, 1, 0, 0, 0, 0, time.UTC)},
+							ErrorMessage: "",
+							Condition:    "CREATE_SNAPSHOT",
+						},
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							controllers.ActionProcessedTime: time.Now().GoString(),
+						},
+					},
+				},
+				remoteClient: nil,
+				log:          logr.Discard(),
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &ReplicationGroupReconciler{}
+			if err := r.processLastActionResult(tt.args.ctx, tt.args.group, tt.args.remoteClient, tt.args.log); (err != nil) != tt.wantErr {
+				t.Errorf("ReplicationGroupReconciler.processLastActionResult() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestReplicationGroupReconciler_processSnapshotEvent(t *testing.T) {
+	originalGetDellCsiReplicationGroupGetSnapshotClass := getDellCsiReplicationGroupGetSnapshotClass
+	originalGetDellCsiReplicationGroupGetNamespace := getDellCsiReplicationGroupGetNamespace
+	originalGetDellCsiReplicationGroupCreateNamespace := getDellCsiReplicationGroupCreateNamespace
+	originalGetDellCsiReplicationGroupCreateSnapshotContent := getDellCsiReplicationGroupCreateSnapshotContent
+	originalGetDellCsiReplicationGroupCreateSnapshotObject := getDellCsiReplicationGroupCreateSnapshotObject
+
+	after := func() {
+		getDellCsiReplicationGroupGetSnapshotClass = originalGetDellCsiReplicationGroupGetSnapshotClass
+		getDellCsiReplicationGroupGetNamespace = originalGetDellCsiReplicationGroupGetNamespace
+		getDellCsiReplicationGroupCreateNamespace = originalGetDellCsiReplicationGroupCreateNamespace
+		getDellCsiReplicationGroupCreateSnapshotContent = originalGetDellCsiReplicationGroupCreateSnapshotContent
+		getDellCsiReplicationGroupCreateSnapshotObject = originalGetDellCsiReplicationGroupCreateSnapshotObject
+	}
+
+	tests := []struct {
+		name         string
+		setup        func()
+		group        *repv1.DellCSIReplicationGroup
+		remoteClient connection.RemoteClusterClient
+		log          logr.Logger
+		wantErr      bool
+	}{
+		{
+			name:         "Snapshot class not found in remote cluster",
+			setup:        func() {},
+			group:        &repv1.DellCSIReplicationGroup{},
+			remoteClient: nil,
+			log:          logr.Discard(),
+			wantErr:      false,
+		},
+		{
+			name: "Snapshot class does not exist on remote cluster",
+			setup: func() {
+				getDellCsiReplicationGroupGetSnapshotClass = func(_ connection.RemoteClusterClient, _ context.Context, _ string) (*s1.VolumeSnapshotClass, error) {
+					return nil, errors.New("error in getDellCsiReplicationGroupGetSnapshotClass")
+				}
+			},
+			group: &repv1.DellCSIReplicationGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						csireplicator.Action: func() string {
+							obj := csireplicator.ActionAnnotation{}
+							val, _ := json.Marshal(obj)
+							return string(val)
+						}(),
+					},
+				},
+			},
+			remoteClient: nil,
+			log:          logr.Discard(),
+			wantErr:      true,
+		},
+		{
+			name: "unable to create the desired namespace",
+			setup: func() {
+				getDellCsiReplicationGroupGetSnapshotClass = func(_ connection.RemoteClusterClient, _ context.Context, _ string) (*s1.VolumeSnapshotClass, error) {
+					// return nil, errors.New("error in getDellCsiReplicationGroupGetSnapshotClass")
+					return &s1.VolumeSnapshotClass{ObjectMeta: metav1.ObjectMeta{Name: "test-snapshotclass"}}, nil
+				}
+
+				getDellCsiReplicationGroupGetNamespace = func(_ connection.RemoteClusterClient, _ context.Context, _ string) (*v1.Namespace, error) {
+					return nil, errors.New("error in getDellCsiReplicationGroupGetNamespace")
+					// return &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test-namespace"}}, nil
+				}
+
+				getDellCsiReplicationGroupCreateNamespace = func(_ connection.RemoteClusterClient, _ context.Context, _ *v1.Namespace) error {
+					return errors.New("error in getDellCsiReplicationGroupCreateNamespace")
+				}
+			},
+			group: &repv1.DellCSIReplicationGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						csireplicator.Action: func() string {
+							obj := csireplicator.ActionAnnotation{}
+							val, _ := json.Marshal(obj)
+							return string(val)
+						}(),
+					},
+				},
+			},
+			remoteClient: nil,
+			log:          logr.Discard(),
+			wantErr:      true,
+		},
+		{
+			name: "unable to create snapshot content",
+			setup: func() {
+				getDellCsiReplicationGroupGetSnapshotClass = func(_ connection.RemoteClusterClient, _ context.Context, _ string) (*s1.VolumeSnapshotClass, error) {
+					return &s1.VolumeSnapshotClass{ObjectMeta: metav1.ObjectMeta{Name: "test-snapshotclass"}}, nil
+				}
+				getDellCsiReplicationGroupGetNamespace = func(_ connection.RemoteClusterClient, _ context.Context, _ string) (*v1.Namespace, error) {
+					return &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test-namespace"}}, nil
+				}
+				getDellCsiReplicationGroupCreateSnapshotContent = func(_ connection.RemoteClusterClient, _ context.Context, _ *s1.VolumeSnapshotContent) error {
+					return errors.New("error in getDellCsiReplicationGroupCreateSnapshotContent")
+				}
+			},
+			group: &repv1.DellCSIReplicationGroup{
+				Status: repv1.DellCSIReplicationGroupStatus{
+					LastAction: repv1.LastAction{
+						ActionAttributes: func() map[string]string {
+							m := map[string]string{
+								"volumeHandle":   "test-volume-handle",
+								"snapshotHandle": "test-snapshot-handle",
+							}
+							return m
+						}(),
+					},
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						csireplicator.Action: func() string {
+							obj := csireplicator.ActionAnnotation{}
+							val, _ := json.Marshal(obj)
+							return string(val)
+						}(),
+					},
+				},
+			},
+			remoteClient: nil,
+			log:          logr.Discard(),
+			wantErr:      true,
+		},
+		{
+			name: "unable to create snapshot object",
+			setup: func() {
+				getDellCsiReplicationGroupGetSnapshotClass = func(_ connection.RemoteClusterClient, _ context.Context, _ string) (*s1.VolumeSnapshotClass, error) {
+					return &s1.VolumeSnapshotClass{ObjectMeta: metav1.ObjectMeta{Name: "test-snapshotclass"}}, nil
+				}
+				getDellCsiReplicationGroupGetNamespace = func(_ connection.RemoteClusterClient, _ context.Context, _ string) (*v1.Namespace, error) {
+					return &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test-namespace"}}, nil
+				}
+				getDellCsiReplicationGroupCreateSnapshotContent = func(_ connection.RemoteClusterClient, _ context.Context, _ *s1.VolumeSnapshotContent) error {
+					return nil
+				}
+				getDellCsiReplicationGroupCreateSnapshotObject = func(_ connection.RemoteClusterClient, _ context.Context, _ *s1.VolumeSnapshot) error {
+					return errors.New("error in getDellCsiReplicationGroupCreateSnapshotObject")
+				}
+			},
+			group: &repv1.DellCSIReplicationGroup{
+				Status: repv1.DellCSIReplicationGroupStatus{
+					LastAction: repv1.LastAction{
+						ActionAttributes: func() map[string]string {
+							m := map[string]string{
+								"volumeHandle":   "test-volume-handle",
+								"snapshotHandle": "test-snapshot-handle",
+							}
+							return m
+						}(),
+					},
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						csireplicator.Action: func() string {
+							obj := csireplicator.ActionAnnotation{}
+							val, _ := json.Marshal(obj)
+							return string(val)
+						}(),
+					},
+				},
+			},
+			remoteClient: nil,
+			log:          logr.Discard(),
+			wantErr:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setup()
+			defer after()
+			r := &ReplicationGroupReconciler{}
+			if err := r.processSnapshotEvent(context.Background(), tt.group, tt.remoteClient, tt.log); (err != nil) != tt.wantErr {
+				t.Errorf("ReplicationGroupReconciler.processLastActionResult() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
 }

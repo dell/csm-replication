@@ -57,6 +57,10 @@ type PersistentVolumeReconciler struct {
 
 const protectionIndexKey = "protection_id"
 
+var getManagerIndexField = func(mgr ctrl.Manager, ctx context.Context) error {
+	return mgr.GetFieldIndexer().IndexField(ctx, &repv1.DellCSIReplicationGroup{}, protectionIndexKey, getProtectionGroupID)
+}
+
 // Reconcile contains reconciliation logic that updates PersistentVolume depending on it's current state
 func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("persistentvolume", req.NamespacedName)
@@ -351,16 +355,10 @@ func (r *PersistentVolumeReconciler) createReplicationGroup(ctx context.Context,
 
 // SetupWithManager start using reconciler by creating new controller managed by provided manager
 func (r *PersistentVolumeReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, limiter workqueue.TypedRateLimiter[reconcile.Request], maxReconcilers int) error {
-	if err := mgr.GetFieldIndexer().IndexField(ctx, &repv1.DellCSIReplicationGroup{}, protectionIndexKey, getProtectionGroupID); err != nil {
+	if err := getManagerIndexField(mgr, ctx); err != nil {
 		return err
 	}
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&v1.PersistentVolume{}).
-		WithOptions(reconciler.Options{
-			MaxConcurrentReconciles: maxReconcilers,
-			RateLimiter:             limiter,
-		}).
-		Complete(r)
+	return ctrl.NewControllerManagedBy(mgr).For(&v1.PersistentVolume{}).WithOptions(reconciler.Options{MaxConcurrentReconciles: maxReconcilers, RateLimiter: limiter}).Complete(r)
 }
 
 // getProtectionGroupID take a DellCSIReplicationGroup instance and returns its protection group ID.
