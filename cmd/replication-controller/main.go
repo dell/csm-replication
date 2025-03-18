@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/bombsimon/logrusr/v4"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsServer "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -57,8 +59,15 @@ import (
 )
 
 var (
-	scheme                    = runtime.NewScheme()
-	setupLog                  = ctrl.Log.WithName("setup")
+	scheme   = runtime.NewScheme()
+	setupLog = ctrl.Log.WithName("setup")
+
+	// Added to improve UT coverage
+	osExit                         = os.Exit
+	createControllerManagerWrapper = func(ctx context.Context, mgr manager.Manager) (*ControllerManager, error) {
+		return createControllerManager(ctx, mgr)
+	}
+
 	getSecretControllerLogger = func(mgr *ControllerManager, request reconcile.Request) logr.Logger {
 		return mgr.SecretController.GetLogger().WithName(request.Name)
 	}
@@ -76,6 +85,24 @@ var (
 	}
 	getConfigPrintConfig = func(config *config.Config, logger logr.Logger) {
 		config.PrintConfig(logger)
+	}
+	getManagerStart = func(mgr manager.Manager) error {
+		return mgr.Start(ctrl.SetupSignalHandler())
+	}
+	getPersistentVolumeReconciler = func(r *repController.PersistentVolumeReconciler, mgr manager.Manager, limiter workqueue.TypedRateLimiter[reconcile.Request], maxReconcilers int) error {
+		return r.SetupWithManager(mgr, limiter, maxReconcilers)
+	}
+	getReplicationGroupReconciler = func(r *repController.ReplicationGroupReconciler, mgr manager.Manager, limiter workqueue.TypedRateLimiter[reconcile.Request], maxReconcilers int) error {
+		return r.SetupWithManager(mgr, limiter, maxReconcilers)
+	}
+	getPersistentVolumeClaimReconciler = func(r *repController.PersistentVolumeClaimReconciler, mgr manager.Manager, limiter workqueue.TypedRateLimiter[reconcile.Request], maxReconcilers int) error {
+		return r.SetupWithManager(mgr, limiter, maxReconcilers)
+	}
+	getSecretController = func(controllerManager *ControllerManager) error {
+		return controllerManager.startSecretController()
+	}
+	getCtrlNewManager = func(options manager.Options) (manager.Manager, error) {
+		return ctrl.NewManager(ctrl.GetConfigOrDie(), options)
 	}
 )
 
@@ -178,6 +205,145 @@ func createControllerManager(ctx context.Context, mgr ctrl.Manager) (*Controller
 // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
 
 func main() {
+
+	flagMap, setupLog, logrusLog, ctx := setupFlags()
+
+	// Create the manager instance
+	mgr := createManagerInstance(flagMap)
+
+	if mgr != nil {
+		controllerMgr := setupControllerManager(ctx, mgr, setupLog)
+		if controllerMgr != nil {
+			// Start the watch on configmap
+			controllerMgr.setupConfigMapWatcher(logrusLog)
+
+			// Process the config. Get initial log level
+			processLogLevel(controllerMgr.config.LogLevel, logrusLog)
+
+			// Start the secret controller
+			startSecretController(controllerMgr, setupLog)
+
+			// Create PersistentVolumeClaimReconciler
+			expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](stringToTimeDuration(flagMap["retry-interval-start"]), stringToTimeDuration(flagMap["retry-interval-max"]))
+			createPersistentVolumeClaimReconciler(mgr, controllerMgr, flagMap["prefix"], stringToInt(flagMap["worker-threads"]), expRateLimiter, setupLog)
+
+			// Create ReplicationGroupReconciler
+			createReplicationGroupReconciler(mgr, controllerMgr, flagMap["prefix"], stringToInt(flagMap["worker-threads"]), expRateLimiter, setupLog)
+
+			// Create PersistentVolumeReconciler
+			createPersistentVolumeReconciler(mgr, controllerMgr, flagMap["prefix"], stringToInt(flagMap["worker-threads"]), expRateLimiter, setupLog)
+
+		}
+
+		// +kubebuilder:scaffold:builder
+
+		// start manager
+		startManager(mgr, setupLog)
+	}
+
+}
+
+func startManager(mgr manager.Manager, setupLog logr.Logger) {
+	setupLog.Info("starting manager")
+
+	if err := getManagerStart(mgr); err != nil {
+		log.Println("problem running manager")
+		setupLog.Error(err, "problem running manager")
+		osExit(1)
+	}
+}
+
+func createPersistentVolumeReconciler(mgr manager.Manager, controllerMgr *ControllerManager, domain string, workerThreads int, expRateLimiter workqueue.TypedRateLimiter[reconcile.Request], setupLog logr.Logger) {
+	// PV Controller
+	if err := getPersistentVolumeReconciler(&repController.PersistentVolumeReconciler{
+		Client:        mgr.GetClient(),
+		Log:           ctrl.Log.WithName("controllers").WithName("PersistentVolume"),
+		Scheme:        mgr.GetScheme(),
+		EventRecorder: mgr.GetEventRecorderFor(common.DellReplicationController),
+		Config:        controllerMgr.config,
+		Domain:        domain,
+	}, mgr, expRateLimiter, workerThreads); err != nil {
+		log.Println("unable to create controller", common.DellReplicationController, "PersistentVolume")
+		setupLog.Error(err, "unable to create controller", common.DellReplicationController, "PersistentVolume")
+		osExit(1)
+	}
+}
+
+func createReplicationGroupReconciler(mgr manager.Manager, controllerMgr *ControllerManager, domain string, workerThreads int, expRateLimiter workqueue.TypedRateLimiter[reconcile.Request], setupLog logr.Logger) {
+	if err := getReplicationGroupReconciler(&repController.ReplicationGroupReconciler{
+		Client:        mgr.GetClient(),
+		Log:           ctrl.Log.WithName("controllers").WithName("DellCSIReplicationGroup"),
+		Scheme:        mgr.GetScheme(),
+		EventRecorder: mgr.GetEventRecorderFor(common.DellReplicationController),
+		Config:        controllerMgr.config,
+		Domain:        domain,
+	}, mgr, expRateLimiter, workerThreads); err != nil {
+		setupLog.Error(err, "unable to create controller", common.DellReplicationController, "DellCSIReplicationGroup")
+		osExit(1)
+	}
+}
+
+func createPersistentVolumeClaimReconciler(mgr manager.Manager, controllerMgr *ControllerManager, domain string, workerThreads int, expRateLimiter workqueue.TypedRateLimiter[reconcile.Request], setupLog logr.Logger) {
+
+	if err := getPersistentVolumeClaimReconciler(&repController.PersistentVolumeClaimReconciler{
+		Client:        mgr.GetClient(),
+		Log:           ctrl.Log.WithName("controllers").WithName("PersistentVolumeClaim"),
+		Scheme:        mgr.GetScheme(),
+		EventRecorder: mgr.GetEventRecorderFor(common.DellReplicationController),
+		Config:        controllerMgr.config,
+		Domain:        domain,
+	}, mgr, expRateLimiter, workerThreads); err != nil {
+		setupLog.Error(err, "unable to create controller", common.DellReplicationController, "PersistentVolumeClaim")
+		osExit(1)
+	}
+}
+
+func startSecretController(controllerMgr *ControllerManager, setupLog logr.Logger) {
+	err := getSecretController(controllerMgr)
+	if err != nil {
+		setupLog.Error(err, "failed to setup secret controller. Continuing")
+	}
+}
+
+func processLogLevel(logLevel string, logrusLog *logrus.Logger) {
+	level, err := common.ParseLevel(logLevel)
+	if err != nil {
+		log.Println("Unable to parse ", err)
+	}
+	log.Println("set level to", level)
+	logrusLog.SetLevel(level)
+}
+
+func setupControllerManager(ctx context.Context, mgr manager.Manager, setupLog logr.Logger) *ControllerManager {
+	controllerMgr, err := createControllerManagerWrapper(ctx, mgr)
+	if err != nil {
+		setupLog.Error(err, "failed to configure the controller manager")
+		osExit(1)
+	}
+
+	return controllerMgr
+}
+
+func createManagerInstance(flagMap map[string]string) manager.Manager {
+	mgr, err := getCtrlNewManager(ctrl.Options{
+		Scheme: scheme,
+		Metrics: metricsServer.Options{
+			BindAddress: flagMap["metrics-addr"],
+		},
+		WebhookServer:              webhook.NewServer(webhook.Options{Port: 9443}),
+		LeaderElection:             stringToBoolean(flagMap["leader-election"]),
+		LeaderElectionResourceLock: "leases",
+		LeaderElectionID:           fmt.Sprintf("%s-manager", common.DellReplicationController),
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to start manager")
+		osExit(1)
+	}
+
+	return mgr
+}
+
+func setupFlags() (map[string]string, logr.Logger, *logrus.Logger, context.Context) {
 	var (
 		retryIntervalStart time.Duration
 		retryIntervalMax   time.Duration
@@ -187,6 +353,7 @@ func main() {
 
 	var metricsAddr string
 	var enableLeaderElection bool
+
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8081", "The address the metric endpoint binds to.")
 	flag.StringVar(&domain, "prefix", common.DefaultDomain, "Prefix used for creating labels/annotations")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
@@ -194,9 +361,8 @@ func main() {
 			"Enabling this will ensure there is only one active dell-replication-controller manager.")
 	flag.DurationVar(&retryIntervalStart, "retry-interval-start", time.Second, "Initial retry interval of failed reconcile request. It doubles with each failure, upto retry-interval-max")
 	flag.DurationVar(&retryIntervalMax, "retry-interval-max", 5*time.Minute, "Maximum retry interval of failed reconcile request")
+	flag.IntVar(&workerThreads, "worker-threads", 2, "Number of concurrent reconcilers for each of the controllers")
 	flag.Parse()
-	setupLog.V(common.InfoLevel).Info("Prefix", "Domain", domain)
-	controllers.InitLabelsAndAnnotations(domain)
 
 	logrusLog := logrus.New()
 	logrusLog.SetFormatter(&logrus.JSONFormatter{
@@ -207,91 +373,41 @@ func main() {
 	ctrl.SetLogger(logger)
 	setupLog.V(common.InfoLevel).Info(common.DellReplicationController, "Version", core.SemVer, "Commit ID", core.CommitSha32, "Commit SHA", core.CommitTime.Format(time.RFC1123))
 
-	ctx := context.Background()
+	setupLog.V(common.InfoLevel).Info("Prefix", "Domain", domain)
+	controllers.InitLabelsAndAnnotations(domain)
 
-	// Create the manager instance
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme: scheme,
-		Metrics: metricsServer.Options{
-			BindAddress: metricsAddr,
-		},
-		WebhookServer:              webhook.NewServer(webhook.Options{Port: 9443}),
-		LeaderElection:             enableLeaderElection,
-		LeaderElectionResourceLock: "leases",
-		LeaderElectionID:           fmt.Sprintf("%s-manager", common.DellReplicationController),
-	})
+	flagMap := make(map[string]string)
+	flagMap["metrics-addr"] = metricsAddr
+	flagMap["leader-election"] = strconv.FormatBool(enableLeaderElection)
+	flagMap["prefix"] = domain
+	flagMap["retry-interval-start"] = retryIntervalStart.String()
+	flagMap["retry-interval-max"] = retryIntervalMax.String()
+	flagMap["worker-threads"] = strconv.Itoa(workerThreads)
+
+	return flagMap, setupLog, logrusLog, context.Background()
+
+}
+
+func stringToTimeDuration(timeString string) time.Duration {
+	duration, err := time.ParseDuration(timeString)
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
-		os.Exit(1)
+		return 0
 	}
+	return duration
+}
 
-	controllerMgr, err := createControllerManager(ctx, mgr)
+func stringToBoolean(boolString string) bool {
+	boolean, err := strconv.ParseBool(boolString)
 	if err != nil {
-		setupLog.Error(err, "failed to configure the controller manager")
-		os.Exit(1)
+		return false
 	}
+	return boolean
+}
 
-	// Start the watch on configmap
-	controllerMgr.setupConfigMapWatcher(logrusLog)
-
-	// Process the config. Get initial log level
-	level, err := common.ParseLevel(controllerMgr.config.LogLevel)
+func stringToInt(intString string) int {
+	integer, err := strconv.Atoi(intString)
 	if err != nil {
-		log.Println("Unable to parse ", err)
+		return 0
 	}
-	log.Println("set level to", level)
-	logrusLog.SetLevel(level)
-
-	// Start the secret controller
-	err = controllerMgr.startSecretController()
-	if err != nil {
-		setupLog.Error(err, "failed to setup secret controller. Continuing")
-	}
-
-	expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](retryIntervalStart, retryIntervalMax)
-	if err = (&repController.PersistentVolumeClaimReconciler{
-		Client:        mgr.GetClient(),
-		Log:           ctrl.Log.WithName("controllers").WithName("PersistentVolumeClaim"),
-		Scheme:        mgr.GetScheme(),
-		EventRecorder: mgr.GetEventRecorderFor(common.DellReplicationController),
-		Config:        controllerMgr.config,
-		Domain:        domain,
-	}).SetupWithManager(mgr, expRateLimiter, workerThreads); err != nil {
-		setupLog.Error(err, "unable to create controller", common.DellReplicationController, "PersistentVolumeClaim")
-		os.Exit(1)
-	}
-
-	if err = (&repController.ReplicationGroupReconciler{
-		Client:        mgr.GetClient(),
-		Log:           ctrl.Log.WithName("controllers").WithName("DellCSIReplicationGroup"),
-		Scheme:        mgr.GetScheme(),
-		EventRecorder: mgr.GetEventRecorderFor(common.DellReplicationController),
-		Config:        controllerMgr.config,
-		Domain:        domain,
-	}).SetupWithManager(mgr, expRateLimiter, workerThreads); err != nil {
-		setupLog.Error(err, "unable to create controller", common.DellReplicationController, "DellCSIReplicationGroup")
-		os.Exit(1)
-	}
-
-	// PV Controller
-	if err = (&repController.PersistentVolumeReconciler{
-		Client:        mgr.GetClient(),
-		Log:           ctrl.Log.WithName("controllers").WithName("PersistentVolume"),
-		Scheme:        mgr.GetScheme(),
-		EventRecorder: mgr.GetEventRecorderFor(common.DellReplicationController),
-		Config:        controllerMgr.config,
-		Domain:        domain,
-	}).SetupWithManager(mgr, expRateLimiter, workerThreads); err != nil {
-		setupLog.Error(err, "unable to create controller", common.DellReplicationController, "PersistentVolume")
-		os.Exit(1)
-	}
-
-	// +kubebuilder:scaffold:builder
-
-	setupLog.Info("starting manager")
-
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
-		os.Exit(1)
-	}
+	return integer
 }

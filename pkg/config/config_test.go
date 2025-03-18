@@ -1082,14 +1082,14 @@ users:
 clusterId: "my-cluster"
 targets:
 CSI_LOG_LEVEL: "INFO"`)
-		err = os.WriteFile(configFilePath, newContent, 0600) // 0600: read/write for owner
+		err = os.WriteFile(configFilePath, newContent, 0o600) // 0600: read/write for owner
 		if err != nil {
 			t.Fatalf("Failed to write new config content: %v", err)
 		}
 
 		// 3. Defer the restore operation
 		defer func() {
-			err := os.WriteFile(configFilePath, originalContent, 0600)
+			err := os.WriteFile(configFilePath, originalContent, 0o600)
 			if err != nil {
 				t.Errorf("Failed to restore original config content: %v", err)
 			}

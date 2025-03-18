@@ -78,7 +78,7 @@ var (
 		return workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](retryIntervalStart, retryIntervalMax)
 	}
 
-	getNodeRescanReconcilerManager = func(r *controller.NodeRescanReconciler, mgr ctrl.Manager, limiter workqueue.TypedRateLimiter[reconcile.Request], maxReconcilers int) error {
+	getNodeRescanReconcilerManager = func(r *controller.NodeRescanReconciler, mgr manager.Manager, limiter workqueue.TypedRateLimiter[reconcile.Request], maxReconcilers int) error {
 		return r.SetupWithManager(mgr, limiter, maxReconcilers)
 	}
 
@@ -155,6 +155,7 @@ func createNodeReScannerManager(_ context.Context, mgr ctrl.Manager) *NodeRescan
 // +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;watch;list;delete;update;create
 
 func main() {
+
 	flagMap, setupLog, ctx := setupFlags()
 
 	// Connect to csi
@@ -221,6 +222,7 @@ func setupFlags() (map[string]string, logr.Logger, context.Context) {
 	flags["probe-frequency"] = probeFrequency.String()
 	flags["max-retry-action-duration"] = maxRetryDurationForActions.String()
 	return flags, setupLog, context.Background()
+
 }
 
 func getCSIConn(csiAddress string, setupLog logr.Logger) *grpc.ClientConn {
@@ -232,7 +234,8 @@ func getCSIConn(csiAddress string, setupLog logr.Logger) *grpc.ClientConn {
 	return csiConn
 }
 
-func probeCSIDriver(ctx context.Context, _ *grpc.ClientConn, setupLog logr.Logger, identityClient csiidentity.Identity) string {
+func probeCSIDriver(ctx context.Context, csiConn *grpc.ClientConn, setupLog logr.Logger, identityClient csiidentity.Identity) string {
+
 	driverName, err := identityClient.ProbeForever(ctx)
 	if err != nil {
 		setupLog.Error(err, "error waiting for the CSI driver to be ready")
@@ -290,21 +293,21 @@ func createMetricsServer(ctx context.Context, driverName string, metricsAddr str
 	createRescanManager(ctx, mgr, driverName, retryIntervalStart, retryIntervalMax, maxRetryDurationForActions, workerThreads, logrusLog)
 }
 
-func createRescanManager(ctx context.Context, mgr ctrl.Manager, driverName string, retryIntervalStart time.Duration, retryIntervalMax time.Duration, maxRetryDurationForActions time.Duration, workerThreads int, logrusLog *logrus.Logger) {
+func createRescanManager(ctx context.Context, mgr manager.Manager, driverName string, retryIntervalStart time.Duration, retryIntervalMax time.Duration, maxRetryDurationForActions time.Duration, workerThreads int, logrusLog *logrus.Logger) {
 	rescanMgr := createNodeReScannerManagerWrapper(ctx, mgr)
 	log.Printf("Rescan manager configured: (+%v)", rescanMgr)
 	// Start the watch on configmap
 	// rescanMgr.setupConfigMapWatcher(logrusLog)
 
 	// Process the config. Get initial log level
-	level, _ := common.ParseLevel("debug")
+	level, err := common.ParseLevel("debug")
 	log.Println("set level to", level)
 	logrusLog.SetLevel(level)
 
 	expRateLimiter := getWorkqueueReconcileRequest(retryIntervalStart, retryIntervalMax)
 	log.Println("expRateLimiter", expRateLimiter)
 
-	if err := getNodeRescanReconcilerManager(&controller.NodeRescanReconciler{
+	if err = getNodeRescanReconcilerManager(&controller.NodeRescanReconciler{
 		Client:                     mgr.GetClient(),
 		Log:                        ctrl.Log.WithName("controllers").WithName("DellCSINodeReScanner"),
 		Scheme:                     mgr.GetScheme(),
