@@ -274,7 +274,6 @@ func createControllerManager(ctx context.Context, mgr ctrl.Manager) (*Controller
 // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
 
 func main() {
-
 	flagMap, setupLog, logrusLog, ctx := setupFlags()
 
 	// Create the manager instance
@@ -309,7 +308,6 @@ func main() {
 		// start manager
 		startManager(mgr, setupLog)
 	}
-
 }
 
 func startManager(mgr manager.Manager, setupLog logr.Logger) {
@@ -353,7 +351,6 @@ func createReplicationGroupReconciler(mgr manager.Manager, controllerMgr *Contro
 }
 
 func createPersistentVolumeClaimReconciler(mgr manager.Manager, controllerMgr *ControllerManager, domain string, workerThreads int, expRateLimiter workqueue.TypedRateLimiter[reconcile.Request], setupLog logr.Logger) {
-
 	if err := getPersistentVolumeClaimReconciler(&repController.PersistentVolumeClaimReconciler{
 		Client:        mgr.GetClient(),
 		Log:           ctrl.Log.WithName("controllers").WithName("PersistentVolumeClaim"),
