@@ -55,7 +55,7 @@ func TestRescanNode_Success(t *testing.T) {
 }
 
 // Mock for os.ReadDir to simulate failure
-func mockReadDirFailure(name string) ([]fs.DirEntry, error) {
+func mockReadDirFailure(_ string) ([]fs.DirEntry, error) {
 	return nil, errors.New("failed to read directory")
 }
 
