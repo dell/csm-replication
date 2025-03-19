@@ -63,7 +63,6 @@ var (
 	getPersistentVolumeReconcilerUpdate = func(r *PersistentVolumeReconciler, ctx context.Context, obj client.Object) error {
 		return r.Update(ctx, obj)
 	}
-	// getPersistentVolumeReconcilerEventf = func(r *PersistentVolumeReconciler, obj runtime.Object, eventtype string, reason string, messageFmt string, args ...interface{}) {
 	getPersistentVolumeReconcilerEventf = func(r *PersistentVolumeReconciler, obj runtime.Object, eventtype string, reason string, messageFmt string, remoteClusterID string) {
 		r.EventRecorder.Eventf(obj, eventtype, reason,
 			messageFmt, remoteClusterID)

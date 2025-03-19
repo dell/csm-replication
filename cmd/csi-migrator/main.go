@@ -18,7 +18,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 	"time"
@@ -156,7 +155,7 @@ func (mgr *MigratorManager) processConfigMapChanges(loggerConfig *logrus.Logger)
 	loggerConfig.Info("Received a config change event")
 	err := getUpdateConfigMapFunc(mgr, context.Background())
 	if err != nil {
-		log.Printf("Error parsing the config: %v\n", err)
+		loggerConfig.Error("Error parsing the config: ", err)
 		return
 	}
 	mgr.config.Lock.Lock()
