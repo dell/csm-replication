@@ -178,7 +178,7 @@ var (
 )
 
 func (mgr *ReplicatorManager) processConfigMapChanges(loggerConfig *logrus.Logger) {
-	log.Println("Received a config change event")
+	loggerConfig.Info("Received a config change event")
 	err := getUpdateConfigMapFunc(mgr, context.Background())
 	if err != nil {
 		log.Printf("Error parsing the config: %v\n", err)
@@ -188,14 +188,14 @@ func (mgr *ReplicatorManager) processConfigMapChanges(loggerConfig *logrus.Logge
 	defer mgr.config.Lock.Unlock()
 	level, err := common.ParseLevel(mgr.config.LogLevel)
 	if err != nil {
-		log.Println("Unable to parse ", err)
+		loggerConfig.Error("Unable to parse ", err)
 	}
-	log.Println("set level to", level)
+	loggerConfig.Info("set level to", level)
 	loggerConfig.SetLevel(level)
 }
 
 func (mgr *ReplicatorManager) setupConfigMapWatcher(loggerConfig *logrus.Logger) {
-	log.Println("Started ConfigMap Watcher")
+	loggerConfig.Info("Started ConfigMap Watcher")
 	watchConfig()
 	onConfigChange(func(_ fsnotify.Event) {
 		mgr.processConfigMapChanges(loggerConfig)
@@ -297,18 +297,18 @@ func main() {
 	// Process the config. Get initial log level
 	level, err := getParseLevelFunc(controllerMgr.config.LogLevel)
 	if err != nil {
-		log.Println("Unable to parse ", err)
+		logrusLog.Error("Unable to parse ", err)
 	}
-	log.Println("set level to", level)
+	logrusLog.Info("set level to", level)
 	logrusLog.SetLevel(level)
 
 	// Get the kube-system content
 	var clusterUID string
 	ns, err := getClusterUID(ctx)
 	if err != nil {
-		log.Println("getClusterUuid error: ", err.Error())
+		logrusLog.Error("getClusterUuid error: ", err.Error())
 	} else {
-		log.Println("getClusterUuid got uuid: ", ns.GetUID())
+		logrusLog.Error("getClusterUuid got uuid: ", ns.GetUID())
 		clusterUID = string(ns.GetUID())
 	}
 
