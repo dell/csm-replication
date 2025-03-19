@@ -106,24 +106,24 @@ type NodeRescanner struct {
 }
 
 func (mgr *NodeRescanner) processConfigMapChanges(loggerConfig *logrus.Logger) {
-	log.Println("Received a config change event")
+	loggerConfig.Info("Received a config change event")
 	err := mgr.config.UpdateConfigMap(context.Background(), nil, mgr.Opts, nil, mgr.Manager.GetLogger())
 	if err != nil {
-		log.Printf("Error parsing the config: %v\n", err)
+		loggerConfig.Error("Error parsing the config: %v\n", err)
 		return
 	}
 	mgr.config.Lock.Lock()
 	defer mgr.config.Lock.Unlock()
 	level, err := common.ParseLevel(mgr.config.LogLevel)
 	if err != nil {
-		log.Println("Unable to parse ", err)
+		loggerConfig.Error("Unable to parse ", err)
 	}
-	log.Println("set level to", level)
+	loggerConfig.Info("set level to", level)
 	loggerConfig.SetLevel(level)
 }
 
 func (mgr *NodeRescanner) setupConfigMapWatcher(loggerConfig *logrus.Logger) {
-	log.Println("Started ConfigMap Watcher")
+	loggerConfig.Info("Started ConfigMap Watcher")
 	viper.WatchConfig()
 	viper.OnConfigChange(func(_ fsnotify.Event) {
 		mgr.processConfigMapChanges(loggerConfig)
@@ -281,7 +281,7 @@ func createMetricsServer(ctx context.Context, driverName string, metricsAddr str
 		LeaderElectionID:           leaderElectionID,
 	})
 	if err != nil {
-		log.Println("Unable to start manager")
+		logrusLog.Error("Unable to start manager")
 		setupLog.Error(err, "unable to start manager")
 		osExit(1)
 	}
@@ -297,14 +297,14 @@ func createRescanManager(ctx context.Context, mgr manager.Manager, driverName st
 	// rescanMgr.setupConfigMapWatcher(logrusLog)
 
 	// Process the config. Get initial log level
-	level, err := common.ParseLevel("debug")
-	log.Println("set level to", level)
+	level, _ := common.ParseLevel("debug")
+	logrusLog.Info("set level to", level)
 	logrusLog.SetLevel(level)
 
 	expRateLimiter := getWorkqueueReconcileRequest(retryIntervalStart, retryIntervalMax)
-	log.Println("expRateLimiter", expRateLimiter)
+	logrusLog.Info("expRateLimiter", expRateLimiter)
 
-	if err = getNodeRescanReconcilerManager(&controller.NodeRescanReconciler{
+	if err := getNodeRescanReconcilerManager(&controller.NodeRescanReconciler{
 		Client:                     mgr.GetClient(),
 		Log:                        ctrl.Log.WithName("controllers").WithName("DellCSINodeReScanner"),
 		Scheme:                     mgr.GetScheme(),
@@ -316,14 +316,14 @@ func createRescanManager(ctx context.Context, mgr manager.Manager, driverName st
 		setupLog.Error(err, "unable to create controller", "controller", "DellCSINodeReScanner")
 		osExit(1)
 	}
-	log.Println("strating manager")
+	logrusLog.Info("strating manager")
 	setupLog.Info("starting manager")
 	if err := getManagerStart(mgr); err != nil {
-		log.Println("problem running manager")
+		logrusLog.Error("problem running manager")
 		setupLog.Error(err, "problem running manager")
 		osExit(1)
 	}
-	log.Println("manager started successfully")
+	logrusLog.Info("manager started successfully")
 }
 
 func stringToTimeDuration(timeString string) time.Duration {

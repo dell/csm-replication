@@ -153,7 +153,7 @@ var (
 )
 
 func (mgr *MigratorManager) processConfigMapChanges(loggerConfig *logrus.Logger) {
-	log.Println("Received a config change event")
+	loggerConfig.Info("Received a config change event")
 	err := getUpdateConfigMapFunc(mgr, context.Background())
 	if err != nil {
 		log.Printf("Error parsing the config: %v\n", err)
@@ -163,14 +163,14 @@ func (mgr *MigratorManager) processConfigMapChanges(loggerConfig *logrus.Logger)
 	defer mgr.config.Lock.Unlock()
 	level, err := common.ParseLevel(mgr.config.LogLevel)
 	if err != nil {
-		log.Println("Unable to parse ", err)
+		loggerConfig.Error("Unable to parse ", err)
 	}
-	log.Println("set level to", level)
+	loggerConfig.Info("set level to", level)
 	loggerConfig.SetLevel(level)
 }
 
 func (mgr *MigratorManager) setupConfigMapWatcher(loggerConfig *logrus.Logger) {
-	log.Println("Started ConfigMap Watcher")
+	loggerConfig.Info("Started ConfigMap Watcher")
 	viper.WatchConfig()
 	viper.OnConfigChange(func(_ fsnotify.Event) {
 		mgr.processConfigMapChanges(loggerConfig)
@@ -290,9 +290,9 @@ func main() {
 	// Process the config. Get initial log level
 	level, err := getParseLevelFunc(MigratorMgr.config.LogLevel)
 	if err != nil {
-		log.Println("Unable to parse ", err)
+		logrusLog.Error("Unable to parse ", err)
 	}
-	log.Println("set level to", level)
+	logrusLog.Info("set level to", level)
 	logrusLog.SetLevel(level)
 
 	expRateLimiter := getWorkqueueReconcileRequest(flags.retryIntervalStart, flags.retryIntervalMax)
