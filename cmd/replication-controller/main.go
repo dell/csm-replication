@@ -218,7 +218,7 @@ func (mgr *ControllerManager) startSecretController() error {
 }
 
 func (mgr *ControllerManager) processConfigMapChanges(loggerConfig *logrus.Logger) {
-	log.Println("Received a config change event")
+	loggerConfig.Info("Received a config change event")
 	er := mgr.Manager.GetEventRecorderFor(common.DellReplicationController)
 	err := getUpdateConfigMap(mgr, context.Background(), er)
 	if err != nil {
@@ -229,14 +229,14 @@ func (mgr *ControllerManager) processConfigMapChanges(loggerConfig *logrus.Logge
 	defer mgr.config.Lock.Unlock()
 	level, err := common.ParseLevel(mgr.config.LogLevel)
 	if err != nil {
-		log.Println("Unable to parse ", err)
+		loggerConfig.Error("Unable to parse ", err)
 	}
-	log.Println("set level to", level)
+	loggerConfig.Info("set level to", level)
 	loggerConfig.SetLevel(level)
 }
 
 func (mgr *ControllerManager) setupConfigMapWatcher(loggerConfig *logrus.Logger) {
-	log.Println("Started ConfigMap Watcher")
+	loggerConfig.Info("Started ConfigMap Watcher")
 	viper.WatchConfig()
 	viper.OnConfigChange(func(_ fsnotify.Event) {
 		mgr.processConfigMapChanges(loggerConfig)
@@ -374,9 +374,9 @@ func startSecretController(controllerMgr *ControllerManager, setupLog logr.Logge
 func processLogLevel(logLevel string, logrusLog *logrus.Logger) {
 	level, err := common.ParseLevel(logLevel)
 	if err != nil {
-		log.Println("Unable to parse ", err)
+		logrusLog.Error("Unable to parse ", err)
 	}
-	log.Println("set level to", level)
+	logrusLog.Info("set level to", level)
 	logrusLog.SetLevel(level)
 }
 
