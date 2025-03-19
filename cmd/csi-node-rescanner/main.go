@@ -109,7 +109,7 @@ func (mgr *NodeRescanner) processConfigMapChanges(loggerConfig *logrus.Logger) {
 	loggerConfig.Info("Received a config change event")
 	err := mgr.config.UpdateConfigMap(context.Background(), nil, mgr.Opts, nil, mgr.Manager.GetLogger())
 	if err != nil {
-		loggerConfig.Error("Error parsing the config: %v\n", err)
+		loggerConfig.Error("Error parsing the config: ", err)
 		return
 	}
 	mgr.config.Lock.Lock()
