@@ -481,9 +481,7 @@ func TestProcessConfigMapChanges(t *testing.T) {
 			config: &config.Config{
 				LogLevel: "info",
 			},
-			loggerConfig: &logrus.Logger{
-				Level: logrus.InfoLevel,
-			},
+			loggerConfig:  logrus.New(),
 			expectedLevel: logrus.InfoLevel,
 			expectedError: nil,
 		},
@@ -492,9 +490,7 @@ func TestProcessConfigMapChanges(t *testing.T) {
 			config: &config.Config{
 				LogLevel: "invalid",
 			},
-			loggerConfig: &logrus.Logger{
-				Level: logrus.InfoLevel,
-			},
+			loggerConfig:  logrus.New(),
 			expectedLevel: logrus.InfoLevel,
 			expectedError: fmt.Errorf("error parsing the config: unable to parse log level"),
 		},
