@@ -334,11 +334,9 @@ func TestControllerManager_processConfigMapChanges(t *testing.T) {
 		expectedError error
 	}{
 		{
-			name:  "Error parsing the config",
-			setup: func() {},
-			loggerConfig: &logrus.Logger{
-				Level: logrus.InfoLevel,
-			},
+			name:          "Error parsing the config",
+			setup:         func() {},
+			loggerConfig:  logrus.New(),
 			expectedLevel: logrus.InfoLevel,
 		},
 		{
@@ -348,9 +346,7 @@ func TestControllerManager_processConfigMapChanges(t *testing.T) {
 					return nil
 				}
 			},
-			loggerConfig: &logrus.Logger{
-				Level: logrus.InfoLevel,
-			},
+			loggerConfig:  logrus.New(),
 			expectedLevel: logrus.InfoLevel,
 		},
 	}

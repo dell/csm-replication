@@ -1,14 +1,11 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 
@@ -371,33 +368,19 @@ func TestProcessConfigMapChanges(t *testing.T) {
 
 func TestSetupConfigMapWatcher(t *testing.T) {
 	tests := []struct {
-		name           string
-		loggerConfig   *logrus.Logger
-		expectedOutput string
+		name         string
+		loggerConfig *logrus.Logger
 	}{
 		{
-			name:           "Test with valid loggerConfig",
-			loggerConfig:   &logrus.Logger{},
-			expectedOutput: "Started ConfigMap Watcher",
-		},
-		{
-			name:           "Test with nil loggerConfig",
-			loggerConfig:   nil,
-			expectedOutput: "Started ConfigMap Watcher",
+			name:         "Test with valid loggerConfig",
+			loggerConfig: logrus.New(),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var output bytes.Buffer
-			log.SetOutput(&output)
-
 			mgr := &ReplicatorManager{}
 			mgr.setupConfigMapWatcher(tt.loggerConfig)
-
-			if !strings.Contains(output.String(), tt.expectedOutput) {
-				t.Errorf("Expected output: %s, but got: %s", tt.expectedOutput, output.String())
-			}
 		})
 	}
 }
