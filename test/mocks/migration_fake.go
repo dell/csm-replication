@@ -1,5 +1,5 @@
 /*
- Copyright © 2022-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2022-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -12,46 +12,13 @@
  limitations under the License.
 */
 
-package migration
+package mocks
 
 import (
 	"context"
 
 	csiext "github.com/dell/dell-csi-extensions/migration"
 )
-
-type injectedError struct {
-	error        error
-	clearAfter   int
-	currentCount int
-}
-
-func (i *injectedError) getError() error {
-	if i.clearAfter != -1 {
-		i.currentCount++
-	}
-	return i.error
-}
-
-func (i *injectedError) setError(err error, clearAfter int) {
-	// Just overwrite any error which exists already
-	i.currentCount = 0
-	i.clearAfter = clearAfter
-	i.error = err
-}
-
-func (i *injectedError) clearError(force bool) {
-	if force {
-		i.clearAfter = 0
-	}
-	if i.clearAfter != -1 {
-		if i.currentCount >= i.clearAfter {
-			i.error = nil
-			i.currentCount = 0
-			i.clearAfter = 0
-		}
-	}
-}
 
 // MockMigration is dummy implementation of Migration interface
 type MockMigration struct {

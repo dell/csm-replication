@@ -1,5 +1,5 @@
 /*
- Copyright © 2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2023-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -24,6 +24,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var OsReader = os.ReadDir
+
 // RescanNode is called to rescan the nodes
 func RescanNode(ctx context.Context) error {
 	log.Info("Calling NodeRescan")
@@ -32,7 +34,7 @@ func RescanNode(ctx context.Context) error {
 
 func rescanSCSIHostAll(ctx context.Context) error {
 	hostsDir := "/sys/class/scsi_host"
-	hostFiles, err := os.ReadDir(fmt.Sprintf("%s/", hostsDir))
+	hostFiles, err := OsReader(fmt.Sprintf("%s/", hostsDir))
 	if err != nil {
 		log.Errorf("rescanSCSIHOSTALL failed to read scsi_host dir, err: %s", err.Error())
 		return err
