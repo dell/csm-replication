@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -16,24 +16,33 @@ package csireplicator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path"
+	"reflect"
 	"testing"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
+	"github.com/dell/csm-replication/pkg/common"
 	constants "github.com/dell/csm-replication/pkg/common"
-	csireplication "github.com/dell/csm-replication/pkg/csi-clients/replication"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
+	csireplication "github.com/dell/csm-replication/test/mocks"
 	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	metricsServer "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 type PersistentVolumeControllerTestSuite struct {
@@ -74,6 +83,29 @@ func (suite *PersistentVolumeControllerTestSuite) getTypicalReconcileRequest(nam
 	return req
 }
 
+func (suite *PersistentVolumeControllerTestSuite) getTypicalManagerManager() manager.Manager {
+	scheme := runtime.NewScheme()
+	metricsAddr := ""
+	enableLeaderElection := false
+
+	mgr, _ := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+		Scheme: scheme,
+		Metrics: metricsServer.Options{
+			BindAddress: metricsAddr,
+		},
+		WebhookServer:              webhook.NewServer(webhook.Options{Port: 9443}),
+		LeaderElection:             enableLeaderElection,
+		LeaderElectionResourceLock: "leases",
+		LeaderElectionID:           fmt.Sprintf("%s-manager", common.DellReplicationController),
+	})
+	return mgr
+}
+
+func (suite *PersistentVolumeControllerTestSuite) getWorkQueueTypeLimiter() workqueue.TypedRateLimiter[reconcile.Request] {
+	lim := workqueue.DefaultTypedItemBasedRateLimiter[reconcile.Request]()
+	return lim
+}
+
 func (suite *PersistentVolumeControllerTestSuite) initReconciler() {
 	fakeRecorder := record.NewFakeRecorder(100)
 	// Initialize the annotations & labels
@@ -88,6 +120,7 @@ func (suite *PersistentVolumeControllerTestSuite) initReconciler() {
 		ReplicationClient: suite.repClient,
 		Domain:            constants.DefaultDomain,
 		ContextPrefix:     utils.ContextPrefix,
+		ClusterUID:        "test-clusterid",
 	}
 }
 
@@ -368,13 +401,14 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVCExistsScenario() {
 	suite.NoError(err, "No error")
 }
 
-func (suite *PersistentVolumeControllerTestSuite) TestPVProtectionCompleteAnnotationNotFound() {
+func (suite *PersistentVolumeControllerTestSuite) TestPVProtectionCompleteAnnotationFound() {
 	pvName := utils.FakePVName
 	pvObj := suite.getFakePV(pvName)
 
 	annotations := map[string]string{}
 	annotations[controllers.CreatedBy] = "dell-csi-replicator"
 	annotations[controllers.ReplicationGroup] = "xyz"
+	annotations[controllers.SynchronizedDeletionStatus] = "requested"
 
 	pvObj.Annotations = annotations
 
@@ -385,6 +419,24 @@ func (suite *PersistentVolumeControllerTestSuite) TestPVProtectionCompleteAnnota
 
 	_, err = suite.reconciler.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error")
+}
+
+func (suite *PersistentVolumeControllerTestSuite) TestPVCreatedBySyncController() {
+	pvName := utils.FakePVName
+	pvObj := suite.getFakePV(pvName)
+
+	annotations := map[string]string{}
+	annotations[controllers.CreatedBy] = "dell-csi-replicator"
+
+	pvObj.Annotations = annotations
+
+	err := suite.client.Create(context.Background(), pvObj)
+	suite.NoError(err)
+
+	req := suite.getTypicalReconcileRequest(pvName)
+
+	_, err = suite.reconciler.Reconcile(context.Background(), req)
+	suite.NoError(err)
 }
 
 func (suite *PersistentVolumeControllerTestSuite) getParams() map[string]string {
@@ -415,4 +467,76 @@ func TestPersistentVolumeControllerTestSuite(t *testing.T) {
 
 func (suite *PersistentVolumeControllerTestSuite) TearDownTest() {
 	suite.T().Log("Cleaning up resources...")
+}
+
+func (suite *PersistentVolumeControllerTestSuite) TestPVSetupWithManager_Error() {
+	ctx := context.Background()
+
+	defaultGetManagerIndexField := getManagerIndexField
+	defer func() {
+		getManagerIndexField = defaultGetManagerIndexField
+	}()
+
+	getManagerIndexField = func(_ ctrl.Manager, _ context.Context) error {
+		return errors.New("error in getManagerIndexField")
+	}
+
+	err := suite.reconciler.SetupWithManager(ctx, nil, nil, 1)
+	suite.Error(err)
+}
+
+func (suite *PersistentVolumeControllerTestSuite) TestPVSetupWithManager() {
+	ctx := context.Background()
+
+	defaultGetManagerIndexField := getManagerIndexField
+	defer func() {
+		getManagerIndexField = defaultGetManagerIndexField
+	}()
+
+	getManagerIndexField = func(_ ctrl.Manager, _ context.Context) error {
+		return nil
+	}
+
+	err := suite.reconciler.SetupWithManager(ctx, nil, nil, 1)
+	suite.Error(err)
+}
+
+func (suite *PersistentVolumeControllerTestSuite) TestCreateProtectionGroupAndRG_Error() {
+	ctx := context.Background()
+	pvName := utils.FakePVName
+	pvObj := suite.getFakePV(pvName)
+
+	err := suite.client.Create(ctx, pvObj)
+	suite.NoError(err)
+
+	_, err = suite.reconciler.createProtectionGroupAndRG(ctx, "", map[string]string{})
+	suite.NoError(err)
+}
+
+func TestGetProtectionGroupID(t *testing.T) {
+	tests := []struct {
+		name             string
+		replicationGroup *repv1.DellCSIReplicationGroup
+		expectedIDs      []string
+	}{
+		{
+			name:             "ReplicationGroup with non-empty ProtectionGroupID",
+			replicationGroup: &repv1.DellCSIReplicationGroup{Spec: repv1.DellCSIReplicationGroupSpec{ProtectionGroupID: "protection-group-id"}},
+			expectedIDs:      []string{"protection-group-id"},
+		},
+		{
+			name:             "ReplicationGroup with empty ProtectionGroupID",
+			replicationGroup: &repv1.DellCSIReplicationGroup{Spec: repv1.DellCSIReplicationGroupSpec{ProtectionGroupID: ""}},
+			expectedIDs:      nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			protectionGroupIDs := getProtectionGroupID(tt.replicationGroup)
+			if !reflect.DeepEqual(protectionGroupIDs, tt.expectedIDs) {
+				t.Errorf("Expected protectionGroupIDs to be %v, got %v", tt.expectedIDs, protectionGroupIDs)
+			}
+		})
+	}
 }

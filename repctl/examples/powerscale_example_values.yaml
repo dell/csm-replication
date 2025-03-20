@@ -21,6 +21,6 @@ parameters:
   accessZone:
     source: "System"
     target: "System"
-  #azServiceIP:
-    #source: "192.168.1.1"
-    #target: "192.168.1.2"
+# azServiceIP:
+#   source: "192.168.1.1"
+#   target: "192.168.1.2"
