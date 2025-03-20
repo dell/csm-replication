@@ -27,10 +27,10 @@ import (
 	controller "github.com/dell/csm-replication/controllers/csi-replicator"
 	replicationController "github.com/dell/csm-replication/controllers/replication-controller"
 	constants "github.com/dell/csm-replication/pkg/common"
-	"github.com/dell/csm-replication/pkg/config"
 	"github.com/dell/csm-replication/pkg/connection"
-	csireplication "github.com/dell/csm-replication/pkg/csi-clients/replication"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
+	"github.com/dell/csm-replication/test/mocks"
+	csireplication "github.com/dell/csm-replication/test/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"golang.org/x/sync/singleflight"
@@ -129,7 +129,7 @@ func (suite *FakeReplicationTestSuite) runCSIReplicator() {
 
 func (suite *FakeReplicationTestSuite) runReplicationController() {
 	fakeRecorder := record.NewFakeRecorder(100)
-	suite.multiClusterClient = config.NewFakeConfig(suite.driver.SourceClusterID, suite.driver.RemoteClusterID)
+	suite.multiClusterClient = mocks.NewFakeConfig(suite.driver.SourceClusterID, suite.driver.RemoteClusterID)
 	pvReconciler := &replicationController.PersistentVolumeReconciler{
 		Client:        suite.client,
 		Log:           ctrl.Log.WithName("controllers").WithName("PersistentVolumeClaim"),
