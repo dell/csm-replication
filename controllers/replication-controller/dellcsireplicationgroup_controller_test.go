@@ -476,10 +476,11 @@ func (suite *RGControllerTestSuite) TestRGSyncDeletion() {
 func (suite *RGControllerTestSuite) TestSetupWithManagerRg() {
 	suite.Init()
 	mgr := manager.Manager(nil)
-	expRateLimiter := workqueue.NewItemExponentialFailureRateLimiter(1*time.Second, 10*time.Second)
+	expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second)
 	err := suite.reconciler.SetupWithManager(mgr, expRateLimiter, 1)
 	suite.Error(err, "Setup should fail when there is no manager")
 }
+
 func (suite *RGControllerTestSuite) TestMakeNamespaceReference() {
 	ns := "test-namespace"
 	result := makeNamespaceReference(ns)
@@ -573,7 +574,7 @@ func (suite *RGControllerTestSuite) TestProcessLastActionResult() {
 	suite.NoError(err)
 
 	// Process the last action. Should update the RG, updating the actionProcessedTime annotation
-	err = suite.reconciler.processLastActionResult(context.Background(), rg, remoteClient, suite.reconciler.Log)
+	err = suite.reconciler.processLastActionResult(context.Background(), rg, rg, remoteClient, suite.reconciler.Log)
 	suite.NoError(err, "processLastActionResult should not fail")
 
 	updatedRG := new(repv1.DellCSIReplicationGroup)
@@ -612,7 +613,7 @@ func (suite *RGControllerTestSuite) TestProcessLastActionResult_AlreadyProcessed
 	suite.NoError(err)
 
 	// Process the last action. Should update the RG, updating the actionProcessedTime annotation
-	err = suite.reconciler.processLastActionResult(context.Background(), rg, remoteClient, suite.reconciler.Log)
+	err = suite.reconciler.processLastActionResult(context.Background(), rg, rg, remoteClient, suite.reconciler.Log)
 	suite.NoError(err, "processLastActionResult should do nothing")
 	// Ideally, we'd check the log output here to confirm it logged "Last action has already been processed", but
 	// it appears there is no method to get the log output.
@@ -646,7 +647,7 @@ func (suite *RGControllerTestSuite) TestProcessLastActionResult_NoActionProcesse
 	suite.NoError(err)
 
 	// Process the last action. Should update the RG, updating the actionProcessedTime annotation
-	err = suite.reconciler.processLastActionResult(context.Background(), rg, remoteClient, suite.reconciler.Log)
+	err = suite.reconciler.processLastActionResult(context.Background(), rg, rg, remoteClient, suite.reconciler.Log)
 	suite.NoError(err, "processLastActionResult should do nothing")
 	// Ideally, we'd check the log output here to confirm it logged "Action Processed does not exist", but
 	// it appears there is no method to get the log output.
