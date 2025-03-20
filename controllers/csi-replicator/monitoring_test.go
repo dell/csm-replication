@@ -23,8 +23,8 @@ import (
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
-	csireplication "github.com/dell/csm-replication/pkg/csi-clients/replication"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
+	csireplication "github.com/dell/csm-replication/test/mocks"
 	"github.com/dell/dell-csi-extensions/replication"
 	"github.com/stretchr/testify/suite"
 	ctrl "sigs.k8s.io/controller-runtime"
