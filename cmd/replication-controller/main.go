@@ -107,6 +107,7 @@ var (
 			retryIntervalMax   time.Duration
 			workerThreads      int
 			domain             string
+			disablePVCRemap    bool
 		)
 
 		var metricsAddr string
@@ -120,6 +121,7 @@ var (
 		flag.DurationVar(&retryIntervalStart, "retry-interval-start", time.Second, "Initial retry interval of failed reconcile request. It doubles with each failure, upto retry-interval-max")
 		flag.DurationVar(&retryIntervalMax, "retry-interval-max", 5*time.Minute, "Maximum retry interval of failed reconcile request")
 		flag.IntVar(&workerThreads, "worker-threads", 2, "Number of concurrent reconcilers for each of the controllers")
+		flag.BoolVar(&disablePVCRemap, "disable-pvc-remap", false, "disables PVC remapping functionality")
 		flag.Parse()
 
 		logrusLog := logrus.New()
@@ -141,6 +143,7 @@ var (
 		flagMap["retry-interval-start"] = retryIntervalStart.String()
 		flagMap["retry-interval-max"] = retryIntervalMax.String()
 		flagMap["worker-threads"] = strconv.Itoa(workerThreads)
+		flagMap["disable-pvc-remap"] = strconv.FormatBool(disablePVCRemap)
 
 		return flagMap, setupLog, logrusLog, context.Background()
 	}
@@ -296,7 +299,7 @@ func main() {
 			createPersistentVolumeClaimReconciler(mgr, controllerMgr, flagMap["prefix"], stringToInt(flagMap["worker-threads"]), expRateLimiter, setupLog)
 
 			// Create ReplicationGroupReconciler
-			createReplicationGroupReconciler(mgr, controllerMgr, flagMap["prefix"], stringToInt(flagMap["worker-threads"]), expRateLimiter, setupLog)
+			createReplicationGroupReconciler(mgr, controllerMgr, flagMap["prefix"], stringToInt(flagMap["worker-threads"]), expRateLimiter, stringToBoolean(flagMap["disable-pvc-remap"]), setupLog)
 
 			// Create PersistentVolumeReconciler
 			createPersistentVolumeReconciler(mgr, controllerMgr, flagMap["prefix"], stringToInt(flagMap["worker-threads"]), expRateLimiter, setupLog)
@@ -309,6 +312,7 @@ func main() {
 		startManager(mgr, setupLog)
 	}
 }
+
 func startManager(mgr manager.Manager, setupLog logr.Logger) {
 	setupLog.Info("starting manager")
 
@@ -316,53 +320,6 @@ func startManager(mgr manager.Manager, setupLog logr.Logger) {
 		log.Println("problem running manager")
 		setupLog.Error(err, "problem running manager")
 		osExit(1)
-		controllerMgr, err := createControllerManager(ctx, mgr)
-		if err != nil {
-			setupLog.Error(err, "failed to configure the controller manager")
-			os.Exit(1)
-		}
-
-		// Start the watch on configmap
-		controllerMgr.setupConfigMapWatcher(logrusLog)
-
-		// Process the config. Get initial log level
-		level, err := common.ParseLevel(controllerMgr.config.LogLevel)
-		if err != nil {
-			log.Println("Unable to parse ", err)
-		}
-		log.Println("set level to", level)
-		logrusLog.SetLevel(level)
-
-		// Start the secret controller
-		err = controllerMgr.startSecretController()
-		if err != nil {
-			setupLog.Error(err, "failed to setup secret controller. Continuing")
-		}
-
-		expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](retryIntervalStart, retryIntervalMax)
-		if err = (&repController.PersistentVolumeClaimReconciler{
-			Client:        mgr.GetClient(),
-			Scheme:        mgr.GetScheme(),
-			EventRecorder: mgr.GetEventRecorderFor(common.DellReplicationController),
-			Config:        controllerMgr.config,
-			Domain:        domain,
-		}).SetupWithManager(mgr, expRateLimiter, workerThreads); err != nil {
-			setupLog.Error(err, "unable to create controller", common.DellReplicationController, "PersistentVolumeClaim")
-			os.Exit(1)
-		}
-
-		if err = (&repController.ReplicationGroupReconciler{
-			Client:          mgr.GetClient(),
-			Log:             ctrl.Log.WithName("controllers").WithName("DellCSIReplicationGroup"),
-			Scheme:          mgr.GetScheme(),
-			EventRecorder:   mgr.GetEventRecorderFor(common.DellReplicationController),
-			Config:          controllerMgr.config,
-			Domain:          domain,
-			DisablePVCRemap: disablePVCRemap,
-		}).SetupWithManager(mgr, expRateLimiter, workerThreads, disablePVCRemap); err != nil {
-			setupLog.Error(err, "unable to create controller", common.DellReplicationController, "DellCSIReplicationGroup")
-			os.Exit(1)
-		}
 	}
 }
 
@@ -382,14 +339,15 @@ func createPersistentVolumeReconciler(mgr manager.Manager, controllerMgr *Contro
 	}
 }
 
-func createReplicationGroupReconciler(mgr manager.Manager, controllerMgr *ControllerManager, domain string, workerThreads int, expRateLimiter workqueue.TypedRateLimiter[reconcile.Request], setupLog logr.Logger) {
+func createReplicationGroupReconciler(mgr manager.Manager, controllerMgr *ControllerManager, domain string, workerThreads int, expRateLimiter workqueue.TypedRateLimiter[reconcile.Request], disablePVCRemap bool, setupLog logr.Logger) {
 	if err := getReplicationGroupReconciler(&repController.ReplicationGroupReconciler{
-		Client:        mgr.GetClient(),
-		Log:           ctrl.Log.WithName("controllers").WithName("DellCSIReplicationGroup"),
-		Scheme:        mgr.GetScheme(),
-		EventRecorder: mgr.GetEventRecorderFor(common.DellReplicationController),
-		Config:        controllerMgr.config,
-		Domain:        domain,
+		Client:          mgr.GetClient(),
+		Log:             ctrl.Log.WithName("controllers").WithName("DellCSIReplicationGroup"),
+		Scheme:          mgr.GetScheme(),
+		EventRecorder:   mgr.GetEventRecorderFor(common.DellReplicationController),
+		Config:          controllerMgr.config,
+		Domain:          domain,
+		DisablePVCRemap: disablePVCRemap,
 	}, mgr, expRateLimiter, workerThreads); err != nil {
 		setupLog.Error(err, "unable to create controller", common.DellReplicationController, "DellCSIReplicationGroup")
 		osExit(1)
@@ -409,6 +367,7 @@ func createPersistentVolumeClaimReconciler(mgr manager.Manager, controllerMgr *C
 		osExit(1)
 	}
 }
+
 func startSecretController(controllerMgr *ControllerManager, setupLog logr.Logger) {
 	err := getSecretController(controllerMgr)
 	if err != nil {
