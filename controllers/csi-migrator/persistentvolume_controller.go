@@ -191,9 +191,16 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	return ctrl.Result{}, nil
 }
 
+var (
+	newPredicateFuncs = predicate.NewPredicateFuncs
+	getAnnotations    = func(meta client.Object) map[string]string {
+		return meta.GetAnnotations()
+	}
+)
+
 func isMigrationRequested() predicate.Predicate {
-	return predicate.NewPredicateFuncs(func(meta client.Object) bool {
-		a := meta.GetAnnotations()
+	return newPredicateFuncs(func(meta client.Object) bool {
+		a := getAnnotations(meta)
 		_, ok := a[controller.MigrationRequested]
 		return a != nil && ok
 	})

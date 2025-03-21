@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -46,6 +46,19 @@ type PersistentVolumeClaimReconciler struct {
 	Config             connection.MultiClusterClient
 	Domain             string
 }
+
+var (
+	getPersistentVolumeClaimUpdatePersistentVolumeClaim = func(r connection.RemoteClusterClient, ctx context.Context, claim *v1.PersistentVolumeClaim) error {
+		return r.UpdatePersistentVolumeClaim(ctx, claim)
+	}
+	getPersistentVolumeClaimUpdate = func(r *PersistentVolumeClaimReconciler, ctx context.Context, claim *v1.PersistentVolumeClaim) error {
+		return r.Update(ctx, claim)
+	}
+	getPersistentVolumeClaimReconcilerEventf = func(r *PersistentVolumeClaimReconciler, claim *v1.PersistentVolumeClaim, eventTypeNormal string, eventReasonUpdated string, message string, remoteClusterID string) {
+		r.EventRecorder.Eventf(claim, eventTypeNormal, eventReasonUpdated,
+			message, remoteClusterID)
+	}
+)
 
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/status,verbs=get;update;patch
@@ -182,7 +195,7 @@ func (r *PersistentVolumeClaimReconciler) processRemotePVC(ctx context.Context,
 		isUpdated = true
 	}
 	if isUpdated {
-		err := rClient.UpdatePersistentVolumeClaim(ctx, claim)
+		err := getPersistentVolumeClaimUpdatePersistentVolumeClaim(rClient, ctx, claim)
 		if err != nil {
 			return false, err
 		}
@@ -218,14 +231,17 @@ func (r *PersistentVolumeClaimReconciler) processLocalPVC(ctx context.Context,
 	if isRemotePVCUpdated {
 		controller.AddAnnotation(claim, controller.PVCSyncComplete, "yes")
 	}
-	err := r.Update(ctx, claim)
+	// err := r.Update(ctx, claim)
+	err := getPersistentVolumeClaimUpdate(r, ctx, claim)
 	if err != nil {
 		return err
 	}
 
 	if isRemotePVCUpdated {
-		r.EventRecorder.Eventf(claim, eventTypeNormal, eventReasonUpdated,
-			"PVC sync complete for ClusterId: %s", remoteClusterID)
+		// r.EventRecorder.Eventf(claim, eventTypeNormal, eventReasonUpdated,
+		// 	"PVC sync complete for ClusterId: %s", remoteClusterID)
+		getPersistentVolumeClaimReconcilerEventf(r, claim, eventTypeNormal, eventReasonUpdated,
+			"PV sync complete for ClusterId: %s", remoteClusterID)
 	}
 	return nil
 }
@@ -244,8 +260,8 @@ func (r *PersistentVolumeClaimReconciler) SetupWithManager(mgr ctrl.Manager, lim
 }
 
 func pvcProtectionIsComplete() predicate.Predicate {
-	return predicate.NewPredicateFuncs(func(meta client.Object) bool {
-		a := meta.GetAnnotations()
+	return newPredicateFuncs(func(meta client.Object) bool {
+		a := getAnnotations(meta)
 		return a != nil && a[controller.PVCProtectionComplete] == "yes"
 	})
 }

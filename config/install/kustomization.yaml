@@ -2,7 +2,7 @@
 namespace: dell-replication-controller
 namePrefix: dell-replication-
 # Labels to add to all resources and selectors.
-#commonLabels:
+# commonLabels:
 #  someName: someValue
 generatorOptions:
   disableNameSuffixHash: true

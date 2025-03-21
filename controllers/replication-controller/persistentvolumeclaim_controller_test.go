@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -22,10 +22,10 @@ import (
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
 	constants "github.com/dell/csm-replication/pkg/common"
-	"github.com/dell/csm-replication/pkg/config"
 	"github.com/dell/csm-replication/pkg/connection"
 	fakeclient "github.com/dell/csm-replication/test/e2e-framework/fake-client"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
+	"github.com/dell/csm-replication/test/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"
@@ -36,7 +36,9 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -60,7 +62,7 @@ func (suite *PVControllerTestSuite) SetupSuite() {
 func (suite *PVControllerTestSuite) Init() {
 	suite.driver = utils.GetDefaultDriver()
 	suite.client = utils.GetFakeClient()
-	suite.fakeConfig = config.New("sourceCluster", "remote-123")
+	suite.fakeConfig = mocks.New("sourceCluster", "remote-123")
 }
 
 func (suite *PVControllerTestSuite) getPV() corev1.PersistentVolume {
@@ -312,4 +314,214 @@ func TestPVControllerTestSuite(t *testing.T) {
 
 func (suite *PVControllerTestSuite) TearDownTestSuite() {
 	suite.T().Log("Cleaning up resources...")
+}
+
+func TestPvcProtectionIsComplete(t *testing.T) {
+	originalNewPredicateFuncs := newPredicateFuncs
+	originalGetAnnotations := getAnnotations
+
+	defer func() {
+		newPredicateFuncs = originalNewPredicateFuncs
+		getAnnotations = originalGetAnnotations
+	}()
+
+	type testCase struct {
+		name        string
+		annotations map[string]string
+		setupMocks  func()
+		expected    bool
+	}
+
+	testCases := []testCase{
+		{
+			name: "PVCProtectionComplete annotation is yes",
+			annotations: map[string]string{
+				controllers.PVCProtectionComplete: "yes",
+			},
+			setupMocks: func() {
+				getAnnotations = func(_ client.Object) map[string]string {
+					return map[string]string{
+						controllers.PVCProtectionComplete: "yes",
+					}
+				}
+			},
+			expected: true,
+		},
+		{
+			name: "PVCProtectionComplete annotation is no",
+			annotations: map[string]string{
+				controllers.PVCProtectionComplete: "no",
+			},
+			setupMocks: func() {
+				getAnnotations = func(_ client.Object) map[string]string {
+					return map[string]string{
+						controllers.PVCProtectionComplete: "no",
+					}
+				}
+			},
+			expected: false,
+		},
+		{
+			name:        "No PVCProtectionComplete annotation",
+			annotations: map[string]string{},
+			setupMocks: func() {
+				getAnnotations = func(_ client.Object) map[string]string {
+					return map[string]string{}
+				}
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setupMocks != nil {
+				tt.setupMocks()
+			}
+
+			meta := &fakeClientObject{
+				annotations: tt.annotations,
+			}
+			newPredicateFuncs = func(f func(client.Object) bool) predicate.Funcs {
+				return predicate.Funcs{
+					GenericFunc: func(e event.GenericEvent) bool {
+						return f(e.Object)
+					},
+				}
+			}
+			predicateFunc := pvcProtectionIsComplete()
+			result := predicateFunc.Generic(event.GenericEvent{Object: meta})
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestPersistentVolumeClaimReconciler_processRemotePVC(t *testing.T) {
+	originalGetPersistentVolumeClaimUpdatePersistentVolumeClaim := getPersistentVolumeClaimUpdatePersistentVolumeClaim
+
+	defer func() {
+		getPersistentVolumeClaimUpdatePersistentVolumeClaim = originalGetPersistentVolumeClaimUpdatePersistentVolumeClaim
+	}()
+
+	getPersistentVolumeClaimUpdatePersistentVolumeClaim = func(_ connection.RemoteClusterClient, _ context.Context, _ *corev1.PersistentVolumeClaim) error {
+		return nil
+	}
+
+	tests := []struct {
+		name          string
+		rClient       connection.RemoteClusterClient
+		claim         *corev1.PersistentVolumeClaim
+		remotePVCName string
+		remotePVCNs   string
+		remotePVName  string
+		wantError     bool
+	}{
+		{
+			name:    "Remote PVC already has the annotations set",
+			rClient: nil,
+			claim: &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						controllers.RemotePVC:          "fake-pvc",
+						controllers.RemotePVCNamespace: "fake-ns",
+						controllers.RemotePV:           "fake-pv",
+					},
+				},
+			},
+			remotePVCName: "fake-pvc",
+			remotePVCNs:   "fake-ns",
+			remotePVName:  "fake-pv",
+			wantError:     false,
+		},
+		{
+			name:    "Successfully updated remote PVC with annotation",
+			rClient: nil,
+			claim: &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						controllers.RemotePVC:          "",
+						controllers.RemotePVCNamespace: "fake-ns",
+						controllers.RemotePV:           "fake-pv",
+					},
+				},
+			},
+			remotePVCName: "fake-pvc",
+			remotePVCNs:   "fake-ns",
+			remotePVName:  "fake-pv",
+			wantError:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &PersistentVolumeClaimReconciler{}
+			_, err := r.processRemotePVC(context.Background(), tt.rClient, tt.claim, tt.remotePVCName, tt.remotePVCNs, tt.remotePVName)
+			if (err != nil) != tt.wantError {
+				t.Errorf("PersistentVolumeClaim.processRemotePVC() error = %v, wantError %v", err, tt.wantError)
+			}
+		})
+	}
+}
+
+func TestPersistentVolumeClaimReconciler_processLocalPVC(t *testing.T) {
+	originalGetPersistentVolumeClaimUpdate := getPersistentVolumeClaimUpdate
+	originalGetPersistentVolumeClaimReconcilerEventf := getPersistentVolumeClaimReconcilerEventf
+
+	defer func() {
+		getPersistentVolumeClaimUpdate = originalGetPersistentVolumeClaimUpdate
+		getPersistentVolumeClaimReconcilerEventf = originalGetPersistentVolumeClaimReconcilerEventf
+	}()
+
+	getPersistentVolumeClaimUpdate = func(_ *PersistentVolumeClaimReconciler, _ context.Context, _ *corev1.PersistentVolumeClaim) error {
+		return nil
+	}
+
+	getPersistentVolumeClaimReconcilerEventf = func(_ *PersistentVolumeClaimReconciler, _ *corev1.PersistentVolumeClaim, _ string, _ string, _ string, _ string) {
+	}
+
+	type args struct {
+		ctx                context.Context
+		claim              *corev1.PersistentVolumeClaim
+		remotePVCName      string
+		remotePVCNs        string
+		remotePVName       string
+		remoteClusterID    string
+		isRemotePVCUpdated bool
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "PVC sync complete for ClusterId",
+			args: args{
+				ctx: context.TODO(),
+				claim: &corev1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							controllers.PVCSyncComplete:    "no",
+							controllers.RemotePV:           "fake-pv",
+							controllers.RemotePVC:          "fake-pvc",
+							controllers.RemotePVCNamespace: "fake-ns",
+						},
+					},
+				},
+				remotePVName:       "remote-pv-name",
+				remotePVCName:      "remote-pvc-name",
+				remotePVCNs:        "remote-pvc-namespace",
+				remoteClusterID:    "remote-cluster-id",
+				isRemotePVCUpdated: true,
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &PersistentVolumeClaimReconciler{}
+			if err := r.processLocalPVC(tt.args.ctx, tt.args.claim, tt.args.remotePVName, tt.args.remotePVCName, tt.args.remotePVCNs, tt.args.remoteClusterID, tt.args.isRemotePVCUpdated); (err != nil) != tt.wantErr {
+				t.Errorf("PersistentVolumeClaim.processLocalPVC() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
 }

@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -12,26 +12,14 @@
  limitations under the License.
 */
 
-package identity
+package mocks
 
 import (
 	"context"
 
+	"github.com/dell/csm-replication/pkg/csi-clients/identity"
 	"github.com/dell/dell-csi-extensions/replication"
 )
-
-type injectedError struct {
-	error        error
-	clearAfter   int
-	currentCount int
-}
-
-func (i injectedError) setError(err error, clearAfter int) {
-	// Just overwrite any error which exists already
-	i.currentCount = 0
-	i.clearAfter = clearAfter
-	i.error = err
-}
 
 func (i injectedError) getAndClearError() error {
 	if i.clearAfter == -1 {
@@ -51,16 +39,16 @@ func (i injectedError) getAndClearError() error {
 type mockIdentity struct {
 	name             string
 	injectedError    injectedError
-	capabilitySet    ReplicationCapabilitySet
+	capabilitySet    identity.ReplicationCapabilitySet
 	supportedActions []*replication.SupportedActions
 }
 
-func (m *mockIdentity) GetMigrationCapabilities(_ context.Context) (MigrationCapabilitySet, error) {
+func (m *mockIdentity) GetMigrationCapabilities(_ context.Context) (identity.MigrationCapabilitySet, error) {
 	// TODO implement me
 	panic("implement me")
 }
 
-func getSupportedActions() (ReplicationCapabilitySet, []*replication.SupportedActions) {
+func getSupportedActions() (identity.ReplicationCapabilitySet, []*replication.SupportedActions) {
 	capResponse := &replication.GetReplicationCapabilityResponse{}
 	for i := int32(0); i < 3; i++ {
 		capResponse.Capabilities = append(capResponse.Capabilities, &replication.ReplicationCapability{
@@ -71,7 +59,7 @@ func getSupportedActions() (ReplicationCapabilitySet, []*replication.SupportedAc
 			},
 		})
 	}
-	capabilitySet := ReplicationCapabilitySet{}
+	capabilitySet := identity.ReplicationCapabilitySet{}
 	for _, capability := range capResponse.Capabilities {
 		if capability == nil {
 			continue
@@ -94,7 +82,7 @@ func getSupportedActions() (ReplicationCapabilitySet, []*replication.SupportedAc
 }
 
 // NewFakeIdentityClient returns fake identity client
-func NewFakeIdentityClient(name string) Identity {
+func NewFakeIdentityClient(name string) identity.Identity {
 	capabilitySet, actions := getSupportedActions()
 	return &mockIdentity{
 		name:             name,
@@ -118,11 +106,11 @@ func (m *mockIdentity) ProbeForever(_ context.Context) (string, error) {
 	return m.name, nil
 }
 
-func (m *mockIdentity) GetReplicationCapabilities(_ context.Context) (ReplicationCapabilitySet,
+func (m *mockIdentity) GetReplicationCapabilities(_ context.Context) (identity.ReplicationCapabilitySet,
 	[]*replication.SupportedActions, error,
 ) {
 	if err := m.injectedError.getAndClearError(); err != nil {
-		return ReplicationCapabilitySet{}, []*replication.SupportedActions{}, err
+		return identity.ReplicationCapabilitySet{}, []*replication.SupportedActions{}, err
 	}
 	return m.capabilitySet, m.supportedActions, nil
 }
@@ -143,6 +131,6 @@ func (m *mockIdentity) SetSupportedActions(supportedActions []*replication.Suppo
 	m.supportedActions = supportedActions
 }
 
-func (m *mockIdentity) SetCapabilitySet(capabilitySet ReplicationCapabilitySet) {
+func (m *mockIdentity) SetCapabilitySet(capabilitySet identity.ReplicationCapabilitySet) {
 	m.capabilitySet = capabilitySet
 }

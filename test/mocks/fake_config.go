@@ -12,7 +12,7 @@
  limitations under the License.
 */
 
-package config
+package mocks
 
 import (
 	"fmt"

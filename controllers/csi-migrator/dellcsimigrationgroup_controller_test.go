@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	csimigration "github.com/dell/csm-replication/pkg/csi-clients/migration"
+	csimigration "github.com/dell/csm-replication/test/mocks"
 
 	storagev1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"

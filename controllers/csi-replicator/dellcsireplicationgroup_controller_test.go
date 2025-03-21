@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -17,8 +17,10 @@ package csireplicator
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -30,9 +32,10 @@ import (
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
 	constants "github.com/dell/csm-replication/pkg/common"
-	csiidentity "github.com/dell/csm-replication/pkg/csi-clients/identity"
-	csireplication "github.com/dell/csm-replication/pkg/csi-clients/replication"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
+	csiidentity "github.com/dell/csm-replication/test/mocks"
+	csireplication "github.com/dell/csm-replication/test/mocks"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -40,7 +43,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -1192,9 +1194,316 @@ func (suite *RGControllerTestSuite) TestNoDeletionTimeStamp() {
 	suite.Nil(err, "This should reconcile successfully")
 }
 
-func (suite *RGControllerTestSuite) TestSetupWithManagerRg() {
-	mgr := manager.Manager(nil)
-	expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second)
-	err := suite.rgReconcile.SetupWithManager(mgr, expRateLimiter, 1)
-	suite.Error(err, "Setup should fail when there is no manager")
+func TestSetupWithManagerRg(t *testing.T) {
+	tests := []struct {
+		name                       string
+		MaxRetryDurationForActions time.Duration
+		manager                    ctrl.Manager
+		limiter                    workqueue.TypedRateLimiter[reconcile.Request]
+		maxReconcilers             int
+		wantError                  bool
+	}{
+		{
+			name:                       "Manager is nil AND MaxRetryDurationForActions is zero",
+			MaxRetryDurationForActions: 0,
+			manager:                    nil,
+			limiter:                    nil,
+			maxReconcilers:             0,
+			wantError:                  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &ReplicationGroupReconciler{
+				MaxRetryDurationForActions: tt.MaxRetryDurationForActions,
+			}
+			err := r.SetupWithManager(tt.manager, tt.limiter, tt.maxReconcilers)
+			if (err != nil) != tt.wantError {
+				t.Errorf("SetupWithManager() error = %v, wantError %v", err, tt.wantError)
+			}
+		})
+	}
+}
+
+func TestReplicationGroupReconciler_getAction(t *testing.T) {
+	tests := []struct {
+		name       string
+		actionType ActionType
+		wantAction *csiext.ExecuteActionRequest_Action
+		wantErr    bool
+	}{
+		{
+			name:       "supportedAction is nil",
+			actionType: ActionType("InvalidAction"),
+			wantAction: nil,
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &ReplicationGroupReconciler{
+				SupportedActions: []*csiext.SupportedActions{
+					nil,
+				},
+			}
+
+			gotAction, err := r.getAction(tt.actionType)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ReplicationGroupReconciler.getAction() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(gotAction, tt.wantAction) {
+				t.Errorf("ReplicationGroupReconciler.getAction() = %v, want %v", gotAction, tt.wantAction)
+			}
+		})
+	}
+}
+
+func TestReplicationGroupReconciler_addFinalizer(t *testing.T) {
+	originalGetReplicationGroupRecouncilerUpdate := getReplicationGroupRecouncilerUpdate
+
+	after := func() {
+		getReplicationGroupRecouncilerUpdate = originalGetReplicationGroupRecouncilerUpdate
+	}
+
+	tests := []struct {
+		name    string
+		setup   func()
+		rg      *repv1.DellCSIReplicationGroup
+		wantErr bool
+	}{
+		{
+			name: "Add finalizer with error",
+			setup: func() {
+				getReplicationGroupRecouncilerUpdate = func(_ *ReplicationGroupReconciler, _ context.Context, _ client.Object) error {
+					return errors.New("Failed to add finalizer")
+				}
+			},
+			rg:      &repv1.DellCSIReplicationGroup{},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer after()
+			tt.setup()
+			ctx := context.Background()
+			r := &ReplicationGroupReconciler{}
+
+			ok, err := r.addFinalizer(ctx, tt.rg)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ReplicationGroupReconciler.addFinalizer() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err == nil {
+				assert.True(t, ok, "Finalizer should be added")
+			}
+		})
+	}
+}
+
+func TestActionType_Equals(t *testing.T) {
+	type args struct {
+		ctx context.Context
+		val string
+	}
+	tests := []struct {
+		name string
+		a    ActionType
+		args args
+		want bool
+	}{
+		{
+			name: "Equal action types",
+			a:    "Action1",
+			args: args{
+				ctx: context.Background(),
+				val: "action1",
+			},
+			want: true,
+		},
+		{
+			name: "Different action types",
+			a:    "Action1",
+			args: args{
+				ctx: context.Background(),
+				val: "action2",
+			},
+			want: false,
+		},
+		{
+			name: "Empty action type",
+			a:    "",
+			args: args{
+				ctx: context.Background(),
+				val: "action1",
+			},
+			want: false,
+		},
+		{
+			name: "Empty value",
+			a:    "Action1",
+			args: args{
+				ctx: context.Background(),
+				val: "",
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.a.Equals(tt.args.ctx, tt.args.val); got != tt.want {
+				t.Errorf("ActionType.Equals() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetActionResultFromActionAnnotation(t *testing.T) {
+	testTime, _ := json.Marshal(metav1.Time{Time: time.Now()})
+
+	tests := []struct {
+		name          string
+		actionAnnot   ActionAnnotation
+		expectedError error
+	}{
+		{
+			name: "Action annotation with invalid finish time",
+			actionAnnot: ActionAnnotation{
+				ActionName: "TestAction",
+				FinishTime: "invalid time",
+			},
+			expectedError: errors.New(""),
+		},
+		{
+			name: "Action annotation with invalid protection group status",
+			actionAnnot: ActionAnnotation{
+				ActionName:            "TestAction",
+				FinishTime:            string(testTime),
+				ProtectionGroupStatus: "invalid",
+			},
+			expectedError: errors.New(""),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+			_, err := getActionResultFromActionAnnotation(ctx, test.actionAnnot)
+			if err == nil && test.expectedError != nil {
+				t.Errorf("Expected error, but got nil")
+			}
+			if err != nil && test.expectedError == nil {
+				t.Errorf("Expected nil error, but got %v", err)
+			}
+		})
+	}
+}
+
+func TestUpdateRGStatusWithActionResult(t *testing.T) {
+	dummyActionAnnotation, _ := json.Marshal(ActionAnnotation{
+		FinalError: "",
+		FinishTime: "invalid time",
+	})
+	tests := []struct {
+		name         string
+		rg           *repv1.DellCSIReplicationGroup
+		actionResult *ActionResult
+		expectedErr  error
+	}{
+		{
+			name: "ActionResult is nil AND failed in getActionInProgress",
+			rg: &repv1.DellCSIReplicationGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						Action:                        "action",
+						controllers.SnapshotNamespace: "default",
+						controllers.SnapshotClass:     "test",
+					},
+				},
+			},
+			actionResult: nil,
+			expectedErr:  errors.New(""),
+		},
+		{
+			name: "ActionResult is nil AND failed in getActionResultFromActionAnnotation",
+			rg: &repv1.DellCSIReplicationGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						Action:                        string(dummyActionAnnotation),
+						controllers.SnapshotNamespace: "default",
+						controllers.SnapshotClass:     "test",
+					},
+				},
+			},
+			actionResult: nil,
+			expectedErr:  errors.New(""),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+			err := updateRGStatusWithActionResult(ctx, test.rg, test.actionResult)
+			if err == nil && test.expectedErr != nil {
+				t.Errorf("Expected error, but got nil")
+			}
+			if err != nil && test.expectedErr == nil {
+				t.Errorf("Expected nil error, but got %v", err)
+			}
+		})
+	}
+}
+
+func TestUpdateActionAttributes(t *testing.T) {
+	tests := []struct {
+		name          string
+		actionType    ActionType
+		actionAttrs   map[string]string
+		expectedAttrs map[string]string
+	}{
+		{
+			name:          "ActionType is CREATE_SNAPSHOT and result.ActionAttributes is not empty",
+			actionType:    ActionType(csiext.ActionTypes_CREATE_SNAPSHOT.String()),
+			actionAttrs:   map[string]string{"key1": "value1", "key2": "value2"},
+			expectedAttrs: map[string]string{"key1": "value1", "key2": "value2"},
+		},
+		{
+			name:          "ActionType is not CREATE_SNAPSHOT",
+			actionType:    ActionType(csiext.ActionTypes_ABORT_SNAPSHOT.String()),
+			actionAttrs:   map[string]string{"key1": "value1", "key2": "value2"},
+			expectedAttrs: nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+			rg := &repv1.DellCSIReplicationGroup{}
+			result := &ActionResult{
+				ActionType:       test.actionType,
+				ActionAttributes: test.actionAttrs,
+			}
+
+			updateActionAttributes(ctx, rg, result)
+
+			if test.expectedAttrs == nil {
+				if rg.Status.LastAction.ActionAttributes != nil {
+					t.Errorf("Expected ActionAttributes to be nil, but it was not")
+				}
+			} else {
+				if rg.Status.LastAction.ActionAttributes == nil {
+					t.Errorf("Expected ActionAttributes to be set, but it was nil")
+				}
+
+				for key, val := range test.expectedAttrs {
+					if rg.Status.LastAction.ActionAttributes[key] != val {
+						t.Errorf("Expected ActionAttributes to be set correctly, but it was not")
+					}
+				}
+			}
+		})
+	}
 }
