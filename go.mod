@@ -2,8 +2,6 @@ module github.com/dell/csm-replication
 
 go 1.24
 
-toolchain go1.24.1
-
 require (
 	github.com/bombsimon/logrusr/v4 v4.1.0
 	github.com/dell/dell-csi-extensions/common v1.7.1-0.20250321180109-ff9405f3dbef
@@ -20,7 +18,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.20.0
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/net v0.37.0
+	golang.org/x/net v0.38.0
 	golang.org/x/sync v0.12.0
 	google.golang.org/grpc v1.71.0
 	google.golang.org/protobuf v1.36.4
