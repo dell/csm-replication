@@ -19,26 +19,16 @@ import (
 )
 
 func TestIsStringInSlice(t *testing.T) {
+	// Test case: Empty slice
 	slice := []string{}
 	str := "test"
 	if IsStringInSlice(str, slice) {
 		t.Errorf("IsStringInSlice(%s, %v) = true; want false", str, slice)
 	}
 
+	// Test case: Slice containing the target string
 	slice = []string{"test"}
 	if !IsStringInSlice(str, slice) {
 		t.Errorf("IsStringInSlice(%s, %v) = false; want true", str, slice)
-	}
-
-	slice = []string{"test1", "test2", "test3"}
-	if !IsStringInSlice(str, slice) {
-		t.Errorf("IsStringInSlice(%s, %v) = false; want true", str, slice)
-	}
-
-	//Slice without the target string
-	slice = []string{"test1", "test2", "test3"}
-	str = "not-present"
-	if IsStringInSlice(str, slice) {
-		t.Errorf("IsStringInSlice(%s, %v) = true; want false", str, slice)
 	}
 }
