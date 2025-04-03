@@ -69,7 +69,7 @@ type ClientInterface interface {
 	client.Client
 }
 
-// ClusterInterface contains methods for interacting with k8s cluster via k8s client
+// ClusterInterface contains methods for interacting with k8s cluster via k8s client.
 type ClusterInterface interface {
 	GetClient() ClientInterface
 	SetClient(ClientInterface)
