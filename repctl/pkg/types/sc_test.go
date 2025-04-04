@@ -89,7 +89,6 @@ func TestGetSC(t *testing.T) {
 }
 
 func TestSCList_Print(t *testing.T) {
-	// Create a new SCList instance with some test data
 	scl := &SCList{
 		SCList: []StorageClass{
 			{
@@ -103,12 +102,5 @@ func TestSCList_Print(t *testing.T) {
 		},
 	}
 
-	// Call the Print function with the tabwriter.Writer
 	scl.Print()
-
-	// // Assert that the expected output is written to the buffer
-	// expectedOutput := "Name\tDriver\tRemoteSC Name\tLocal Cluster\tRemote Cluster\tValid\ntest-sc\ttest.dellemc.com\ttest-remote-sc\tcluster-A\tcluster-B\ttrue\n"
-	// if buf.String() != expectedOutput {
-	// 	t.Errorf("Expected output: %s, but got: %s", expectedOutput, buf.String())
-	// }
 }
