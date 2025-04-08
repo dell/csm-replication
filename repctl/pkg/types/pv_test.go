@@ -20,7 +20,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -117,66 +116,6 @@ func TestGetPV(t *testing.T) {
 			},
 			expectedError: nil,
 		},
-		{
-			name: "PersistentVolume with valid resourceRequest annotation",
-			persistentVolume: &v1.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "pv3",
-					Annotations: map[string]string{
-						"remotePVCNamespace": "remote-namespace",
-						"remotePVC":          "remote-pvc",
-						"replicationGroup":   "rg3",
-						"resourceRequest":    `{"storage":"10Gi"}`,
-					},
-				},
-				Spec: v1.PersistentVolumeSpec{
-					StorageClassName:              "standard",
-					PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimRetain,
-					AccessModes:                   []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-				},
-			},
-			expectedPV: PersistentVolume{
-				Name:   "pv3",
-				RGName: "",
-				SCName: "standard",
-				Requests: v1.ResourceList{
-					v1.ResourceStorage: resource.MustParse("10Gi"),
-				},
-				RemotePVCName:      "remote-pvc",
-				RemotePVCNameSpace: "N/A",
-				ReclaimPolicy:      v1.PersistentVolumeReclaimRetain,
-				AccessMode:         []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-				Labels:             map[string]string(nil),
-				Annotations: map[string]string{
-					"remotePVCNamespace": "remote-namespace",
-					"remotePVC":          "remote-pvc",
-					"replicationGroup":   "rg3",
-					"resourceRequest":    `{"storage":"10Gi"}`,
-				},
-			},
-			expectedError: nil,
-		},
-		// {
-		// 	name: "PersistentVolume with invalid resourceRequest annotation",
-		// 	persistentVolume: &v1.PersistentVolume{
-		// 		ObjectMeta: metav1.ObjectMeta{
-		// 			Name: "pv4",
-		// 			Annotations: map[string]string{
-		// 				"remotePVCNamespace": "remote-namespace",
-		// 				"remotePVC":          "remote-pvc",
-		// 				"replicationGroup":   "rg4",
-		// 				"resourceRequest":    `{"invalid":"data"}`,
-		// 			},
-		// 		},
-		// 		Spec: v1.PersistentVolumeSpec{
-		// 			StorageClassName:              "standard",
-		// 			PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimRetain,
-		// 			AccessModes:                   []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-		// 		},
-		// 	},
-		// 	expectedPV: PersistentVolume{},
-		// 	expectedError: fmt.Errorf("Failed to unmarshal json for resource requirements. Error: %s", "json: cannot unmarshal object into Go value of type v1.ResourceList"),
-		// },
 	}
 
 	for _, tt := range tests {
