@@ -25,12 +25,14 @@ import (
 	"github.com/dell/repctl/pkg/metadata"
 	"github.com/dell/repctl/pkg/types"
 	"github.com/stretchr/testify/suite"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	apiTypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -521,8 +523,7 @@ func (m *MockClient) List(ctx context.Context, list client.ObjectList, opts ...c
 
 // Patch implements ClientInterface.
 func (m *MockClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-	m.Called(ctx, obj, patch)
-	return nil
+	panic("unimplemented")
 }
 
 func (m *MockClient) Called(ctx context.Context, obj client.Object, patch client.Patch) any {
@@ -712,4 +713,261 @@ func (suite *ClusterTestSuite) TestGetPersistentVolumeClaim() {
 	suite.NotNil(foundPVC)
 	suite.Equal("test-pvc", foundPVC.Name)
 	suite.Equal("test-namespace", foundPVC.Namespace)
+}
+
+func (suite *ClusterTestSuite) TestGetReplicationGroups() {
+	replicationGroup := &repv1.DellCSIReplicationGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-rg",
+		},
+	}
+
+	fake, err := fake_client.NewFakeClient([]runtime.Object{replicationGroup}, nil)
+	suite.NoError(err)
+
+	suite.cluster.SetClient(fake)
+
+	foundRG, err := suite.cluster.GetReplicationGroups(context.Background(), "test-rg")
+	suite.NoError(err)
+	suite.NotNil(foundRG)
+	suite.Equal("test-rg", foundRG.Name)
+}
+
+func (suite *ClusterTestSuite) TestGetStatefulSet() {
+	statefulSet := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-sts",
+			Namespace: "test-namespace",
+		},
+	}
+
+	fake, err := fake_client.NewFakeClient([]runtime.Object{statefulSet}, nil)
+	suite.NoError(err)
+
+	suite.cluster.SetClient(fake)
+
+	foundSTS, err := suite.cluster.GetStatefulSet(context.Background(), "test-namespace", "test-sts")
+	suite.NoError(err)
+	suite.NotNil(foundSTS)
+	suite.Equal("test-sts", foundSTS.Name)
+	suite.Equal("test-namespace", foundSTS.Namespace)
+}
+
+func (suite *ClusterTestSuite) TestGetPod() {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: "test-namespace",
+		},
+	}
+
+	fake, err := fake_client.NewFakeClient([]runtime.Object{pod}, nil)
+	suite.NoError(err)
+
+	suite.cluster.SetClient(fake)
+
+	foundPod, err := suite.cluster.GetPod(context.Background(), "test-pod", "test-namespace")
+	suite.NoError(err)
+	suite.NotNil(foundPod)
+	suite.Equal("test-pod", foundPod.Name)
+	suite.Equal("test-namespace", foundPod.Namespace)
+}
+
+func (suite *ClusterTestSuite) TestGetMigrationGroup() {
+	mg := &repv1.DellCSIMigrationGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-mg",
+		},
+	}
+
+	fake, err := fake_client.NewFakeClient([]runtime.Object{mg}, nil)
+	suite.NoError(err)
+
+	suite.cluster.SetClient(fake)
+
+	foundMG, err := suite.cluster.GetMigrationGroup(context.Background(), "test-mg")
+	suite.NoError(err)
+	suite.NotNil(foundMG)
+	suite.Equal("test-mg", foundMG.Name)
+}
+
+func (suite *ClusterTestSuite) TestDeletePod() {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: "test-namespace",
+		},
+	}
+
+	fake, err := fake_client.NewFakeClient([]runtime.Object{pod}, nil)
+	suite.NoError(err)
+
+	suite.cluster.SetClient(fake)
+
+	err = suite.cluster.DeletePod(context.Background(), pod)
+	suite.NoError(err)
+
+	// Verify that the Pod has been deleted
+	foundPod := &v1.Pod{}
+	err = fake.Get(context.Background(), apiTypes.NamespacedName{Name: "test-pod", Namespace: "test-namespace"}, foundPod)
+	suite.Error(err) // Expect an error since the Pod should be deleted
+}
+
+func (suite *ClusterTestSuite) TestDeletePersistentVolumeClaim() {
+	pvc := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pvc",
+			Namespace: "test-namespace",
+		},
+	}
+
+	fake, err := fake_client.NewFakeClient([]runtime.Object{pvc}, nil)
+	suite.NoError(err)
+
+	suite.cluster.SetClient(fake)
+
+	err = suite.cluster.DeletePersistentVolumeClaim(context.Background(), pvc)
+	suite.NoError(err)
+
+	// Verify that the PersistentVolumeClaim has been deleted
+	foundPVC := &v1.PersistentVolumeClaim{}
+	err = fake.Get(context.Background(), apiTypes.NamespacedName{Name: "test-pvc", Namespace: "test-namespace"}, foundPVC)
+	suite.Error(err) // Expect an error since the PersistentVolumeClaim should be deleted
+}
+
+func (suite *ClusterTestSuite) TestCreateStatefulSet() {
+	sts := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-sts",
+			Namespace: "test-namespace",
+		},
+		Spec: appsv1.StatefulSetSpec{
+			// Add necessary spec fields here
+		},
+	}
+
+	fake, err := fake_client.NewFakeClient([]runtime.Object{}, nil)
+	suite.NoError(err)
+
+	suite.cluster.SetClient(fake)
+
+	err = suite.cluster.CreateStatefulSet(context.Background(), sts)
+	suite.NoError(err)
+
+	// Verify that the StatefulSet has been created
+	foundSts := &appsv1.StatefulSet{}
+	err = fake.Get(context.Background(), apiTypes.NamespacedName{Name: "test-sts", Namespace: "test-namespace"}, foundSts)
+	suite.NoError(err)
+	suite.NotNil(foundSts)
+	suite.Equal("test-sts", foundSts.Name)
+	suite.Equal("test-namespace", foundSts.Namespace)
+}
+
+func (suite *ClusterTestSuite) TestUpdateMigrationGroup() {
+	mg := &repv1.DellCSIMigrationGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-mg",
+		},
+		// Add necessary spec fields here
+	}
+
+	fake, err := fake_client.NewFakeClient([]runtime.Object{mg}, nil)
+	suite.NoError(err)
+
+	suite.cluster.SetClient(fake)
+
+	// Update the MigrationGroup
+	mg.Spec.SourceID = "new-value" // Modify a field to simulate an update
+	err = suite.cluster.UpdateMigrationGroup(context.Background(), mg)
+	suite.NoError(err)
+
+	// Verify that the MigrationGroup has been updated
+	foundMG := &repv1.DellCSIMigrationGroup{}
+	err = fake.Get(context.Background(), apiTypes.NamespacedName{Name: "test-mg"}, foundMG)
+	suite.NoError(err)
+	suite.NotNil(foundMG)
+	suite.Equal("new-value", foundMG.Spec.SourceID)
+}
+
+func (suite *ClusterTestSuite) TestUpdateReplicationGroup() {
+	rg := &repv1.DellCSIReplicationGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-rg",
+		},
+		// Add necessary spec fields here
+	}
+
+	fake, err := fake_client.NewFakeClient([]runtime.Object{rg}, nil)
+	suite.NoError(err)
+
+	suite.cluster.SetClient(fake)
+
+	// Update the ReplicationGroup
+	rg.Spec.Action = "new-value" // Modify a field to simulate an update
+	err = suite.cluster.UpdateReplicationGroup(context.Background(), rg)
+	suite.NoError(err)
+
+	// Verify that the ReplicationGroup has been updated
+	foundRG := &repv1.DellCSIReplicationGroup{}
+	err = fake.Get(context.Background(), apiTypes.NamespacedName{Name: "test-rg"}, foundRG)
+	suite.NoError(err)
+	suite.NotNil(foundRG)
+	suite.Equal("new-value", foundRG.Spec.Action)
+}
+
+func (suite *ClusterTestSuite) TestUpdateSecret() {
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-secret",
+			Namespace: "test-namespace",
+		},
+		Data: map[string][]byte{
+			"key": []byte("value"),
+		},
+	}
+
+	fake, err := fake_client.NewFakeClient([]runtime.Object{secret}, nil)
+	suite.NoError(err)
+
+	suite.cluster.SetClient(fake)
+
+	// Update the Secret
+	secret.Data["key"] = []byte("new-value") // Modify a field to simulate an update
+	err = suite.cluster.UpdateSecret(context.Background(), secret)
+	suite.NoError(err)
+
+	// Verify that the Secret has been updated
+	foundSecret := &v1.Secret{}
+	err = fake.Get(context.Background(), apiTypes.NamespacedName{Name: "test-secret", Namespace: "test-namespace"}, foundSecret)
+	suite.NoError(err)
+	suite.NotNil(foundSecret)
+	suite.Equal([]byte("new-value"), foundSecret.Data["key"])
+}
+
+func (suite *ClusterTestSuite) TestUpdatePersistentVolume() {
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-pv",
+		},
+		Spec: v1.PersistentVolumeSpec{
+			// Add necessary spec fields here
+		},
+	}
+
+	fake, err := fake_client.NewFakeClient([]runtime.Object{pv}, nil)
+	suite.NoError(err)
+
+	suite.cluster.SetClient(fake)
+
+	// Update the PersistentVolume
+	pv.Spec.StorageClassName = "new-value" // Modify a field to simulate an update
+	err = suite.cluster.UpdatePersistentVolume(context.Background(), pv)
+	suite.NoError(err)
+
+	// Verify that the PersistentVolume has been updated
+	foundPV := &v1.PersistentVolume{}
+	err = fake.Get(context.Background(), apiTypes.NamespacedName{Name: "test-pv"}, foundPV)
+	suite.NoError(err)
+	suite.NotNil(foundPV)
+	suite.Equal("new-value", foundPV.Spec.StorageClassName)
 }
