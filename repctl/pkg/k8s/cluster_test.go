@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  limitations under the License.
 */
 
-package k8s_test
+package k8s
 
 import (
 	"context"
@@ -22,22 +22,23 @@ import (
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	fake_client "github.com/dell/csm-replication/test/e2e-framework/fake-client"
-	"github.com/dell/repctl/pkg/k8s"
 	"github.com/dell/repctl/pkg/metadata"
 	"github.com/dell/repctl/pkg/types"
 	"github.com/stretchr/testify/suite"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type ClusterTestSuite struct {
 	suite.Suite
-	cluster    k8s.ClusterInterface
-	fakeClient k8s.ClientInterface
+	cluster    ClusterInterface
+	fakeClient ClientInterface
 }
 
 // blank assignment to verify client.Client method implementations
@@ -45,7 +46,7 @@ var _ client.Client = &fake_client.Client{}
 
 func (suite *ClusterTestSuite) SetupSuite() {
 	metadata.Init("replication.storage.dell.com")
-	suite.cluster = &k8s.Cluster{}
+	suite.cluster = &Cluster{}
 	_ = repv1.AddToScheme(scheme.Scheme)
 }
 
@@ -464,7 +465,7 @@ func (suite *ClusterTestSuite) TestFilterReplicationGroups() {
 
 func (suite *ClusterTestSuite) TestGetAllClusters() {
 	suite.Run("failed to get any config files", func() {
-		mc := k8s.MultiClusterConfigurator{}
+		mc := MultiClusterConfigurator{}
 		_, err := mc.GetAllClusters([]string{"cluster-2"}, "testdata/")
 		suite.Error(err)
 		suite.Contains(err.Error(), "failed to find any valid config files")
@@ -474,4 +475,241 @@ func (suite *ClusterTestSuite) TestGetAllClusters() {
 
 func TestClusterTestSuite(t *testing.T) {
 	suite.Run(t, new(ClusterTestSuite))
+}
+
+// Mock implementation of ClientInterface
+type MockClient struct{}
+
+func (m *MockClient) On(s string, ctx context.Context, rg *repv1.DellCSIReplicationGroup, patch client.Patch) {
+	panic("unimplemented")
+}
+
+// Create implements ClientInterface.
+func (m *MockClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+	panic("unimplemented")
+}
+
+// Delete implements ClientInterface.
+func (m *MockClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
+	panic("unimplemented")
+}
+
+// DeleteAllOf implements ClientInterface.
+func (m *MockClient) DeleteAllOf(ctx context.Context, obj client.Object, opts ...client.DeleteAllOfOption) error {
+	panic("unimplemented")
+}
+
+// Get implements ClientInterface.
+func (m *MockClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	panic("unimplemented")
+}
+
+// GroupVersionKindFor implements ClientInterface.
+func (m *MockClient) GroupVersionKindFor(obj runtime.Object) (schema.GroupVersionKind, error) {
+	panic("unimplemented")
+}
+
+// IsObjectNamespaced implements ClientInterface.
+func (m *MockClient) IsObjectNamespaced(obj runtime.Object) (bool, error) {
+	panic("unimplemented")
+}
+
+// List implements ClientInterface.
+func (m *MockClient) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+	panic("unimplemented")
+}
+
+// Patch implements ClientInterface.
+func (m *MockClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+	m.Called(ctx, obj, patch)
+	return nil
+}
+
+func (m *MockClient) Called(ctx context.Context, obj client.Object, patch client.Patch) any {
+	panic("unimplemented")
+}
+
+// RESTMapper implements ClientInterface.
+func (m *MockClient) RESTMapper() meta.RESTMapper {
+	panic("unimplemented")
+}
+
+// Scheme implements ClientInterface.
+func (m *MockClient) Scheme() *runtime.Scheme {
+	panic("unimplemented")
+}
+
+// Status implements ClientInterface.
+func (m *MockClient) Status() client.SubResourceWriter {
+	panic("unimplemented")
+}
+
+// SubResource implements ClientInterface.
+func (m *MockClient) SubResource(subResource string) client.SubResourceClient {
+	panic("unimplemented")
+}
+
+// Update implements ClientInterface.
+func (m *MockClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+	panic("unimplemented")
+}
+
+func (m *MockClient) GetClient() ClientInterface {
+	return m
+}
+
+func (m *MockClient) SetClient(client ClientInterface) {}
+
+func (m *MockClient) GetID() string {
+	return "mock-id"
+}
+
+func (m *MockClient) GetKubeVersion() string {
+	return "mock-version"
+}
+
+func (m *MockClient) GetHost() string {
+	return "mock-host"
+}
+
+func (m *MockClient) GetKubeConfigFile() string {
+	return "mock-kubeconfig"
+}
+
+// Add other methods as needed...
+
+func TestCluster_GetKubeVersion(t *testing.T) {
+	tests := []struct {
+		name    string
+		cluster Cluster
+		want    string
+	}{
+		{
+			name: "Get KubeVersion",
+			cluster: Cluster{
+				KubeVersion: "v1.20.0",
+			},
+			want: "v1.20.0",
+		},
+		{
+			name: "Get KubeVersion with different version",
+			cluster: Cluster{
+				KubeVersion: "v1.21.0",
+			},
+			want: "v1.21.0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.cluster.GetKubeVersion()
+			if got != tt.want {
+				t.Errorf("GetKubeVersion() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCluster_GetHost(t *testing.T) {
+	tests := []struct {
+		name    string
+		cluster Cluster
+		want    string
+	}{
+		{
+			name: "Get Host",
+			cluster: Cluster{
+				Host: "https://cluster1.example.com",
+			},
+			want: "https://cluster1.example.com",
+		},
+		{
+			name: "Get Host with different URL",
+			cluster: Cluster{
+				Host: "https://cluster2.example.com",
+			},
+			want: "https://cluster2.example.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.cluster.GetHost()
+			if got != tt.want {
+				t.Errorf("GetHost() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCluster_GetKubeConfigFile(t *testing.T) {
+	tests := []struct {
+		name    string
+		cluster Cluster
+		want    string
+	}{
+		{
+			name: "Get KubeConfigFile",
+			cluster: Cluster{
+				kubeConfigFile: "/path/to/kubeconfig1",
+			},
+			want: "/path/to/kubeconfig1",
+		},
+		{
+			name: "Get KubeConfigFile with different path",
+			cluster: Cluster{
+				kubeConfigFile: "/path/to/kubeconfig2",
+			},
+			want: "/path/to/kubeconfig2",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.cluster.GetKubeConfigFile()
+			if got != tt.want {
+				t.Errorf("GetKubeConfigFile() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func (suite *ClusterTestSuite) TestGetSecret() {
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-secret",
+			Namespace: "test-namespace",
+		},
+	}
+
+	fake, err := fake_client.NewFakeClient([]runtime.Object{secret}, nil)
+	suite.NoError(err)
+
+	suite.cluster.SetClient(fake)
+
+	foundSecret, err := suite.cluster.GetSecret(context.Background(), "test-namespace", "test-secret")
+	suite.NoError(err)
+	suite.NotNil(foundSecret)
+	suite.Equal("test-secret", foundSecret.Name)
+	suite.Equal("test-namespace", foundSecret.Namespace)
+}
+
+func (suite *ClusterTestSuite) TestGetPersistentVolumeClaim() {
+	pvc := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pvc",
+			Namespace: "test-namespace",
+		},
+	}
+
+	fake, err := fake_client.NewFakeClient([]runtime.Object{pvc}, nil)
+	suite.NoError(err)
+
+	suite.cluster.SetClient(fake)
+
+	foundPVC, err := suite.cluster.GetPersistentVolumeClaim(context.Background(), "test-namespace", "test-pvc")
+	suite.NoError(err)
+	suite.NotNil(foundPVC)
+	suite.Equal("test-pvc", foundPVC.Name)
+	suite.Equal("test-namespace", foundPVC.Namespace)
 }
