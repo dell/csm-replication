@@ -17,6 +17,7 @@ package k8s
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -723,41 +724,99 @@ func (suite *ClusterTestSuite) TestGetPersistentVolumeClaim() {
 }
 
 func (suite *ClusterTestSuite) TestGetReplicationGroups() {
-	replicationGroup := &repv1.DellCSIReplicationGroup{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-rg",
+
+	tests := []struct {
+		name           string
+		client         ClientInterface
+		expectedRGName string
+		expectedErr    error
+	}{
+
+		{
+			name: "Successful",
+			client: func() ClientInterface {
+				replicationGroup := &repv1.DellCSIReplicationGroup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-rg",
+					},
+				}
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{replicationGroup}, nil)
+				return fake
+			}(),
+			expectedErr:    nil,
+			expectedRGName: "test-rg",
+		},
+		{
+			name: "Error",
+			client: func() ClientInterface {
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil)
+				return fake
+			}(),
+			expectedErr: errors.New("DellCSIReplicationGroup.replication.storage.dell.com \"test-rg\" not found"),
 		},
 	}
 
-	fake, err := fake_client.NewFakeClient([]runtime.Object{replicationGroup}, nil)
-	suite.NoError(err)
-
-	suite.cluster.SetClient(fake)
-
-	foundRG, err := suite.cluster.GetReplicationGroups(context.Background(), "test-rg")
-	suite.NoError(err)
-	suite.NotNil(foundRG)
-	suite.Equal("test-rg", foundRG.Name)
+	for _, tt := range tests {
+		suite.cluster.SetClient(tt.client)
+		foundRG, err := suite.cluster.GetReplicationGroups(context.Background(), "test-rg")
+		if tt.expectedErr == nil {
+			suite.Nil(err)
+			suite.NotNil(foundRG)
+			suite.Equal(tt.expectedRGName, foundRG.Name)
+		} else {
+			suite.Equal(tt.expectedErr.Error(), err.Error())
+		}
+	}
 }
 
 func (suite *ClusterTestSuite) TestGetStatefulSet() {
-	statefulSet := &appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-sts",
-			Namespace: "test-namespace",
+
+	tests := []struct {
+		name                 string
+		client               ClientInterface
+		expectedSTSName      string
+		expectedSTSNamespace string
+		expectedErr          error
+	}{
+
+		{
+			name: "Successful",
+			client: func() ClientInterface {
+				statefulSet := &appsv1.StatefulSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-sts",
+						Namespace: "test-namespace",
+					},
+				}
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{statefulSet}, nil)
+				return fake
+			}(),
+			expectedErr:          nil,
+			expectedSTSName:      "test-sts",
+			expectedSTSNamespace: "test-namespace",
+		},
+		{
+			name: "Error",
+			client: func() ClientInterface {
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil)
+				return fake
+			}(),
+			expectedErr: errors.New("StatefulSet.apps \"test-sts\" not found"),
 		},
 	}
 
-	fake, err := fake_client.NewFakeClient([]runtime.Object{statefulSet}, nil)
-	suite.NoError(err)
-
-	suite.cluster.SetClient(fake)
-
-	foundSTS, err := suite.cluster.GetStatefulSet(context.Background(), "test-namespace", "test-sts")
-	suite.NoError(err)
-	suite.NotNil(foundSTS)
-	suite.Equal("test-sts", foundSTS.Name)
-	suite.Equal("test-namespace", foundSTS.Namespace)
+	for _, tt := range tests {
+		suite.cluster.SetClient(tt.client)
+		foundSTS, err := suite.cluster.GetStatefulSet(context.Background(), "test-namespace", "test-sts")
+		if tt.expectedErr == nil {
+			suite.Nil(err)
+			suite.NotNil(foundSTS)
+			suite.Equal(tt.expectedSTSName, foundSTS.Name)
+			suite.Equal(tt.expectedSTSNamespace, foundSTS.Namespace)
+		} else {
+			suite.Equal(tt.expectedErr.Error(), err.Error())
+		}
+	}
 }
 
 func (suite *ClusterTestSuite) TestGetPod() {
