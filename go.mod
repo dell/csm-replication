@@ -11,7 +11,7 @@ require (
 	github.com/dell/dell-csi-extensions/replication v1.10.2-0.20250325135746-bee5d830cdce
 	github.com/dell/gobrick v1.13.2-0.20250324100052-8d8c8046d514
 	github.com/fatih/color v1.18.0
-	github.com/fsnotify/fsnotify v1.8.0
+	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/go-logr/logr v1.4.2
 	github.com/google/uuid v1.6.0
@@ -21,7 +21,7 @@ require (
 	github.com/spf13/viper v1.20.0
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/net v0.38.0
-	golang.org/x/sync v0.12.0
+	golang.org/x/sync v0.13.0
 	google.golang.org/grpc v1.71.0
 	google.golang.org/protobuf v1.36.4
 	k8s.io/api v0.32.1
