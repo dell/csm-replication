@@ -53,6 +53,7 @@ type GlobalParameters struct {
 	IgnoreNamespaces  bool
 	VolumeGroupPrefix string
 	Mode              string
+	CsiNfs            string
 
 	// PowerMax
 	Srp          Mirrored
