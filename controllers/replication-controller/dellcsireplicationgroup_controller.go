@@ -73,6 +73,16 @@ var (
 	getDellCsiReplicationGroupUpdate = func(r *ReplicationGroupReconciler, ctx context.Context, group *repv1.DellCSIReplicationGroup) error {
 		return r.Update(ctx, group)
 	}
+	getPersistentVolume = func(ctx context.Context, client connection.RemoteClusterClient, pvName string) (*v1.PersistentVolume, error) {
+		return client.GetPersistentVolume(ctx, pvName)
+	}
+	updatePersistentVolume = func(ctx context.Context, client connection.RemoteClusterClient, pv *v1.PersistentVolume) error {
+		return client.UpdatePersistentVolume(ctx, pv)
+	}
+
+	getPersistentVolumeClaim = func(ctx context.Context, client connection.RemoteClusterClient, namespace string, pvcName string) (*v1.PersistentVolumeClaim, error) {
+		return client.GetPersistentVolumeClaim(ctx, namespace, pvcName)
+	}
 )
 
 // ReplicationGroupReconciler reconciles a ReplicationGroup object
@@ -579,19 +589,19 @@ func (r *ReplicationGroupReconciler) swapAllPVC(ctx context.Context, c connectio
 
 func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connection.RemoteClusterClient, pvcName, namespace, targetPV, rgTarget string, log logr.Logger) error {
 	// Read the PVC
-	pvc, err := client.GetPersistentVolumeClaim(ctx, namespace, pvcName)
+	pvc, err := getPersistentVolumeClaim(ctx, client, namespace, pvcName)
 	if err != nil {
-		return fmt.Errorf("error getting pv %s: %s", pvcName, err)
+		return fmt.Errorf("error getting pvc %s: %s", pvcName, err)
 	}
 
 	// Save the Reclaim Policy for both PVs - return reclaim policy to makepvcreclaimpolicyretain
-	pv, err := client.GetPersistentVolume(ctx, pvc.Spec.VolumeName)
+	pv, err := getPersistentVolume(ctx, client, pvc.Spec.VolumeName)
 	if err != nil {
 		return fmt.Errorf("error retrieving local PV %s", pvc.Spec.VolumeName)
 	}
 	localPVPolicy := pv.Spec.PersistentVolumeReclaimPolicy
 
-	pv, err = client.GetPersistentVolume(ctx, pvc.Annotations[controller.RemotePV])
+	pv, err = getPersistentVolume(ctx, client, pvc.Annotations[controller.RemotePV])
 	if err != nil {
 		return fmt.Errorf("error retrieving remote PV %s", pvc.Annotations[controller.RemotePV])
 	}
@@ -623,7 +633,7 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	done := false
 	for iteration := 0; !done; iteration++ {
 		time.Sleep(2 * time.Second)
-		_, err := client.GetPersistentVolumeClaim(ctx, namespace, pvcName)
+		_, err := getPersistentVolumeClaim(ctx, client, namespace, pvcName)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				done = true
@@ -692,7 +702,7 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 
 func verifyPVC(ctx context.Context, client connection.RemoteClusterClient, localPVName string, remotePVName string, pvcName string, namespace string) error {
 	for iteration := 0; iteration < 30; iteration++ {
-		pvc, err := client.GetPersistentVolumeClaim(ctx, namespace, pvcName)
+		pvc, err := getPersistentVolumeClaim(ctx, client, namespace, pvcName)
 
 		if (err == nil) && (localPVName == pvc.Spec.VolumeName) && (remotePVName == pvc.Annotations[controller.RemotePV]) {
 			return nil
@@ -706,18 +716,18 @@ func verifyPVC(ctx context.Context, client connection.RemoteClusterClient, local
 
 func setPVReclaimPolicy(ctx context.Context, client connection.RemoteClusterClient, pvName string, prevPolicy v1.PersistentVolumeReclaimPolicy) error {
 	for iteration := 0; iteration < 30; iteration++ {
-		pv, err := client.GetPersistentVolume(ctx, pvName)
+		pv, err := getPersistentVolume(ctx, client, pvName)
 		if err != nil {
 			return fmt.Errorf("error retrieving PV %s: %s", pvName, err.Error())
 		}
 
 		pv.Spec.PersistentVolumeReclaimPolicy = prevPolicy
-		err = client.UpdatePersistentVolume(ctx, pv)
+		err = updatePersistentVolume(ctx, client, pv)
 		if err != nil {
 			return fmt.Errorf("error updating PV %s: %s", pvName, err.Error())
 		}
 
-		pv, err = client.GetPersistentVolume(ctx, pvName)
+		pv, err = getPersistentVolume(ctx, client, pvName)
 		if err != nil {
 			return fmt.Errorf("error retrieving PV %s: %s", pvName, err.Error())
 		}
@@ -734,7 +744,7 @@ func setPVReclaimPolicy(ctx context.Context, client connection.RemoteClusterClie
 func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient, pvName, pvcNamespace, pvcName string, log logr.Logger) error {
 	log.V(common.InfoLevel).Info(fmt.Sprintf("Removing ClaimRef on LocalPV: %s", pvName))
 	for iteration := 0; iteration < 30; iteration++ {
-		pv, err := client.GetPersistentVolume(ctx, pvName)
+		pv, err := getPersistentVolume(ctx, client, pvName)
 		if err != nil {
 			return fmt.Errorf("error retrieving PV %s: %s", pvName, err.Error())
 		}
@@ -749,7 +759,7 @@ func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 		pv.Labels[controller.RemotePVCNamespace] = pvcNamespace
 		pv.Annotations[controller.RemotePVC] = pvcName
 
-		err = client.UpdatePersistentVolume(ctx, pv)
+		err = updatePersistentVolume(ctx, client, pv)
 		if err != nil {
 			if !errors.IsConflict(err) {
 				return fmt.Errorf("error updating PV %s: %s", pvName, err.Error())
@@ -765,9 +775,10 @@ func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 
 func updatePVClaimRef(ctx context.Context, client connection.RemoteClusterClient, pvName, pvcNamespace, pvcResourceVersion, pvcName string, pvcUID types.UID, log logr.Logger) error {
 	for iteration := 0; iteration < 30; iteration++ {
-		pv, err := client.GetPersistentVolume(ctx, pvName)
+		pv, err := getPersistentVolume(ctx, client, pvName)
 		if err != nil {
 			log.V(common.InfoLevel).Info(fmt.Sprintf("Error retrieving PV %s: %s", pvName, err.Error()))
+
 			return err
 		}
 
@@ -795,7 +806,7 @@ func updatePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 			pv.Annotations[controller.RemotePVC] = ""
 		}
 
-		err = client.UpdatePersistentVolume(ctx, pv)
+		err = updatePersistentVolume(ctx, client, pv)
 		if err != nil {
 			if !errors.IsConflict(err) {
 				return fmt.Errorf("error updating PV %s: %s", pvName, err.Error())

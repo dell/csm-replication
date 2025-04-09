@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -1371,4 +1372,353 @@ func (suite *RGControllerTestSuite) TestPVCRemapWithMismatchedRemotePV() {
 	err = suite.client.Get(context.Background(), types.NamespacedName{Name: remotePV.Name}, &unchangedRemotePV)
 	suite.NoError(err)
 	suite.Nil(unchangedRemotePV.Spec.ClaimRef, "Remote PV's claim reference should remain nil")
+}
+
+func TestUpdatePVClaimRef(t *testing.T) {
+	originalGetPersistentVolume := getPersistentVolume
+	originalUpdatePersistentVolume := updatePersistentVolume
+
+	after := func() {
+		getPersistentVolume = originalGetPersistentVolume
+		updatePersistentVolume = originalUpdatePersistentVolume
+	}
+
+	tests := []struct {
+		name               string
+		pv                 *v1.PersistentVolume
+		client             connection.RemoteClusterClient
+		pvName             string
+		pvcNamespace       string
+		pvcResourceVersion string
+		pvcName            string
+		pvcUID             types.UID
+		log                logr.Logger
+		setup              func()
+		expectedErr        bool
+	}{
+		{
+			name:   "Error in getting persisitent volume",
+			pvName: "",
+			pv: &corev1.PersistentVolume{
+				Spec: corev1.PersistentVolumeSpec{
+					ClaimRef: &corev1.ObjectReference{
+						Kind:            "PersistentVolumeClaim",
+						Namespace:       "fake-ns",
+						Name:            "",
+						UID:             "fake-uid",
+						ResourceVersion: "fake-version",
+					},
+				},
+			},
+			setup: func() {
+				getPersistentVolume = func(_ context.Context, _ connection.RemoteClusterClient, _ string) (*v1.PersistentVolume, error) {
+					return nil, errors.New("Error retrieving PV")
+				}
+			},
+			expectedErr: true,
+		},
+		{
+			name:   "Error in updating persisitent volume",
+			pvName: "fake-pv",
+			pv: &corev1.PersistentVolume{
+				Spec: corev1.PersistentVolumeSpec{
+					ClaimRef: &corev1.ObjectReference{
+						Kind:            "PersistentVolumeClaim",
+						Namespace:       "fake-ns",
+						Name:            "",
+						UID:             "fake-uid",
+						ResourceVersion: "fake-version",
+					},
+				},
+			},
+			setup: func() {
+				pv := &corev1.PersistentVolume{}
+				getPersistentVolume = func(_ context.Context, _ connection.RemoteClusterClient, _ string) (*v1.PersistentVolume, error) {
+					return pv, nil
+				}
+				updatePersistentVolume = func(_ context.Context, _ connection.RemoteClusterClient, _ *v1.PersistentVolume) error {
+					return errors.New("error updating PV")
+				}
+			},
+			expectedErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer after()
+			tt.setup()
+			pvName := tt.pvName
+			pvcNamespace := tt.pvcNamespace
+			pvcResourceVersion := tt.pvcResourceVersion
+			pvcName := tt.pvcName
+			pvcUID := tt.pvcUID
+			log := tt.log
+			client := tt.client
+			ctx := context.Background()
+			err := updatePVClaimRef(ctx, client, pvName, pvcNamespace, pvcResourceVersion, pvcName, pvcUID, log)
+			if tt.expectedErr {
+				if tt.name == "Error in getting persisitent volume" && err.Error() != "Error retrieving PV" {
+					t.Errorf("expected error, got %s", err)
+				} else if tt.name == "Error in updating persisitent volume" && !strings.Contains(err.Error(), "error updating PV") {
+					t.Errorf("expected error, got %s", err)
+				}
+			} else {
+				t.Logf("Expected no error, got %s", err)
+			}
+		})
+	}
+}
+
+func TestRemovePVClaimRef(t *testing.T) {
+	originalGetPersistentVolume := getPersistentVolume
+	originalUpdatePersistentVolume := updatePersistentVolume
+
+	after := func() {
+		getPersistentVolume = originalGetPersistentVolume
+		updatePersistentVolume = originalUpdatePersistentVolume
+	}
+
+	tests := []struct {
+		name         string
+		pv           *v1.PersistentVolume
+		client       connection.RemoteClusterClient
+		pvName       string
+		pvcNamespace string
+		pvcName      string
+		log          logr.Logger
+		setup        func()
+		expectedErr  bool
+	}{
+		{
+			name: "When PV cannot be retrieved",
+			pv: &corev1.PersistentVolume{
+				Spec: corev1.PersistentVolumeSpec{
+					ClaimRef: nil,
+				},
+			},
+			setup: func() {
+				getPersistentVolume = func(_ context.Context, _ connection.RemoteClusterClient, _ string) (*v1.PersistentVolume, error) {
+					return nil, errors.New("Error retrieving PV")
+				}
+			},
+		},
+		{
+			name:   "Error in updating persisitent volume",
+			pvName: "fake-pv",
+			pv: &corev1.PersistentVolume{
+				Spec: corev1.PersistentVolumeSpec{
+					ClaimRef: &corev1.ObjectReference{
+						Kind:            "PersistentVolumeClaim",
+						Namespace:       "fake-ns",
+						Name:            "",
+						UID:             "fake-uid",
+						ResourceVersion: "fake-version",
+					},
+				},
+			},
+			setup: func() {
+				pv := &corev1.PersistentVolume{}
+				getPersistentVolume = func(_ context.Context, _ connection.RemoteClusterClient, _ string) (*v1.PersistentVolume, error) {
+					return pv, nil
+				}
+				updatePersistentVolume = func(_ context.Context, _ connection.RemoteClusterClient, _ *v1.PersistentVolume) error {
+					return errors.New("error updating PV")
+				}
+			},
+			expectedErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer after()
+			tt.setup()
+			pvName := tt.pvName
+			pvcNamespace := tt.pvcNamespace
+			pvcName := tt.pvcName
+			log := tt.log
+			client := tt.client
+			ctx := context.Background()
+			err := removePVClaimRef(ctx, client, pvName, pvcNamespace, pvcName, log)
+			if tt.expectedErr && err != nil {
+				if tt.name == "When PV cannot be retrieved" && err.Error() != "Error retrieving PV" {
+					t.Errorf("expected error, got %s", err)
+				} else if tt.name == "Error in updating persisitent volume" && !strings.Contains(err.Error(), "error updating PV") {
+					t.Errorf("expected error, got %s", err)
+				}
+			} else {
+				t.Logf("Expected no error, got %s", err)
+			}
+		})
+	}
+}
+
+func TestSetPVClaimRef(t *testing.T) {
+	originalGetPersistentVolume := getPersistentVolume
+	originalUpdatePersistentVolume := updatePersistentVolume
+
+	after := func() {
+		getPersistentVolume = originalGetPersistentVolume
+		updatePersistentVolume = originalUpdatePersistentVolume
+	}
+
+	tests := []struct {
+		name         string
+		pv           *v1.PersistentVolume
+		client       connection.RemoteClusterClient
+		pvName       string
+		pvcNamespace string
+		pvcName      string
+		log          logr.Logger
+		setup        func()
+		expectedErr  bool
+	}{
+		{
+			name: "When PV cannot be retrieved",
+			pv: &corev1.PersistentVolume{
+				Spec: corev1.PersistentVolumeSpec{
+					ClaimRef: nil,
+				},
+			},
+			setup: func() {
+				getPersistentVolume = func(_ context.Context, _ connection.RemoteClusterClient, _ string) (*v1.PersistentVolume, error) {
+					return nil, errors.New("Error retrieving PV")
+				}
+			},
+		},
+		{
+			name:   "Error in updating persisitent volume",
+			pvName: "fake-pv",
+			pv: &corev1.PersistentVolume{
+				Spec: corev1.PersistentVolumeSpec{
+					ClaimRef: &corev1.ObjectReference{
+						Kind:            "PersistentVolumeClaim",
+						Namespace:       "fake-ns",
+						Name:            "",
+						UID:             "fake-uid",
+						ResourceVersion: "fake-version",
+					},
+				},
+			},
+			setup: func() {
+				pv := &corev1.PersistentVolume{}
+				getPersistentVolume = func(_ context.Context, _ connection.RemoteClusterClient, _ string) (*v1.PersistentVolume, error) {
+					return pv, nil
+				}
+				updatePersistentVolume = func(_ context.Context, _ connection.RemoteClusterClient, _ *v1.PersistentVolume) error {
+					return errors.New("error updating PV")
+				}
+			},
+			expectedErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer after()
+			tt.setup()
+			pv := &corev1.PersistentVolume{
+				Spec: corev1.PersistentVolumeSpec{
+					PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimRetain,
+				},
+			}
+			pvName := tt.pvName
+			prevPolicy := pv.Spec.PersistentVolumeReclaimPolicy
+			client := tt.client
+			ctx := context.Background()
+			err := setPVReclaimPolicy(ctx, client, pvName, prevPolicy)
+			if tt.expectedErr && err != nil {
+				if tt.name == "When PV cannot be retrieved" && err.Error() != "Error retrieving PV" {
+					t.Errorf("expected error, got %s", err)
+				} else if tt.name == "Error in updating persisitent volume" && !strings.Contains(err.Error(), "error updating PV") {
+					t.Errorf("expected error, got %s", err)
+				}
+			} else {
+				t.Logf("Expected no error, got %s", err)
+			}
+		})
+	}
+}
+
+func TestSwapPVC(t *testing.T) {
+	originalGetPersistentVolumeClaim := getPersistentVolumeClaim
+	originalGetPersistentVolume := getPersistentVolume
+
+	after := func() {
+		getPersistentVolumeClaim = originalGetPersistentVolumeClaim
+		getPersistentVolume = originalGetPersistentVolume
+	}
+	tests := []struct {
+		name        string
+		pvc         *v1.PersistentVolumeClaim
+		client      connection.RemoteClusterClient
+		pvcName     string
+		namespace   string
+		targetPV    string
+		rgTarget    string
+		log         logr.Logger
+		setup       func()
+		expectedErr bool
+	}{
+		{
+			name:      "Error getting PVC",
+			namespace: "fake-ns",
+			pvcName:   "fake-pvc",
+			setup: func() {
+				getPersistentVolumeClaim = func(_ context.Context, _ connection.RemoteClusterClient, _ string, _ string) (*v1.PersistentVolumeClaim, error) {
+					return nil, errors.New("error getting pvc")
+				}
+			},
+			expectedErr: true,
+		},
+		{
+			name:      "Error getting PV",
+			namespace: "fake-ns",
+			pvcName:   "fake-pvc",
+			setup: func() {
+				pvc := &corev1.PersistentVolumeClaim{}
+				getPersistentVolumeClaim = func(_ context.Context, _ connection.RemoteClusterClient, _ string, _ string) (*v1.PersistentVolumeClaim, error) {
+					return pvc, nil
+				}
+				getPersistentVolume = func(_ context.Context, _ connection.RemoteClusterClient, _ string) (*v1.PersistentVolume, error) {
+					return nil, errors.New("error getting pv")
+				}
+			},
+			expectedErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setup()
+			defer after()
+			pvcName := tt.pvcName
+			namespace := tt.namespace
+			targetPV := tt.targetPV
+			rgTarget := tt.rgTarget
+			log := tt.log
+			client := tt.client
+			ctx := context.Background()
+			r := &ReplicationGroupReconciler{
+				Client:          nil,
+				Log:             ctrl.Log.WithName("controllers").WithName("DellCSIReplicationGroup"),
+				Scheme:          nil,
+				EventRecorder:   nil,
+				Config:          nil,
+				Domain:          "",
+				DisablePVCRemap: false,
+			}
+			err := r.swapPVC(ctx, client, pvcName, namespace, targetPV, rgTarget, log)
+			if tt.expectedErr {
+				if tt.name == "Error getting PVC" && !strings.Contains(err.Error(), "error getting pvc") {
+					t.Errorf("expected error, got %s", err)
+				} else if tt.name == "Error getting PV" && !strings.Contains(err.Error(), "error retrieving local PV") {
+					t.Errorf("expected error, got %s", err)
+				}
+			} else {
+				t.Logf("Expected no error, got %s", err)
+			}
+		})
+	}
 }
