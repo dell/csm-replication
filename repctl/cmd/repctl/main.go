@@ -99,12 +99,17 @@ func setupRepctlCommand() *cobra.Command {
 	return repctl
 }
 
+var getRepctlCommandExecFunction = func(repctl *cobra.Command) error {
+	return repctl.Execute()
+}
+var osExit = os.Exit
+
 func main() {
 	repctl := setupRepctlCommand()
 
-	err := repctl.Execute()
+	err := getRepctlCommandExecFunction(repctl)
 	if err != nil {
 		log.Fatalf("repctl: error: %s\n", err.Error())
 	}
-	os.Exit(0)
+	osExit(0)
 }

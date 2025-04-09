@@ -15,49 +15,104 @@
 package main
 
 import (
-	"bytes"
 	"testing"
+
+	"github.com/dell/repctl/pkg/config"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestMainFunc(t *testing.T) {
+func TestSetupRepctlCommand(t *testing.T) {
+	// Initialize viper with test values
+	viper.Set(config.ReplicationPrefix, "test.prefix")
+
+	// Call the function
 	repctl := setupRepctlCommand()
 
-	// Test cases
+	// Assert the command properties
+	assert.Equal(t, "repctl", repctl.Use)
+	assert.Equal(t, "repctl is CLI tool for managing replication in Kubernetes", repctl.Short)
+	assert.Equal(t, "repctl is CLI tool for managing replication in Kubernetes", repctl.Long)
+	assert.Equal(t, "v1.11.0", repctl.Version)
+
+	// Assert the persistent flags
+	clustersFlag := repctl.PersistentFlags().Lookup("clusters")
+	assert.NotNil(t, clustersFlag)
+	assert.Equal(t, "remote cluster id", clustersFlag.Usage)
+
+	driverFlag := repctl.PersistentFlags().Lookup("driver")
+	assert.NotNil(t, driverFlag)
+	assert.Equal(t, "name of the driver", driverFlag.Usage)
+
+	rgFlag := repctl.PersistentFlags().Lookup("rg")
+	assert.NotNil(t, rgFlag)
+	assert.Equal(t, "replication group name", rgFlag.Usage)
+
+	prefixFlag := repctl.PersistentFlags().Lookup("prefix")
+	assert.NotNil(t, prefixFlag)
+	assert.Equal(t, "prefix for replication (default is replication.storage.dell.com)", prefixFlag.Usage)
+
+	verboseFlag := repctl.PersistentFlags().Lookup("verbose")
+	assert.NotNil(t, verboseFlag)
+	assert.Equal(t, "enables verbosity and debug output", verboseFlag.Usage)
+
+	// Assert the commands
+	expectedCommands := []string{
+		"cluster", "create", "failover", "failback", "reprotect",
+		"swap", "exec", "edit", "migrate", "snapshot",
+	}
+	for _, cmdName := range expectedCommands {
+		cmd := repctl.Commands()
+		found := false
+		for _, c := range cmd {
+			if c.Use == cmdName {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found, "command %s not found", cmdName)
+	}
+}
+
+func TestMain(t *testing.T) {
+	originalGetRepctlCommandExecFunction := getRepctlCommandExecFunction
+	defaultOSExit := osExit
+	osExitCode := 0
+	osExit = func(code int) {
+		osExitCode = code
+	}
+	defer func() {
+		getRepctlCommandExecFunction = originalGetRepctlCommandExecFunction
+		osExit = defaultOSExit
+	}()
+
 	tests := []struct {
-		name       string
-		args       []string
-		wantOutput string
-		wantErr    bool
+		name             string
+		mockExecFunc     func(*cobra.Command) error
+		expectedExitCode int
 	}{
 		{
-			name:       "Unknown command",
-			args:       []string{"repctl", "unknown"},
-			wantOutput: "Error: unknown command \"repctl\" for \"repctl\"\nRun 'repctl --help' for usage.\n",
-			wantErr:    true,
+			name: "successful execution",
+			mockExecFunc: func(_ *cobra.Command) error {
+				return nil
+			},
+			expectedExitCode: 0,
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Set up a test output buffer
-			out := &bytes.Buffer{}
+			// Reset the exit code
+			osExitCode = 0
 
-			// Set the arguments
-			repctl.SetArgs(tt.args)
+			// Mock the command execution function
+			getRepctlCommandExecFunction = tt.mockExecFunc
+			// Call the main function
+			main()
 
-			// Set the output
-			repctl.SetOutput(out)
-
-			// Execute the command
-			err := repctl.Execute()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("repctl.Execute() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-
-			// Check the output
-			if out.String() != tt.wantOutput {
-				t.Errorf("repctl.Execute() output = %v, want %v", out.String(), tt.wantOutput)
+			// Assert the exit code
+			if osExitCode != tt.expectedExitCode {
+				t.Errorf("Expected osExitCode: %v, but got osExitCode: %v", tt.expectedExitCode, osExitCode)
 			}
 		})
 	}
