@@ -15,15 +15,19 @@
 package k8s
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"testing"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	fake_client "github.com/dell/csm-replication/test/e2e-framework/fake-client"
+	"github.com/dell/repctl/pkg/display"
 	"github.com/dell/repctl/pkg/metadata"
 	"github.com/dell/repctl/pkg/types"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -33,7 +37,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apiTypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/version"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -970,4 +977,494 @@ func (suite *ClusterTestSuite) TestUpdatePersistentVolume() {
 	suite.NoError(err)
 	suite.NotNil(foundPV)
 	suite.Equal("new-value", foundPV.Spec.StorageClassName)
+}
+
+func TestNewClientSet(t *testing.T) {
+	// Saving original functions
+	defaultBuildConfigFromFlags := clientcmdBuildConfigFromFlags
+	defaultNewForConfig := kubernetesNewForConfig
+
+	after := func() {
+		clientcmdBuildConfigFromFlags = defaultBuildConfigFromFlags
+		kubernetesNewForConfig = defaultNewForConfig
+	}
+
+	tests := []struct {
+		name        string
+		setup       func()
+		expectedErr bool
+	}{
+		{
+			name: "Clientset creation is successful",
+			setup: func() {
+				clientcmdBuildConfigFromFlags = func(masterUrl, kubeconfigPath string) (*rest.Config, error) {
+					return &rest.Config{}, nil
+				}
+				kubernetesNewForConfig = func(config *rest.Config) (*kubernetes.Clientset, error) {
+					return &kubernetes.Clientset{}, nil
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name: "Config creation fails",
+			setup: func() {
+				clientcmdBuildConfigFromFlags = func(masterUrl, kubeconfigPath string) (*rest.Config, error) {
+					return nil, fmt.Errorf("mock error")
+				}
+			},
+			expectedErr: true,
+		},
+		{
+			name: "Clientset creation fails",
+			setup: func() {
+				clientcmdBuildConfigFromFlags = func(masterUrl, kubeconfigPath string) (*rest.Config, error) {
+					return &rest.Config{}, nil
+				}
+				kubernetesNewForConfig = func(config *rest.Config) (*kubernetes.Clientset, error) {
+					return nil, fmt.Errorf("mock error")
+				}
+			},
+			expectedErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setup()
+			defer after()
+
+			clientset, restConfig, err := newClientSet("/path/to/mock/kubeconfig")
+
+			if tt.expectedErr {
+				if err == nil {
+					t.Fatalf("Expected error, got nil")
+				}
+				if clientset != nil {
+					t.Fatalf("Expected nil clientset, got %v", clientset)
+				}
+				if restConfig != nil {
+					t.Fatalf("Expected nil restConfig, got %v", restConfig)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("Expected no error, got %v", err)
+				}
+				if clientset == nil {
+					t.Fatalf("Expected clientset, got nil")
+				}
+				if restConfig == nil {
+					t.Fatalf("Expected restConfig, got nil")
+				}
+			}
+		})
+	}
+}
+
+func TestClusters_Print(t *testing.T) {
+	// Saving original function
+	defaultDisplayNewTableWriter := displayNewTableWriter
+
+	after := func() {
+		displayNewTableWriter = defaultDisplayNewTableWriter
+	}
+
+	tests := []struct {
+		name        string
+		setup       func()
+		expectedErr bool
+	}{
+		{
+			name: "Print is successful",
+			setup: func() {
+				displayNewTableWriter = func(obj interface{}, w io.Writer) (*display.TableWriter, error) {
+					return display.NewTableWriter(obj, w)
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name: "Table writer creation fails",
+			setup: func() {
+				displayNewTableWriter = func(obj interface{}, w io.Writer) (*display.TableWriter, error) {
+					return nil, fmt.Errorf("mock error")
+				}
+			},
+			expectedErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setup()
+			defer after()
+
+			// Mock Clusters data
+			mockClusters := &Clusters{
+				Clusters: []ClusterInterface{
+					&Cluster{ClusterID: ""},
+					&Cluster{ClusterID: ""},
+				},
+			}
+
+			// Capture the output
+			var buf bytes.Buffer
+			oldStdout := os.Stdout
+			defer func() { os.Stdout = oldStdout }()
+
+			mockClusters.Print()
+
+			// Check the output
+			output := buf.String()
+			if tt.expectedErr {
+				assert.Empty(t, output)
+			} else {
+				assert.Contains(t, output, "")
+				assert.Contains(t, output, "")
+			}
+		})
+	}
+}
+
+func TestCreateCluster(t *testing.T) {
+	// Saving original functions
+	defaultGetControllerRuntimeClient := getCtrlRuntimeClient
+	defaultNewClientSet := newClntSet
+	defaultGetServiceVersion := getServiceVersion
+
+	after := func() {
+		getCtrlRuntimeClient = defaultGetControllerRuntimeClient
+		newClntSet = defaultNewClientSet
+		getServiceVersion = defaultGetServiceVersion
+	}
+
+	tests := []struct {
+		name        string
+		setup       func()
+		expectedErr bool
+	}{
+		{
+			name: "Cluster creation is successful",
+			setup: func() {
+				getCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+					return &mockClient{}, nil
+				}
+				newClntSet = func(kubeconfig string) (*kubernetes.Clientset, *rest.Config, error) {
+					return &kubernetes.Clientset{}, &rest.Config{Host: "https://mock-host"}, nil
+				}
+				getServiceVersion = func(clientset *kubernetes.Clientset) (*version.Info, error) {
+					return &version.Info{Major: "1", Minor: "20"}, nil
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name: "Controller runtime client creation fails",
+			setup: func() {
+				getCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+					return nil, fmt.Errorf("mock error")
+				}
+			},
+			expectedErr: true,
+		},
+		{
+			name: "Clientset creation fails",
+			setup: func() {
+				getCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+					return &mockClient{}, nil
+				}
+				newClntSet = func(kubeconfig string) (*kubernetes.Clientset, *rest.Config, error) {
+					return nil, nil, fmt.Errorf("mock error")
+				}
+			},
+			expectedErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setup()
+			defer after()
+
+			cluster, err := CreateCluster("test-cluster", "/path/to/mock/kubeconfig")
+
+			if tt.expectedErr {
+				assert.Error(t, err)
+				assert.Nil(t, cluster)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, cluster)
+			}
+		})
+	}
+}
+
+func (m *mockClient) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+	podList := list.(*v1.PodList)
+	*podList = v1.PodList{
+		Items: []v1.Pod{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod-1",
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							Name: "statefulset-1",
+							Kind: "StatefulSet",
+						},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod-2",
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							Name: "statefulset-2",
+							Kind: "StatefulSet",
+						},
+					},
+				},
+			},
+		},
+	}
+	return nil
+}
+
+func TestFilterPods(t *testing.T) {
+	mockClient := &mockClient{}
+	cluster := &Cluster{client: mockClient}
+
+	tests := []struct {
+		name             string
+		namespace        string
+		stsName          string
+		expectedPodNames []string
+	}{
+		{
+			name:             "Filter pods by StatefulSet name",
+			namespace:        "default",
+			stsName:          "statefulset-1",
+			expectedPodNames: []string{"pod-1"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			podList, err := cluster.FilterPods(context.Background(), tt.namespace, tt.stsName)
+			assert.NoError(t, err)
+			assert.NotNil(t, podList)
+
+			var podNames []string
+			for _, pod := range podList.Items {
+				podNames = append(podNames, pod.Name)
+			}
+
+			assert.Equal(t, tt.expectedPodNames, podNames)
+		})
+	}
+}
+
+func (m *mockClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
+	// Mock deletion logic
+	if obj.GetName() == "error-sts" {
+		return fmt.Errorf("mock error")
+	}
+	return nil
+}
+
+func TestDeleteStsOrphan(t *testing.T) {
+	mockClient := &mockClient{}
+	cluster := &Cluster{client: mockClient}
+
+	tests := []struct {
+		name        string
+		sts         *appsv1.StatefulSet
+		expectedErr bool
+	}{
+		{
+			name: "Successful deletion",
+			sts: &appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-sts",
+				},
+			},
+			expectedErr: false,
+		},
+		{
+			name: "Deletion fails",
+			sts: &appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "error-sts",
+				},
+			},
+			expectedErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := cluster.DeleteStsOrphan(context.Background(), tt.sts)
+			if tt.expectedErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func (m *mockClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+	// Mock creation logic
+	if obj.GetName() == "error-object" {
+		return fmt.Errorf("mock error")
+	}
+	if obj.GetName() == "already-exists-object" {
+		return fmt.Errorf("already exists")
+	}
+	return nil
+}
+
+func (m *mockClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+	// Mock update logic
+	if obj.GetName() == "error-object" {
+		return fmt.Errorf("mock error")
+	}
+	return nil
+}
+
+func TestCreateObject(t *testing.T) {
+	mockClient := &mockClient{}
+	cluster := &Cluster{client: mockClient}
+
+	tests := []struct {
+		name        string
+		data        []byte
+		expectedErr bool
+	}{
+		{
+			name: "Create StorageClass",
+			data: []byte(`apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: test-storageclass`),
+			expectedErr: false,
+		},
+		{
+			name: "Create Namespace",
+			data: []byte(`apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-namespace`),
+			expectedErr: false,
+		},
+		{
+			name: "Create CustomResourceDefinition",
+			data: []byte(`apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: test-crd`),
+			expectedErr: false,
+		},
+		{
+			name: "Create ClusterRole",
+			data: []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: test-clusterrole`),
+			expectedErr: false,
+		},
+		{
+			name: "Create ClusterRoleBinding",
+			data: []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: test-clusterrolebinding`),
+			expectedErr: false,
+		},
+		{
+			name: "Create Service",
+			data: []byte(`apiVersion: v1
+kind: Service
+metadata:
+  name: test-service`),
+			expectedErr: false,
+		},
+		{
+			name: "Create Deployment",
+			data: []byte(`apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-deployment`),
+			expectedErr: false,
+		},
+		{
+			name: "Create ConfigMap",
+			data: []byte(`apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-configmap`),
+			expectedErr: false,
+		},
+		{
+			name: "Create ServiceAccount",
+			data: []byte(`apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: test-serviceaccount`),
+			expectedErr: false,
+		},
+		{
+			name: "Create Secret",
+			data: []byte(`apiVersion: v1
+kind: Secret
+metadata:
+  name: test-secret`),
+			expectedErr: false,
+		},
+		{
+			name: "Unsupported object type",
+			data: []byte(`apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod`),
+			expectedErr: true,
+		},
+		{
+			name: "Error creating object",
+			data: []byte(`apiVersion: v1
+kind: Namespace
+metadata:
+  name: error-object`),
+			expectedErr: true,
+		},
+		{
+			name: "Object already exists and update succeeds",
+			data: []byte(`apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: already-exists-object`),
+			expectedErr: false,
+		},
+		{
+			name: "Object already exists and update fails",
+			data: []byte(`apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: error-object`),
+			expectedErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			obj, err := cluster.CreateObject(context.Background(), tt.data)
+			if tt.expectedErr {
+				assert.Error(t, err)
+				assert.Nil(t, obj)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, obj)
+			}
+		})
+	}
 }

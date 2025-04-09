@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	apiTypes "k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -49,10 +50,25 @@ type Clusters struct {
 	Clusters []ClusterInterface
 }
 
+var (
+	displayNewTableWriter         = display.NewTableWriter
+	clientcmdBuildConfigFromFlags = clientcmd.BuildConfigFromFlags
+	kubernetesNewForConfig        = kubernetes.NewForConfig
+	getCtrlRuntimeClient          = func(kubeconfig string) (client.Client, error) {
+		return getControllerRuntimeClient(kubeconfig)
+	}
+	newClntSet = func(kubeconfig string) (*kubernetes.Clientset, *rest.Config, error) {
+		return newClientSet(kubeconfig)
+	}
+	getServiceVersion = func(clientset *kubernetes.Clientset) (*version.Info, error) {
+		return clientset.Discovery().ServerVersion()
+	}
+)
+
 // Print prints all currently managed clusters to stdout in form a table
 func (c *Clusters) Print() {
 	// Form an empty object and create a new table writer
-	t, err := display.NewTableWriter(Cluster{}, os.Stdout)
+	t, err := displayNewTableWriter(Cluster{}, os.Stdout)
 	if err != nil {
 		return
 	}
@@ -626,11 +642,11 @@ func (*MultiClusterConfigurator) GetAllClusters(clusterIDs []string, configDir s
 
 func newClientSet(kubeconfig string) (*kubernetes.Clientset, *rest.Config, error) {
 	// Create a Config (k8s.io/client-go/rest)
-	restConfig, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	restConfig, err := clientcmdBuildConfigFromFlags("", kubeconfig)
 	if err != nil {
 		return nil, nil, err
 	}
-	clientset, err := kubernetes.NewForConfig(restConfig)
+	clientset, err := kubernetesNewForConfig(restConfig)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -639,7 +655,7 @@ func newClientSet(kubeconfig string) (*kubernetes.Clientset, *rest.Config, error
 
 // CreateCluster creates new k8s client for cluster
 func CreateCluster(clusterID, kubeconfig string) (ClusterInterface, error) {
-	k8sClient, err := getControllerRuntimeClient(kubeconfig)
+	k8sClient, err := getCtrlRuntimeClient(kubeconfig)
 	if err != nil {
 		return nil, err
 	}
@@ -648,12 +664,12 @@ func CreateCluster(clusterID, kubeconfig string) (ClusterInterface, error) {
 
 	// Create a temporary clientset to get the server version
 	// controller runtime client doesnt provide the discovery interface
-	clientset, restConfig, err := newClientSet(kubeconfig)
+	clientset, restConfig, err := newClntSet(kubeconfig)
 	if err != nil {
 		// We can silently ignore this error
 	} else {
 		host = restConfig.Host
-		version, err := clientset.Discovery().ServerVersion()
+		version, err := getServiceVersion(clientset)
 		if err != nil {
 			// We can silently ignore this error
 		} else {
