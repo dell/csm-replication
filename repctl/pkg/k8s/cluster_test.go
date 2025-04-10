@@ -64,21 +64,49 @@ func (suite *ClusterTestSuite) TearDownSuite() {
 }
 
 func (suite *ClusterTestSuite) TestGetPersistentVolume() {
-	pv := &v1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-pv",
+	tests := []struct {
+		name           string
+		client         ClientInterface
+		expectedPVName string
+		expectedErr    error
+	}{
+		{
+			name: "Successful",
+			client: func() ClientInterface {
+				persistentVolume := &v1.PersistentVolume{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-pv",
+					},
+				}
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{persistentVolume}, nil)
+				return fake
+			}(),
+			expectedErr:    nil,
+			expectedPVName: "test-pv",
+		},
+		{
+			name: "Error",
+			client: func() ClientInterface {
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil)
+				return fake
+			}(),
+			expectedErr: errors.New("PersistentVolume \"test-pv\" not found"),
 		},
 	}
 
-	fake, err := fake_client.NewFakeClient([]runtime.Object{pv}, nil)
-	suite.NoError(err)
-
-	suite.cluster.SetClient(fake)
-
-	volume, err := suite.cluster.GetPersistentVolume(context.Background(), "test-pv")
-	suite.NoError(err)
-	suite.NotNil(volume)
-	suite.Equal("test-pv", volume.Name)
+	for _, tt := range tests {
+		suite.Run(tt.name, func() {
+			suite.cluster.SetClient(tt.client)
+			foundPV, err := suite.cluster.GetPersistentVolume(context.Background(), "test-pv")
+			if tt.expectedErr == nil {
+				suite.Nil(err)
+				suite.NotNil(foundPV)
+				suite.Equal(tt.expectedPVName, foundPV.Name)
+			} else {
+				suite.Equal(tt.expectedErr.Error(), err.Error())
+			}
+		})
+	}
 }
 
 func (suite *ClusterTestSuite) TestListPersistentVolumes() {
@@ -153,21 +181,49 @@ func (suite *ClusterTestSuite) TestFilterPersistentVolumes() {
 }
 
 func (suite *ClusterTestSuite) TestGetNamespace() {
-	ns := &v1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-ns",
+	tests := []struct {
+		name           string
+		client         ClientInterface
+		expectedNSName string
+		expectedErr    error
+	}{
+		{
+			name: "Successful",
+			client: func() ClientInterface {
+				namespace := &v1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-ns",
+					},
+				}
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{namespace}, nil)
+				return fake
+			}(),
+			expectedErr:    nil,
+			expectedNSName: "test-ns",
+		},
+		{
+			name: "Error",
+			client: func() ClientInterface {
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil)
+				return fake
+			}(),
+			expectedErr: errors.New("Namespace \"test-ns\" not found"),
 		},
 	}
 
-	fake, err := fake_client.NewFakeClient([]runtime.Object{ns}, nil)
-	suite.NoError(err)
-
-	suite.cluster.SetClient(fake)
-
-	gotNs, err := suite.cluster.GetNamespace(context.Background(), "test-ns")
-	suite.NoError(err)
-	suite.NotNil(gotNs)
-	suite.Equal("test-ns", gotNs.Name)
+	for _, tt := range tests {
+		suite.Run(tt.name, func() {
+			suite.cluster.SetClient(tt.client)
+			foundNS, err := suite.cluster.GetNamespace(context.Background(), "test-ns")
+			if tt.expectedErr == nil {
+				suite.Nil(err)
+				suite.NotNil(foundNS)
+				suite.Equal(tt.expectedNSName, foundNS.Name)
+			} else {
+				suite.Equal(tt.expectedErr.Error(), err.Error())
+			}
+		})
+	}
 }
 
 func (suite *ClusterTestSuite) TestCreateNamespace() {
@@ -684,43 +740,97 @@ func TestCluster_GetKubeConfigFile(t *testing.T) {
 }
 
 func (suite *ClusterTestSuite) TestGetSecret() {
-	secret := &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-secret",
-			Namespace: "test-namespace",
+	tests := []struct {
+		name               string
+		client             ClientInterface
+		expectedSecretName string
+		expectedErr        error
+	}{
+		{
+			name: "Successful",
+			client: func() ClientInterface {
+				secret := &v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-secret",
+						Namespace: "test-namespace",
+					},
+				}
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{secret}, nil)
+				return fake
+			}(),
+			expectedErr:        nil,
+			expectedSecretName: "test-secret",
+		},
+		{
+			name: "Error",
+			client: func() ClientInterface {
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil)
+				return fake
+			}(),
+			expectedErr: errors.New("Secret \"test-secret\" not found"),
 		},
 	}
 
-	fake, err := fake_client.NewFakeClient([]runtime.Object{secret}, nil)
-	suite.NoError(err)
-
-	suite.cluster.SetClient(fake)
-
-	foundSecret, err := suite.cluster.GetSecret(context.Background(), "test-namespace", "test-secret")
-	suite.NoError(err)
-	suite.NotNil(foundSecret)
-	suite.Equal("test-secret", foundSecret.Name)
-	suite.Equal("test-namespace", foundSecret.Namespace)
+	for _, tt := range tests {
+		suite.Run(tt.name, func() {
+			suite.cluster.SetClient(tt.client)
+			foundSecret, err := suite.cluster.GetSecret(context.Background(), "test-namespace", "test-secret")
+			if tt.expectedErr == nil {
+				suite.Nil(err)
+				suite.NotNil(foundSecret)
+				suite.Equal(tt.expectedSecretName, foundSecret.Name)
+			} else {
+				suite.Equal(tt.expectedErr.Error(), err.Error())
+			}
+		})
+	}
 }
 
 func (suite *ClusterTestSuite) TestGetPersistentVolumeClaim() {
-	pvc := &v1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-pvc",
-			Namespace: "test-namespace",
+	tests := []struct {
+		name            string
+		client          ClientInterface
+		expectedPVCName string
+		expectedErr     error
+	}{
+		{
+			name: "Successful",
+			client: func() ClientInterface {
+				persistentVolumeClaim := &v1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pvc",
+						Namespace: "test-namespace",
+					},
+				}
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{persistentVolumeClaim}, nil)
+				return fake
+			}(),
+			expectedErr:     nil,
+			expectedPVCName: "test-pvc",
+		},
+		{
+			name: "Error",
+			client: func() ClientInterface {
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil)
+				return fake
+			}(),
+			expectedErr: errors.New("PersistentVolumeClaim \"test-pvc\" not found"),
 		},
 	}
 
-	fake, err := fake_client.NewFakeClient([]runtime.Object{pvc}, nil)
-	suite.NoError(err)
-
-	suite.cluster.SetClient(fake)
-
-	foundPVC, err := suite.cluster.GetPersistentVolumeClaim(context.Background(), "test-namespace", "test-pvc")
-	suite.NoError(err)
-	suite.NotNil(foundPVC)
-	suite.Equal("test-pvc", foundPVC.Name)
-	suite.Equal("test-namespace", foundPVC.Namespace)
+	for _, tt := range tests {
+		suite.Run(tt.name, func() {
+			suite.cluster.SetClient(tt.client)
+			foundPVC, err := suite.cluster.GetPersistentVolumeClaim(context.Background(), "test-namespace", "test-pvc")
+			if tt.expectedErr == nil {
+				suite.Nil(err)
+				suite.NotNil(foundPVC)
+				suite.Equal(tt.expectedPVCName, foundPVC.Name)
+			} else {
+				suite.Equal(tt.expectedErr.Error(), err.Error())
+			}
+		})
+	}
 }
 
 func (suite *ClusterTestSuite) TestGetReplicationGroups() {
@@ -820,85 +930,208 @@ func (suite *ClusterTestSuite) TestGetStatefulSet() {
 }
 
 func (suite *ClusterTestSuite) TestGetPod() {
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-pod",
-			Namespace: "test-namespace",
+	tests := []struct {
+		name            string
+		client          ClientInterface
+		expectedPodName string
+		expectedErr     error
+	}{
+		{
+			name: "Successful",
+			client: func() ClientInterface {
+				pod := &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod",
+						Namespace: "test-namespace",
+					},
+				}
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{pod}, nil)
+				return fake
+			}(),
+			expectedErr:     nil,
+			expectedPodName: "test-pod",
+		},
+		{
+			name: "Error",
+			client: func() ClientInterface {
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil)
+				return fake
+			}(),
+			expectedErr: errors.New("Pod \"test-pod\" not found"),
 		},
 	}
 
-	fake, err := fake_client.NewFakeClient([]runtime.Object{pod}, nil)
-	suite.NoError(err)
-
-	suite.cluster.SetClient(fake)
-
-	foundPod, err := suite.cluster.GetPod(context.Background(), "test-pod", "test-namespace")
-	suite.NoError(err)
-	suite.NotNil(foundPod)
-	suite.Equal("test-pod", foundPod.Name)
-	suite.Equal("test-namespace", foundPod.Namespace)
+	for _, tt := range tests {
+		suite.Run(tt.name, func() {
+			suite.cluster.SetClient(tt.client)
+			foundPod, err := suite.cluster.GetPod(context.Background(), "test-pod", "test-namespace")
+			if tt.expectedErr == nil {
+				suite.Nil(err)
+				suite.NotNil(foundPod)
+				suite.Equal(tt.expectedPodName, foundPod.Name)
+			} else {
+				suite.Equal(tt.expectedErr.Error(), err.Error())
+			}
+		})
+	}
 }
 
 func (suite *ClusterTestSuite) TestGetMigrationGroup() {
-	mg := &repv1.DellCSIMigrationGroup{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-mg",
+	tests := []struct {
+		name           string
+		client         ClientInterface
+		expectedMGName string
+		expectedErr    error
+	}{
+		{
+			name: "Successful",
+			client: func() ClientInterface {
+				migrationGroup := &repv1.DellCSIMigrationGroup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-mg",
+					},
+				}
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{migrationGroup}, nil)
+				return fake
+			}(),
+			expectedErr:    nil,
+			expectedMGName: "test-mg",
+		},
+		{
+			name: "Error",
+			client: func() ClientInterface {
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil)
+				return fake
+			}(),
+			expectedErr: errors.New("DellCSIMigrationGroup.replication.storage.dell.com \"test-mg\" not found"),
 		},
 	}
 
-	fake, err := fake_client.NewFakeClient([]runtime.Object{mg}, nil)
-	suite.NoError(err)
-
-	suite.cluster.SetClient(fake)
-
-	foundMG, err := suite.cluster.GetMigrationGroup(context.Background(), "test-mg")
-	suite.NoError(err)
-	suite.NotNil(foundMG)
-	suite.Equal("test-mg", foundMG.Name)
+	for _, tt := range tests {
+		suite.Run(tt.name, func() {
+			suite.cluster.SetClient(tt.client)
+			foundMG, err := suite.cluster.GetMigrationGroup(context.Background(), "test-mg")
+			if tt.expectedErr == nil {
+				suite.Nil(err)
+				suite.NotNil(foundMG)
+				suite.Equal(tt.expectedMGName, foundMG.Name)
+			} else {
+				suite.Equal(tt.expectedErr.Error(), err.Error())
+			}
+		})
+	}
 }
 
 func (suite *ClusterTestSuite) TestDeletePod() {
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-pod",
-			Namespace: "test-namespace",
+	tests := []struct {
+		name        string
+		client      ClientInterface
+		pod         *v1.Pod
+		expectedErr error
+	}{
+		{
+			name: "Successful",
+			client: func() ClientInterface {
+				pod := &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod",
+						Namespace: "test-namespace",
+					},
+				}
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{pod}, nil)
+				return fake
+			}(),
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod",
+					Namespace: "test-namespace",
+				},
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "Error",
+			client: func() ClientInterface {
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil)
+				return fake
+			}(),
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod",
+					Namespace: "test-namespace",
+				},
+			},
+			expectedErr: errors.New("Pod \"test-pod\" not found"),
 		},
 	}
 
-	fake, err := fake_client.NewFakeClient([]runtime.Object{pod}, nil)
-	suite.NoError(err)
-
-	suite.cluster.SetClient(fake)
-
-	err = suite.cluster.DeletePod(context.Background(), pod)
-	suite.NoError(err)
-
-	// Verify that the Pod has been deleted
-	foundPod := &v1.Pod{}
-	err = fake.Get(context.Background(), apiTypes.NamespacedName{Name: "test-pod", Namespace: "test-namespace"}, foundPod)
-	suite.Error(err) // Expect an error since the Pod should be deleted
+	for _, tt := range tests {
+		suite.Run(tt.name, func() {
+			suite.cluster.SetClient(tt.client)
+			err := suite.cluster.DeletePod(context.Background(), tt.pod)
+			if tt.expectedErr == nil {
+				suite.Nil(err)
+			} else {
+				suite.Equal(tt.expectedErr.Error(), err.Error())
+			}
+		})
+	}
 }
 
 func (suite *ClusterTestSuite) TestDeletePersistentVolumeClaim() {
-	pvc := &v1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-pvc",
-			Namespace: "test-namespace",
+	tests := []struct {
+		name        string
+		client      ClientInterface
+		pvc         *v1.PersistentVolumeClaim
+		expectedErr error
+	}{
+		{
+			name: "Successful",
+			client: func() ClientInterface {
+				persistentVolumeClaim := &v1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pvc",
+						Namespace: "test-namespace",
+					},
+				}
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{persistentVolumeClaim}, nil)
+				return fake
+			}(),
+			pvc: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pvc",
+					Namespace: "test-namespace",
+				},
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "Error",
+			client: func() ClientInterface {
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil)
+				return fake
+			}(),
+			pvc: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pvc",
+					Namespace: "test-namespace",
+				},
+			},
+			expectedErr: errors.New("PersistentVolumeClaim \"test-pvc\" not found"),
 		},
 	}
 
-	fake, err := fake_client.NewFakeClient([]runtime.Object{pvc}, nil)
-	suite.NoError(err)
-
-	suite.cluster.SetClient(fake)
-
-	err = suite.cluster.DeletePersistentVolumeClaim(context.Background(), pvc)
-	suite.NoError(err)
-
-	// Verify that the PersistentVolumeClaim has been deleted
-	foundPVC := &v1.PersistentVolumeClaim{}
-	err = fake.Get(context.Background(), apiTypes.NamespacedName{Name: "test-pvc", Namespace: "test-namespace"}, foundPVC)
-	suite.Error(err) // Expect an error since the PersistentVolumeClaim should be deleted
+	for _, tt := range tests {
+		suite.Run(tt.name, func() {
+			suite.cluster.SetClient(tt.client)
+			err := suite.cluster.DeletePersistentVolumeClaim(context.Background(), tt.pvc)
+			if tt.expectedErr == nil {
+				suite.Nil(err)
+			} else {
+				suite.Equal(tt.expectedErr.Error(), err.Error())
+			}
+		})
+	}
 }
 
 func (suite *ClusterTestSuite) TestCreateStatefulSet() {
