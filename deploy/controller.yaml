@@ -63,18 +63,18 @@ rules:
       - get
       - list
       - watch
-  # - apiGroups:
-  #     - ""
-  #   resources:
-  #     - persistentvolumeclaims
-  #   verbs:
-  #     - create
-  #     - delete
-  #     - get
-  #     - list
-  #     - patch
-  #     - update
-  #     - watch
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumeclaims
+    verbs:
+      # - create
+      # - delete
+      # - get
+      - list
+      # - patch
+      # - update
+      # - watch
   # - apiGroups:
   #     - ""
   #   resources:
@@ -103,26 +103,26 @@ rules:
   #     - get
   #     - list
   #     - watch
-  # - apiGroups:
-  #     - ""
-  #   resources:
-  #     - secrets
-  #   verbs:
-  #     - get
-  #     - list
-  #     - watch
-  # - apiGroups:
-  #     - replication.storage.dell.com
-  #   resources:
-  #     - dellcsireplicationgroups
-  #   verbs:
-  #     - create
-  #     - delete
-  #     - get
-  #     - list
-  #     - patch
-  #     - update
-  #     - watch
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      # - get
+      - list
+      # - watch
+  - apiGroups:
+      - replication.storage.dell.com
+    resources:
+      - dellcsireplicationgroups
+    verbs:
+      # - create
+      # - delete
+      # - get
+      - list
+      # - patch
+      # - update
+      # - watch
   # - apiGroups:
   #     - replication.storage.dell.com
   #   resources:
@@ -221,7 +221,7 @@ rules:
       - create
       - delete
       - get
-      - list
+      # - list
       - patch
       - update
       - watch
@@ -247,7 +247,7 @@ rules:
       - secrets
     verbs:
       - get
-      - list
+      # - list
       - watch
   - apiGroups:
       - replication.storage.dell.com
@@ -257,7 +257,7 @@ rules:
       - create
       - delete
       - get
-      - list
+      # - list
       - patch
       - update
       - watch
