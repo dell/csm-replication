@@ -74,7 +74,7 @@ rules:
       - list
       # - patch
       # - update
-      # - watch
+      - watch
   # - apiGroups:
   #     - ""
   #   resources:
@@ -110,7 +110,7 @@ rules:
     verbs:
       # - get
       - list
-      # - watch
+      - watch
   - apiGroups:
       - replication.storage.dell.com
     resources:
@@ -122,7 +122,7 @@ rules:
       - list
       # - patch
       # - update
-      # - watch
+      - watch
   # - apiGroups:
   #     - replication.storage.dell.com
   #   resources:
@@ -224,7 +224,7 @@ rules:
       # - list
       - patch
       - update
-      - watch
+      # - watch
   - apiGroups:
       - ""
     resources:
@@ -248,7 +248,7 @@ rules:
     verbs:
       - get
       # - list
-      - watch
+      # - watch
   - apiGroups:
       - replication.storage.dell.com
     resources:
@@ -260,7 +260,7 @@ rules:
       # - list
       - patch
       - update
-      - watch
+      # - watch
   - apiGroups:
       - replication.storage.dell.com
     resources:
