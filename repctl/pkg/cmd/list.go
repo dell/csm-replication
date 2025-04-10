@@ -50,27 +50,25 @@ func GetListCommand() *cobra.Command {
 	listCmd.PersistentFlags().StringSlice("rc", []string{""}, "remote cluster id")
 	_ = viper.BindPFlag("rc", listCmd.PersistentFlags().Lookup("rc"))
 
-	listCmd.AddCommand(getListStorageClassesCommand())
-	listCmd.AddCommand(getListPersistentVolumesCommand())
-	listCmd.AddCommand(getListPersistentVolumeClaimsCommand())
+	listCmd.AddCommand(getListStorageClassesCommand(&k8s.MultiClusterConfigurator{}))
+	listCmd.AddCommand(getListPersistentVolumesCommand(&k8s.MultiClusterConfigurator{}))
+	listCmd.AddCommand(getListPersistentVolumeClaimsCommand(&k8s.MultiClusterConfigurator{}))
 	listCmd.AddCommand(getListReplicationGroupsCommand())
-	listCmd.AddCommand(getListClusterGlobalCommand())
+	listCmd.AddCommand(getListClusterGlobalCommand(&k8s.MultiClusterConfigurator{}))
 
 	return listCmd
 }
 
-func getListClusterGlobalCommand() *cobra.Command {
+func getListClusterGlobalCommand(mc GetClustersInterface) *cobra.Command {
 	listClusterCmd := &cobra.Command{
 		Use:     "cluster",
 		Aliases: []string{"clusters"},
 		Short:   "list all clusters currently being managed by repctl",
 		Run: func(cmd *cobra.Command, args []string) {
-			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
+			configFolder, err := getClustersFolderPathFunction("/.repctl/clusters/")
 			if err != nil {
 				log.Fatalf("cluster list: error getting clusters folder path: %s", err.Error())
 			}
-
-			mc := &k8s.MultiClusterConfigurator{}
 
 			clusters, err := mc.GetAllClusters([]string{}, configFolder)
 			if err != nil {
@@ -83,7 +81,7 @@ func getListClusterGlobalCommand() *cobra.Command {
 	return listClusterCmd
 }
 
-func getListStorageClassesCommand() *cobra.Command {
+func getListStorageClassesCommand(mc GetClustersInterface) *cobra.Command {
 	return &cobra.Command{
 		Use:     "sc",
 		Aliases: []string{"storageclass", "storageclasses"},
@@ -96,14 +94,13 @@ You can also list all storage classes by passing --all (-A) flag`,
 		Run: func(cmd *cobra.Command, args []string) {
 			log.Print("listing storage classes")
 
-			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
+			configFolder, err := getClustersFolderPathFunction("/.repctl/clusters/")
 			if err != nil {
 				log.Fatalf("list sc: error getting clusters folder path: %s", err.Error())
 			}
 
 			clusterIDs := viper.GetStringSlice(config.Clusters)
 
-			mc := &k8s.MultiClusterConfigurator{}
 			clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
 			if err != nil {
 				log.Fatalf("list sc: error in initializing cluster info: %s", err.Error())
@@ -128,7 +125,12 @@ You can also list all storage classes by passing --all (-A) flag`,
 	}
 }
 
-func getListPersistentVolumesCommand() *cobra.Command {
+//go:generate mockgen -destination=mocks/get_clusters_interface.go -package mocks . GetClustersInterface
+type GetClustersInterface interface {
+	GetAllClusters(clusterIDs []string, configDir string) (*k8s.Clusters, error)
+}
+
+func getListPersistentVolumesCommand(mc GetClustersInterface) *cobra.Command {
 	return &cobra.Command{
 		Use:     "pv",
 		Aliases: []string{"persistentvolumes", "persistentvolume"},
@@ -141,7 +143,7 @@ Remote Namespace, Remote ClusterId`,
 		Run: func(cmd *cobra.Command, args []string) {
 			log.Print("listing persistent volumes")
 
-			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
+			configFolder, err := getClustersFolderPathFunction("/.repctl/clusters/")
 			if err != nil {
 				log.Fatalf("list pv: error getting clusters folder path: %s", err.Error())
 			}
@@ -150,7 +152,6 @@ Remote Namespace, Remote ClusterId`,
 
 			log.Print(clusterIDs)
 
-			mc := &k8s.MultiClusterConfigurator{}
 			clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
 			if err != nil {
 				log.Fatalf("list pv: error in initializing cluster info: %s", err.Error())
@@ -189,7 +190,7 @@ Remote Namespace, Remote ClusterId`,
 }
 
 /* #nosec G104 */
-func getListPersistentVolumeClaimsCommand() *cobra.Command {
+func getListPersistentVolumeClaimsCommand(mc GetClustersInterface) *cobra.Command {
 	listPVC := &cobra.Command{
 		Use:     "pvc",
 		Aliases: []string{"persistentvolumeclaims", "persistentvolumeclaim"},
@@ -201,14 +202,13 @@ You can apply filters like remoteClusterId, remoteNamespace.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			log.Print("listing persistent volume claims")
 
-			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
+			configFolder, err := getClustersFolderPathFunction("/.repctl/clusters/")
 			if err != nil {
 				log.Fatalf("list pvc: error getting clusters folder path: %s", err.Error())
 			}
 
 			clusterIDs := viper.GetStringSlice(config.Clusters)
 
-			mc := &k8s.MultiClusterConfigurator{}
 			clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
 			if err != nil {
 				log.Fatalf("list pvc: error in initializing cluster info: %s", err.Error())
@@ -262,7 +262,7 @@ remote cluster id (rc) & driver name`,
 		Run: func(cmd *cobra.Command, args []string) {
 			log.Print("listing replication groups")
 
-			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
+			configFolder, err := getClustersFolderPathFunction("/.repctl/clusters/")
 			if err != nil {
 				log.Fatalf("list pvc: error getting clusters folder path: %s", err.Error())
 			}
