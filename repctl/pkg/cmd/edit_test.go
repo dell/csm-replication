@@ -22,8 +22,10 @@ import (
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/repctl/pkg/k8s"
+	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/yaml"
 )
 
 type MockCluster struct {
@@ -170,6 +172,145 @@ func TestSecret_ToDecodedSecret(t *testing.T) {
 			if got := s.ToDecodedSecret(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Secret.ToDecodedSecret() = %v, want %v", got, tt.want)
 			}
+		})
+	}
+}
+
+func TestParseSecret(t *testing.T) {
+	// Save original functions
+	originalReadFile := readFile
+	originalUnmarshalYAML := unmarshalYAML
+
+	// Restore original functions after test
+	defer func() {
+		readFile = originalReadFile
+		unmarshalYAML = originalUnmarshalYAML
+	}()
+
+	tests := []struct {
+		name        string
+		setup       func()
+		expectedErr bool
+	}{
+		{
+			name: "Success - valid YAML",
+			setup: func() {
+				readFile = func(path string) ([]byte, error) {
+					return []byte("key: value"), nil
+				}
+				unmarshalYAML = func(content []byte, v interface{}, opts ...yaml.JSONOpt) error {
+					*v.(*DecodedSecret) = DecodedSecret{}
+					return nil
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name: "Error - readFile fails",
+			setup: func() {
+				readFile = func(path string) ([]byte, error) {
+					return nil, fmt.Errorf("read file error")
+				}
+			},
+			expectedErr: true,
+		},
+		{
+			name: "Error - unmarshalYAML fails",
+			setup: func() {
+				readFile = func(path string) ([]byte, error) {
+					return []byte("key: value"), nil
+				}
+				unmarshalYAML = func(content []byte, v interface{}, opts ...yaml.JSONOpt) error {
+					return fmt.Errorf("unmarshal error")
+				}
+			},
+			expectedErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setup()
+
+			// Call the function
+			secret, err := parseSecret("test.yaml")
+
+			// Assertions
+			if tt.expectedErr {
+				assert.Error(t, err)
+				assert.Nil(t, secret)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, secret)
+			}
+		})
+	}
+}
+
+func TestObjectYAML(t *testing.T) {
+	// Save original functions
+	originalJSONMarshal := jsonMarshal
+	originalJSONToYAML := jsonToYAML
+
+	// Restore original functions after test
+	defer func() {
+		jsonMarshal = originalJSONMarshal
+		jsonToYAML = originalJSONToYAML
+	}()
+
+	tests := []struct {
+		name     string
+		setup    func()
+		input    interface{}
+		expected string
+	}{
+		{
+			name: "Success - valid object",
+			setup: func() {
+				jsonMarshal = func(v interface{}) ([]byte, error) {
+					return []byte(`{"key":"value"}`), nil
+				}
+				jsonToYAML = func(j []byte) ([]byte, error) {
+					return []byte("key: value\n"), nil
+				}
+			},
+			input:    map[string]string{"key": "value"},
+			expected: "key: value\n",
+		},
+		{
+			name: "Error - jsonMarshal fails",
+			setup: func() {
+				jsonMarshal = func(v interface{}) ([]byte, error) {
+					return nil, fmt.Errorf("json marshal error")
+				}
+			},
+			input:    map[string]string{"key": "value"},
+			expected: "json marshal error",
+		},
+		{
+			name: "Error - jsonToYAML fails",
+			setup: func() {
+				jsonMarshal = func(v interface{}) ([]byte, error) {
+					return []byte(`{"key":"value"}`), nil
+				}
+				jsonToYAML = func(j []byte) ([]byte, error) {
+					return nil, fmt.Errorf("yaml conversion error")
+				}
+			},
+			input:    map[string]string{"key": "value"},
+			expected: "yaml conversion error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setup()
+
+			// Call the function
+			result := objectYAML(tt.input)
+
+			// Assertions
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
