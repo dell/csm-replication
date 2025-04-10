@@ -24,6 +24,12 @@ import (
 	"github.com/spf13/viper"
 )
 
+var clusterPath = "/.repctl/clusters/"
+
+var getClustersFolderPathFunction = func(path string) (string, error) {
+	return getClustersFolderPath(path)
+}
+
 // GetSnapshotCommand returns 'snapshot' cobra command
 /* #nosec G104 */
 func GetSnapshotCommand() *cobra.Command {
@@ -45,7 +51,7 @@ This command will create a snapshot for the specified RG on the target cluster.\
 			wait := viper.GetBool("snapshot-wait")
 			input, res := verifyInputForSnapshotAction(inputCluster, rgName)
 
-			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
+			configFolder, err := getClustersFolderPathFunction(clusterPath)
 			if err != nil {
 				log.Fatalf("snapshot: error getting clusters folder path: %s\n", err.Error())
 			}
@@ -79,7 +85,7 @@ func verifyInputForSnapshotAction(input string, rg string) (res string, tgt stri
 		}
 	}
 
-	configFolder, err := getClustersFolderPath("/.repctl/clusters/")
+	configFolder, err := getClustersFolderPathFunction(clusterPath)
 	if err != nil {
 		log.Fatalf("snapshot: error getting clusters folder path: %s", err.Error())
 	}
