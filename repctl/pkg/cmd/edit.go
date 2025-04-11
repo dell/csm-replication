@@ -41,6 +41,13 @@ type DecodedSecret struct {
 	Type              v1.SecretType     `json:"type,omitempty" protobuf:"bytes,3,opt,name=type,casttype=SecretType"`
 }
 
+var (
+	readFile      = os.ReadFile
+	unmarshalYAML = yaml.Unmarshal
+	jsonMarshal   = json.Marshal
+	jsonToYAML    = yaml.JSONToYAML
+)
+
 // ToSecret converts Decoded Secret to Secret
 func (s *DecodedSecret) ToSecret() *v1.Secret {
 	m := make(map[string][]byte)
@@ -195,11 +202,11 @@ func editSecretCommand() *cobra.Command {
 // objectYAML converts object into string
 func objectYAML(obj interface{}) string {
 	objString := ""
-	j, err := json.Marshal(obj)
+	j, err := jsonMarshal(obj)
 	if err != nil {
 		objString = err.Error()
 	} else {
-		y, err := yaml.JSONToYAML(j)
+		y, err := jsonToYAML(j)
 		if err != nil {
 			objString = err.Error()
 		} else {
@@ -211,13 +218,13 @@ func objectYAML(obj interface{}) string {
 
 // parseSecret parses *one* secret out of a YAML file and returns it
 func parseSecret(path string) (*v1.Secret, error) {
-	content, err := os.ReadFile(filepath.Clean(path))
+	content, err := readFile(filepath.Clean(path))
 	if err != nil {
 		return nil, err
 	}
 
 	var mySecret DecodedSecret
-	err = yaml.Unmarshal(content, &mySecret)
+	err = unmarshalYAML(content, &mySecret)
 	if err != nil {
 		return nil, err
 	}

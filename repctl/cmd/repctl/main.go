@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -56,13 +56,12 @@ func init() {
 	log.AddHook(lfshook.NewHook(pathMap, file))
 }
 
-func main() {
-	repctl := cobra.Command{
+func setupRepctlCommand() *cobra.Command {
+	repctl := &cobra.Command{
 		Use:     "repctl",
 		Short:   "repctl is CLI tool for managing replication in Kubernetes",
 		Long:    "repctl is CLI tool for managing replication in Kubernetes",
 		Version: "v1.11.0",
-
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			metadata.Init(viper.GetString(config.ReplicationPrefix))
 		},
@@ -97,9 +96,20 @@ func main() {
 	repctl.AddCommand(cmd.GetMigrateCommand())
 	repctl.AddCommand(cmd.GetSnapshotCommand())
 
-	err := repctl.Execute()
+	return repctl
+}
+
+var getRepctlCommandExecFunction = func(repctl *cobra.Command) error {
+	return repctl.Execute()
+}
+var osExit = os.Exit
+
+func main() {
+	repctl := setupRepctlCommand()
+
+	err := getRepctlCommandExecFunction(repctl)
 	if err != nil {
 		log.Fatalf("repctl: error: %s\n", err.Error())
 	}
-	os.Exit(0)
+	osExit(0)
 }
