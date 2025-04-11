@@ -392,7 +392,7 @@ func (c *Cluster) CreatePersistentVolumeClaimsFromPVs(ctx context.Context, names
 
 // CreateObject creates k8s object from yaml file
 // Supported objects:
-// StorageClass, Namespace, CustomResourceDefinition, ClusterRole, ClusterRoleBinding, Service, Deployment and ConfigMap
+// StorageClass, Namespace, CustomResourceDefinition, ClusterRole, ClusterRoleBinding, Role, RoleBinding, Service, Deployment and ConfigMap
 func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object, error) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
@@ -453,6 +453,25 @@ func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object
 		} else {
 			log.Print("Successfully created cluster role: ", crObj.Name)
 		}
+	case *rbacv1.Role:
+		crObj, ok := runtimeObj.(*rbacv1.Role)
+		if !ok {
+			return nil, fmt.Errorf("unsupported object type")
+		}
+		err := c.client.Create(ctx, crObj)
+		if err != nil {
+			if strings.Contains(err.Error(), "already exists") {
+				err := c.client.Update(ctx, crObj)
+				if err != nil {
+					return nil, err
+				}
+				log.Print("Successfully updated existing role: ", crObj.Name)
+			} else {
+				return nil, err
+			}
+		} else {
+			log.Print("Successfully created role: ", crObj.Name)
+		}
 	case *rbacv1.ClusterRoleBinding:
 		crbObj, ok := runtimeObj.(*rbacv1.ClusterRoleBinding)
 		if !ok {
@@ -471,6 +490,25 @@ func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object
 			}
 		} else {
 			log.Print("Successfully created cluster role binding: ", crbObj.Name)
+		}
+	case *rbacv1.RoleBinding:
+		crbObj, ok := runtimeObj.(*rbacv1.RoleBinding)
+		if !ok {
+			return nil, fmt.Errorf("unsupported object type")
+		}
+		err := c.client.Create(ctx, crbObj)
+		if err != nil {
+			if strings.Contains(err.Error(), "already exists") {
+				err := c.client.Update(ctx, crbObj)
+				if err != nil {
+					return nil, err
+				}
+				log.Print("Successfully updated existing role binding: ", crbObj.Name)
+			} else {
+				return nil, err
+			}
+		} else {
+			log.Print("Successfully created role binding: ", crbObj.Name)
 		}
 	case *v1.Service:
 		svcObj, ok := runtimeObj.(*v1.Service)
