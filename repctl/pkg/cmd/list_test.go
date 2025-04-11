@@ -15,8 +15,10 @@
 package cmd
 
 import (
+	"errors"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -83,6 +85,102 @@ func (suite *ListTestSuite) TestGetListCommand() {
 	}
 
 	cmd.Run(nil, []string{"test"})
+}
+
+func TestGetListClusterGlobalCommandExitClustersFolderPath(t *testing.T) {
+
+	if os.Getenv("INVOKE_ERROR_EXIT") == "1" {
+		originalGetClustersFolderPathFunction := getClustersFolderPathFunction
+		defer func() {
+			getClustersFolderPathFunction = originalGetClustersFolderPathFunction
+		}()
+		getClustersFolderPathFunction = func(path string) (string, error) {
+			return "", errors.New("error getting clusters folder path")
+		}
+		cmd := getListClusterGlobalCommand(nil)
+		cmd.Run(nil, nil)
+		return
+	}
+
+	// call the test again with INVOKE_ERROR_EXIT=1 so the function is invoked and we can check the return code
+	cmd := exec.Command(os.Args[0], "-test.run=TestGetListClusterGlobalCommandExitClustersFolderPath") // #nosec G204
+	cmd.Env = append(os.Environ(), "INVOKE_ERROR_EXIT=1")
+
+	stdout, err := cmd.StderrPipe()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	if err := cmd.Start(); err != nil {
+		t.Error(err)
+	}
+
+	buf := make([]byte, 1024)
+	n, err := stdout.Read(buf)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = cmd.Wait()
+	if e, ok := err.(*exec.ExitError); ok && e.Success() {
+		t.Error(err)
+	}
+
+	// Trim the warning message from the actual output
+	actualMessage := string(buf[:n])
+
+	// check the output is the message we logged in errorExit
+	assert.Contains(t, actualMessage, "cluster list: error getting clusters folder path: error getting clusters folder path")
+}
+
+func TestGetListClusterGlobalCommandExitGetAllClusters(t *testing.T) {
+
+	if os.Getenv("INVOKE_ERROR_EXIT") == "1" {
+		originalGetClustersFolderPathFunction := getClustersFolderPathFunction
+		defer func() {
+			getClustersFolderPathFunction = originalGetClustersFolderPathFunction
+		}()
+		getClustersFolderPathFunction = func(path string) (string, error) {
+			return "folder", nil
+		}
+		getClustersMock := mocks.NewMockGetClustersInterface(gomock.NewController(t))
+		getClustersMock.EXPECT().GetAllClusters(gomock.Any(), gomock.Any()).Times(1).Return(nil, errors.New("error calling GetAllClusters"))
+		cmd := getListClusterGlobalCommand(getClustersMock)
+		cmd.Run(nil, nil)
+		return
+	}
+
+	// call the test again with INVOKE_ERROR_EXIT=1 so the function is invoked and we can check the return code
+	cmd := exec.Command(os.Args[0], "-test.run=TestGetListClusterGlobalCommandExitGetAllClusters") // #nosec G204
+	cmd.Env = append(os.Environ(), "INVOKE_ERROR_EXIT=1")
+
+	stdout, err := cmd.StderrPipe()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	if err := cmd.Start(); err != nil {
+		t.Error(err)
+	}
+
+	buf := make([]byte, 1024)
+	n, err := stdout.Read(buf)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = cmd.Wait()
+	if e, ok := err.(*exec.ExitError); ok && e.Success() {
+		t.Error(err)
+	}
+
+	// Trim the warning message from the actual output
+	actualMessage := string(buf[:n])
+
+	// check the output is the message we logged in errorExit
+	assert.Contains(t, actualMessage, "cluster list: error in initializing cluster info: error calling GetAllClusters")
 }
 
 func TestListTestSuite(t *testing.T) {
