@@ -44,16 +44,16 @@ rules:
   #     - list
   #     - update
   #     - watch
-  # - apiGroups:
-  #     - ""
-  #   resources:
-  #     - events
-  #   verbs:
-  #     - create
-  #     - list
-  #     - patch
-  #     - update
-  #     - watch
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      # - list
+      # - patch
+      # - update
+      # - watch
   - apiGroups:
       - ""
     resources:
@@ -208,7 +208,7 @@ rules:
     resources:
       - events
     verbs:
-      - create
+      # - create
       - list
       - patch
       - update
