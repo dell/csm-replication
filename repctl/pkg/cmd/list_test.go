@@ -23,6 +23,7 @@ import (
 	fake_client "github.com/dell/csm-replication/test/e2e-framework/fake-client"
 	"github.com/dell/repctl/pkg/cmd/mocks"
 	"github.com/dell/repctl/pkg/k8s"
+	"github.com/dell/repctl/pkg/metadata"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -52,6 +53,7 @@ func (suite *ListTestSuite) SetupSuite() {
 	suite.testDataFolder = curUserPath
 	_ = repv1.AddToScheme(scheme.Scheme)
 
+	metadata.Init("replication.storage.dell.com")
 }
 
 func (suite *ListTestSuite) TestGetListCommand() {
@@ -89,16 +91,56 @@ func TestListTestSuite(t *testing.T) {
 
 func (suite *ListTestSuite) TestGetListPersistentVolumesCommand() {
 	tests := []struct {
-		name                   string
-		getClustersFolderPath  func(string) (string, error)
-		expectedOutputContains string
+		name                      string
+		getClustersFolderPath     func(string) (string, error)
+		objects                   []runtime.Object
+		filter                    bool
+		driverFilter              string
+		expectedOutputContains    []string
+		expectedOutputNotContains []string
 	}{
 		{
-			name: "Successful",
+			name: "Successful with no filter",
 			getClustersFolderPath: func(path string) (string, error) {
 				return clusterPath, nil
 			},
-			expectedOutputContains: "test-pv",
+			objects: []runtime.Object{
+				&v1.PersistentVolume{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-pv",
+					},
+				},
+			},
+			filter:                 false,
+			expectedOutputContains: []string{"test-pv"},
+		},
+		{
+			name: "Successful with filter",
+			getClustersFolderPath: func(path string) (string, error) {
+				return clusterPath, nil
+			},
+			objects: []runtime.Object{
+				&v1.PersistentVolume{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-pv-1",
+						Labels: map[string]string{
+							"replication.storage.dell.com/driverName": "driver-1",
+						},
+					},
+				},
+				&v1.PersistentVolume{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-pv-2",
+						Labels: map[string]string{
+							"replication.storage.dell.com/driverName": "driver-2",
+						},
+					},
+				},
+			},
+			filter:                    true,
+			driverFilter:              "driver-1",
+			expectedOutputContains:    []string{"test-pv-1"},
+			expectedOutputNotContains: []string{"test-pv-2"},
 		},
 	}
 
@@ -111,13 +153,16 @@ func (suite *ListTestSuite) TestGetListPersistentVolumesCommand() {
 
 			getClustersFolderPathFunction = tt.getClustersFolderPath
 
-			persistentVolume := &v1.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-pv",
-				},
-			}
+			viper.Set("driver", tt.driverFilter)
 
-			fake, _ := fake_client.NewFakeClient([]runtime.Object{persistentVolume}, nil)
+			if tt.filter {
+				viper.Set("all", "false")
+			} else {
+				viper.Set("all", "true")
+			}
+			defer viper.Reset()
+
+			fake, _ := fake_client.NewFakeClient(tt.objects, nil)
 
 			mockClusters := &k8s.Clusters{
 				Clusters: []k8s.ClusterInterface{
@@ -131,7 +176,7 @@ func (suite *ListTestSuite) TestGetListPersistentVolumesCommand() {
 			getClustersMock := mocks.NewMockGetClustersInterface(gomock.NewController(t))
 			getClustersMock.EXPECT().GetAllClusters(gomock.Any(), gomock.Any()).Times(1).Return(mockClusters, nil)
 
-			listPVCmd := getListPersistentVolumesCommand(getClustersMock)
+			cmd := getListPersistentVolumesCommand(getClustersMock)
 
 			rescueStdout := os.Stdout
 			r, w, _ := os.Pipe()
@@ -140,13 +185,19 @@ func (suite *ListTestSuite) TestGetListPersistentVolumesCommand() {
 				os.Stdout = rescueStdout
 			}()
 
-			listPVCmd.Run(nil, nil)
+			cmd.Run(nil, nil)
 
 			w.Close()
 			out, _ := io.ReadAll(r)
 			os.Stdout = rescueStdout
 
-			assert.Contains(t, string(out), tt.expectedOutputContains)
+			for _, expected := range tt.expectedOutputContains {
+				assert.Contains(t, string(out), expected)
+			}
+
+			for _, notExpected := range tt.expectedOutputNotContains {
+				assert.NotContains(t, string(out), notExpected)
+			}
 		})
 	}
 }
@@ -174,6 +225,8 @@ func (suite *ListTestSuite) TestGetListStorageClassesCommand() {
 			}()
 
 			viper.Set("all", "true")
+			defer viper.Reset()
+
 			getClustersFolderPathFunction = tt.getClustersFolderPath
 
 			storageClass := &storagev1.StorageClass{
@@ -307,6 +360,7 @@ func (suite *ListTestSuite) TestGetListPersistentVolumeClaimsCommand() {
 			} else {
 				viper.Set("all", "true")
 			}
+			defer viper.Reset()
 
 			fake, _ := fake_client.NewFakeClient(tt.objects, nil)
 
@@ -429,7 +483,6 @@ func (suite *ListTestSuite) TestGetListReplicationGroupsCommand() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-rg",
 				},
-				// Add necessary spec fields here
 			}
 
 			fake, err := fake_client.NewFakeClient([]runtime.Object{rg}, nil)
