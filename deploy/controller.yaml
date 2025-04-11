@@ -95,14 +95,14 @@ rules:
       - patch
       - update
       - watch
-  # - apiGroups:
-  #     - ""
-  #   resources:
-  #     - pods
-  #   verbs:
-  #     - get
-  #     - list
-  #     - watch
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      # - get
+      - list
+      - watch
   - apiGroups:
       - ""
     resources:
@@ -239,8 +239,8 @@ rules:
       - pods
     verbs:
       - get
-      - list
-      - watch
+      # - list
+      # - watch
   - apiGroups:
       - ""
     resources:
