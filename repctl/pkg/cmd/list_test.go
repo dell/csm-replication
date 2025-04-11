@@ -83,7 +83,7 @@ func TestListTestSuite(t *testing.T) {
 	suite.Run(t, new(ListTestSuite))
 }
 
-func TestGetListPersistentVolumesCommand(t *testing.T) {
+func (suite *ListTestSuite) TestGetListPersistentVolumesCommand() {
 	tests := []struct {
 		name                   string
 		getClustersFolderPath  func(string) (string, error)
@@ -99,7 +99,7 @@ func TestGetListPersistentVolumesCommand(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		suite.Suite.T().Run(tt.name, func(t *testing.T) {
 			originalGetClustersFolderPathFunction := getClustersFolderPathFunction
 			defer func() {
 				getClustersFolderPathFunction = originalGetClustersFolderPathFunction
@@ -147,7 +147,7 @@ func TestGetListPersistentVolumesCommand(t *testing.T) {
 	}
 }
 
-func TestGetListStorageClassesCommand(t *testing.T) {
+func (suite *ListTestSuite) TestGetListStorageClassesCommand() {
 	tests := []struct {
 		name                   string
 		getClustersFolderPath  func(string) (string, error)
@@ -163,7 +163,7 @@ func TestGetListStorageClassesCommand(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		suite.Suite.T().Run(tt.name, func(t *testing.T) {
 			originalGetClustersFolderPathFunction := getClustersFolderPathFunction
 			defer func() {
 				getClustersFolderPathFunction = originalGetClustersFolderPathFunction
@@ -215,7 +215,7 @@ func TestGetListStorageClassesCommand(t *testing.T) {
 	}
 }
 
-func TestGetListPersistentVolumeClaimsCommand(t *testing.T) {
+func (suite *ListTestSuite) TestGetListPersistentVolumeClaimsCommand() {
 	tests := []struct {
 		name                   string
 		getClustersFolderPath  func(string) (string, error)
@@ -231,7 +231,7 @@ func TestGetListPersistentVolumeClaimsCommand(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		suite.Suite.T().Run(tt.name, func(t *testing.T) {
 			originalGetClustersFolderPathFunction := getClustersFolderPathFunction
 			defer func() {
 				getClustersFolderPathFunction = originalGetClustersFolderPathFunction
@@ -284,7 +284,7 @@ func TestGetListPersistentVolumeClaimsCommand(t *testing.T) {
 	}
 }
 
-func TestGetListClusterGlobalCommand(t *testing.T) {
+func (suite *ListTestSuite) TestGetListClusterGlobalCommand() {
 	tests := []struct {
 		name                   string
 		getClustersFolderPath  func(string) (string, error)
@@ -300,7 +300,7 @@ func TestGetListClusterGlobalCommand(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		suite.Suite.T().Run(tt.name, func(t *testing.T) {
 			originalGetClustersFolderPathFunction := getClustersFolderPathFunction
 			defer func() {
 				getClustersFolderPathFunction = originalGetClustersFolderPathFunction
