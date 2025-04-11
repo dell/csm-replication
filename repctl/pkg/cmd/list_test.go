@@ -31,7 +31,9 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	repv1 "github.com/dell/csm-replication/api/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 type ListTestSuite struct {
@@ -48,6 +50,8 @@ func (suite *ListTestSuite) SetupSuite() {
 	suite.NoError(err)
 
 	suite.testDataFolder = curUserPath
+	_ = repv1.AddToScheme(scheme.Scheme)
+
 }
 
 func (suite *ListTestSuite) TestGetListCommand() {
@@ -216,17 +220,74 @@ func (suite *ListTestSuite) TestGetListStorageClassesCommand() {
 }
 
 func (suite *ListTestSuite) TestGetListPersistentVolumeClaimsCommand() {
+	storageClassName := "test-sc"
+
 	tests := []struct {
-		name                   string
-		getClustersFolderPath  func(string) (string, error)
-		expectedOutputContains string
+		name                      string
+		getClustersFolderPath     func(string) (string, error)
+		objects                   []runtime.Object
+		filter                    bool
+		namespaceFilter           string
+		expectedOutputContains    []string
+		expectedOutputNotContains []string
 	}{
 		{
-			name: "Successful",
+			name: "Successful with filter",
 			getClustersFolderPath: func(path string) (string, error) {
 				return clusterPath, nil
 			},
-			expectedOutputContains: "test-pvc",
+			objects: []runtime.Object{
+				&v1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pvc-1",
+						Namespace: "test-ns-1",
+					},
+					Spec: v1.PersistentVolumeClaimSpec{
+						StorageClassName: &storageClassName,
+					},
+				},
+				&v1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pvc-2",
+						Namespace: "test-ns-2",
+					},
+					Spec: v1.PersistentVolumeClaimSpec{
+						StorageClassName: &storageClassName,
+					},
+				},
+			},
+			filter:                    true,
+			namespaceFilter:           "test-ns-1",
+			expectedOutputContains:    []string{"test-pvc-1"},
+			expectedOutputNotContains: []string{"test-pvc-2"},
+		},
+		{
+			name: "Successful with no filter",
+			getClustersFolderPath: func(path string) (string, error) {
+				return clusterPath, nil
+			},
+			objects: []runtime.Object{
+				&v1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pvc-1",
+						Namespace: "test-ns-1",
+					},
+					Spec: v1.PersistentVolumeClaimSpec{
+						StorageClassName: &storageClassName,
+					},
+				},
+				&v1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pvc-2",
+						Namespace: "test-ns-2",
+					},
+					Spec: v1.PersistentVolumeClaimSpec{
+						StorageClassName: &storageClassName,
+					},
+				},
+			},
+			filter:                 false,
+			expectedOutputContains: []string{"test-pvc-1", "test-pvc-2"},
 		},
 	}
 
@@ -239,24 +300,19 @@ func (suite *ListTestSuite) TestGetListPersistentVolumeClaimsCommand() {
 
 			getClustersFolderPathFunction = tt.getClustersFolderPath
 
-			storageClassName := "test-sc"
+			viper.Set("namespace", tt.namespaceFilter)
 
-			persistentVolumeClaim := &v1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-pvc",
-				},
-				Spec: v1.PersistentVolumeClaimSpec{
-					StorageClassName: &storageClassName,
-				},
+			if tt.filter {
+				viper.Set("all", "false")
+			} else {
+				viper.Set("all", "true")
 			}
 
-			fake, _ := fake_client.NewFakeClient([]runtime.Object{persistentVolumeClaim}, nil)
+			fake, _ := fake_client.NewFakeClient(tt.objects, nil)
 
 			mockClusters := &k8s.Clusters{
 				Clusters: []k8s.ClusterInterface{
-					&k8s.Cluster{
-						ClusterID: "",
-					},
+					&k8s.Cluster{},
 				},
 			}
 			mockClusters.Clusters[0].SetClient(fake)
@@ -264,7 +320,7 @@ func (suite *ListTestSuite) TestGetListPersistentVolumeClaimsCommand() {
 			getClustersMock := mocks.NewMockGetClustersInterface(gomock.NewController(t))
 			getClustersMock.EXPECT().GetAllClusters(gomock.Any(), gomock.Any()).Times(1).Return(mockClusters, nil)
 
-			listPVCmd := getListPersistentVolumeClaimsCommand(getClustersMock)
+			cmd := getListPersistentVolumeClaimsCommand(getClustersMock)
 
 			rescueStdout := os.Stdout
 			r, w, _ := os.Pipe()
@@ -273,13 +329,19 @@ func (suite *ListTestSuite) TestGetListPersistentVolumeClaimsCommand() {
 				os.Stdout = rescueStdout
 			}()
 
-			listPVCmd.Run(nil, nil)
+			cmd.Run(nil, nil)
 
 			w.Close()
 			out, _ := io.ReadAll(r)
 			os.Stdout = rescueStdout
 
-			assert.Contains(t, string(out), tt.expectedOutputContains)
+			for _, expected := range tt.expectedOutputContains {
+				assert.Contains(t, string(out), expected)
+			}
+
+			for _, notExpected := range tt.expectedOutputNotContains {
+				assert.NotContains(t, string(out), notExpected)
+			}
 		})
 	}
 }
@@ -320,6 +382,72 @@ func (suite *ListTestSuite) TestGetListClusterGlobalCommand() {
 			getClustersMock.EXPECT().GetAllClusters(gomock.Any(), gomock.Any()).Times(1).Return(mockClusters, nil)
 
 			cmd := getListClusterGlobalCommand(getClustersMock)
+
+			rescueStdout := os.Stdout
+			r, w, _ := os.Pipe()
+			os.Stdout = w
+			defer func() {
+				os.Stdout = rescueStdout
+			}()
+
+			cmd.Run(nil, nil)
+
+			w.Close()
+			out, _ := io.ReadAll(r)
+			os.Stdout = rescueStdout
+
+			assert.Contains(t, string(out), tt.expectedOutputContains)
+		})
+	}
+}
+
+func (suite *ListTestSuite) TestGetListReplicationGroupsCommand() {
+	tests := []struct {
+		name                   string
+		getClustersFolderPath  func(string) (string, error)
+		expectedOutputContains string
+	}{
+		{
+			name: "Successful",
+			getClustersFolderPath: func(path string) (string, error) {
+				return clusterPath, nil
+			},
+			expectedOutputContains: "test-rg",
+		},
+	}
+
+	for _, tt := range tests {
+		suite.Suite.T().Run(tt.name, func(t *testing.T) {
+			originalGetClustersFolderPathFunction := getClustersFolderPathFunction
+			defer func() {
+				getClustersFolderPathFunction = originalGetClustersFolderPathFunction
+			}()
+
+			getClustersFolderPathFunction = tt.getClustersFolderPath
+
+			rg := &repv1.DellCSIReplicationGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-rg",
+				},
+				// Add necessary spec fields here
+			}
+
+			fake, err := fake_client.NewFakeClient([]runtime.Object{rg}, nil)
+			assert.NoError(t, err)
+
+			mockClusters := &k8s.Clusters{
+				Clusters: []k8s.ClusterInterface{
+					&k8s.Cluster{
+						ClusterID: "",
+					},
+				},
+			}
+			mockClusters.Clusters[0].SetClient(fake)
+
+			getClustersMock := mocks.NewMockGetClustersInterface(gomock.NewController(t))
+			getClustersMock.EXPECT().GetAllClusters(gomock.Any(), gomock.Any()).Times(1).Return(mockClusters, nil)
+
+			cmd := getListReplicationGroupsCommand(getClustersMock)
 
 			rescueStdout := os.Stdout
 			r, w, _ := os.Pipe()

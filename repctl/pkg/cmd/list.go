@@ -53,7 +53,7 @@ func GetListCommand() *cobra.Command {
 	listCmd.AddCommand(getListStorageClassesCommand(&k8s.MultiClusterConfigurator{}))
 	listCmd.AddCommand(getListPersistentVolumesCommand(&k8s.MultiClusterConfigurator{}))
 	listCmd.AddCommand(getListPersistentVolumeClaimsCommand(&k8s.MultiClusterConfigurator{}))
-	listCmd.AddCommand(getListReplicationGroupsCommand())
+	listCmd.AddCommand(getListReplicationGroupsCommand(&k8s.MultiClusterConfigurator{}))
 	listCmd.AddCommand(getListClusterGlobalCommand(&k8s.MultiClusterConfigurator{}))
 
 	return listCmd
@@ -251,7 +251,7 @@ You can apply filters like remoteClusterId, remoteNamespace.`,
 	return listPVC
 }
 
-func getListReplicationGroupsCommand() *cobra.Command {
+func getListReplicationGroupsCommand(mc GetClustersInterface) *cobra.Command {
 	return &cobra.Command{
 		Use:     "rg",
 		Aliases: []string{"replicationgroups", "replicationgroup"},
@@ -269,7 +269,6 @@ remote cluster id (rc) & driver name`,
 
 			clusterIDs := viper.GetStringSlice(config.Clusters)
 
-			mc := &k8s.MultiClusterConfigurator{}
 			clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
 			if err != nil {
 				log.Fatalf("list pvc: error in initializing cluster info: %s", err.Error())
