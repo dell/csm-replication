@@ -73,7 +73,7 @@ rules:
       # - get
       - list
       # - patch
-      # - update
+      - update
       - watch
   # - apiGroups:
   #     - ""
@@ -121,7 +121,7 @@ rules:
       # - get
       - list
       # - patch
-      # - update
+      - update
       - watch
   # - apiGroups:
   #     - replication.storage.dell.com
@@ -223,7 +223,7 @@ rules:
       - get
       # - list
       - patch
-      - update
+      # - update
       # - watch
   - apiGroups:
       - ""
@@ -259,7 +259,7 @@ rules:
       - get
       # - list
       - patch
-      - update
+      # - update
       # - watch
   - apiGroups:
       - replication.storage.dell.com
