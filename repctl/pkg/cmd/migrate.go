@@ -57,9 +57,9 @@ func GetMigrateCommand() *cobra.Command {
 	_ = viper.BindPFlag("migration-prefix", migrateCmd.Flags().Lookup("migration-prefix"))
 	migrationAnnotation = viper.GetString("migration-prefix") + "/migrate-to"
 	migrationNS = viper.GetString("migration-prefix") + "/namespace"
-	migrateCmd.AddCommand(migratePVCommand())
-	migrateCmd.AddCommand(migratePVCCommand())
-	migrateCmd.AddCommand(migrateSTSCommand())
+	migrateCmd.AddCommand(migratePVCommand(&k8s.MultiClusterConfigurator{}))
+	migrateCmd.AddCommand(migratePVCCommand(&k8s.MultiClusterConfigurator{}))
+	migrateCmd.AddCommand(migrateSTSCommand(&k8s.MultiClusterConfigurator{}))
 	migrateCmd.AddCommand(migrateMGCommand())
 
 	return migrateCmd
@@ -67,7 +67,7 @@ func GetMigrateCommand() *cobra.Command {
 
 // GetMigratePVCommand returns 'migrate' cobra command
 /* #nosec G104 */
-func migratePVCommand() *cobra.Command {
+func migratePVCommand(mc GetClustersInterface) *cobra.Command {
 	migrateCmd := &cobra.Command{
 		Use:   "pv",
 		Short: "allows to execute migrate action on pv",
@@ -85,11 +85,11 @@ This command will perform a migrate command to target StorageClass.`,
 			toSc := viper.GetString("pvto-sc")
 			targetNs := viper.GetString("pvtarget-ns")
 			wait := viper.GetBool("pvwait")
-			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
+			configFolder, err := getClustersFolderPathFunction("/.repctl/clusters/")
 			if err != nil {
 				log.Fatalf("failover: error getting clusters folder path: %s\n", err.Error())
 			}
-			migrate(configFolder, "pv", pvName, "", toSc, targetNs, wait, false)
+			migrate(mc, configFolder, "pv", pvName, "", toSc, targetNs, wait, false)
 		},
 	}
 
@@ -108,7 +108,7 @@ This command will perform a migrate command to target StorageClass.`,
 
 // GetMigratePVCCommand returns 'migrate' cobra command
 /* #nosec G104 */
-func migratePVCCommand() *cobra.Command {
+func migratePVCCommand(mc GetClustersInterface) *cobra.Command {
 	migrateCmd := &cobra.Command{
 		Use:   "pvc",
 		Short: "allows to execute migrate action on pvc",
@@ -127,11 +127,11 @@ This command will perform a migrate command to target StorageClass.`,
 			toSc := viper.GetString("pvcto-sc")
 			targetNs := viper.GetString("pvctarget-ns")
 			wait := viper.GetBool("pvcwait")
-			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
+			configFolder, err := getClustersFolderPathFunction("/.repctl/clusters/")
 			if err != nil {
 				log.Fatalf("failover: error getting clusters folder path: %s\n", err.Error())
 			}
-			migrate(configFolder, "pvc", pvcName, pvcNS, toSc, targetNs, wait, false)
+			migrate(mc, configFolder, "pvc", pvcName, pvcNS, toSc, targetNs, wait, false)
 		},
 	}
 
@@ -156,7 +156,7 @@ This command will perform a migrate command to target StorageClass.`,
 
 // GetMigratePVCCommand returns 'migrate' cobra command
 /* #nosec G104 */
-func migrateSTSCommand() *cobra.Command {
+func migrateSTSCommand(mc GetClustersInterface) *cobra.Command {
 	migrateCmd := &cobra.Command{
 		Use:   "sts",
 		Short: "allows to execute migrate action on sts",
@@ -177,11 +177,11 @@ This command will perform a migrate command to target StorageClass.`,
 			wait := viper.GetBool("stswait")
 			ndu := viper.GetBool("ndu")
 			yes = viper.GetBool("yes")
-			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
+			configFolder, err := getClustersFolderPathFunction("/.repctl/clusters/")
 			if err != nil {
 				log.Fatalf("failover: error getting clusters folder path: %s\n", err.Error())
 			}
-			migrate(configFolder, "sts", stsName, stsNS, toSc, targetNs, wait, ndu)
+			migrate(mc, configFolder, "sts", stsName, stsNS, toSc, targetNs, wait, ndu)
 		},
 	}
 
@@ -228,7 +228,7 @@ This command will perform a migration of all volumes on source to target.`,
 			targetNs := viper.GetString("ststarget-ns")
 			wait := viper.GetBool("stswait")
 			ndu := viper.GetBool("ndu")
-			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
+			configFolder, err := getClustersFolderPathFunction("/.repctl/clusters/")
 			if err != nil {
 				log.Fatalf("migrate: error getting clusters folder path: %s\n", err.Error())
 			}
@@ -243,9 +243,8 @@ This command will perform a migration of all volumes on source to target.`,
 	return migrateCmd
 }
 
-func migrate(configFolder, resource string, resName string, resNS string, toSC string, targetNS string, wait bool, ndu bool) {
+func migrate(mc GetClustersInterface, configFolder, resource string, resName string, resNS string, toSC string, targetNS string, wait bool, ndu bool) {
 	clusterIDs := viper.GetStringSlice(config.Clusters)
-	mc := &k8s.MultiClusterConfigurator{}
 	clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
 	if err != nil {
 		log.Fatalf("edit secret: error in initializing cluster info: %s", err.Error())
@@ -357,10 +356,15 @@ func migratePV(ctx context.Context, cluster k8s.ClusterInterface, pvName string,
 		os.Exit(1)
 	}
 	log.Infof("Setting migration annotation %s on pv %s", migrationAnnotation+"/"+toSC, pv.Name)
-	pv.Annotations[migrationAnnotation] = toSC
-	if len(targetNS) > 0 {
-		pv.Annotations[migrationNS] = targetNS
+	annotations := pv.Annotations
+	if annotations == nil {
+		annotations = make(map[string]string)
 	}
+	annotations[migrationAnnotation] = toSC
+	if len(targetNS) > 0 {
+		annotations[migrationNS] = targetNS
+	}
+	pv.Annotations = annotations
 	err = cluster.UpdatePersistentVolume(context.Background(), pv)
 	if err != nil {
 		log.Error(err, "unable to update persistent volume")
@@ -369,6 +373,7 @@ func migratePV(ctx context.Context, cluster k8s.ClusterInterface, pvName string,
 	if wait {
 		done := waitForPVToBeBound(pvName+"-to-"+toSC, cluster)
 		if done {
+			fmt.Printf("Successfully updated pv") //This message is validated in UT; do not delete or change
 			log.Infof("Successfully updated pv %s in cluster %s. Consider using new PV: [%s]", pv.Name, cluster.GetID(), pvName+"-to-"+toSC)
 		} else {
 			log.Error("time out waiting for the PV to be bound")
@@ -379,6 +384,7 @@ func migratePV(ctx context.Context, cluster k8s.ClusterInterface, pvName string,
 }
 
 func waitForPVToBeBound(pvName string, cluster k8s.ClusterInterface) bool {
+	log.Info("migrated pv name:", pvName)
 	t := time.NewTicker(5 * time.Second)
 	ret := make(chan bool)
 	go func() {
