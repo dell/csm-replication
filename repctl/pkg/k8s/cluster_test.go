@@ -1420,12 +1420,12 @@ func TestClusters_Print(t *testing.T) {
 
 func TestCreateCluster(t *testing.T) {
 	// Saving original functions
-	defaultGetControllerRuntimeClient := getCtrlRuntimeClient
+	defaultGetControllerRuntimeClient := GetCtrlRuntimeClient
 	defaultNewClientSet := newClntSet
 	defaultGetServiceVersion := getServiceVersion
 
 	after := func() {
-		getCtrlRuntimeClient = defaultGetControllerRuntimeClient
+		GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		newClntSet = defaultNewClientSet
 		getServiceVersion = defaultGetServiceVersion
 	}
@@ -1438,7 +1438,7 @@ func TestCreateCluster(t *testing.T) {
 		{
 			name: "Cluster creation is successful",
 			setup: func() {
-				getCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+				GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
 					return &mockClient{}, nil
 				}
 				newClntSet = func(kubeconfig string) (*kubernetes.Clientset, *rest.Config, error) {
@@ -1453,7 +1453,7 @@ func TestCreateCluster(t *testing.T) {
 		{
 			name: "Controller runtime client creation fails",
 			setup: func() {
-				getCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+				GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
 					return nil, fmt.Errorf("mock error")
 				}
 			},
@@ -1462,7 +1462,7 @@ func TestCreateCluster(t *testing.T) {
 		{
 			name: "Clientset creation fails",
 			setup: func() {
-				getCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+				GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
 					return &mockClient{}, nil
 				}
 				newClntSet = func(kubeconfig string) (*kubernetes.Clientset, *rest.Config, error) {
