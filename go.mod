@@ -6,10 +6,10 @@ toolchain go1.24.1
 
 require (
 	github.com/bombsimon/logrusr/v4 v4.1.0
-	github.com/dell/dell-csi-extensions/common v1.7.1-0.20250325135746-bee5d830cdce
-	github.com/dell/dell-csi-extensions/migration v1.7.2-0.20250325135746-bee5d830cdce
-	github.com/dell/dell-csi-extensions/replication v1.10.2-0.20250325135746-bee5d830cdce
-	github.com/dell/gobrick v1.13.2-0.20250324100052-8d8c8046d514
+	github.com/dell/dell-csi-extensions/common v1.7.1-0.20250409134836-11639e1ca9bc
+	github.com/dell/dell-csi-extensions/migration v1.7.2-0.20250409134836-11639e1ca9bc
+	github.com/dell/dell-csi-extensions/replication v1.10.2-0.20250409134836-11639e1ca9bc
+	github.com/dell/gobrick v1.13.2-0.20250410180029-6d79b5ff6cc8
 	github.com/fatih/color v1.18.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-chi/chi v4.1.2+incompatible
