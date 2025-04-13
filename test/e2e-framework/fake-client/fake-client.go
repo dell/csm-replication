@@ -73,6 +73,7 @@ func getKey(obj runtime.Object) (storageKey, error) {
 
 // NewFakeClient initializes and returns new fake k8s client
 func NewFakeClient(initialObjects []runtime.Object, errorInjector errorInjector) (*Client, error) {
+	repv1.AddToScheme(scheme.Scheme)
 	client := &Client{
 		Objects:       map[storageKey]runtime.Object{},
 		errorInjector: errorInjector,
@@ -139,6 +140,8 @@ func (f Client) List(_ context.Context, list client.ObjectList, opts ...client.L
 		return f.listPersistentVolume(list.(*core_v1.PersistentVolumeList), opts...)
 	case *repv1.DellCSIReplicationGroupList:
 		return f.listReplicationGroup(list.(*repv1.DellCSIReplicationGroupList), opts...)
+	case *core_v1.PodList:
+		return f.listPod(list.(*core_v1.PodList), opts...)
 	default:
 		return fmt.Errorf("unknown type: %s", reflect.TypeOf(list))
 	}
@@ -166,6 +169,24 @@ func (f *Client) listPersistentVolumeClaim(list *core_v1.PersistentVolumeClaimLi
 				continue
 			}
 			list.Items = append(list.Items, *v.(*core_v1.PersistentVolumeClaim))
+		}
+	}
+	return nil
+}
+
+func (f *Client) listPod(list *core_v1.PodList, opts ...client.ListOption) error {
+	lo := &client.ListOptions{}
+	for _, option := range opts {
+		option.ApplyToList(lo)
+	}
+
+	for k, v := range f.Objects {
+		if k.Kind == "Pod" {
+			pod := *v.(*core_v1.Pod)
+			if lo.LabelSelector != nil && !lo.LabelSelector.Matches(labels.Set(pod.Labels)) {
+				continue
+			}
+			list.Items = append(list.Items, *v.(*core_v1.Pod))
 		}
 	}
 	return nil

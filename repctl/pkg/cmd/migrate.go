@@ -60,7 +60,7 @@ func GetMigrateCommand() *cobra.Command {
 	migrateCmd.AddCommand(migratePVCommand(&k8s.MultiClusterConfigurator{}))
 	migrateCmd.AddCommand(migratePVCCommand(&k8s.MultiClusterConfigurator{}))
 	migrateCmd.AddCommand(migrateSTSCommand(&k8s.MultiClusterConfigurator{}))
-	migrateCmd.AddCommand(migrateMGCommand())
+	migrateCmd.AddCommand(migrateMGCommand(&k8s.MultiClusterConfigurator{}))
 
 	return migrateCmd
 }
@@ -210,7 +210,7 @@ This command will perform a migrate command to target StorageClass.`,
 
 // GetMigrateArrayCommand returns 'migrate' cobra command
 /* #nosec G104 */
-func migrateMGCommand() *cobra.Command {
+func migrateMGCommand(mc GetClustersInterface) *cobra.Command {
 	migrateCmd := &cobra.Command{
 		Use:   "mg",
 		Short: "allows to execute migrate action on mg",
@@ -225,14 +225,13 @@ This command will perform a migration of all volumes on source to target.`,
 				os.Exit(0)
 			}
 			mgName := args[0]
-			targetNs := viper.GetString("ststarget-ns")
-			wait := viper.GetBool("stswait")
-			ndu := viper.GetBool("ndu")
+			targetNs := viper.GetString("mgtarget-ns")
+			wait := viper.GetBool("mgwait")
 			configFolder, err := getClustersFolderPathFunction("/.repctl/clusters/")
 			if err != nil {
 				log.Fatalf("migrate: error getting clusters folder path: %s\n", err.Error())
 			}
-			migrateMG(configFolder, "mg", mgName, targetNs, wait, ndu)
+			migrateMG(mc, configFolder, "mg", mgName, targetNs, wait)
 		},
 	}
 
@@ -496,9 +495,8 @@ func recreateStsNdu(cluster k8s.ClusterInterface, sts *v12.StatefulSet, targetSC
 	return nil
 }
 
-func migrateMG(configFolder, resource string, resName string, targetNS string, wait bool, ndu bool) {
+func migrateMG(mc GetClustersInterface, configFolder, resource string, resName string, targetNS string, wait bool) {
 	clusterIDs := viper.GetStringSlice(config.Clusters)
-	mc := &k8s.MultiClusterConfigurator{}
 	clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
 	if err != nil {
 		log.Fatalf("edit secret: error in initializing cluster info: %s", err.Error())
@@ -524,10 +522,15 @@ func migrateArray(ctx context.Context, cluster k8s.ClusterInterface, mgName stri
 		log.Error(err, "Unable to find mg")
 		os.Exit(1)
 	}
+	annotations := mg.Annotations
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
 	migrationAnnotation = "ArrayMigrate"
 	Action := "Ready"
 	log.Infof("Setting Array migration annotation %s on mg %s", migrationAnnotation+"/"+Action, mg.Name)
-	mg.Annotations[migrationAnnotation] = Action
+	annotations[migrationAnnotation] = Action
+	mg.Annotations = annotations
 	err = cluster.UpdateMigrationGroup(context.Background(), mg)
 	if err != nil {
 		log.Error(err, "unable to update mg")
@@ -537,6 +540,7 @@ func migrateArray(ctx context.Context, cluster k8s.ClusterInterface, mgName stri
 	if wait {
 		done := waitForArrayMigration(mgName, cluster)
 		if done {
+			fmt.Printf("Successfully migrated all volumes from source array to target") //This message is validated in UT; do not delete or change
 			log.Infof("Successfully migrated all volumes from source array to target")
 		} else {
 			log.Error("time out waiting for array migration")
