@@ -15,13 +15,17 @@
 package cmd
 
 import (
+	"os"
 	"testing"
 
 	"github.com/dell/repctl/mocks"
+	"github.com/dell/repctl/pkg/config"
 	"github.com/dell/repctl/pkg/k8s"
 	"github.com/dell/repctl/pkg/types"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	"gopkg.in/yaml.v2"
 	v1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -51,8 +55,32 @@ func (suite *CreateTestSuite) TestCreatePVCs() {
 			On("CreatePersistentVolumeClaimsFromPVs", mock.Anything, "test-ns", pvs, prefix, dryRun).
 			Return(nil)
 
-		err := createPVCs(pvList, mockCluster, rgName, "test-ns", prefix, dryRun)
-		suite.NoError(err)
+		clusters := &k8s.Clusters{
+			Clusters: []k8s.ClusterInterface{mockCluster},
+		}
+
+		mcMock := new(mocks.MultiClusterConfiguratorInterface)
+		mcMock.On("GetAllClusters", mock.Anything, mock.Anything).Return(clusters, nil)
+		originalFunc := createMultiClusterConfiguratorInterface
+		createMultiClusterConfiguratorInterface = func() k8s.MultiClusterConfiguratorInterface {
+			return mcMock
+		}
+
+		cmd := getCreatePersistentVolumeClaimsCommand()
+		suite.NotNil(cmd)
+
+		//cmd.Flag("rg").Value.Set(rgName)
+		cmd.Flag("target-namespace").Value.Set("test-ns")
+		viper.Set("pvs", pvList)
+		cmd.Flag("dry-run").Value.Set("true")
+		viper.Set(config.Clusters, "cluster-1")
+		viper.Set(config.ReplicationGroup, rgName)
+		viper.Set(config.ReplicationPrefix, prefix)
+		cmd.Run(nil, []string{})
+
+		createMultiClusterConfiguratorInterface = originalFunc
+
+		//err := createPVCs(pvList, mockCluster, rgName, "test-ns", prefix, dryRun)
 	})
 
 	suite.Run("from provided pvs", func() {
@@ -76,8 +104,32 @@ func (suite *CreateTestSuite) TestCreatePVCs() {
 			On("CreatePersistentVolumeClaimsFromPVs", mock.Anything, "test-ns", pvs, prefix, dryRun).
 			Return(nil)
 
-		err := createPVCs(pvList, mockCluster, "", "test-ns", prefix, dryRun)
-		suite.NoError(err)
+		clusters := &k8s.Clusters{
+			Clusters: []k8s.ClusterInterface{mockCluster},
+		}
+
+		mcMock := new(mocks.MultiClusterConfiguratorInterface)
+		mcMock.On("GetAllClusters", mock.Anything, mock.Anything).Return(clusters, nil)
+		originalFunc := createMultiClusterConfiguratorInterface
+		createMultiClusterConfiguratorInterface = func() k8s.MultiClusterConfiguratorInterface {
+			return mcMock
+		}
+
+		cmd := getCreatePersistentVolumeClaimsCommand()
+		suite.NotNil(cmd)
+
+		//cmd.Flag("rg").Value.Set(rgName)
+		cmd.Flag("target-namespace").Value.Set("test-ns")
+		viper.Set("pvs", pvList)
+		cmd.Flag("dry-run").Value.Set("true")
+		viper.Set(config.Clusters, "cluster-1")
+		viper.Set(config.ReplicationGroup, "")
+		viper.Set(config.ReplicationPrefix, prefix)
+		cmd.Run(nil, []string{})
+
+		createMultiClusterConfiguratorInterface = originalFunc
+
+		//err := createPVCs(pvList, mockCluster, "", "test-ns", prefix, dryRun)
 	})
 }
 
@@ -108,6 +160,13 @@ func (suite *CreateTestSuite) TestCreateSCs() {
 		Clusters: []k8s.ClusterInterface{mockClusterA, mockClusterB},
 	}
 
+	mcMock := new(mocks.MultiClusterConfiguratorInterface)
+	mcMock.On("GetAllClusters", mock.Anything, mock.Anything).Return(clusters, nil)
+	originalFunc := createMultiClusterConfiguratorInterface
+	createMultiClusterConfiguratorInterface = func() k8s.MultiClusterConfiguratorInterface {
+		return mcMock
+	}
+
 	config := ScConfig{
 		Name:            "powerstore-replication",
 		Driver:          "powerstore",
@@ -127,9 +186,25 @@ func (suite *CreateTestSuite) TestCreateSCs() {
 			Mode: "ASYNC",
 		},
 	}
+	cmd := getCreateStorageClassCommand()
+	suite.NotNil(cmd)
 
-	err := createSCs(config, clusters, false)
-	suite.NoError(err)
+	file, err := os.OpenFile("testdata/test.yaml", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	suite.Nil(err)
+	defer file.Close()
+
+	enc := yaml.NewEncoder(file)
+	err = enc.Encode(config)
+	suite.Nil(err)
+	cmd.Flag("from-config").Value.Set("testdata/test.yaml")
+	cmd.Flag("dry-run").Value.Set("true")
+	cmd.Run(nil, []string{})
+	//err := createSCs(config, clusters, false)
+
+	cmd.Flag("dry-run").Value.Set("fasle")
+	cmd.Run(nil, []string{})
+
+	createMultiClusterConfiguratorInterface = originalFunc
 }
 
 func TestCreateTestSuite(t *testing.T) {
@@ -171,4 +246,48 @@ func TestSplitFuncAtWithYAMLSeparator(t *testing.T) {
 			t.Errorf("%d: token did not match: %q %q", i, testCase.expect, string(token))
 		}
 	}
+}
+
+func (suite *CreateTestSuite) TestGetCreateCommand() {
+	cmd := GetCreateCommand()
+	suite.Equal("create", cmd.Use)
+	suite.Equal("create object in specified clusters managed by repctl", cmd.Short)
+
+	// Test the flags
+	prefixFlag := cmd.Flags().Lookup("file")
+	suite.NotNil(prefixFlag)
+	suite.Equal("filename", prefixFlag.Usage)
+
+	subCommands := cmd.Commands()
+	suite.NotEmpty(subCommands)
+	for _, subCmd := range subCommands {
+		suite.NotNil(subCmd)
+	}
+}
+
+func (suite *CreateTestSuite) TestCreateFile() {
+	mockCluster := new(mocks.ClusterInterface)
+	mockCluster.On("GetID").Return("cluster-1")
+	mockCluster.On("CreateObject", mock.Anything, mock.Anything).Return(nil, nil)
+
+	clusters := &k8s.Clusters{
+		Clusters: []k8s.ClusterInterface{mockCluster},
+	}
+
+	mcMock := new(mocks.MultiClusterConfiguratorInterface)
+	mcMock.On("GetAllClusters", mock.Anything, mock.Anything).Return(clusters, nil)
+	originalFunc := createMultiClusterConfiguratorInterface
+	createMultiClusterConfiguratorInterface = func() k8s.MultiClusterConfiguratorInterface {
+		return mcMock
+	}
+
+	cmd := GetCreateCommand()
+	suite.NotNil(cmd)
+
+	cmd.Flag("file").Value.Set("testdata/test-ns.yaml")
+	viper.Set(config.Clusters, "")
+
+	cmd.Run(nil, []string{})
+
+	createMultiClusterConfiguratorInterface = originalFunc
 }

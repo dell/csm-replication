@@ -54,7 +54,7 @@ var (
 	displayNewTableWriter         = display.NewTableWriter
 	clientcmdBuildConfigFromFlags = clientcmd.BuildConfigFromFlags
 	kubernetesNewForConfig        = kubernetes.NewForConfig
-	getCtrlRuntimeClient          = func(kubeconfig string) (client.Client, error) {
+	GetCtrlRuntimeClient          = func(kubeconfig string) (client.Client, error) {
 		return getControllerRuntimeClient(kubeconfig)
 	}
 	newClntSet = func(kubeconfig string) (*kubernetes.Clientset, *rest.Config, error) {
@@ -655,7 +655,7 @@ func newClientSet(kubeconfig string) (*kubernetes.Clientset, *rest.Config, error
 
 // CreateCluster creates new k8s client for cluster
 func CreateCluster(clusterID, kubeconfig string) (ClusterInterface, error) {
-	k8sClient, err := getCtrlRuntimeClient(kubeconfig)
+	k8sClient, err := GetCtrlRuntimeClient(kubeconfig)
 	if err != nil {
 		return nil, err
 	}

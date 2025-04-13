@@ -168,6 +168,9 @@ func (f *Client) listPersistentVolumeClaim(list *core_v1.PersistentVolumeClaimLi
 			if lo.LabelSelector != nil && !lo.LabelSelector.Matches(labels.Set(pvc.Labels)) {
 				continue
 			}
+			if lo.Namespace != "" && lo.Namespace != pvc.Namespace {
+				continue
+			}
 			list.Items = append(list.Items, *v.(*core_v1.PersistentVolumeClaim))
 		}
 	}
