@@ -215,7 +215,7 @@ func migrateMGCommand(mc GetClustersInterface) *cobra.Command {
 		Use:   "mg",
 		Short: "allows to execute migrate action on mg",
 		Example: `
-./repctl migrate mg <name> (--target-ns=tns) (--wait)`,
+./repctl migrate mg <name>  (--wait)`,
 		Long: `
 This command will perform a migration of all volumes on source to target.`,
 
@@ -225,18 +225,15 @@ This command will perform a migration of all volumes on source to target.`,
 				os.Exit(0)
 			}
 			mgName := args[0]
-			targetNs := viper.GetString("mgtarget-ns")
 			wait := viper.GetBool("mgwait")
 			configFolder, err := getClustersFolderPathFunction("/.repctl/clusters/")
 			if err != nil {
 				log.Fatalf("migrate: error getting clusters folder path: %s\n", err.Error())
 			}
-			migrateMG(mc, configFolder, "mg", mgName, targetNs, wait)
+			migrateMG(mc, configFolder, "mg", mgName, wait)
 		},
 	}
 
-	migrateCmd.Flags().String("target-ns", "", "target namespace")
-	_ = viper.BindPFlag("mgtarget-ns", migrateCmd.Flags().Lookup("target-ns"))
 	migrateCmd.Flags().Bool("wait", true, "wait for action to complete")
 	_ = viper.BindPFlag("mgwait", migrateCmd.Flags().Lookup("wait"))
 	return migrateCmd
@@ -378,6 +375,7 @@ func migratePV(ctx context.Context, cluster k8s.ClusterInterface, pvName string,
 			log.Error("time out waiting for the PV to be bound")
 		}
 	} else {
+		fmt.Printf("Successfully updated pv") //This message is validated in UT; do not delete or change
 		log.Infof("Successfully updated pv %s in cluster %s. Consider using new PV: [%s]", pv.Name, cluster.GetID(), pvName+"-to-"+toSC)
 	}
 }
@@ -495,7 +493,7 @@ func recreateStsNdu(cluster k8s.ClusterInterface, sts *v12.StatefulSet, targetSC
 	return nil
 }
 
-func migrateMG(mc GetClustersInterface, configFolder, resource string, resName string, targetNS string, wait bool) {
+func migrateMG(mc GetClustersInterface, configFolder, resource string, resName string, wait bool) {
 	clusterIDs := viper.GetStringSlice(config.Clusters)
 	clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
 	if err != nil {
@@ -509,12 +507,12 @@ func migrateMG(mc GetClustersInterface, configFolder, resource string, resName s
 			continue
 		}
 		wg.Add(1)
-		go migrateArray(context.Background(), cluster, resName, targetNS, wg, wait)
+		go migrateArray(context.Background(), cluster, resName, wg, wait)
 	}
 	wg.Wait()
 }
 
-func migrateArray(ctx context.Context, cluster k8s.ClusterInterface, mgName string, targetNS string, wg *sync.WaitGroup, wait bool) {
+func migrateArray(ctx context.Context, cluster k8s.ClusterInterface, mgName string, wg *sync.WaitGroup, wait bool) {
 	defer wg.Done()
 	log.Info(mgName)
 	mg, err := cluster.GetMigrationGroup(context.Background(), mgName)
@@ -546,6 +544,7 @@ func migrateArray(ctx context.Context, cluster k8s.ClusterInterface, mgName stri
 			log.Error("time out waiting for array migration")
 		}
 	} else {
+		fmt.Printf("Successfully migrated all volumes from source array to target") //This message is validated in UT; do not delete or change
 		log.Infof("Successfully migrated all volumes from source array to target")
 	}
 }
