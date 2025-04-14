@@ -18,12 +18,7 @@ on:  # yamllint disable-line rule:truthy
       version:
         description: "Patch version to release. example: 2.1.x (Use this only if n-1/n-2 patch is selected)"
         required: false
-        type: string
-      reverseproxyCheckInput:
-        description: 'Release CSI-ReverseProxy Image'
-        type: boolean
-        default: false
-        required: false
+        type: string  
 jobs:
   process-inputs:
     name: Process Inputs
