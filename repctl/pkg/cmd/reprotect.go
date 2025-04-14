@@ -45,7 +45,7 @@ repctl will patch CR at cluster1 with action REPROTECT_LOCAL.`,
 			verbose := viper.GetBool(config.Verbose)
 			wait := viper.GetBool("reprotect-wait")
 			input, res := verifyInputForAction(inputCluster, rgName)
-			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
+			configFolder, err := getClustersFolderPathFunction(clusterPath)
 			if err != nil {
 				log.Fatalf("reprotect: error getting clusters folder path: %s\n", err.Error())
 			}
@@ -54,7 +54,8 @@ repctl will patch CR at cluster1 with action REPROTECT_LOCAL.`,
 			} else if input == "rg" {
 				reprotectAtRG(configFolder, res, verbose, wait)
 			} else {
-				log.Fatal("Unexpected input received")
+				log.Error("unexpected input received")
+				return
 			}
 		},
 	}
@@ -77,7 +78,7 @@ func verifyInputForAction(input string, rg string) (res string, tgt string) {
 		}
 	}
 
-	configFolder, err := getClustersFolderPath("/.repctl/clusters/")
+	configFolder, err := getClustersFolderPathFunction(clusterPath)
 	if err != nil {
 		log.Fatalf("list pvc: error getting clusters folder path: %s", err.Error())
 	}

@@ -73,7 +73,11 @@ func getKey(obj runtime.Object) (storageKey, error) {
 
 // NewFakeClient initializes and returns new fake k8s client
 func NewFakeClient(initialObjects []runtime.Object, errorInjector errorInjector) (*Client, error) {
-	repv1.AddToScheme(scheme.Scheme)
+	err := repv1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		return nil, err
+	}
+
 	client := &Client{
 		Objects:       map[storageKey]runtime.Object{},
 		errorInjector: errorInjector,
