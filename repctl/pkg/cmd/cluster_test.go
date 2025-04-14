@@ -16,14 +16,19 @@ package cmd
 
 import (
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/dell/repctl/mocks"
+	cmdMocks "github.com/dell/repctl/pkg/cmd/mocks"
 	"github.com/dell/repctl/pkg/k8s"
+	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
 )
 
 const folderPath = ".repctl/testdata/"
@@ -105,4 +110,187 @@ func (suite *ClusterTestSuite) TestInjectCluster() {
 
 func TestClusterTestSuite(t *testing.T) {
 	suite.Run(t, new(ClusterTestSuite))
+}
+
+func (suite *ClusterTestSuite) TestAddClusterCommand() {
+
+	tests := []struct {
+		name                  string
+		getClustersFolderPath func(string) (string, error)
+		expectedOutputEquals  string
+	}{
+		{
+			name: "Successful",
+			getClustersFolderPath: func(path string) (string, error) {
+				filePath, err := os.Getwd()
+				if err != nil {
+					return "", err
+				}
+				filePath += "/testdata"
+
+				return filePath, nil
+			},
+			expectedOutputEquals: "",
+		},
+	}
+
+	for _, tt := range tests {
+		suite.Suite.T().Run(tt.name, func(t *testing.T) {
+			originalGetClustersFolderPathFunction := getClustersFolderPathFunction
+			defer func() {
+				getClustersFolderPathFunction = originalGetClustersFolderPathFunction
+			}()
+
+			getClustersFolderPathFunction = tt.getClustersFolderPath
+
+			defer viper.Reset()
+
+			getClustersMock := cmdMocks.NewMockGetClustersInterface(gomock.NewController(t))
+
+			filePath, err := os.Getwd()
+			assert.Nil(t, err)
+			filePath += "/testdata/config"
+
+			viper.Set("files", filePath)
+			viper.Set("add-name", "test-cluster-1")
+
+			cmd := getAddClusterCommand(getClustersMock)
+
+			rescueStdout := os.Stdout
+			r, w, _ := os.Pipe()
+			os.Stdout = w
+			defer func() {
+				os.Stdout = rescueStdout
+			}()
+
+			cmd.Run(nil, nil)
+
+			w.Close()
+			out, _ := io.ReadAll(r)
+			os.Stdout = rescueStdout
+
+			assert.Equal(t, string(out), tt.expectedOutputEquals)
+		})
+	}
+}
+
+func (suite *ClusterTestSuite) TestRemoveClusterCommand() {
+
+	tests := []struct {
+		name                  string
+		getClustersFolderPath func(string) (string, error)
+		expectedOutputEquals  string
+	}{
+		{
+			name: "Successful",
+			getClustersFolderPath: func(path string) (string, error) {
+				filePath, err := os.Getwd()
+				if err != nil {
+					return "", err
+				}
+				filePath += "/testdata"
+
+				return filePath, nil
+			},
+			expectedOutputEquals: "",
+		},
+	}
+
+	for _, tt := range tests {
+		suite.Suite.T().Run(tt.name, func(t *testing.T) {
+			originalGetClustersFolderPathFunction := getClustersFolderPathFunction
+			defer func() {
+				getClustersFolderPathFunction = originalGetClustersFolderPathFunction
+			}()
+
+			getClustersFolderPathFunction = tt.getClustersFolderPath
+
+			defer viper.Reset()
+
+			filePath, err := os.Getwd()
+			assert.Nil(t, err)
+			filePath += "/testdata/remove-cluster-sample"
+
+			_, err = os.Create(filePath)
+			assert.Nil(t, err)
+
+			viper.Set("remove-name", "remove-cluster-sample")
+
+			cmd := getRemoveClusterCommand()
+
+			rescueStdout := os.Stdout
+			r, w, _ := os.Pipe()
+			os.Stdout = w
+			defer func() {
+				os.Stdout = rescueStdout
+			}()
+
+			cmd.Run(nil, nil)
+
+			w.Close()
+			out, _ := io.ReadAll(r)
+			os.Stdout = rescueStdout
+
+			assert.Equal(t, string(out), tt.expectedOutputEquals)
+		})
+	}
+}
+
+func (suite *ListTestSuite) TestGetListClustersCommand() {
+	tests := []struct {
+		name                   string
+		getClustersFolderPath  func(string) (string, error)
+		clusters               *k8s.Clusters
+		expectedOutputContains []string
+	}{
+		{
+			name: "Successful",
+			getClustersFolderPath: func(path string) (string, error) {
+				return clusterPath, nil
+			},
+			clusters: &k8s.Clusters{
+				Clusters: []k8s.ClusterInterface{
+					&k8s.Cluster{
+						ClusterID: "cluster-1",
+					},
+					&k8s.Cluster{
+						ClusterID: "cluster-2",
+					},
+				},
+			},
+			expectedOutputContains: []string{"cluster-1", "cluster-2"},
+		},
+	}
+
+	for _, tt := range tests {
+		suite.Suite.T().Run(tt.name, func(t *testing.T) {
+			originalGetClustersFolderPathFunction := getClustersFolderPathFunction
+			defer func() {
+				getClustersFolderPathFunction = originalGetClustersFolderPathFunction
+			}()
+			getClustersFolderPathFunction = tt.getClustersFolderPath
+
+			getClustersMock := cmdMocks.NewMockGetClustersInterface(gomock.NewController(t))
+			getClustersMock.EXPECT().GetAllClusters(gomock.Any(), gomock.Any()).Times(1).Return(tt.clusters, nil)
+
+			cmd := getListClusterCommand(getClustersMock)
+
+			rescueStdout := os.Stdout
+			r, w, _ := os.Pipe()
+			os.Stdout = w
+			defer func() {
+				os.Stdout = rescueStdout
+			}()
+
+			cmd.Run(nil, nil)
+
+			w.Close()
+			out, _ := io.ReadAll(r)
+			os.Stdout = rescueStdout
+
+			for _, expected := range tt.expectedOutputContains {
+				assert.Contains(t, string(out), expected)
+			}
+		})
+	}
 }
