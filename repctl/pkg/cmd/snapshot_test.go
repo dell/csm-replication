@@ -267,7 +267,7 @@ func (suite *SnapshotTestSuite) TestCreateSnapshot() {
 			expectedError: "",
 		},
 		{
-			name:         "successful snapshot creation with wait",
+			name:         "successful snapshot creation with wait and getWaitForStateToUpdate is true",
 			configFolder: "config",
 			rgName:       "rg1",
 			prefix:       "replication.storage.dell.com",
@@ -297,7 +297,7 @@ func (suite *SnapshotTestSuite) TestCreateSnapshot() {
 			expectedError: "",
 		},
 		{
-			name:         "snapshot creation with wait but timeout",
+			name:         "snapshot creation with wait but getWaitForStateToUpdate is false",
 			configFolder: "config",
 			rgName:       "rg1",
 			prefix:       "replication.storage.dell.com",
