@@ -15,40 +15,40 @@ rules:
   #     - list
   #     - update
   #     - watch
-  # - apiGroups:
-  #     - ""
-  #   resources:
-  #     - configmaps
-  #   verbs:
-  #     - create
-  #     - delete
-  #     - get
-  #     - list
-  #     - patch
-  #     - update
-  #     - watch
-  # - apiGroups:
-  #     - ""
-  #   resources:
-  #     - events
-  #   verbs:
-  #     - create
-  #     - list
-  #     - patch
-  #     - update
-  #     - watch
-  # - apiGroups:
-  #     - ""
-  #   resources:
-  #     - persistentvolumeclaims
-  #   verbs:
-  #     - create
-  #     - delete
-  #     - get
-  #     - list
-  #     - patch
-  #     - update
-  #     - watch
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      # - list
+      # - patch
+      # - update
+      # - watch
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumeclaims
+    verbs:
+      # - create
+      # - delete
+      # - get
+      - list
+      # - patch
+      - update
+      - watch
   # - apiGroups:
   #     - ""
   #   resources:
@@ -65,18 +65,18 @@ rules:
       - get
       - patch
       - update
-  # - apiGroups:
-  #     - replication.storage.dell.com
-  #   resources:
-  #     - dellcsireplicationgroups
-  #   verbs:
-  #     - create
-  #     - delete
-  #     - get
-  #     - list
-  #     - patch
-  #     - update
-  #     - watch
+  - apiGroups:
+      - replication.storage.dell.com
+    resources:
+      - dellcsireplicationgroups
+    verbs:
+      # - create
+      # - delete
+      # - get
+      - list
+      # - patch
+      - update
+      - watch
   # - apiGroups:
   #     - replication.storage.dell.com
   #   resources:
@@ -113,21 +113,9 @@ rules:
   - apiGroups:
       - ""
     resources:
-      - configmaps
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - ""
-    resources:
       - events
     verbs:
-      - create
+      # - create
       - list
       - patch
       - update
@@ -140,10 +128,10 @@ rules:
       - create
       - delete
       - get
-      - list
+      # - list
       - patch
-      - update
-      - watch
+      # - update
+      # - watch
   - apiGroups:
       - ""
     resources:
@@ -160,10 +148,10 @@ rules:
       - create
       - delete
       - get
-      - list
+      # - list
       - patch
-      - update
-      - watch
+      # - update
+      # - watch
   - apiGroups:
       - replication.storage.dell.com
     resources:

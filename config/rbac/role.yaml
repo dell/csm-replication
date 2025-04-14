@@ -31,16 +31,16 @@ rules:
   #     - list
   #     - update
   #     - watch
-  # - apiGroups:
-  #     - ""
-  #   resources:
-  #     - events
-  #   verbs:
-  #     - create
-  #     - list
-  #     - patch
-  #     - update
-  #     - watch
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      # - list
+      # - patch
+      # - update
+      # - watch
   - apiGroups:
       - ""
     resources:
@@ -49,18 +49,18 @@ rules:
       - get
       - list
       - watch
-  # - apiGroups:
-  #     - ""
-  #   resources:
-  #     - persistentvolumeclaims
-  #   verbs:
-  #     - create
-  #     - delete
-  #     - get
-  #     - list
-  #     - patch
-  #     - update
-  #     - watch
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumeclaims
+    verbs:
+      # - create
+      # - delete
+      # - get
+      - list
+      # - patch
+      - update
+      - watch
   # - apiGroups:
   #     - ""
   #   resources:
@@ -81,34 +81,34 @@ rules:
       - patch
       - update
       - watch
-  # - apiGroups:
-  #     - ""
-  #   resources:
-  #     - pods
-  #   verbs:
-  #     - get
-  #     - list
-  #     - watch
-  # - apiGroups:
-  #     - ""
-  #   resources:
-  #     - secrets
-  #   verbs:
-  #     - get
-  #     - list
-  #     - watch
-  # - apiGroups:
-  #     - replication.storage.dell.com
-  #   resources:
-  #     - dellcsireplicationgroups
-  #   verbs:
-  #     - create
-  #     - delete
-  #     - get
-  #     - list
-  #     - patch
-  #     - update
-  #     - watch
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      # - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      # - get
+      - list
+      - watch
+  - apiGroups:
+      - replication.storage.dell.com
+    resources:
+      - dellcsireplicationgroups
+    verbs:
+      # - create
+      # - delete
+      # - get
+      - list
+      # - patch
+      - update
+      - watch
   # - apiGroups:
   #     - replication.storage.dell.com
   #   resources:
@@ -157,7 +157,7 @@ rules:
     resources:
       - events
     verbs:
-      - create
+      # - create
       - list
       - patch
       - update
@@ -170,10 +170,10 @@ rules:
       - create
       - delete
       - get
-      - list
+      # - list
       - patch
-      - update
-      - watch
+      # - update
+      # - watch
   - apiGroups:
       - ""
     resources:
@@ -188,16 +188,16 @@ rules:
       - pods
     verbs:
       - get
-      - list
-      - watch
+      # - list
+      # - watch
   - apiGroups:
       - ""
     resources:
       - secrets
     verbs:
       - get
-      - list
-      - watch
+      # - list
+      # - watch
   - apiGroups:
       - replication.storage.dell.com
     resources:
@@ -206,10 +206,10 @@ rules:
       - create
       - delete
       - get
-      - list
+      # - list
       - patch
-      - update
-      - watch
+      # - update
+      # - watch
   - apiGroups:
       - replication.storage.dell.com
     resources:
