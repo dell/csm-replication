@@ -15,13 +15,16 @@
 package cmd
 
 import (
+	"errors"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/dell/repctl/mocks"
 	"github.com/dell/repctl/pkg/config"
 	"github.com/dell/repctl/pkg/k8s"
 	"github.com/dell/repctl/pkg/types"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -78,6 +81,14 @@ func (suite *CreateTestSuite) TestCreatePVCs() {
 		viper.Set(config.ReplicationPrefix, prefix)
 		cmd.Run(nil, []string{})
 
+		defer func() { log.StandardLogger().ExitFunc = nil }()
+		var fatal bool
+		log.StandardLogger().ExitFunc = func(int) { fatal = true }
+
+		cmd.Flag("dry-run").Value.Set("false")
+		cmd.Run(nil, []string{})
+		suite.Equal(true, fatal)
+
 		createMultiClusterConfiguratorInterface = originalFunc
 
 		//err := createPVCs(pvList, mockCluster, rgName, "test-ns", prefix, dryRun)
@@ -126,6 +137,14 @@ func (suite *CreateTestSuite) TestCreatePVCs() {
 		viper.Set(config.ReplicationGroup, "")
 		viper.Set(config.ReplicationPrefix, prefix)
 		cmd.Run(nil, []string{})
+
+		defer func() { log.StandardLogger().ExitFunc = nil }()
+		var fatal bool
+		log.StandardLogger().ExitFunc = func(int) { fatal = true }
+
+		cmd.Flag("dry-run").Value.Set("false")
+		cmd.Run(nil, []string{})
+		suite.Equal(true, fatal)
 
 		createMultiClusterConfiguratorInterface = originalFunc
 
@@ -266,28 +285,147 @@ func (suite *CreateTestSuite) TestGetCreateCommand() {
 }
 
 func (suite *CreateTestSuite) TestCreateFile() {
-	mockCluster := new(mocks.ClusterInterface)
-	mockCluster.On("GetID").Return("cluster-1")
-	mockCluster.On("CreateObject", mock.Anything, mock.Anything).Return(nil, nil)
-
-	clusters := &k8s.Clusters{
-		Clusters: []k8s.ClusterInterface{mockCluster},
-	}
-
-	mcMock := new(mocks.MultiClusterConfiguratorInterface)
-	mcMock.On("GetAllClusters", mock.Anything, mock.Anything).Return(clusters, nil)
 	originalFunc := createMultiClusterConfiguratorInterface
-	createMultiClusterConfiguratorInterface = func() k8s.MultiClusterConfiguratorInterface {
-		return mcMock
-	}
+	suite.Run("success", func() {
+		mockCluster := new(mocks.ClusterInterface)
+		mockCluster.On("GetID").Return("cluster-1")
+		mockCluster.On("CreateObject", mock.Anything, mock.Anything).Return(nil, nil)
 
-	cmd := GetCreateCommand()
-	suite.NotNil(cmd)
+		clusters := &k8s.Clusters{
+			Clusters: []k8s.ClusterInterface{mockCluster},
+		}
 
-	cmd.Flag("file").Value.Set("testdata/test-ns.yaml")
-	viper.Set(config.Clusters, "")
+		mcMock := new(mocks.MultiClusterConfiguratorInterface)
+		mcMock.On("GetAllClusters", mock.Anything, mock.Anything).Return(clusters, nil)
 
-	cmd.Run(nil, []string{})
+		createMultiClusterConfiguratorInterface = func() k8s.MultiClusterConfiguratorInterface {
+			return mcMock
+		}
+
+		cmd := GetCreateCommand()
+		suite.NotNil(cmd)
+
+		cmd.Flag("file").Value.Set("testdata/test-ns.yaml")
+		viper.Set(config.Clusters, "")
+
+		cmd.Run(nil, []string{})
+
+		cmd.Flag("file").Value.Set("-")
+		cmd.Run(nil, []string{})
+
+		defer func() { log.StandardLogger().ExitFunc = nil }()
+		var fatal bool
+		log.StandardLogger().ExitFunc = func(int) { fatal = true }
+
+		cmd.Flag("file").Value.Set("testdata/invalid.yaml")
+		cmd.Run(nil, []string{})
+		suite.Equal(true, fatal)
+	})
+
+	suite.Run("getAllClusters fail", func() {
+		mockCluster := new(mocks.ClusterInterface)
+		mockCluster.On("GetID").Return("cluster-1")
+		mockCluster.On("CreateObject", mock.Anything, mock.Anything).Return(nil, nil)
+
+		clusters := &k8s.Clusters{
+			Clusters: []k8s.ClusterInterface{mockCluster},
+		}
+
+		mcMock := new(mocks.MultiClusterConfiguratorInterface)
+		mcMock.On("GetAllClusters", mock.Anything, mock.Anything).Return(clusters, errors.New("test error"))
+
+		createMultiClusterConfiguratorInterface = func() k8s.MultiClusterConfiguratorInterface {
+			return mcMock
+		}
+
+		cmd := GetCreateCommand()
+		suite.NotNil(cmd)
+
+		cmd.Flag("file").Value.Set("testdata/test-ns.yaml")
+		viper.Set(config.Clusters, "")
+
+		defer func() { log.StandardLogger().ExitFunc = nil }()
+		var fatal bool
+		log.StandardLogger().ExitFunc = func(int) { fatal = true }
+		cmd.Run(nil, []string{})
+		suite.Equal(true, fatal)
+	})
+
+	suite.Run("createObject warning", func() {
+		mockCluster := new(mocks.ClusterInterface)
+		mockCluster.On("GetID").Return("cluster-1")
+		mockCluster.On("CreateObject", mock.Anything, mock.Anything).Return(nil, errors.New("already exists"))
+
+		clusters := &k8s.Clusters{
+			Clusters: []k8s.ClusterInterface{mockCluster},
+		}
+
+		mcMock := new(mocks.MultiClusterConfiguratorInterface)
+		mcMock.On("GetAllClusters", mock.Anything, mock.Anything).Return(clusters, nil)
+
+		createMultiClusterConfiguratorInterface = func() k8s.MultiClusterConfiguratorInterface {
+			return mcMock
+		}
+
+		cmd := GetCreateCommand()
+		suite.NotNil(cmd)
+
+		cmd.Flag("file").Value.Set("testdata/test-ns.yaml")
+		viper.Set(config.Clusters, "")
+
+		defer func() { log.StandardLogger().ExitFunc = nil }()
+		var fatal bool
+		log.StandardLogger().ExitFunc = func(int) { fatal = true }
+		cmd.Run(nil, []string{})
+		suite.Equal(false, fatal)
+	})
+
+	suite.Run("createObject error", func() {
+		mockCluster := new(mocks.ClusterInterface)
+		mockCluster.On("GetID").Return("cluster-1")
+		mockCluster.On("CreateObject", mock.Anything, mock.Anything).Return(nil, errors.New("test error"))
+
+		clusters := &k8s.Clusters{
+			Clusters: []k8s.ClusterInterface{mockCluster},
+		}
+
+		mcMock := new(mocks.MultiClusterConfiguratorInterface)
+		mcMock.On("GetAllClusters", mock.Anything, mock.Anything).Return(clusters, nil)
+
+		createMultiClusterConfiguratorInterface = func() k8s.MultiClusterConfiguratorInterface {
+			return mcMock
+		}
+
+		cmd := GetCreateCommand()
+		suite.NotNil(cmd)
+
+		cmd.Flag("file").Value.Set("testdata/test-ns.yaml")
+		viper.Set(config.Clusters, "")
+
+		defer func() { log.StandardLogger().ExitFunc = nil }()
+		var fatal bool
+		log.StandardLogger().ExitFunc = func(int) { fatal = true }
+		cmd.Run(nil, []string{})
+		suite.Equal(false, fatal)
+	})
 
 	createMultiClusterConfiguratorInterface = originalFunc
+}
+
+func (suite *CreateTestSuite) TestAskForConfirmation() {
+	res, err := askForConfirmation("test", strings.NewReader("y\n"), 3)
+	suite.Equal(res, true)
+	suite.Nil(err)
+
+	res, err = askForConfirmation("test", strings.NewReader("test1\ntest2\ntest3\ntest4\n"), 3)
+	suite.Equal(res, false)
+	suite.Nil(err)
+
+	res, err = askForConfirmation("test", strings.NewReader(""), 3)
+	suite.Equal(res, false)
+	suite.NotNil(err)
+
+	res, err = askForConfirmation("test", strings.NewReader("\n"), 1)
+	suite.Equal(res, false)
+	suite.Nil(err)
 }
