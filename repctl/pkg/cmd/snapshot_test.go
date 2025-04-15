@@ -177,7 +177,7 @@ func (suite *SnapshotTestSuite) TestGetSnapshotCommand() {
 			viper.Set(config.Verbose, false)
 
 			// Fake client and mock clusters
-			fake, _ := fake_client.NewFakeClient(tt.objects, nil)
+			fake, _ := fake_client.NewFakeClient(tt.objects, nil, nil)
 			mockClusters := &k8s.Clusters{
 				Clusters: []k8s.ClusterInterface{
 					&k8s.Cluster{
