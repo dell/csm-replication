@@ -143,9 +143,9 @@ func (suite *ClusterTestSuite) TestGetInjectClustersCommand() {
 	mockClusterA.On("GetKubeConfigFile").Return("testdata/config")
 	mockClusterA.
 		On("GetNamespace", mock.Anything, "dell-replication-controller").
-		Return(nil, errors.New("namespace not found")).Once()
+		Return(nil, errors.New("namespace not found"))
 	mockClusterA.
-		On("CreateNamespace", mock.Anything, mock.Anything).Return(nil).Once()
+		On("CreateNamespace", mock.Anything, mock.Anything).Return(nil)
 	mockClusterA.On("GetClient").Return(mockClient)
 
 	mockClusterB := new(mocks.ClusterInterface)
@@ -154,9 +154,9 @@ func (suite *ClusterTestSuite) TestGetInjectClustersCommand() {
 	mockClusterB.On("GetKubeConfigFile").Return("testdata/config")
 	mockClusterB.
 		On("GetNamespace", mock.Anything, "dell-replication-controller").
-		Return(nil, errors.New("namespace not found")).Once()
+		Return(nil, errors.New("namespace not found"))
 	mockClusterB.
-		On("CreateNamespace", mock.Anything, mock.Anything).Return(nil).Once()
+		On("CreateNamespace", mock.Anything, mock.Anything).Return(nil)
 	mockClusterB.On("GetClient").Return(mockClient)
 
 	clusters := &k8s.Clusters{
@@ -175,7 +175,11 @@ func (suite *ClusterTestSuite) TestGetInjectClustersCommand() {
 	getClustersFolderPathFunction = func(_ string) (string, error) {
 		return path, nil
 	}
+	RunCommand = func(_ *exec.Cmd) error {
+		return nil
+	}
 	viper.Set("clusters", clusterIDs)
+	viper.Set("use-sa", "true")
 	defer viper.Reset()
 	cmd := getInjectClustersCommand(mcMock)
 	cmd.Run(nil, nil)
@@ -218,7 +222,18 @@ func (suite *ClusterTestSuite) TestAddClusterCommand() {
 
 			defer viper.Reset()
 
+			clusters := &k8s.Clusters{
+				Clusters: []k8s.ClusterInterface{
+					&k8s.Cluster{
+						ClusterID: "cluster-1",
+					},
+				},
+			}
 			getClustersMock := cmdMocks.NewMockGetClustersInterface(gomock.NewController(t))
+			getClustersMock.EXPECT().GetAllClusters(gomock.Any(), gomock.Any()).Times(1).Return(clusters, nil)
+
+			fake, _ := fake_client.NewFakeClient(nil, nil, nil)
+			clusters.Clusters[0].SetClient(fake)
 
 			filePath, err := os.Getwd()
 			assert.Nil(t, err)
@@ -226,6 +241,8 @@ func (suite *ClusterTestSuite) TestAddClusterCommand() {
 
 			viper.Set("files", filePath)
 			viper.Set("add-name", "test-cluster-1")
+			viper.Set("auto-inject", "true")
+			viper.Set("clusters", "cluster-1")
 
 			cmd := getAddClusterCommand(getClustersMock)
 
