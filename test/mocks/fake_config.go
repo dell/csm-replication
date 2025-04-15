@@ -65,7 +65,7 @@ func New(source string, targets ...string) connection.MultiClusterClient {
 			ReclaimPolicy: &policy,
 		}
 		obj = append(obj, &scObj)
-		client, _ := fake_client.NewFakeClient(obj, nil)
+		client, _ := fake_client.NewFakeClient(obj, nil, nil)
 		config.clusterClient[target] = &connection.RemoteK8sControllerClient{
 			ClusterID: target,
 			Client:    client,

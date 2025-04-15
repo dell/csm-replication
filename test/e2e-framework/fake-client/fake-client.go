@@ -39,6 +39,33 @@ type errorInjector interface {
 	shouldFail(method string, obj runtime.Object) error
 }
 
+type deleteSpoofer interface {
+	match(obj runtime.Object) bool
+}
+
+type deleteSpooferImpl struct {
+	allowedObject runtime.Object
+}
+
+func NewDeleteSpooferImpl(allowedObject runtime.Object) deleteSpoofer {
+	return &deleteSpooferImpl{allowedObject: allowedObject}
+}
+
+func (d *deleteSpooferImpl) match(obj runtime.Object) bool {
+	allowedKey, err := getKey(d.allowedObject)
+	if err != nil {
+		return false
+	}
+	key, err := getKey(obj)
+	if err != nil {
+		return false
+	}
+	if key.Name == allowedKey.Name && key.Kind == allowedKey.Kind {
+		return true
+	}
+	return false
+}
+
 type storageKey struct {
 	Namespace string
 	Name      string
@@ -49,6 +76,7 @@ type storageKey struct {
 type Client struct {
 	Objects       map[storageKey]runtime.Object
 	errorInjector errorInjector
+	deleteSpoofer deleteSpoofer
 	SubResourceClient
 }
 
@@ -72,11 +100,12 @@ func getKey(obj runtime.Object) (storageKey, error) {
 }
 
 // NewFakeClient initializes and returns new fake k8s client
-func NewFakeClient(initialObjects []runtime.Object, errorInjector errorInjector) (*Client, error) {
+func NewFakeClient(initialObjects []runtime.Object, errorInjector errorInjector, deleteSpoofer deleteSpoofer) (*Client, error) {
 	repv1.AddToScheme(scheme.Scheme)
 	client := &Client{
 		Objects:       map[storageKey]runtime.Object{},
 		errorInjector: errorInjector,
+		deleteSpoofer: deleteSpoofer,
 	}
 
 	for _, obj := range initialObjects {
@@ -261,7 +290,7 @@ func (f Client) Create(_ context.Context, obj client.Object, _ ...client.CreateO
 // Delete deletes existing object in fake cluster by removing it from map
 func (f Client) Delete(_ context.Context, obj client.Object, opts ...client.DeleteOption) error {
 	if len(opts) > 0 {
-		return fmt.Errorf("delete options are not supported")
+		fmt.Printf("delete options are not supported")
 	}
 	if f.errorInjector != nil {
 		if err := f.errorInjector.shouldFail("Delete", obj); err != nil {
@@ -284,6 +313,12 @@ func (f Client) Delete(_ context.Context, obj client.Object, opts ...client.Dele
 			Resource: gvk.Kind,
 		}
 		return errors.NewNotFound(gvr, k.Name)
+	}
+	if f.deleteSpoofer != nil {
+		if f.deleteSpoofer.match(obj) {
+			//Return without actually removing object from map.
+			return nil
+		}
 	}
 	delete(f.Objects, k)
 	return nil

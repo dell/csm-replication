@@ -150,7 +150,7 @@ func TestMigratePVCommand(t *testing.T) {
 				},
 			}
 
-			fake, _ := fake_client.NewFakeClient([]runtime.Object{persistentVolume, migratedPV}, nil)
+			fake, _ := fake_client.NewFakeClient([]runtime.Object{persistentVolume, migratedPV}, nil, nil)
 
 			mockClusters := &k8s.Clusters{
 				Clusters: []k8s.ClusterInterface{
@@ -286,7 +286,7 @@ func TestMigratePVCCommand(t *testing.T) {
 				},
 			}
 
-			fake, _ := fake_client.NewFakeClient([]runtime.Object{persistentVolumeClaim, persistentVolume, migratedPV}, nil)
+			fake, _ := fake_client.NewFakeClient([]runtime.Object{persistentVolumeClaim, persistentVolume, migratedPV}, nil, nil)
 
 			mockClusters := &k8s.Clusters{
 				Clusters: []k8s.ClusterInterface{
@@ -332,10 +332,12 @@ func TestMigratePVCCommand(t *testing.T) {
 func TestMigrateSTSCommand(t *testing.T) {
 	toSC := "target-sc"
 	fromSC := "sc1"
+	fromSC2 := "sc2"
 	tests := []struct {
 		name                   string
 		getClustersFolderPath  func(string) (string, error)
 		stsName                string
+		numReplicas            int
 		podName                string
 		ns                     string
 		pvcName                string
@@ -345,6 +347,7 @@ func TestMigrateSTSCommand(t *testing.T) {
 		wait                   string
 		ndu                    string
 		yesToPrompts           string
+		multiplePVCs           bool
 		wantErr                bool
 		expectedOutputContains string
 	}{
@@ -358,6 +361,7 @@ func TestMigrateSTSCommand(t *testing.T) {
 			ns:                     "test-ns",
 			pvcName:                "test-pvc",
 			pvName:                 "test-pv",
+			numReplicas:            1,
 			toSC:                   "target-sc",
 			wantErr:                false,
 			expectedOutputContains: "Successfully updated pv",
@@ -371,6 +375,7 @@ func TestMigrateSTSCommand(t *testing.T) {
 			podName:                "test-pod",
 			ns:                     "test-ns",
 			pvcName:                "test-pvc",
+			numReplicas:            1,
 			pvName:                 "test-pv",
 			toSC:                   "target-sc",
 			targetNamespace:        "target-ns",
@@ -386,6 +391,7 @@ func TestMigrateSTSCommand(t *testing.T) {
 			podName:                "test-pod",
 			ns:                     "test-ns",
 			pvcName:                "test-pvc",
+			numReplicas:            1,
 			pvName:                 "test-pv",
 			toSC:                   "target-sc",
 			wait:                   "false",
@@ -401,9 +407,80 @@ func TestMigrateSTSCommand(t *testing.T) {
 			podName:                "test-pod",
 			ns:                     "test-ns",
 			pvcName:                "test-pvc",
+			numReplicas:            1,
 			pvName:                 "test-pv",
 			toSC:                   "target-sc",
 			ndu:                    "false",
+			wantErr:                false,
+			expectedOutputContains: "Successfully updated pv",
+		},
+
+		{
+			name: "successful STS migration -- yes ndu --numreplicas 1",
+			getClustersFolderPath: func(path string) (string, error) {
+				return clusterPath, nil
+			},
+			stsName:                "test-sts",
+			podName:                "test-pod",
+			ns:                     "test-ns",
+			pvcName:                "test-pvc",
+			numReplicas:            1,
+			pvName:                 "test-pv",
+			toSC:                   "target-sc",
+			wait:                   "false",
+			ndu:                    "true",
+			wantErr:                false,
+			expectedOutputContains: "Successfully updated pv",
+		},
+
+		{
+			name: "successful STS migration -- yes ndu --numReplicas 2",
+			getClustersFolderPath: func(path string) (string, error) {
+				return clusterPath, nil
+			},
+			stsName:                "test-sts",
+			podName:                "test-pod",
+			ns:                     "test-ns",
+			pvcName:                "test-pvc",
+			pvName:                 "test-pv",
+			toSC:                   "target-sc",
+			numReplicas:            2,
+			ndu:                    "true",
+			wantErr:                false,
+			expectedOutputContains: "Successfully updated pv",
+		},
+		{
+			name: " STS migration -- multiple PVCs",
+			getClustersFolderPath: func(path string) (string, error) {
+				return clusterPath, nil
+			},
+			stsName:                "test-sts",
+			podName:                "test-pod",
+			ns:                     "test-ns",
+			pvcName:                "test-pvc",
+			pvName:                 "test-pv",
+			toSC:                   "target-sc",
+			numReplicas:            1,
+			ndu:                    "false",
+			multiplePVCs:           true,
+			wantErr:                false,
+			expectedOutputContains: "Do you want to continue",
+		},
+		{
+			name: "successful STS migration -- multiple PVCs ",
+			getClustersFolderPath: func(path string) (string, error) {
+				return clusterPath, nil
+			},
+			stsName:                "test-sts",
+			podName:                "test-pod",
+			ns:                     "test-ns",
+			pvcName:                "test-pvc",
+			pvName:                 "test-pv",
+			toSC:                   "target-sc",
+			numReplicas:            1,
+			ndu:                    "false",
+			multiplePVCs:           true,
+			yesToPrompts:           "true",
 			wantErr:                false,
 			expectedOutputContains: "Successfully updated pv",
 		},
@@ -428,6 +505,24 @@ func TestMigrateSTSCommand(t *testing.T) {
 					StorageClassName: &fromSC,
 				},
 			}
+			pvcs := []v1.PersistentVolumeClaim{
+				*persistentVolumeClaim,
+			}
+			if tt.multiplePVCs {
+				persistentVolumeClaim2 := &v1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      tt.pvcName + "2",
+						Namespace: tt.ns,
+					},
+					Spec: v1.PersistentVolumeClaimSpec{
+						VolumeName:       tt.pvName + "2",
+						StorageClassName: &fromSC2,
+					},
+				}
+				pvcs = append(pvcs, *persistentVolumeClaim2)
+			}
+
+			numReplicas := int32(tt.numReplicas)
 
 			sts := &appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
@@ -435,9 +530,8 @@ func TestMigrateSTSCommand(t *testing.T) {
 					Namespace: tt.ns,
 				},
 				Spec: appsv1.StatefulSetSpec{
-					VolumeClaimTemplates: []v1.PersistentVolumeClaim{
-						*persistentVolumeClaim,
-					},
+					Replicas:             &numReplicas,
+					VolumeClaimTemplates: pvcs,
 				},
 			}
 
@@ -464,6 +558,14 @@ func TestMigrateSTSCommand(t *testing.T) {
 						},
 					},
 				},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					Conditions: []v1.PodCondition{
+						v1.PodCondition{
+							Type: v1.PodReady,
+						},
+					},
+				},
 			}
 
 			persistentVolume := &v1.PersistentVolume{
@@ -484,7 +586,14 @@ func TestMigrateSTSCommand(t *testing.T) {
 				},
 			}
 
-			fake, _ := fake_client.NewFakeClient([]runtime.Object{persistentVolumeClaim, sts, pod, persistentVolume, migratedPV}, nil)
+			var fake *fake_client.Client
+			if tt.ndu == "true" {
+				allowedObject := pod
+				spoofer := fake_client.NewDeleteSpooferImpl(allowedObject)
+				fake, _ = fake_client.NewFakeClient([]runtime.Object{persistentVolumeClaim, sts, pod, persistentVolume, migratedPV}, nil, spoofer)
+			} else {
+				fake, _ = fake_client.NewFakeClient([]runtime.Object{persistentVolumeClaim, sts, pod, persistentVolume, migratedPV}, nil, nil)
+			}
 
 			mockClusters := &k8s.Clusters{
 				Clusters: []k8s.ClusterInterface{
@@ -562,6 +671,16 @@ func TestMigrateMGCommand(t *testing.T) {
 			},
 			mgName:                 "test-mg",
 			wait:                   "false",
+			wantErr:                false,
+			expectedOutputContains: "Successfully migrated all volumes",
+		},
+		{
+			name: "successful array migration - wait",
+			getClustersFolderPath: func(path string) (string, error) {
+				return clusterPath, nil
+			},
+			mgName:                 "test-mg",
+			wait:                   "true",
 			mgState:                "Committed",
 			wantErr:                false,
 			expectedOutputContains: "Successfully migrated all volumes",
@@ -589,7 +708,7 @@ func TestMigrateMGCommand(t *testing.T) {
 			scheme := runtime.NewScheme()
 			_ = repv1.AddToScheme(scheme)
 
-			fake, _ := fake_client.NewFakeClient([]runtime.Object{migrationGroup}, nil)
+			fake, _ := fake_client.NewFakeClient([]runtime.Object{migrationGroup}, nil, nil)
 
 			mockClusters := &k8s.Clusters{
 				Clusters: []k8s.ClusterInterface{

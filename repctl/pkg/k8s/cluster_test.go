@@ -78,7 +78,7 @@ func (suite *ClusterTestSuite) TestGetPersistentVolume() {
 						Name: "test-pv",
 					},
 				}
-				fake, _ := fake_client.NewFakeClient([]runtime.Object{persistentVolume}, nil)
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{persistentVolume}, nil, nil)
 				return fake
 			}(),
 			expectedErr:    nil,
@@ -87,7 +87,7 @@ func (suite *ClusterTestSuite) TestGetPersistentVolume() {
 		{
 			name: "Error",
 			client: func() ClientInterface {
-				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil)
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil, nil)
 				return fake
 			}(),
 			expectedErr: errors.New("PersistentVolume \"test-pv\" not found"),
@@ -122,7 +122,7 @@ func (suite *ClusterTestSuite) TestListPersistentVolumes() {
 		},
 	}
 
-	fake, err := fake_client.NewFakeClient([]runtime.Object{pv1, pv2}, nil)
+	fake, err := fake_client.NewFakeClient([]runtime.Object{pv1, pv2}, nil, nil)
 	suite.NoError(err)
 
 	suite.cluster.SetClient(fake)
@@ -158,7 +158,7 @@ func (suite *ClusterTestSuite) TestFilterPersistentVolumes() {
 		},
 	}
 
-	fake, err := fake_client.NewFakeClient([]runtime.Object{pv1, pv2, repPV}, nil)
+	fake, err := fake_client.NewFakeClient([]runtime.Object{pv1, pv2, repPV}, nil, nil)
 	suite.NoError(err)
 
 	suite.cluster.SetClient(fake)
@@ -195,7 +195,7 @@ func (suite *ClusterTestSuite) TestGetNamespace() {
 						Name: "test-ns",
 					},
 				}
-				fake, _ := fake_client.NewFakeClient([]runtime.Object{namespace}, nil)
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{namespace}, nil, nil)
 				return fake
 			}(),
 			expectedErr:    nil,
@@ -204,7 +204,7 @@ func (suite *ClusterTestSuite) TestGetNamespace() {
 		{
 			name: "Error",
 			client: func() ClientInterface {
-				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil)
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil, nil)
 				return fake
 			}(),
 			expectedErr: errors.New("Namespace \"test-ns\" not found"),
@@ -227,7 +227,7 @@ func (suite *ClusterTestSuite) TestGetNamespace() {
 }
 
 func (suite *ClusterTestSuite) TestCreateNamespace() {
-	fake, err := fake_client.NewFakeClient([]runtime.Object{}, nil)
+	fake, err := fake_client.NewFakeClient([]runtime.Object{}, nil, nil)
 	suite.NoError(err)
 
 	suite.cluster.SetClient(fake)
@@ -260,7 +260,7 @@ func (suite *ClusterTestSuite) TestListStorageClass() {
 		},
 	}
 
-	fake, err := fake_client.NewFakeClient([]runtime.Object{sc1, sc2}, nil)
+	fake, err := fake_client.NewFakeClient([]runtime.Object{sc1, sc2}, nil, nil)
 	suite.NoError(err)
 
 	suite.cluster.SetClient(fake)
@@ -292,7 +292,7 @@ func (suite *ClusterTestSuite) TestFilterStorageClass() {
 		Provisioner: "powerstore.dellemc.com",
 	}
 
-	fake, err := fake_client.NewFakeClient([]runtime.Object{sc1, repSC}, nil)
+	fake, err := fake_client.NewFakeClient([]runtime.Object{sc1, repSC}, nil, nil)
 	suite.NoError(err)
 
 	suite.cluster.SetClient(fake)
@@ -329,7 +329,7 @@ func (suite *ClusterTestSuite) TestListPersistentVolumeClaims() {
 		},
 	}
 
-	fake, err := fake_client.NewFakeClient([]runtime.Object{pvc1, pvc2}, nil)
+	fake, err := fake_client.NewFakeClient([]runtime.Object{pvc1, pvc2}, nil, nil)
 	suite.NoError(err)
 
 	suite.cluster.SetClient(fake)
@@ -379,7 +379,7 @@ func (suite *ClusterTestSuite) TestFilterPersistentVolumeClaims() {
 		},
 	}
 
-	fake, err := fake_client.NewFakeClient([]runtime.Object{pvc1, pvc2, repPVC}, nil)
+	fake, err := fake_client.NewFakeClient([]runtime.Object{pvc1, pvc2, repPVC}, nil, nil)
 	suite.NoError(err)
 
 	suite.cluster.SetClient(fake)
@@ -423,7 +423,7 @@ func (suite *ClusterTestSuite) TestCreatePVCsFromPVs() {
 		Labels:        matchingLabels,
 	}
 
-	fake, err := fake_client.NewFakeClient([]runtime.Object{}, nil)
+	fake, err := fake_client.NewFakeClient([]runtime.Object{}, nil, nil)
 	suite.NoError(err)
 
 	suite.cluster.SetClient(fake)
@@ -446,7 +446,7 @@ func (suite *ClusterTestSuite) TestCreatePVCsFromPVs() {
 }
 
 func (suite *ClusterTestSuite) TestCreateObject() {
-	fake, err := fake_client.NewFakeClient([]runtime.Object{}, nil)
+	fake, err := fake_client.NewFakeClient([]runtime.Object{}, nil, nil)
 	suite.NoError(err)
 
 	suite.cluster.SetClient(fake)
@@ -480,7 +480,7 @@ func (suite *ClusterTestSuite) TestListReplicationGroups() {
 		},
 	}
 
-	fake, err := fake_client.NewFakeClient([]runtime.Object{rg1, rg2}, nil)
+	fake, err := fake_client.NewFakeClient([]runtime.Object{rg1, rg2}, nil, nil)
 	suite.NoError(err)
 
 	suite.cluster.SetClient(fake)
@@ -516,7 +516,7 @@ func (suite *ClusterTestSuite) TestFilterReplicationGroups() {
 		},
 	}
 
-	fake, err := fake_client.NewFakeClient([]runtime.Object{rg1, rg2}, nil)
+	fake, err := fake_client.NewFakeClient([]runtime.Object{rg1, rg2}, nil, nil)
 	suite.NoError(err)
 
 	suite.cluster.SetClient(fake)
@@ -755,7 +755,7 @@ func (suite *ClusterTestSuite) TestGetSecret() {
 						Namespace: "test-namespace",
 					},
 				}
-				fake, _ := fake_client.NewFakeClient([]runtime.Object{secret}, nil)
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{secret}, nil, nil)
 				return fake
 			}(),
 			expectedErr:        nil,
@@ -764,7 +764,7 @@ func (suite *ClusterTestSuite) TestGetSecret() {
 		{
 			name: "Error",
 			client: func() ClientInterface {
-				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil)
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil, nil)
 				return fake
 			}(),
 			expectedErr: errors.New("Secret \"test-secret\" not found"),
@@ -802,7 +802,7 @@ func (suite *ClusterTestSuite) TestGetPersistentVolumeClaim() {
 						Namespace: "test-namespace",
 					},
 				}
-				fake, _ := fake_client.NewFakeClient([]runtime.Object{persistentVolumeClaim}, nil)
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{persistentVolumeClaim}, nil, nil)
 				return fake
 			}(),
 			expectedErr:     nil,
@@ -811,7 +811,7 @@ func (suite *ClusterTestSuite) TestGetPersistentVolumeClaim() {
 		{
 			name: "Error",
 			client: func() ClientInterface {
-				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil)
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil, nil)
 				return fake
 			}(),
 			expectedErr: errors.New("PersistentVolumeClaim \"test-pvc\" not found"),
@@ -850,7 +850,7 @@ func (suite *ClusterTestSuite) TestGetReplicationGroups() {
 						Name: "test-rg",
 					},
 				}
-				fake, _ := fake_client.NewFakeClient([]runtime.Object{replicationGroup}, nil)
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{replicationGroup}, nil, nil)
 				return fake
 			}(),
 			expectedErr:    nil,
@@ -859,7 +859,7 @@ func (suite *ClusterTestSuite) TestGetReplicationGroups() {
 		{
 			name: "Error",
 			client: func() ClientInterface {
-				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil)
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil, nil)
 				return fake
 			}(),
 			expectedErr: errors.New("DellCSIReplicationGroup.replication.storage.dell.com \"test-rg\" not found"),
@@ -898,7 +898,7 @@ func (suite *ClusterTestSuite) TestGetStatefulSet() {
 						Namespace: "test-namespace",
 					},
 				}
-				fake, _ := fake_client.NewFakeClient([]runtime.Object{statefulSet}, nil)
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{statefulSet}, nil, nil)
 				return fake
 			}(),
 			expectedErr:          nil,
@@ -908,7 +908,7 @@ func (suite *ClusterTestSuite) TestGetStatefulSet() {
 		{
 			name: "Error",
 			client: func() ClientInterface {
-				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil)
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil, nil)
 				return fake
 			}(),
 			expectedErr: errors.New("StatefulSet.apps \"test-sts\" not found"),
@@ -945,7 +945,7 @@ func (suite *ClusterTestSuite) TestGetPod() {
 						Namespace: "test-namespace",
 					},
 				}
-				fake, _ := fake_client.NewFakeClient([]runtime.Object{pod}, nil)
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{pod}, nil, nil)
 				return fake
 			}(),
 			expectedErr:     nil,
@@ -954,7 +954,7 @@ func (suite *ClusterTestSuite) TestGetPod() {
 		{
 			name: "Error",
 			client: func() ClientInterface {
-				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil)
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil, nil)
 				return fake
 			}(),
 			expectedErr: errors.New("Pod \"test-pod\" not found"),
@@ -991,7 +991,7 @@ func (suite *ClusterTestSuite) TestGetMigrationGroup() {
 						Name: "test-mg",
 					},
 				}
-				fake, _ := fake_client.NewFakeClient([]runtime.Object{migrationGroup}, nil)
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{migrationGroup}, nil, nil)
 				return fake
 			}(),
 			expectedErr:    nil,
@@ -1000,7 +1000,7 @@ func (suite *ClusterTestSuite) TestGetMigrationGroup() {
 		{
 			name: "Error",
 			client: func() ClientInterface {
-				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil)
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil, nil)
 				return fake
 			}(),
 			expectedErr: errors.New("DellCSIMigrationGroup.replication.storage.dell.com \"test-mg\" not found"),
@@ -1038,7 +1038,7 @@ func (suite *ClusterTestSuite) TestDeletePod() {
 						Namespace: "test-namespace",
 					},
 				}
-				fake, _ := fake_client.NewFakeClient([]runtime.Object{pod}, nil)
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{pod}, nil, nil)
 				return fake
 			}(),
 			pod: &v1.Pod{
@@ -1052,7 +1052,7 @@ func (suite *ClusterTestSuite) TestDeletePod() {
 		{
 			name: "Error",
 			client: func() ClientInterface {
-				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil)
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil, nil)
 				return fake
 			}(),
 			pod: &v1.Pod{
@@ -1094,7 +1094,7 @@ func (suite *ClusterTestSuite) TestDeletePersistentVolumeClaim() {
 						Namespace: "test-namespace",
 					},
 				}
-				fake, _ := fake_client.NewFakeClient([]runtime.Object{persistentVolumeClaim}, nil)
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{persistentVolumeClaim}, nil, nil)
 				return fake
 			}(),
 			pvc: &v1.PersistentVolumeClaim{
@@ -1108,7 +1108,7 @@ func (suite *ClusterTestSuite) TestDeletePersistentVolumeClaim() {
 		{
 			name: "Error",
 			client: func() ClientInterface {
-				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil)
+				fake, _ := fake_client.NewFakeClient([]runtime.Object{}, nil, nil)
 				return fake
 			}(),
 			pvc: &v1.PersistentVolumeClaim{
@@ -1145,7 +1145,7 @@ func (suite *ClusterTestSuite) TestCreateStatefulSet() {
 		},
 	}
 
-	fake, err := fake_client.NewFakeClient([]runtime.Object{}, nil)
+	fake, err := fake_client.NewFakeClient([]runtime.Object{}, nil, nil)
 	suite.NoError(err)
 
 	suite.cluster.SetClient(fake)
@@ -1170,7 +1170,7 @@ func (suite *ClusterTestSuite) TestUpdateMigrationGroup() {
 		// Add necessary spec fields here
 	}
 
-	fake, err := fake_client.NewFakeClient([]runtime.Object{mg}, nil)
+	fake, err := fake_client.NewFakeClient([]runtime.Object{mg}, nil, nil)
 	suite.NoError(err)
 
 	suite.cluster.SetClient(fake)
@@ -1196,7 +1196,7 @@ func (suite *ClusterTestSuite) TestUpdateReplicationGroup() {
 		// Add necessary spec fields here
 	}
 
-	fake, err := fake_client.NewFakeClient([]runtime.Object{rg}, nil)
+	fake, err := fake_client.NewFakeClient([]runtime.Object{rg}, nil, nil)
 	suite.NoError(err)
 
 	suite.cluster.SetClient(fake)
@@ -1225,7 +1225,7 @@ func (suite *ClusterTestSuite) TestUpdateSecret() {
 		},
 	}
 
-	fake, err := fake_client.NewFakeClient([]runtime.Object{secret}, nil)
+	fake, err := fake_client.NewFakeClient([]runtime.Object{secret}, nil, nil)
 	suite.NoError(err)
 
 	suite.cluster.SetClient(fake)
@@ -1253,7 +1253,7 @@ func (suite *ClusterTestSuite) TestUpdatePersistentVolume() {
 		},
 	}
 
-	fake, err := fake_client.NewFakeClient([]runtime.Object{pv}, nil)
+	fake, err := fake_client.NewFakeClient([]runtime.Object{pv}, nil, nil)
 	suite.NoError(err)
 
 	suite.cluster.SetClient(fake)

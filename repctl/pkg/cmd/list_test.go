@@ -260,7 +260,7 @@ func (suite *ListTestSuite) TestGetListPersistentVolumesCommand() {
 			}
 			defer viper.Reset()
 
-			fake, _ := fake_client.NewFakeClient(tt.objects, nil)
+			fake, _ := fake_client.NewFakeClient(tt.objects, nil, nil)
 
 			mockClusters := &k8s.Clusters{
 				Clusters: []k8s.ClusterInterface{
@@ -336,7 +336,7 @@ func (suite *ListTestSuite) TestGetListStorageClassesCommand() {
 				},
 			}
 
-			fake, _ := fake_client.NewFakeClient([]runtime.Object{storageClass}, nil)
+			fake, _ := fake_client.NewFakeClient([]runtime.Object{storageClass}, nil, nil)
 
 			mockClusters := &k8s.Clusters{
 				Clusters: []k8s.ClusterInterface{
@@ -460,7 +460,7 @@ func (suite *ListTestSuite) TestGetListPersistentVolumeClaimsCommand() {
 			}
 			defer viper.Reset()
 
-			fake, _ := fake_client.NewFakeClient(tt.objects, nil)
+			fake, _ := fake_client.NewFakeClient(tt.objects, nil, nil)
 
 			mockClusters := &k8s.Clusters{
 				Clusters: []k8s.ClusterInterface{
@@ -583,7 +583,7 @@ func (suite *ListTestSuite) TestGetListReplicationGroupsCommand() {
 				},
 			}
 
-			fake, err := fake_client.NewFakeClient([]runtime.Object{rg}, nil)
+			fake, err := fake_client.NewFakeClient([]runtime.Object{rg}, nil, nil)
 			assert.NoError(t, err)
 
 			mockClusters := &k8s.Clusters{
