@@ -16,6 +16,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -84,122 +85,152 @@ func TestGetFailbackCommand(t *testing.T) {
 
 		cmd.Run(nil, nil)
 	})
-
 }
 
 func TestFailbackToRG(t *testing.T) {
+	origGetRGAndCluster := getRGAndClusterFromRGIDFunction
+	origUpdateRG := getUpdateReplicationGroupFunction
+	origWait := getWaitForStateToUpdateFunction
+	originalFatalfLog := fatalfLog
+	originalFatalLog := fatalLog
+	exitCode := 0
+
+	after := func() {
+		getRGAndClusterFromRGIDFunction = origGetRGAndCluster
+		getUpdateReplicationGroupFunction = origUpdateRG
+		getWaitForStateToUpdateFunction = origWait
+		fatalfLog = originalFatalfLog
+		fatalLog = originalFatalLog
+		exitCode = 0
+	}
+
+	type args struct {
+		configFolder string
+		rgName       string
+		discard      bool
+		verbose      bool
+		wait         bool
+	}
+
 	tests := []struct {
-		name                       string
-		configFolder               string
-		rgName                     string
-		discard, verbose, wait     bool
-		mockGetRGAndCluster        func(string, string, string) (k8s.ClusterInterface, *v1.DellCSIReplicationGroup, error)
-		mockUpdateReplicationGroup func(k8s.ClusterInterface, context.Context, *v1.DellCSIReplicationGroup) error
-		mockWaitForStateToUpdate   func(string, k8s.ClusterInterface, v1.ReplicationLinkState) bool
-		expectedErrorContains      string
+		name             string
+		args             args
+		setup            func()
+		expectedExitCode int
 	}{
 		{
-			name:         "success: planned failback without wait",
-			configFolder: "config",
-			rgName:       "rg-id",
-			discard:      false,
-			verbose:      true,
-			wait:         false,
-			mockGetRGAndCluster: func(_, _, _ string) (k8s.ClusterInterface, *v1.DellCSIReplicationGroup, error) {
-				return &k8s.Cluster{ClusterID: "cluster-1"}, &v1.DellCSIReplicationGroup{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "rg-id",
-					},
-					Spec: v1.DellCSIReplicationGroupSpec{},
-					Status: v1.DellCSIReplicationGroupStatus{
-						ReplicationLinkState: v1.ReplicationLinkState{
-							IsSource:             true,
-							LastSuccessfulUpdate: &metav1.Time{Time: time.Now()},
+			name: "success: planned failback without wait",
+			args: args{
+				configFolder: "config",
+				rgName:       "rg-id",
+				discard:      true,
+				verbose:      true,
+				wait:         false,
+			},
+			setup: func() {
+				getRGAndClusterFromRGIDFunction = func(_, _, _ string) (k8s.ClusterInterface, *v1.DellCSIReplicationGroup, error) {
+					return &k8s.Cluster{ClusterID: "cluster-1"}, &v1.DellCSIReplicationGroup{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "rg-id",
 						},
-					},
-				}, nil
+						Spec: v1.DellCSIReplicationGroupSpec{},
+						Status: v1.DellCSIReplicationGroupStatus{
+							ReplicationLinkState: v1.ReplicationLinkState{
+								IsSource:             true,
+								LastSuccessfulUpdate: &metav1.Time{Time: time.Now()},
+							},
+						},
+					}, nil
+				}
+				getUpdateReplicationGroupFunction = func(_ k8s.ClusterInterface, _ context.Context, _ *v1.DellCSIReplicationGroup) error {
+					return nil
+				}
 			},
-			mockUpdateReplicationGroup: func(_ k8s.ClusterInterface, _ context.Context, _ *v1.DellCSIReplicationGroup) error {
-				return nil
-			},
+			expectedExitCode: 0,
 		},
-		// {
-		// 	name:         "success: planned failback with wait and getWaitForStateToUpdate is false",
-		// 	configFolder: "config",
-		// 	rgName:       "rg-id",
-		// 	discard:      false,
-		// 	verbose:      true,
-		// 	wait:         true,
-		// 	mockGetRGAndCluster: func(_, _, _ string) (k8s.ClusterInterface, *v1.DellCSIReplicationGroup, error) {
-		// 		return &k8s.Cluster{ClusterID: "cluster-1"}, &v1.DellCSIReplicationGroup{
-		// 			ObjectMeta: metav1.ObjectMeta{
-		// 				Name: "rg-id",
-		// 			},
-		// 			Spec: v1.DellCSIReplicationGroupSpec{},
-		// 			Status: v1.DellCSIReplicationGroupStatus{
-		// 				ReplicationLinkState: v1.ReplicationLinkState{
-		// 					IsSource:             true,
-		// 					LastSuccessfulUpdate: &metav1.Time{Time: time.Now()},
-		// 				},
-		// 			},
-		// 		}, nil
-		// 	},
-		// 	mockUpdateReplicationGroup: func(_ k8s.ClusterInterface, _ context.Context, _ *v1.DellCSIReplicationGroup) error {
-		// 		return nil
-		// 	},
-		// 	mockWaitForStateToUpdate: func(rgName string, cluster k8s.ClusterInterface, rLinkState v1.ReplicationLinkState) bool {
-		// 		return false
-		// 	},
-		// },
-		// {
-		// 	name:         "success: planned failback with wait and getWaitForStateToUpdate is true",
-		// 	configFolder: "config",
-		// 	rgName:       "rg-id",
-		// 	discard:      false,
-		// 	verbose:      true,
-		// 	wait:         true,
-		// 	mockGetRGAndCluster: func(_, _, _ string) (k8s.ClusterInterface, *v1.DellCSIReplicationGroup, error) {
-		// 		return &k8s.Cluster{ClusterID: "cluster-1"}, &v1.DellCSIReplicationGroup{
-		// 			ObjectMeta: metav1.ObjectMeta{
-		// 				Name: "rg-id",
-		// 			},
-		// 			Spec: v1.DellCSIReplicationGroupSpec{},
-		// 			Status: v1.DellCSIReplicationGroupStatus{
-		// 				ReplicationLinkState: v1.ReplicationLinkState{
-		// 					IsSource:             true,
-		// 					LastSuccessfulUpdate: &metav1.Time{Time: time.Now()},
-		// 				},
-		// 			},
-		// 		}, nil
-		// 	},
-		// 	mockUpdateReplicationGroup: func(_ k8s.ClusterInterface, _ context.Context, _ *v1.DellCSIReplicationGroup) error {
-		// 		return nil
-		// 	},
-		// 	mockWaitForStateToUpdate: func(rgName string, cluster k8s.ClusterInterface, rLinkState v1.ReplicationLinkState) bool {
-		// 		return true
-		// 	},
-		// },
+		{
+			name: "Timeout: timed out with action: failover",
+			args: args{
+				configFolder: "config",
+				rgName:       "rg-id",
+				discard:      true,
+				verbose:      true,
+				wait:         true,
+			},
+			setup: func() {
+				getRGAndClusterFromRGIDFunction = func(_, _, _ string) (k8s.ClusterInterface, *v1.DellCSIReplicationGroup, error) {
+					return &k8s.Cluster{ClusterID: "cluster-1"}, &v1.DellCSIReplicationGroup{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "rg-id",
+						},
+						Spec: v1.DellCSIReplicationGroupSpec{},
+						Status: v1.DellCSIReplicationGroupStatus{
+							ReplicationLinkState: v1.ReplicationLinkState{
+								IsSource:             true,
+								LastSuccessfulUpdate: &metav1.Time{Time: time.Now()},
+							},
+						},
+					}, nil
+				}
+				getUpdateReplicationGroupFunction = func(_ k8s.ClusterInterface, _ context.Context, _ *v1.DellCSIReplicationGroup) error {
+					return nil
+				}
+				getWaitForStateToUpdateFunction = func(rgName string, cluster k8s.ClusterInterface, rLinkState v1.ReplicationLinkState) bool {
+					return false
+				}
+			},
+			expectedExitCode: 0,
+		},
+		{
+			name: "failed: getRGAndClusterFromRGIDFunction failed",
+			args: args{
+				configFolder: "config",
+				rgName:       "rg-id",
+				discard:      false,
+				verbose:      false,
+				wait:         true,
+			},
+			setup: func() {
+				getRGAndClusterFromRGIDFunction = func(_, _, _ string) (k8s.ClusterInterface, *v1.DellCSIReplicationGroup, error) {
+					return &k8s.Cluster{ClusterID: "cluster-1"}, &v1.DellCSIReplicationGroup{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "rg-id",
+						},
+						Spec: v1.DellCSIReplicationGroupSpec{},
+						Status: v1.DellCSIReplicationGroupStatus{
+							ReplicationLinkState: v1.ReplicationLinkState{
+								IsSource:             true,
+								LastSuccessfulUpdate: nil,
+							},
+						},
+					}, errors.New("failback to RG: error fetching source RG info")
+				}
+				fatalfLog = func(_ string, _ ...interface{}) {
+					exitCode = 1
+				}
+				fatalLog = func(_ ...interface{}) {
+					exitCode = 1
+				}
+				getUpdateReplicationGroupFunction = func(_ k8s.ClusterInterface, _ context.Context, _ *v1.DellCSIReplicationGroup) error {
+					return errors.New("failback: error executing UpdateAction")
+				}
+				getWaitForStateToUpdateFunction = func(rgName string, cluster k8s.ClusterInterface, rLinkState v1.ReplicationLinkState) bool {
+					return true
+				}
+			},
+			expectedExitCode: 1,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Backup and inject mocks
-			origGetRGAndCluster := getRGAndClusterFromRGIDFunction
-			origUpdateRG := getUpdateReplicationGroupFunction
-			origWait := getWaitForStateToUpdateFunction
+			tt.setup()
 
-			getRGAndClusterFromRGIDFunction = tt.mockGetRGAndCluster
-			getUpdateReplicationGroupFunction = tt.mockUpdateReplicationGroup
-			getWaitForStateToUpdateFunction = tt.mockWaitForStateToUpdate
+			defer after()
 
-			defer func() {
-				getRGAndClusterFromRGIDFunction = origGetRGAndCluster
-				getUpdateReplicationGroupFunction = origUpdateRG
-				getWaitForStateToUpdateFunction = origWait
-			}()
+			failbackToRG(tt.args.configFolder, tt.args.rgName, tt.args.discard, tt.args.verbose, tt.args.wait)
 
-			failbackToRG(tt.configFolder, tt.rgName, tt.discard, tt.verbose, tt.wait)
-
+			assert.Equal(t, tt.expectedExitCode, exitCode, "Expected exit code %d, got %d", tt.expectedExitCode, exitCode)
 		})
 	}
 }

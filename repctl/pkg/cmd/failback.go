@@ -24,6 +24,11 @@ import (
 	"github.com/spf13/viper"
 )
 
+var (
+	fatalfLog = log.Fatalf
+	fatalLog  = log.Fatal
+)
+
 // GetFailbackCommand returns 'failback' cobra command
 /* #nosec G104 */
 func GetFailbackCommand() *cobra.Command {
@@ -85,14 +90,14 @@ func failbackToRG(configFolder, rgName string, discard, verbose bool, wait bool)
 	// fetch the source RG and the cluster info
 	cluster, rg, err := getRGAndClusterFromRGIDFunction(configFolder, rgName, "src")
 	if err != nil {
-		log.Fatalf("failback to RG: error fetching source RG info: (%s)\n", err.Error())
+		fatalfLog("failback to RG: error fetching source RG info: (%s)\n", err.Error())
 	}
 	if verbose {
 		log.Printf("found RG (%s) on cluster (%s)...\n", rg.Name, cluster.GetID())
 	}
 	rLinkState := rg.Status.ReplicationLinkState
 	if rLinkState.LastSuccessfulUpdate == nil {
-		log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
+		fatalLog("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
 	}
 	rg.Spec.Action = config.ActionFailbackLocal
 	if discard {
@@ -105,7 +110,7 @@ func failbackToRG(configFolder, rgName string, discard, verbose bool, wait bool)
 		log.Print("updating spec...")
 	}
 	if err := getUpdateReplicationGroupFunction(cluster, context.Background(), rg); err != nil {
-		log.Fatalf("failback: error executing UpdateAction %s\n", err.Error())
+		fatalfLog("failback: error executing UpdateAction %s\n", err.Error())
 	}
 	if wait {
 		success := getWaitForStateToUpdateFunction(rgName, cluster, rLinkState)
