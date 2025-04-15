@@ -18,9 +18,11 @@ import (
 	"errors"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
+	fake_client "github.com/dell/csm-replication/test/e2e-framework/fake-client"
 	"github.com/dell/repctl/mocks"
 	cmdMocks "github.com/dell/repctl/pkg/cmd/mocks"
 	"github.com/dell/repctl/pkg/k8s"
@@ -29,6 +31,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const folderPath = ".repctl/testdata/"
@@ -52,6 +57,22 @@ func (suite *ClusterTestSuite) SetupSuite() {
 func (suite *ClusterTestSuite) TearDownSuite() {
 	err := os.RemoveAll(suite.testDataFolder)
 	suite.NoError(err)
+}
+
+func (suite *ClusterTestSuite) TestGetClusterCommand() {
+	cmd := GetClusterCommand()
+
+	// Test the command usage
+	suite.Equal("cluster", cmd.Use)
+	suite.Equal("allows to manipulate cluster configs", cmd.Short)
+
+	subCommands := cmd.Commands()
+	suite.NotEmpty(subCommands)
+	for _, subCmd := range subCommands {
+		suite.NotNil(subCmd)
+	}
+
+	cmd.Run(nil, []string{"test"})
 }
 
 func (suite *ClusterTestSuite) TestAddAndRemoveCluster() {
@@ -291,6 +312,54 @@ func (suite *ListTestSuite) TestGetListClustersCommand() {
 			for _, expected := range tt.expectedOutputContains {
 				assert.Contains(t, string(out), expected)
 			}
+		})
+	}
+}
+
+func TestGenerateConfigsFromSA(t *testing.T) {
+	tests := []struct {
+		name    string
+		objects []runtime.Object
+	}{
+		{
+			name: "Successful",
+			objects: []runtime.Object{
+				&v1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "dell-replication-controller",
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			RunCommand = func(_ *exec.Cmd) error {
+				return nil
+			}
+
+			mockClusters := &k8s.Clusters{
+				Clusters: []k8s.ClusterInterface{
+					&k8s.Cluster{
+						ClusterID: "cluster-1",
+					},
+					&k8s.Cluster{
+						ClusterID: "cluster-2",
+					},
+				},
+			}
+			fake, _ := fake_client.NewFakeClient(tt.objects, nil, nil)
+
+			getClustersMock := cmdMocks.NewMockGetClustersInterface(gomock.NewController(t))
+			getClustersMock.EXPECT().GetAllClusters(gomock.Any(), gomock.Any()).Times(1).Return(mockClusters, nil)
+
+			mockClusters.Clusters[0].SetClient(fake)
+			mockClusters.Clusters[1].SetClient(fake)
+
+			_, err := generateConfigsFromSA(getClustersMock, []string{"cluster-1", "cluster-2"})
+			assert.Nil(t, err)
 		})
 	}
 }

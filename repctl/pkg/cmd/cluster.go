@@ -539,7 +539,7 @@ func generateConfigsFromSA(mc GetClustersInterface, clusterIDs []string) ([]stri
 			return nil, err
 		}
 
-		err = c.Run()
+		err = RunCommand(c)
 		if err != nil {
 			log.Errorf("cluster inject: %s",
 				fmt.Errorf("failed to get kubeconfig from service account %s", err.Error()))
@@ -551,6 +551,10 @@ func generateConfigsFromSA(mc GetClustersInterface, clusterIDs []string) ([]stri
 	}
 
 	return res, nil
+}
+
+var RunCommand = func(cmd *exec.Cmd) error {
+	return cmd.Run()
 }
 
 // addKeyFromLiteralToSecret adds the given key and data to the given secret,
