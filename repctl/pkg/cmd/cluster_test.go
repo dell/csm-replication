@@ -88,45 +88,164 @@ func (suite *ClusterTestSuite) TestAddAndRemoveCluster() {
 }
 
 func (suite *ClusterTestSuite) TestInjectCluster() {
-	path := filepath.Join(folderPath, "clusters")
 
-	mockClient := new(mocks.ClientInterface)
-	mockClient.On("Create", mock.Anything, mock.Anything).Return(nil)
-	mockClient.On("Update", mock.Anything, mock.Anything).Return(nil)
+	tests := []struct {
+		name          string
+		clusters      *k8s.Clusters
+		createCluster k8s.ClusterInterface
+		clusterIDs    []string
+		path          string
+		customConfigs []string
+		expectError   bool
+	}{
+		{
+			name: "Successful",
+			clusters: func() *k8s.Clusters {
+				mockClient := new(mocks.ClientInterface)
+				mockClient.On("Create", mock.Anything, mock.Anything).Return(nil)
+				mockClient.On("Update", mock.Anything, mock.Anything).Return(nil)
 
-	clusterIDs := []string{"test-cluster"}
+				mockClusterA := new(mocks.ClusterInterface)
+				mockClusterA.On("GetID").Return("cluster-A")
+				mockClusterA.On("GetHost").Return("192.168.0.1")
+				mockClusterA.On("GetKubeConfigFile").Return("testdata/config")
+				mockClusterA.
+					On("GetNamespace", mock.Anything, "dell-replication-controller").
+					Return(nil, errors.New("namespace not found")).Once()
+				mockClusterA.
+					On("CreateNamespace", mock.Anything, mock.Anything).Return(nil).Once()
+				mockClusterA.On("GetClient").Return(mockClient)
 
-	mockClusterA := new(mocks.ClusterInterface)
-	mockClusterA.On("GetID").Return("cluster-A")
-	mockClusterA.On("GetHost").Return("192.168.0.1")
-	mockClusterA.On("GetKubeConfigFile").Return("testdata/config")
-	mockClusterA.
-		On("GetNamespace", mock.Anything, "dell-replication-controller").
-		Return(nil, errors.New("namespace not found")).Once()
-	mockClusterA.
-		On("CreateNamespace", mock.Anything, mock.Anything).Return(nil).Once()
-	mockClusterA.On("GetClient").Return(mockClient)
+				mockClusterB := new(mocks.ClusterInterface)
+				mockClusterB.On("GetID").Return("cluster-B")
+				mockClusterB.On("GetHost").Return("192.168.0.2")
+				mockClusterB.On("GetKubeConfigFile").Return("testdata/config")
+				mockClusterB.
+					On("GetNamespace", mock.Anything, "dell-replication-controller").
+					Return(nil, errors.New("namespace not found")).Once()
+				mockClusterB.
+					On("CreateNamespace", mock.Anything, mock.Anything).Return(nil).Once()
+				mockClusterB.On("GetClient").Return(mockClient)
 
-	mockClusterB := new(mocks.ClusterInterface)
-	mockClusterB.On("GetID").Return("cluster-B")
-	mockClusterB.On("GetHost").Return("192.168.0.2")
-	mockClusterB.On("GetKubeConfigFile").Return("testdata/config")
-	mockClusterB.
-		On("GetNamespace", mock.Anything, "dell-replication-controller").
-		Return(nil, errors.New("namespace not found")).Once()
-	mockClusterB.
-		On("CreateNamespace", mock.Anything, mock.Anything).Return(nil).Once()
-	mockClusterB.On("GetClient").Return(mockClient)
+				clusters := &k8s.Clusters{
+					Clusters: []k8s.ClusterInterface{mockClusterA, mockClusterB},
+				}
+				return clusters
+			}(),
+			clusterIDs:  []string{"test-cluster"},
+			path:        filepath.Join(folderPath, "clusters"),
+			expectError: false,
+		},
+		{
+			name: "Successful with customConfigs",
+			clusters: func() *k8s.Clusters {
+				mockClient := new(mocks.ClientInterface)
+				mockClient.On("Create", mock.Anything, mock.Anything).Return(nil)
+				mockClient.On("Update", mock.Anything, mock.Anything).Return(nil)
 
-	clusters := &k8s.Clusters{
-		Clusters: []k8s.ClusterInterface{mockClusterA, mockClusterB},
+				mockClusterA := new(mocks.ClusterInterface)
+				mockClusterA.On("GetID").Return("cluster-A")
+				mockClusterA.On("GetHost").Return("192.168.0.1")
+				mockClusterA.On("GetKubeConfigFile").Return("testdata/config")
+				mockClusterA.
+					On("GetNamespace", mock.Anything, "dell-replication-controller").
+					Return(nil, errors.New("namespace not found")).Once()
+				mockClusterA.
+					On("CreateNamespace", mock.Anything, mock.Anything).Return(nil).Once()
+				mockClusterA.On("GetClient").Return(mockClient)
+
+				mockClusterB := new(mocks.ClusterInterface)
+				mockClusterB.On("GetID").Return("cluster-B")
+				mockClusterB.On("GetHost").Return("192.168.0.2")
+				mockClusterB.On("GetKubeConfigFile").Return("testdata/config")
+				mockClusterB.
+					On("GetNamespace", mock.Anything, "dell-replication-controller").
+					Return(nil, errors.New("namespace not found")).Once()
+				mockClusterB.
+					On("CreateNamespace", mock.Anything, mock.Anything).Return(nil).Once()
+				mockClusterB.On("GetClient").Return(mockClient)
+
+				clusters := &k8s.Clusters{
+					Clusters: []k8s.ClusterInterface{mockClusterA, mockClusterB},
+				}
+				return clusters
+			}(),
+			createCluster: func() k8s.ClusterInterface {
+				mockClient := new(mocks.ClientInterface)
+				mockClient.On("Create", mock.Anything, mock.Anything).Return(nil)
+				mockClient.On("Update", mock.Anything, mock.Anything).Return(nil)
+
+				mockClusterA := new(mocks.ClusterInterface)
+				mockClusterA.On("GetID").Return("cluster-C")
+				mockClusterA.On("GetHost").Return("192.168.0.3")
+				mockClusterA.On("GetKubeConfigFile").Return("testdata/config")
+				mockClusterA.
+					On("GetNamespace", mock.Anything, "dell-replication-controller").
+					Return(nil, errors.New("namespace not found")).Once()
+				mockClusterA.
+					On("CreateNamespace", mock.Anything, mock.Anything).Return(nil).Once()
+				mockClusterA.On("GetClient").Return(mockClient)
+				return mockClusterA
+			}(),
+			clusterIDs:    []string{"test-cluster"},
+			path:          filepath.Join(folderPath, "clusters"),
+			customConfigs: []string{"cluster-c"},
+			expectError:   false,
+		},
+		{
+			name: "Successful when creating ConfigMap that already exists",
+			clusters: func() *k8s.Clusters {
+				mockClient := new(mocks.ClientInterface)
+
+				mockClient.On("Create", mock.Anything, mock.Anything).Return(errors.New("ConfigMap already exists"))
+				mockClient.On("Update", mock.Anything, mock.Anything).Return(nil)
+				mockClient.On("Get", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+				mockClusterA := new(mocks.ClusterInterface)
+				mockClusterA.On("GetID").Return("cluster-A")
+				mockClusterA.On("GetHost").Return("192.168.0.1")
+				mockClusterA.On("GetKubeConfigFile").Return("testdata/config")
+				mockClusterA.
+					On("GetNamespace", mock.Anything, "dell-replication-controller").
+					Return(nil, errors.New("namespace not found")).Once()
+				mockClusterA.
+					On("CreateNamespace", mock.Anything, mock.Anything).Return(nil).Once()
+				mockClusterA.On("GetClient").Return(mockClient)
+
+				clusters := &k8s.Clusters{
+					Clusters: []k8s.ClusterInterface{mockClusterA},
+				}
+				return clusters
+			}(),
+			clusterIDs:  []string{"test-cluster"},
+			path:        filepath.Join(folderPath, "clusters"),
+			expectError: false,
+		},
 	}
 
-	mcMock := new(mocks.MultiClusterConfiguratorInterface)
-	mcMock.On("GetAllClusters", clusterIDs, filepath.Join(suite.testDataFolder, "clusters")).Return(clusters, nil)
+	for _, tt := range tests {
+		suite.Suite.T().Run(tt.name, func(t *testing.T) {
 
-	err := injectCluster(mcMock, clusterIDs, path)
-	suite.NoError(err)
+			clusterIDs := tt.clusterIDs
+			mcMock := new(mocks.MultiClusterConfiguratorInterface)
+			mcMock.On("GetAllClusters", clusterIDs, filepath.Join(suite.testDataFolder, "clusters")).Return(tt.clusters, nil)
+
+			OsStat = func(_ string) (string, error) {
+				return "name", nil
+			}
+
+			CreateCluster = func(_ string, _ string) (k8s.ClusterInterface, error) {
+				return tt.createCluster, nil
+			}
+
+			err := injectCluster(mcMock, clusterIDs, tt.path, tt.customConfigs...)
+			if tt.expectError {
+				suite.Error(err)
+			} else {
+				suite.NoError(err)
+			}
+		})
+	}
 }
 
 func (suite *ClusterTestSuite) TestGetInjectClustersCommand() {

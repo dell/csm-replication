@@ -213,6 +213,18 @@ func addCluster(configs, clusterNames []string, folderPath string, force bool) e
 	return nil
 }
 
+var OsStat = func(cfg string) (string, error) {
+	info, err := os.Stat(cfg)
+	if err != nil {
+		return "", err
+	}
+	return info.Name(), nil
+}
+
+var CreateCluster = func(name string, cfg string) (k8s.ClusterInterface, error) {
+	return k8s.CreateCluster(name, cfg)
+}
+
 func injectCluster(mc k8s.MultiClusterConfiguratorInterface, clusterIDs []string, path string, customConfigs ...string) error {
 	configFolder, err := getClustersFolderPathFunction(path)
 	if err != nil {
@@ -228,12 +240,12 @@ func injectCluster(mc k8s.MultiClusterConfiguratorInterface, clusterIDs []string
 	if len(customConfigs) != 0 {
 		log.Print("Custom configs provided, injecting them into clusters")
 		for _, cfg := range customConfigs {
-			info, err := os.Stat(cfg)
+			name, err := OsStat(cfg)
 			if err != nil {
 				return fmt.Errorf("error checking cfg %s: %s", cfg, err.Error())
 			}
 
-			cluster, err := k8s.CreateCluster(info.Name(), cfg)
+			cluster, err := CreateCluster(name, cfg)
 			if err != nil {
 				return fmt.Errorf("error creating cluster: %s", err.Error())
 			}
