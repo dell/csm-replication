@@ -17,14 +17,19 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/repctl/pkg/k8s"
+	"github.com/dell/repctl/pkg/metadata"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/yaml"
 )
 
@@ -48,39 +53,6 @@ type MockMultiClusterConfigurator struct {
 func (m *MockMultiClusterConfigurator) GetAllClusters(args []string, configFolder string) (*k8s.Clusters, error) {
 	return &k8s.Clusters{Clusters: m.clusters}, nil
 }
-
-// func TestGetRGAndClusterFromRGID(t *testing.T) {
-// 	mockRG := &repv1.DellCSIReplicationGroup{
-// 		Status: repv1.DellCSIReplicationGroupStatus{
-// 			ReplicationLinkState: repv1.ReplicationLinkState{IsSource: true},
-// 		},
-// 	}
-// 	mockCluster := &MockCluster{repGroups: map[string]*repv1.DellCSIReplicationGroup{"rgID": mockRG}}
-// 	mockConfigurator := &MockMultiClusterConfigurator{clusters: []k8s.ClusterInterface{mockCluster}}
-
-// 	tests := []struct {
-// 		configFolder string
-// 		rgID         string
-// 		filter       string
-// 		expectedRG   *repv1.DellCSIReplicationGroup
-// 		expectedErr  error
-// 	}{
-// 		{"configFolder", "rgID", "", mockRG, nil},
-// 		{"configFolder", "rgID", "src", mockRG, nil},
-// 		{"configFolder", "rgID", "tgt", nil, fmt.Errorf("no matching cluster having (tgt) RG:(rgID) found")},
-// 		{"configFolder", "invalidRGID", "", nil, fmt.Errorf("no matching cluster having () RG:(invalidRGID) found")},
-// 	}
-
-// 	for _, test := range tests {
-// 		_, rg, err := GetRGAndClusterFromRGID(mockConfigurator, test.configFolder, test.rgID, test.filter)
-// 		assert.Equal(t, test.expectedRG, rg)
-// 		if test.expectedErr != nil {
-// 			assert.EqualError(t, err, test.expectedErr.Error())
-// 		} else {
-// 			assert.NoError(t, err)
-// 		}
-// 	}
-// }
 
 func TestDecodedSecret_ToSecret(t *testing.T) {
 	type fields struct {
@@ -313,4 +285,43 @@ func TestObjectYAML(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+type EditTestSuite struct {
+	suite.Suite
+	testDataFolder string
+}
+
+func (suite *EditTestSuite) SetupSuite() {
+	curUser, err := os.UserHomeDir()
+	suite.NoError(err)
+
+	curUser = filepath.Join(curUser, folderPath)
+	curUserPath, err := filepath.Abs(curUser)
+	suite.NoError(err)
+
+	suite.testDataFolder = curUserPath
+	_ = repv1.AddToScheme(scheme.Scheme)
+
+	metadata.Init("replication.storage.dell.com")
+}
+
+func TestEditTestSuite(t *testing.T) {
+	suite.Run(t, new(EditTestSuite))
+}
+func (suite *EditTestSuite) TestGetEditCommand() {
+	cmd := GetEditCommand()
+
+	// Test the command usage
+	suite.Equal("edit", cmd.Use)
+	suite.Equal("edit different resources in clusters", cmd.Short)
+
+	// Test the subcommands
+	subCommands := cmd.Commands()
+	suite.NotEmpty(subCommands)
+	for _, subCmd := range subCommands {
+		suite.NotNil(subCmd)
+	}
+
+	cmd.Run(nil, []string{"test"})
 }
