@@ -25,8 +25,12 @@ import (
 )
 
 var (
-	fatalfLog = log.Fatalf
-	fatalLog  = log.Fatal
+	fatalfLog                  = log.Fatalf
+	fatalLog                   = log.Fatal
+	getMultiClusterAllClusters = func(mc *k8s.MultiClusterConfigurator, clusterIDs []string, configDir string) (*k8s.Clusters, error) {
+		return mc.GetAllClusters(clusterIDs, configDir)
+	}
+	waitForStateToUpdateFunc = waitForStateToUpdate
 )
 
 // GetFailbackCommand returns 'failback' cobra command
@@ -130,9 +134,9 @@ func failbackToCluster(configFolder, inputSourceCluster, rgName string, discard,
 		log.Print("reading cluster configs...")
 	}
 	mc := &k8s.MultiClusterConfigurator{}
-	clusters, err := mc.GetAllClusters([]string{inputSourceCluster}, configFolder)
+	clusters, err := getMultiClusterAllClusters(mc, []string{inputSourceCluster}, configFolder)
 	if err != nil {
-		log.Fatalf("failback: error in initializing cluster info: %s\n", err.Error())
+		fatalfLog("failback: error in initializing cluster info: %s\n", err.Error())
 	}
 	sourceCluster := clusters.Clusters[0]
 	if verbose {
@@ -140,17 +144,17 @@ func failbackToCluster(configFolder, inputSourceCluster, rgName string, discard,
 	}
 	rg, err := sourceCluster.GetReplicationGroups(context.Background(), rgName)
 	if err != nil {
-		log.Fatalf("failback: error in fecthing RG info: %s\n", err.Error())
+		fatalfLog("failback: error in fecthing RG info: %s\n", err.Error())
 	}
 	if verbose {
 		log.Printf("found RG (%s) on cluster (%s)...\n", rg.Name, sourceCluster.GetID())
 	}
 	if !rg.Status.ReplicationLinkState.IsSource {
-		log.Fatalf("failback: error executing failback to target site.")
+		fatalfLog("failback: error executing failback to target site.")
 	}
 	rLinkState := rg.Status.ReplicationLinkState
 	if rLinkState.LastSuccessfulUpdate == nil {
-		log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
+		fatalLog("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
 	}
 	rg.Spec.Action = config.ActionFailbackLocal
 	if discard {
@@ -163,10 +167,10 @@ func failbackToCluster(configFolder, inputSourceCluster, rgName string, discard,
 		log.Printf("found RG (%s) on source cluster, updating spec...\n", rg.Name)
 	}
 	if err := sourceCluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
-		log.Fatalf("failback: error executing UpdateAction %s\n", err.Error())
+		fatalfLog("failback: error executing UpdateAction %s\n", err.Error())
 	}
 	if wait {
-		success := waitForStateToUpdate(rgName, sourceCluster, rLinkState)
+		success := waitForStateToUpdateFunc(rgName, sourceCluster, rLinkState)
 		if success {
 			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
 			return

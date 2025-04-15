@@ -27,6 +27,7 @@ import (
 	"github.com/dell/repctl/pkg/k8s"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"go.uber.org/mock/gomock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -229,6 +230,190 @@ func TestFailbackToRG(t *testing.T) {
 			defer after()
 
 			failbackToRG(tt.args.configFolder, tt.args.rgName, tt.args.discard, tt.args.verbose, tt.args.wait)
+
+			assert.Equal(t, tt.expectedExitCode, exitCode, "Expected exit code %d, got %d", tt.expectedExitCode, exitCode)
+		})
+	}
+}
+
+func Test_failbackToCluster(t *testing.T) {
+	originalGetMultiClusterAllClusters := getMultiClusterAllClusters
+	originalWaitForStateToUpdateFunc := waitForStateToUpdateFunc
+	originalFatalfLog := fatalfLog
+	originalFatalLog := fatalLog
+	exitCode := 0
+
+	after := func() {
+		getMultiClusterAllClusters = originalGetMultiClusterAllClusters
+		waitForStateToUpdateFunc = originalWaitForStateToUpdateFunc
+		fatalfLog = originalFatalfLog
+		fatalLog = originalFatalLog
+		exitCode = 0
+	}
+
+	type args struct {
+		configFolder       string
+		inputSourceCluster string
+		rgName             string
+		discard            bool
+		verbose            bool
+		wait               bool
+	}
+	tests := []struct {
+		name             string
+		args             args
+		setup            func()
+		expectedExitCode int
+	}{
+		{
+			name: "Successful function call",
+			args: args{
+				configFolder:       "",
+				inputSourceCluster: "",
+				rgName:             "",
+				discard:            false,
+				verbose:            true,
+				wait:               false,
+			},
+			setup: func() {
+				mockClusterA := new(mocks.ClusterInterface)
+				mockClusterA.On("GetID").Return("test-name")
+				mockClusterA.On("GetReplicationGroups", mock.Anything, mock.Anything).Return(
+					&v1.DellCSIReplicationGroup{
+						Status: v1.DellCSIReplicationGroupStatus{
+							ReplicationLinkState: v1.ReplicationLinkState{
+								IsSource: true,
+								LastSuccessfulUpdate: &metav1.Time{
+									Time: time.Now(),
+								},
+							},
+						},
+					},
+					nil,
+				)
+				mockClusterA.On("UpdateReplicationGroup", mock.Anything, mock.Anything).Return(nil)
+
+				getMultiClusterAllClusters = func(mc *k8s.MultiClusterConfigurator, clusterIDs []string, configDir string) (*k8s.Clusters, error) {
+					return &k8s.Clusters{
+						Clusters: []k8s.ClusterInterface{
+							mockClusterA,
+						},
+					}, nil
+				}
+				fatalfLog = func(_ string, _ ...interface{}) {
+					exitCode = 1
+				}
+				fatalLog = func(_ ...interface{}) {
+					exitCode = 1
+				}
+			},
+			expectedExitCode: 0,
+		},
+		{
+			name: "Covering all failed paths",
+			args: args{
+				configFolder:       "",
+				inputSourceCluster: "",
+				rgName:             "",
+				discard:            true,
+				verbose:            true,
+				wait:               true,
+			},
+			setup: func() {
+				mockClusterA := new(mocks.ClusterInterface)
+				mockClusterA.On("GetID").Return("test-name")
+				mockClusterA.On("GetReplicationGroups", mock.Anything, mock.Anything).Return(
+					&v1.DellCSIReplicationGroup{
+						Status: v1.DellCSIReplicationGroupStatus{
+							ReplicationLinkState: v1.ReplicationLinkState{
+								IsSource:             false,
+								LastSuccessfulUpdate: nil,
+							},
+						},
+					},
+					errors.New("failback: error in fecthing RG info"),
+				)
+				mockClusterA.On("UpdateReplicationGroup", mock.Anything, mock.Anything).Return(
+					errors.New("failback: error executing UpdateAction"),
+				)
+
+				getMultiClusterAllClusters = func(mc *k8s.MultiClusterConfigurator, clusterIDs []string, configDir string) (*k8s.Clusters, error) {
+					return &k8s.Clusters{
+						Clusters: []k8s.ClusterInterface{
+							mockClusterA,
+						},
+					}, errors.New("failback: error in initializing cluster info")
+				}
+
+				waitForStateToUpdateFunc = func(_ string, _ k8s.ClusterInterface, _ v1.ReplicationLinkState) bool {
+					return true
+				}
+
+				fatalfLog = func(_ string, _ ...interface{}) {
+					exitCode = 1
+				}
+				fatalLog = func(_ ...interface{}) {
+					exitCode = 1
+				}
+			},
+			expectedExitCode: 1,
+		},
+		{
+			name: "Covering all failed paths - action timed out",
+			args: args{
+				configFolder:       "",
+				inputSourceCluster: "",
+				rgName:             "",
+				discard:            true,
+				verbose:            true,
+				wait:               true,
+			},
+			setup: func() {
+				mockClusterA := new(mocks.ClusterInterface)
+				mockClusterA.On("GetID").Return("test-name")
+				mockClusterA.On("GetReplicationGroups", mock.Anything, mock.Anything).Return(
+					&v1.DellCSIReplicationGroup{
+						Status: v1.DellCSIReplicationGroupStatus{
+							ReplicationLinkState: v1.ReplicationLinkState{
+								IsSource:             false,
+								LastSuccessfulUpdate: nil,
+							},
+						},
+					},
+					errors.New("failback: error in fecthing RG info"),
+				)
+				mockClusterA.On("UpdateReplicationGroup", mock.Anything, mock.Anything).Return(
+					errors.New("failback: error executing UpdateAction"),
+				)
+
+				getMultiClusterAllClusters = func(mc *k8s.MultiClusterConfigurator, clusterIDs []string, configDir string) (*k8s.Clusters, error) {
+					return &k8s.Clusters{
+						Clusters: []k8s.ClusterInterface{
+							mockClusterA,
+						},
+					}, errors.New("failback: error in initializing cluster info")
+				}
+
+				waitForStateToUpdateFunc = func(_ string, _ k8s.ClusterInterface, _ v1.ReplicationLinkState) bool {
+					return false
+				}
+
+				fatalfLog = func(_ string, _ ...interface{}) {
+					exitCode = 1
+				}
+				fatalLog = func(_ ...interface{}) {
+					exitCode = 1
+				}
+			},
+			expectedExitCode: 1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setup()
+			defer after()
+
+			failbackToCluster(tt.args.configFolder, tt.args.inputSourceCluster, tt.args.rgName, tt.args.discard, tt.args.verbose, tt.args.wait)
 
 			assert.Equal(t, tt.expectedExitCode, exitCode, "Expected exit code %d, got %d", tt.expectedExitCode, exitCode)
 		})
