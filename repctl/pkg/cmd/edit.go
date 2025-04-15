@@ -113,6 +113,20 @@ func GetEditCommand() *cobra.Command {
 	return editCmd
 }
 
+var (
+	getMultiConfigClusters = func(mc *k8s.MultiClusterConfigurator, clusterIDs []string, configDir string) (*k8s.Clusters, error) {
+		return mc.GetAllClusters(clusterIDs, configDir)
+	}
+
+	getSecretFunction = func(cluster k8s.ClusterInterface, ctx context.Context, secretNamespace string, secretName string) (*v1.Secret, error) {
+		return cluster.GetSecret(ctx, secretNamespace, secretName)
+	}
+
+	getUpdateSecretFunction = func(cluster k8s.ClusterInterface, ctx context.Context, secret *v1.Secret) error {
+		return cluster.UpdateSecret(ctx, secret)
+	}
+)
+
 func editSecretCommand() *cobra.Command {
 	editSecretCmd := &cobra.Command{
 		Use:     "secret",
@@ -122,7 +136,7 @@ func editSecretCommand() *cobra.Command {
 ./repctl edit secret <secret name> --namespace <namespace>
 ./repctl edit secret <secret name> --namespace <namespace> --clusters <cluster name>`,
 		Run: func(cmd *cobra.Command, args []string) {
-			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
+			configFolder, err := getClustersFolderPathFunction(clusterPath)
 			if err != nil {
 				log.Fatalf("edit secret: error getting clusters folder path: %s", err.Error())
 			}
@@ -130,7 +144,7 @@ func editSecretCommand() *cobra.Command {
 			clusterIDs := viper.GetStringSlice(config.Clusters)
 
 			mc := &k8s.MultiClusterConfigurator{}
-			clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
+			clusters, err := getMultiConfigClusters(mc, clusterIDs, configFolder)
 			if err != nil {
 				log.Fatalf("edit secret: error in initializing cluster info: %s", err.Error())
 			}
@@ -140,7 +154,7 @@ func editSecretCommand() *cobra.Command {
 
 			secretName := args[0]
 			secretNamespace := viper.GetString("namespace")
-			s, err := cluster.GetSecret(context.Background(), secretNamespace, secretName)
+			s, err := getSecretFunction(cluster, context.Background(), secretNamespace, secretName)
 			if err != nil {
 				log.Fatalf("edit secret: error in getting secret: %s", err.Error())
 			}
@@ -183,7 +197,7 @@ func editSecretCommand() *cobra.Command {
 
 			for _, cluster := range clusters.Clusters {
 				copiedSecret := newSecret.DeepCopy()
-				err = cluster.UpdateSecret(context.Background(), copiedSecret)
+				err = getUpdateSecretFunction(cluster, context.Background(), copiedSecret)
 				if err != nil {
 					log.Fatalf("edit secret: error in updating secret in clusters: %s", err.Error())
 				}

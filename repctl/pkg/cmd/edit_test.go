@@ -17,6 +17,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -25,6 +26,7 @@ import (
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/repctl/pkg/k8s"
 	"github.com/dell/repctl/pkg/metadata"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	v1 "k8s.io/api/core/v1"
@@ -324,4 +326,114 @@ func (suite *EditTestSuite) TestGetEditCommand() {
 	}
 
 	cmd.Run(nil, []string{"test"})
+}
+
+func (suite *EditTestSuite) TestEditSecretCommand() {
+	tests := []struct {
+		name                      string
+		getClustersFolderPath     func(string) (string, error)
+		getMultiConfigClusters    func(mc *k8s.MultiClusterConfigurator, clusterIDs []string, configDir string) (*k8s.Clusters, error)
+		getSecretFunction         func(cluster k8s.ClusterInterface, ctx context.Context, secretNamespace string, secretName string) (*v1.Secret, error)
+		getUpdateSecretFunction   func(cluster k8s.ClusterInterface, ctx context.Context, secret *v1.Secret) error
+		secretName                string
+		secretNamespace           string
+		expectedOutputContains    []string
+		expectedOutputNotContains []string
+	}{
+		{
+			name: "Successful edit secret",
+			getClustersFolderPath: func(path string) (string, error) {
+				return clusterPath, nil
+			},
+			getMultiConfigClusters: func(mc *k8s.MultiClusterConfigurator, clusterIDs []string, configDir string) (*k8s.Clusters, error) {
+				return &k8s.Clusters{
+					Clusters: []k8s.ClusterInterface{
+						&k8s.Cluster{
+							ClusterID: "",
+						},
+					},
+				}, nil
+			},
+			getSecretFunction: func(cluster k8s.ClusterInterface, ctx context.Context, secretNamespace string, secretName string) (*v1.Secret, error) {
+				return &v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      secretName,
+						Namespace: secretNamespace,
+					},
+					Data: map[string][]byte{
+						"key": []byte("value"),
+					},
+				}, nil
+			},
+			getUpdateSecretFunction: func(cluster k8s.ClusterInterface, ctx context.Context, secret *v1.Secret) error {
+				return nil
+			},
+			secretName:                "test-secret",
+			secretNamespace:           "default",
+			expectedOutputContains:    []string{""},
+			expectedOutputNotContains: []string{"error"},
+		},
+	}
+
+	for _, tt := range tests {
+		suite.Suite.T().Run(tt.name, func(t *testing.T) {
+			originalGetClustersFolderPathFunction := getClustersFolderPathFunction
+			defer func() {
+				getClustersFolderPathFunction = originalGetClustersFolderPathFunction
+			}()
+
+			getClustersFolderPathFunction = tt.getClustersFolderPath
+
+			originalGetMultiConfigClusters := getMultiConfigClusters
+			defer func() {
+				getMultiConfigClusters = originalGetMultiConfigClusters
+			}()
+
+			getMultiConfigClusters = tt.getMultiConfigClusters
+
+			originalGetSecretFunction := getSecretFunction
+			defer func() {
+				getSecretFunction = originalGetSecretFunction
+			}()
+
+			getSecretFunction = tt.getSecretFunction
+
+			originalGetUpdateSecretFunction := getUpdateSecretFunction
+			defer func() {
+				getUpdateSecretFunction = originalGetUpdateSecretFunction
+			}()
+
+			getUpdateSecretFunction = tt.getUpdateSecretFunction
+
+			viper.Set("namespace", tt.secretNamespace)
+			defer viper.Reset()
+
+			cmd := editSecretCommand()
+
+			// Mock the editor interaction
+			originalEditor := os.Getenv("EDITOR")
+			defer os.Setenv("EDITOR", originalEditor)
+			os.Setenv("EDITOR", "true") // Mock editor command
+
+			rescueStdout := os.Stdout
+			r, w, _ := os.Pipe()
+			os.Stdout = w
+			defer func() {
+				os.Stdout = rescueStdout
+			}()
+
+			cmd.Run(nil, []string{tt.secretName})
+
+			w.Close()
+			out, _ := io.ReadAll(r)
+			os.Stdout = rescueStdout
+			for _, expected := range tt.expectedOutputContains {
+				assert.Contains(t, string(out), expected)
+			}
+
+			for _, notExpected := range tt.expectedOutputNotContains {
+				assert.NotContains(t, string(out), notExpected)
+			}
+		})
+	}
 }
