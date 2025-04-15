@@ -321,7 +321,7 @@ func (f Client) Delete(_ context.Context, obj client.Object, opts ...client.Dele
 	}
 	if f.deleteSpoofer != nil {
 		if f.deleteSpoofer.match(obj) {
-			//Return without actually removing object from map.
+			// Return without actually removing object from map.
 			return nil
 		}
 	}
