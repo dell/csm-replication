@@ -23,6 +23,7 @@ import (
 
 	"github.com/dell/repctl/pkg/cmd"
 	"github.com/dell/repctl/pkg/config"
+	"github.com/dell/repctl/pkg/k8s"
 	"github.com/dell/repctl/pkg/metadata"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -94,7 +95,7 @@ func setupRepctlCommand() *cobra.Command {
 	repctl.AddCommand(cmd.GetExecCommand())
 	repctl.AddCommand(cmd.GetEditCommand())
 	repctl.AddCommand(cmd.GetMigrateCommand())
-	repctl.AddCommand(cmd.GetSnapshotCommand())
+	repctl.AddCommand(cmd.GetSnapshotCommand(&k8s.MultiClusterConfigurator{}))
 
 	return repctl
 }

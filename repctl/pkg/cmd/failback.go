@@ -17,9 +17,8 @@ package cmd
 import (
 	"context"
 
-	"github.com/dell/repctl/pkg/k8s"
-
 	"github.com/dell/repctl/pkg/config"
+	"github.com/dell/repctl/pkg/k8s"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -51,7 +50,7 @@ With --discard, this command will perform an failback but discard any writes at 
 			wait := viper.GetBool("failback-wait")
 			input := verifyInputForFailoverAction(inputSourceCluster)
 
-			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
+			configFolder, err := getClustersFolderPathFunction("/.repctl/clusters/")
 			if err != nil {
 				log.Fatalf("failback: error getting clusters folder path: %s\n", err.Error())
 			}
@@ -61,7 +60,8 @@ With --discard, this command will perform an failback but discard any writes at 
 			} else if input == "rg" {
 				failbackToRG(configFolder, inputSourceCluster, discard, verbose, wait)
 			} else {
-				log.Fatal("Unexpected input received")
+				log.Error("unexpected input")
+				return
 			}
 		},
 	}
@@ -83,7 +83,7 @@ func failbackToRG(configFolder, rgName string, discard, verbose bool, wait bool)
 		log.Printf("fetching RG and cluster info...\n")
 	}
 	// fetch the source RG and the cluster info
-	cluster, rg, err := GetRGAndClusterFromRGID(configFolder, rgName, "src")
+	cluster, rg, err := getRGAndClusterFromRGIDFunction(configFolder, rgName, "src")
 	if err != nil {
 		log.Fatalf("failback to RG: error fetching source RG info: (%s)\n", err.Error())
 	}
@@ -104,11 +104,11 @@ func failbackToRG(configFolder, rgName string, discard, verbose bool, wait bool)
 	if verbose {
 		log.Print("updating spec...")
 	}
-	if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
+	if err := getUpdateReplicationGroupFunction(cluster, context.Background(), rg); err != nil {
 		log.Fatalf("failback: error executing UpdateAction %s\n", err.Error())
 	}
 	if wait {
-		success := waitForStateToUpdate(rgName, cluster, rLinkState)
+		success := getWaitForStateToUpdateFunction(rgName, cluster, rLinkState)
 		if success {
 			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
 			return

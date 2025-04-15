@@ -1,5 +1,5 @@
 /*
- Copyright © 2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package cmd
 import (
 	"context"
 
+	v1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/repctl/pkg/config"
 	"github.com/dell/repctl/pkg/k8s"
 	log "github.com/sirupsen/logrus"
@@ -30,9 +31,17 @@ var getClustersFolderPathFunction = func(path string) (string, error) {
 	return getClustersFolderPath(path)
 }
 
+var getVerifyInputForSnapshotActionFunction = func(mc GetClustersInterface, input string, rg string) (res string, tgt string) {
+	return verifyInputForSnapshotAction(mc, input, rg)
+}
+
+var getListReplicationGroupsFunction = func(cluster k8s.ClusterInterface, ctx context.Context) (*v1.DellCSIReplicationGroupList, error) {
+	return cluster.ListReplicationGroups(context.Background())
+}
+
 // GetSnapshotCommand returns 'snapshot' cobra command
 /* #nosec G104 */
-func GetSnapshotCommand() *cobra.Command {
+func GetSnapshotCommand(mc GetClustersInterface) *cobra.Command {
 	snapshotCmd := &cobra.Command{
 		Use:   "snapshot",
 		Short: "allows to execute snapshot action at the specified cluster or rg",
@@ -49,7 +58,7 @@ This command will create a snapshot for the specified RG on the target cluster.\
 			snClass := viper.GetString("sn-class")
 			verbose := viper.GetBool(config.Verbose)
 			wait := viper.GetBool("snapshot-wait")
-			input, res := verifyInputForSnapshotAction(inputCluster, rgName)
+			input, res := verifyInputForSnapshotAction(mc, inputCluster, rgName)
 
 			configFolder, err := getClustersFolderPathFunction(clusterPath)
 			if err != nil {
@@ -59,7 +68,8 @@ This command will create a snapshot for the specified RG on the target cluster.\
 			if input == "rg" {
 				createSnapshot(configFolder, res, prefix, snNamespace, snClass, verbose, wait)
 			} else {
-				log.Fatal("Unexpected input received")
+				log.Error("unexpected input")
+				return
 			}
 		},
 	}
@@ -76,7 +86,7 @@ This command will create a snapshot for the specified RG on the target cluster.\
 	return snapshotCmd
 }
 
-func verifyInputForSnapshotAction(input string, rg string) (res string, tgt string) {
+func verifyInputForSnapshotAction(mc GetClustersInterface, input string, rg string) (res string, tgt string) {
 	if input == "" {
 		if rg != "" {
 			input = rg
@@ -90,16 +100,16 @@ func verifyInputForSnapshotAction(input string, rg string) (res string, tgt stri
 		log.Fatalf("snapshot: error getting clusters folder path: %s", err.Error())
 	}
 
-	mc := &k8s.MultiClusterConfigurator{}
+	//mc := &k8s.MultiClusterConfigurator{}
 	clusters, err := mc.GetAllClusters([]string{}, configFolder)
 	if err != nil {
 		log.Fatalf("error in initializing cluster info: %s", err.Error())
 	}
 
 	for _, cluster := range clusters.Clusters {
-		rgList, err := cluster.ListReplicationGroups(context.Background())
+		rgList, err := getListReplicationGroupsFunction(cluster, context.Background())
 		if err != nil {
-			log.Printf("Encountered error during filtering preplication groups. Error: %s",
+			log.Printf("Encountered error during filtering replication groups. Error: %s",
 				err.Error())
 			continue
 		}
@@ -112,12 +122,24 @@ func verifyInputForSnapshotAction(input string, rg string) (res string, tgt stri
 	return "", ""
 }
 
+var getRGAndClusterFromRGIDFunction = func(configFolder string, rgID string, filter string) (k8s.ClusterInterface, *v1.DellCSIReplicationGroup, error) {
+	return GetRGAndClusterFromRGID(configFolder, rgID, "src")
+}
+
+var getUpdateReplicationGroupFunction = func(cluster k8s.ClusterInterface, ctx context.Context, rg *v1.DellCSIReplicationGroup) error {
+	return cluster.UpdateReplicationGroup(context.Background(), rg)
+}
+
+var getWaitForStateToUpdateFunction = func(rgName string, cluster k8s.ClusterInterface, rLinkState v1.ReplicationLinkState) bool {
+	return waitForStateToUpdate(rgName, cluster, rLinkState)
+}
+
 func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass string, verbose bool, wait bool) {
 	if verbose {
 		log.Printf("fetching RG and cluster info...\n")
 	}
 
-	cluster, rg, err := GetRGAndClusterFromRGID(configFolder, rgName, "src")
+	cluster, rg, err := getRGAndClusterFromRGIDFunction(configFolder, rgName, "src")
 	if err != nil {
 		log.Fatalf("snapshot to RG: error fetching RG info: (%s)\n", err.Error())
 		return
@@ -149,16 +171,20 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass string, v
 
 	log.Printf("Executing CreateSnapshot on Namespace: %s, Snapshot Class: %s", namespace, snClass)
 
+	if rg.Annotations == nil {
+		rg.Annotations = make(map[string]string)
+	}
+
 	rg.Annotations[prefix+"/snapshotNamespace"] = namespace
 	rg.Annotations[prefix+"/snapshotClass"] = snClass
 
-	if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
+	if err := getUpdateReplicationGroupFunction(cluster, context.Background(), rg); err != nil {
 		log.Fatalf("snapshot: error executing UpdateAction %s\n", err.Error())
 		return
 	}
 
 	if wait {
-		success := waitForStateToUpdate(rgName, cluster, rLinkState)
+		success := getWaitForStateToUpdateFunction(rgName, cluster, rLinkState)
 		if success {
 			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
 			return

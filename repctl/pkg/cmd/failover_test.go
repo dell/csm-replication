@@ -158,6 +158,169 @@ func TestGetFailoverCommand(t *testing.T) {
 		cmd.Run(nil, nil)
 	})
 
+	t.Run("success: using cluster id - planned - wait", func(t *testing.T) {
+		viper.Set("tgt", "cluster-1")
+		viper.Set("unplanned", false)
+		viper.Set("failover-wait", true)
+		viper.Set(config.ReplicationGroup, "rg-id")
+		viper.Set(config.Verbose, true)
+		defer func() {
+			viper.Reset()
+		}()
+
+		originalClusterPath := clusterPath
+		defer func() {
+			clusterPath = originalClusterPath
+		}()
+
+		clusterPath = "testdata"
+
+		originalGetClustersFolderPathFunction := getClustersFolderPathFunction
+		defer func() {
+			getClustersFolderPathFunction = originalGetClustersFolderPathFunction
+		}()
+
+		getClustersFolderPathFunction = func(path string) (string, error) {
+			return path, nil
+		}
+
+		repList := &repv1.DellCSIReplicationGroupList{
+			Items: []repv1.DellCSIReplicationGroup{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "rg-id",
+					},
+				},
+			},
+		}
+
+		rg := &repv1.DellCSIReplicationGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "rg-id",
+			},
+			Spec: repv1.DellCSIReplicationGroupSpec{
+				RemoteClusterID: "cluster-2",
+			},
+			Status: repv1.DellCSIReplicationGroupStatus{
+				ReplicationLinkState: repv1.ReplicationLinkState{
+					IsSource: false,
+					State:    "Synchronized",
+					LastSuccessfulUpdate: &metav1.Time{
+						Time: time.Now(),
+					},
+				},
+			},
+		}
+
+		mockClient := mocks.NewMockClientInterface(gomock.NewController(t))
+		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil).SetArg(2, *rg)
+		mockClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil).SetArg(1, *repList)
+		mockClient.EXPECT().Update(gomock.Any(), gomock.Any()).Times(1).Return(nil)
+
+		defaultGetControllerRuntimeClient := k8s.GetCtrlRuntimeClient
+		defer func() {
+			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
+		}()
+		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+			return mockClient, nil
+		}
+
+		maxWaitTimeout = 100 * time.Millisecond
+		waitRetryDelay = 50 * time.Millisecond
+
+		setAndReturnRG := func() repv1.DellCSIReplicationGroup {
+			rg.Status.ReplicationLinkState.LastSuccessfulUpdate = &metav1.Time{
+				Time: time.Now().Add(maxWaitTimeout),
+			}
+
+			return *rg
+		}
+
+		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil).SetArg(2, *rg)
+		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil).SetArg(2, setAndReturnRG())
+
+		cmd := GetFailoverCommand()
+		assert.NotNil(t, cmd)
+
+		cmd.Run(nil, nil)
+	})
+
+	t.Run("fail: using cluster id - planned - wait", func(t *testing.T) {
+		viper.Set("tgt", "cluster-1")
+		viper.Set("unplanned", false)
+		viper.Set("failover-wait", true)
+		viper.Set(config.ReplicationGroup, "rg-id")
+		viper.Set(config.Verbose, true)
+		defer func() {
+			viper.Reset()
+		}()
+
+		originalClusterPath := clusterPath
+		defer func() {
+			clusterPath = originalClusterPath
+		}()
+
+		clusterPath = "testdata"
+
+		originalGetClustersFolderPathFunction := getClustersFolderPathFunction
+		defer func() {
+			getClustersFolderPathFunction = originalGetClustersFolderPathFunction
+		}()
+
+		getClustersFolderPathFunction = func(path string) (string, error) {
+			return path, nil
+		}
+
+		repList := &repv1.DellCSIReplicationGroupList{
+			Items: []repv1.DellCSIReplicationGroup{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "rg-id",
+					},
+				},
+			},
+		}
+
+		rg := &repv1.DellCSIReplicationGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "rg-id",
+			},
+			Spec: repv1.DellCSIReplicationGroupSpec{
+				RemoteClusterID: "cluster-2",
+			},
+			Status: repv1.DellCSIReplicationGroupStatus{
+				ReplicationLinkState: repv1.ReplicationLinkState{
+					IsSource: false,
+					State:    "Synchronized",
+					LastSuccessfulUpdate: &metav1.Time{
+						Time: time.Now(),
+					},
+				},
+			},
+		}
+
+		mockClient := mocks.NewMockClientInterface(gomock.NewController(t))
+		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil).SetArg(2, *rg)
+		mockClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil).SetArg(1, *repList)
+		mockClient.EXPECT().Update(gomock.Any(), gomock.Any()).Times(1).Return(nil)
+
+		defaultGetControllerRuntimeClient := k8s.GetCtrlRuntimeClient
+		defer func() {
+			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
+		}()
+		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+			return mockClient, nil
+		}
+
+		maxWaitTimeout = 100 * time.Millisecond
+		waitRetryDelay = 50 * time.Millisecond
+
+		cmd := GetFailoverCommand()
+		assert.NotNil(t, cmd)
+
+		cmd.Run(nil, nil)
+	})
+
 	t.Run("success: using cluster id - unplanned", func(t *testing.T) {
 		viper.Set("tgt", "cluster-1")
 		viper.Set("unplanned", true)
@@ -224,6 +387,168 @@ func TestGetFailoverCommand(t *testing.T) {
 		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
 			return mockClient, nil
 		}
+
+		cmd := GetFailoverCommand()
+		assert.NotNil(t, cmd)
+
+		cmd.Run(nil, nil)
+	})
+
+	t.Run("success: using cluster id - unplanned - wait", func(t *testing.T) {
+		viper.Set("tgt", "cluster-1")
+		viper.Set("unplanned", true)
+		viper.Set("failover-wait", true)
+		viper.Set(config.ReplicationGroup, "rg-id")
+		viper.Set(config.Verbose, true)
+		defer func() {
+			viper.Reset()
+		}()
+
+		originalClusterPath := clusterPath
+		defer func() {
+			clusterPath = originalClusterPath
+		}()
+
+		clusterPath = "testdata"
+
+		originalGetClustersFolderPathFunction := getClustersFolderPathFunction
+		defer func() {
+			getClustersFolderPathFunction = originalGetClustersFolderPathFunction
+		}()
+
+		getClustersFolderPathFunction = func(path string) (string, error) {
+			return path, nil
+		}
+
+		repList := &repv1.DellCSIReplicationGroupList{
+			Items: []repv1.DellCSIReplicationGroup{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "rg-id",
+					},
+				},
+			},
+		}
+
+		rg := &repv1.DellCSIReplicationGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "rg-id",
+			},
+			Spec: repv1.DellCSIReplicationGroupSpec{
+				RemoteClusterID: "cluster-2",
+			},
+			Status: repv1.DellCSIReplicationGroupStatus{
+				ReplicationLinkState: repv1.ReplicationLinkState{
+					IsSource: false,
+					State:    "Synchronized",
+					LastSuccessfulUpdate: &metav1.Time{
+						Time: time.Now(),
+					},
+				},
+			},
+		}
+
+		mockClient := mocks.NewMockClientInterface(gomock.NewController(t))
+		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil).SetArg(2, *rg)
+		mockClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil).SetArg(1, *repList)
+		mockClient.EXPECT().Update(gomock.Any(), gomock.Any()).Times(1).Return(nil)
+
+		defaultGetControllerRuntimeClient := k8s.GetCtrlRuntimeClient
+		defer func() {
+			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
+		}()
+		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+			return mockClient, nil
+		}
+
+		maxWaitTimeout = 100 * time.Millisecond
+		waitRetryDelay = 50 * time.Millisecond
+
+		setAndReturnRG := func() repv1.DellCSIReplicationGroup {
+			rg.Status.ReplicationLinkState.LastSuccessfulUpdate = &metav1.Time{
+				Time: time.Now().Add(maxWaitTimeout),
+			}
+
+			return *rg
+		}
+
+		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil).SetArg(2, setAndReturnRG())
+
+		cmd := GetFailoverCommand()
+		assert.NotNil(t, cmd)
+
+		cmd.Run(nil, nil)
+	})
+
+	t.Run("fail: using cluster id - unplanned - wait", func(t *testing.T) {
+		viper.Set("tgt", "cluster-1")
+		viper.Set("unplanned", true)
+		viper.Set("failover-wait", true)
+		viper.Set(config.ReplicationGroup, "rg-id")
+		viper.Set(config.Verbose, true)
+		defer func() {
+			viper.Reset()
+		}()
+
+		originalClusterPath := clusterPath
+		defer func() {
+			clusterPath = originalClusterPath
+		}()
+
+		clusterPath = "testdata"
+
+		originalGetClustersFolderPathFunction := getClustersFolderPathFunction
+		defer func() {
+			getClustersFolderPathFunction = originalGetClustersFolderPathFunction
+		}()
+
+		getClustersFolderPathFunction = func(path string) (string, error) {
+			return path, nil
+		}
+
+		repList := &repv1.DellCSIReplicationGroupList{
+			Items: []repv1.DellCSIReplicationGroup{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "rg-id",
+					},
+				},
+			},
+		}
+
+		rg := &repv1.DellCSIReplicationGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "rg-id",
+			},
+			Spec: repv1.DellCSIReplicationGroupSpec{
+				RemoteClusterID: "cluster-2",
+			},
+			Status: repv1.DellCSIReplicationGroupStatus{
+				ReplicationLinkState: repv1.ReplicationLinkState{
+					IsSource: false,
+					State:    "Synchronized",
+					LastSuccessfulUpdate: &metav1.Time{
+						Time: time.Now(),
+					},
+				},
+			},
+		}
+
+		mockClient := mocks.NewMockClientInterface(gomock.NewController(t))
+		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil).SetArg(2, *rg)
+		mockClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil).SetArg(1, *repList)
+		mockClient.EXPECT().Update(gomock.Any(), gomock.Any()).Times(1).Return(nil)
+
+		defaultGetControllerRuntimeClient := k8s.GetCtrlRuntimeClient
+		defer func() {
+			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
+		}()
+		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+			return mockClient, nil
+		}
+
+		maxWaitTimeout = 100 * time.Millisecond
+		waitRetryDelay = 50 * time.Millisecond
 
 		cmd := GetFailoverCommand()
 		assert.NotNil(t, cmd)
@@ -308,6 +633,176 @@ func TestGetFailoverCommand(t *testing.T) {
 		cmd.Run(nil, nil)
 	})
 
+	t.Run("success: using target - planned - wait", func(t *testing.T) {
+		viper.Set("tgt", "cluster-2")
+		viper.Set("unplanned", false)
+		viper.Set("failover-wait", true)
+		viper.Set(config.ReplicationGroup, "rg-id")
+		viper.Set(config.ReplicationPrefix, "replication.storage.dell.com")
+		viper.Set(config.Verbose, true)
+		defer func() {
+			viper.Reset()
+		}()
+
+		originalClusterPath := clusterPath
+		defer func() {
+			clusterPath = originalClusterPath
+		}()
+
+		clusterPath = "testdata"
+
+		originalGetClustersFolderPathFunction := getClustersFolderPathFunction
+		defer func() {
+			getClustersFolderPathFunction = originalGetClustersFolderPathFunction
+		}()
+
+		getClustersFolderPathFunction = func(path string) (string, error) {
+			return path, nil
+		}
+
+		repList := &repv1.DellCSIReplicationGroupList{
+			Items: []repv1.DellCSIReplicationGroup{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "cluster-2",
+					},
+				},
+			},
+		}
+
+		rg := &repv1.DellCSIReplicationGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "rg-id",
+				Annotations: map[string]string{
+					"replication.storage.dell.com/remoteReplicationGroupName": "rg-id-target",
+				},
+			},
+			Spec: repv1.DellCSIReplicationGroupSpec{
+				RemoteClusterID: "cluster-2",
+			},
+			Status: repv1.DellCSIReplicationGroupStatus{
+				ReplicationLinkState: repv1.ReplicationLinkState{
+					IsSource: false,
+					State:    "Synchronized",
+					LastSuccessfulUpdate: &metav1.Time{
+						Time: time.Now(),
+					},
+				},
+			},
+		}
+
+		mockClient := mocks.NewMockClientInterface(gomock.NewController(t))
+		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil).SetArg(2, *rg)
+		mockClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil).SetArg(1, *repList)
+		mockClient.EXPECT().Update(gomock.Any(), gomock.Any()).Times(1).Return(nil)
+
+		defaultGetControllerRuntimeClient := k8s.GetCtrlRuntimeClient
+		defer func() {
+			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
+		}()
+		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+			return mockClient, nil
+		}
+
+		maxWaitTimeout = 100 * time.Millisecond
+		waitRetryDelay = 50 * time.Millisecond
+
+		setAndReturnRG := func() repv1.DellCSIReplicationGroup {
+			rg.Status.ReplicationLinkState.LastSuccessfulUpdate = &metav1.Time{
+				Time: time.Now().Add(maxWaitTimeout),
+			}
+
+			return *rg
+		}
+
+		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil).SetArg(2, setAndReturnRG())
+
+		cmd := GetFailoverCommand()
+		assert.NotNil(t, cmd)
+
+		cmd.Run(nil, nil)
+	})
+
+	t.Run("fail: using target - planned - wait", func(t *testing.T) {
+		viper.Set("tgt", "cluster-2")
+		viper.Set("unplanned", false)
+		viper.Set("failover-wait", true)
+		viper.Set(config.ReplicationGroup, "rg-id")
+		viper.Set(config.ReplicationPrefix, "replication.storage.dell.com")
+		viper.Set(config.Verbose, true)
+		defer func() {
+			viper.Reset()
+		}()
+
+		originalClusterPath := clusterPath
+		defer func() {
+			clusterPath = originalClusterPath
+		}()
+
+		clusterPath = "testdata"
+
+		originalGetClustersFolderPathFunction := getClustersFolderPathFunction
+		defer func() {
+			getClustersFolderPathFunction = originalGetClustersFolderPathFunction
+		}()
+
+		getClustersFolderPathFunction = func(path string) (string, error) {
+			return path, nil
+		}
+
+		repList := &repv1.DellCSIReplicationGroupList{
+			Items: []repv1.DellCSIReplicationGroup{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "cluster-2",
+					},
+				},
+			},
+		}
+
+		rg := &repv1.DellCSIReplicationGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "rg-id",
+				Annotations: map[string]string{
+					"replication.storage.dell.com/remoteReplicationGroupName": "rg-id-target",
+				},
+			},
+			Spec: repv1.DellCSIReplicationGroupSpec{
+				RemoteClusterID: "cluster-2",
+			},
+			Status: repv1.DellCSIReplicationGroupStatus{
+				ReplicationLinkState: repv1.ReplicationLinkState{
+					IsSource: false,
+					State:    "Synchronized",
+					LastSuccessfulUpdate: &metav1.Time{
+						Time: time.Now(),
+					},
+				},
+			},
+		}
+
+		mockClient := mocks.NewMockClientInterface(gomock.NewController(t))
+		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil).SetArg(2, *rg)
+		mockClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil).SetArg(1, *repList)
+		mockClient.EXPECT().Update(gomock.Any(), gomock.Any()).Times(1).Return(nil)
+
+		defaultGetControllerRuntimeClient := k8s.GetCtrlRuntimeClient
+		defer func() {
+			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
+		}()
+		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+			return mockClient, nil
+		}
+
+		maxWaitTimeout = 100 * time.Millisecond
+		waitRetryDelay = 50 * time.Millisecond
+
+		cmd := GetFailoverCommand()
+		assert.NotNil(t, cmd)
+
+		cmd.Run(nil, nil)
+	})
+
 	t.Run("success: using target - unplanned", func(t *testing.T) {
 		viper.Set("tgt", "cluster-2")
 		viper.Set("unplanned", true)
@@ -384,6 +879,176 @@ func TestGetFailoverCommand(t *testing.T) {
 
 		cmd.Run(nil, nil)
 	})
+
+	t.Run("success: using target - unplanned - wait", func(t *testing.T) {
+		viper.Set("tgt", "cluster-2")
+		viper.Set("unplanned", true)
+		viper.Set("failover-wait", true)
+		viper.Set(config.ReplicationGroup, "rg-id")
+		viper.Set(config.ReplicationPrefix, "replication.storage.dell.com")
+		viper.Set(config.Verbose, true)
+		defer func() {
+			viper.Reset()
+		}()
+
+		originalClusterPath := clusterPath
+		defer func() {
+			clusterPath = originalClusterPath
+		}()
+
+		clusterPath = "testdata"
+
+		originalGetClustersFolderPathFunction := getClustersFolderPathFunction
+		defer func() {
+			getClustersFolderPathFunction = originalGetClustersFolderPathFunction
+		}()
+
+		getClustersFolderPathFunction = func(path string) (string, error) {
+			return path, nil
+		}
+
+		repList := &repv1.DellCSIReplicationGroupList{
+			Items: []repv1.DellCSIReplicationGroup{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "cluster-2",
+					},
+				},
+			},
+		}
+
+		rg := &repv1.DellCSIReplicationGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "rg-id",
+				Annotations: map[string]string{
+					"replication.storage.dell.com/remoteReplicationGroupName": "rg-id-target",
+				},
+			},
+			Spec: repv1.DellCSIReplicationGroupSpec{
+				RemoteClusterID: "cluster-2",
+			},
+			Status: repv1.DellCSIReplicationGroupStatus{
+				ReplicationLinkState: repv1.ReplicationLinkState{
+					IsSource: false,
+					State:    "Synchronized",
+					LastSuccessfulUpdate: &metav1.Time{
+						Time: time.Now(),
+					},
+				},
+			},
+		}
+
+		mockClient := mocks.NewMockClientInterface(gomock.NewController(t))
+		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil).SetArg(2, *rg)
+		mockClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil).SetArg(1, *repList)
+		mockClient.EXPECT().Update(gomock.Any(), gomock.Any()).Times(1).Return(nil)
+
+		defaultGetControllerRuntimeClient := k8s.GetCtrlRuntimeClient
+		defer func() {
+			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
+		}()
+		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+			return mockClient, nil
+		}
+
+		maxWaitTimeout = 100 * time.Millisecond
+		waitRetryDelay = 50 * time.Millisecond
+
+		setAndReturnRG := func() repv1.DellCSIReplicationGroup {
+			rg.Status.ReplicationLinkState.LastSuccessfulUpdate = &metav1.Time{
+				Time: time.Now().Add(maxWaitTimeout),
+			}
+
+			return *rg
+		}
+
+		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil).SetArg(2, setAndReturnRG())
+
+		cmd := GetFailoverCommand()
+		assert.NotNil(t, cmd)
+
+		cmd.Run(nil, nil)
+	})
+
+	t.Run("fail: using target - unplanned - wait", func(t *testing.T) {
+		viper.Set("tgt", "cluster-2")
+		viper.Set("unplanned", true)
+		viper.Set("failover-wait", true)
+		viper.Set(config.ReplicationGroup, "rg-id")
+		viper.Set(config.ReplicationPrefix, "replication.storage.dell.com")
+		viper.Set(config.Verbose, true)
+		defer func() {
+			viper.Reset()
+		}()
+
+		originalClusterPath := clusterPath
+		defer func() {
+			clusterPath = originalClusterPath
+		}()
+
+		clusterPath = "testdata"
+
+		originalGetClustersFolderPathFunction := getClustersFolderPathFunction
+		defer func() {
+			getClustersFolderPathFunction = originalGetClustersFolderPathFunction
+		}()
+
+		getClustersFolderPathFunction = func(path string) (string, error) {
+			return path, nil
+		}
+
+		repList := &repv1.DellCSIReplicationGroupList{
+			Items: []repv1.DellCSIReplicationGroup{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "cluster-2",
+					},
+				},
+			},
+		}
+
+		rg := &repv1.DellCSIReplicationGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "rg-id",
+				Annotations: map[string]string{
+					"replication.storage.dell.com/remoteReplicationGroupName": "rg-id-target",
+				},
+			},
+			Spec: repv1.DellCSIReplicationGroupSpec{
+				RemoteClusterID: "cluster-2",
+			},
+			Status: repv1.DellCSIReplicationGroupStatus{
+				ReplicationLinkState: repv1.ReplicationLinkState{
+					IsSource: false,
+					State:    "Synchronized",
+					LastSuccessfulUpdate: &metav1.Time{
+						Time: time.Now(),
+					},
+				},
+			},
+		}
+
+		mockClient := mocks.NewMockClientInterface(gomock.NewController(t))
+		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil).SetArg(2, *rg)
+		mockClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil).SetArg(1, *repList)
+		mockClient.EXPECT().Update(gomock.Any(), gomock.Any()).Times(1).Return(nil)
+
+		defaultGetControllerRuntimeClient := k8s.GetCtrlRuntimeClient
+		defer func() {
+			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
+		}()
+		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+			return mockClient, nil
+		}
+
+		maxWaitTimeout = 100 * time.Millisecond
+		waitRetryDelay = 50 * time.Millisecond
+
+		cmd := GetFailoverCommand()
+		assert.NotNil(t, cmd)
+
+		cmd.Run(nil, nil)
+	})
 }
 
 func TestWaitForStateToUpdate(t *testing.T) {
@@ -420,8 +1085,8 @@ func TestWaitForStateToUpdate(t *testing.T) {
 			return rg, nil
 		})
 
-		maxWaitTimeout = 5 * time.Second
-		waitRetryDelay = 1 * time.Second
+		maxWaitTimeout = 150 * time.Millisecond
+		waitRetryDelay = 50 * time.Millisecond
 
 		result := waitForStateToUpdate(rgName, cluster, rg.Status.ReplicationLinkState)
 		assert.True(t, result)
@@ -453,8 +1118,8 @@ func TestWaitForStateToUpdate(t *testing.T) {
 
 		cluster.EXPECT().GetReplicationGroups(gomock.Any(), gomock.Any()).AnyTimes().Return(rg, nil)
 
-		maxWaitTimeout = 1 * time.Second
-		waitRetryDelay = 250 * time.Millisecond
+		maxWaitTimeout = 100 * time.Millisecond
+		waitRetryDelay = 50 * time.Millisecond
 
 		result := waitForStateToUpdate(rgName, cluster, rg.Status.ReplicationLinkState)
 		assert.False(t, result)
