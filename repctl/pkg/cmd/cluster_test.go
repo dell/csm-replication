@@ -16,10 +16,12 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	fake_client "github.com/dell/csm-replication/test/e2e-framework/fake-client"
@@ -31,9 +33,11 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 const folderPath = ".repctl/testdata/"
@@ -90,13 +94,16 @@ func (suite *ClusterTestSuite) TestAddAndRemoveCluster() {
 func (suite *ClusterTestSuite) TestInjectCluster() {
 
 	tests := []struct {
-		name          string
-		clusters      *k8s.Clusters
-		createCluster k8s.ClusterInterface
-		clusterIDs    []string
-		path          string
-		customConfigs []string
-		expectError   bool
+		name                          string
+		clusters                      *k8s.Clusters
+		createCluster                 k8s.ClusterInterface
+		clusterIDs                    []string
+		path                          string
+		customConfigs                 []string
+		getAllClustersError           error
+		createClusterError            error
+		expectError                   bool
+		getClustersFolderPathFunction func(_ string) (string, error)
 	}{
 		{
 			name: "Successful",
@@ -221,24 +228,43 @@ func (suite *ClusterTestSuite) TestInjectCluster() {
 			path:        filepath.Join(folderPath, "clusters"),
 			expectError: false,
 		},
+		{
+			name: "Error due to incorrect path",
+			getClustersFolderPathFunction: func(path string) (string, error) {
+				return "", errors.New("error")
+			},
+			expectError: true,
+		},
+		{
+			name:                "Error calling GetAllClusters",
+			getAllClustersError: errors.New("error"),
+			expectError:         true,
+		},
 	}
 
 	for _, tt := range tests {
 		suite.Suite.T().Run(tt.name, func(t *testing.T) {
 
-			clusterIDs := tt.clusterIDs
 			mcMock := new(mocks.MultiClusterConfiguratorInterface)
-			mcMock.On("GetAllClusters", clusterIDs, filepath.Join(suite.testDataFolder, "clusters")).Return(tt.clusters, nil)
+			mcMock.On("GetAllClusters", tt.clusterIDs, mock.Anything).Return(tt.clusters, tt.getAllClustersError)
 
-			OsStat = func(_ string) (string, error) {
+			oldGetFileName := GetFileName
+			defer func() { GetFileName = oldGetFileName }()
+			GetFileName = func(_ string) (string, error) {
 				return "name", nil
 			}
 
-			CreateCluster = func(_ string, _ string) (k8s.ClusterInterface, error) {
-				return tt.createCluster, nil
+			oldGetClustersFolderPathFunction := getClustersFolderPathFunction
+			defer func() { getClustersFolderPathFunction = oldGetClustersFolderPathFunction }()
+			if tt.getClustersFolderPathFunction != nil {
+				getClustersFolderPathFunction = tt.getClustersFolderPathFunction
 			}
 
-			err := injectCluster(mcMock, clusterIDs, tt.path, tt.customConfigs...)
+			CreateCluster = func(_ string, _ string) (k8s.ClusterInterface, error) {
+				return tt.createCluster, tt.createClusterError
+			}
+
+			err := injectCluster(mcMock, tt.clusterIDs, tt.path, tt.customConfigs...)
 			if tt.expectError {
 				suite.Error(err)
 			} else {
@@ -506,8 +532,12 @@ func (suite *ListTestSuite) TestGetListClustersCommand() {
 
 func TestGenerateConfigsFromSA(t *testing.T) {
 	tests := []struct {
-		name    string
-		objects []runtime.Object
+		name                string
+		objects             []runtime.Object
+		clusters            *k8s.Clusters
+		getAllClustersError error
+		runCommandError     error
+		expectedError       error
 	}{
 		{
 			name: "Successful",
@@ -518,17 +548,7 @@ func TestGenerateConfigsFromSA(t *testing.T) {
 					},
 				},
 			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-
-			RunCommand = func(_ *exec.Cmd) error {
-				return nil
-			}
-
-			mockClusters := &k8s.Clusters{
+			clusters: &k8s.Clusters{
 				Clusters: []k8s.ClusterInterface{
 					&k8s.Cluster{
 						ClusterID: "cluster-1",
@@ -537,17 +557,167 @@ func TestGenerateConfigsFromSA(t *testing.T) {
 						ClusterID: "cluster-2",
 					},
 				},
+			},
+		},
+		{
+			name:                "Error calling GetAllClusters",
+			getAllClustersError: errors.New("error"),
+			expectedError:       errors.New("error in initializing cluster info: error"),
+		},
+		{
+			name: "Success even with error from RunCommand",
+			objects: []runtime.Object{
+				&v1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "dell-replication-controller",
+					},
+				},
+			},
+			clusters: &k8s.Clusters{
+				Clusters: []k8s.ClusterInterface{
+					&k8s.Cluster{
+						ClusterID: "cluster-1",
+					},
+					&k8s.Cluster{
+						ClusterID: "cluster-2",
+					},
+				},
+			},
+			runCommandError: errors.New("error"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			RunCommand = func(_ *exec.Cmd) error {
+				return tt.runCommandError
 			}
+
 			fake, _ := fake_client.NewFakeClient(tt.objects, nil, nil)
 
 			getClustersMock := cmdMocks.NewMockGetClustersInterface(gomock.NewController(t))
-			getClustersMock.EXPECT().GetAllClusters(gomock.Any(), gomock.Any()).Times(1).Return(mockClusters, nil)
+			getClustersMock.EXPECT().GetAllClusters(gomock.Any(), gomock.Any()).Times(1).Return(tt.clusters, tt.getAllClustersError)
 
-			mockClusters.Clusters[0].SetClient(fake)
-			mockClusters.Clusters[1].SetClient(fake)
+			if tt.clusters != nil {
+				tt.clusters.Clusters[0].SetClient(fake)
+				tt.clusters.Clusters[1].SetClient(fake)
+			}
 
 			_, err := generateConfigsFromSA(getClustersMock, []string{"cluster-1", "cluster-2"})
-			assert.Nil(t, err)
+			if tt.expectedError == nil {
+				assert.Nil(t, err)
+			} else {
+				assert.Equal(t, tt.expectedError.Error(), err.Error())
+			}
 		})
+	}
+}
+
+func TestAddKeyFromLiteralToSecret(t *testing.T) {
+	tests := []struct {
+		secret      *corev1.Secret
+		keyName     string
+		data        []byte
+		expectedErr error
+	}{
+		{
+			secret: &corev1.Secret{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: corev1.SchemeGroupVersion.String(),
+					Kind:       "Secret",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-secret",
+					Namespace: "test-namespace",
+				},
+				Type: corev1.SecretTypeOpaque,
+				Data: map[string][]byte{},
+			},
+			keyName:     "test-key",
+			data:        []byte("test-value"),
+			expectedErr: nil,
+		},
+		{
+			secret: &corev1.Secret{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: corev1.SchemeGroupVersion.String(),
+					Kind:       "Secret",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-secret",
+					Namespace: "test-namespace",
+				},
+				Type: corev1.SecretTypeOpaque,
+				Data: map[string][]byte{"test-key": []byte("test-value")},
+			},
+			keyName:     "test-key",
+			data:        []byte("test-value"),
+			expectedErr: fmt.Errorf("cannot add key %s, another key by that name already exists", "test-key"),
+		},
+		{
+			secret: &corev1.Secret{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: corev1.SchemeGroupVersion.String(),
+					Kind:       "Secret",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-secret",
+					Namespace: "test-namespace",
+				},
+				Type: corev1.SecretTypeOpaque,
+				Data: map[string][]byte{},
+			},
+			keyName:     "invalid key",
+			data:        []byte("test-value"),
+			expectedErr: fmt.Errorf("%q is not valid key name for a Secret %s", "invalid key", strings.Join(validation.IsConfigMapKey("invalid key"), ";")),
+		},
+	}
+
+	for _, tt := range tests {
+		err := addKeyFromLiteralToSecret(tt.secret, tt.keyName, tt.data)
+		if tt.expectedErr == nil {
+			assert.NoError(t, err)
+		} else {
+			assert.Equal(t, tt.expectedErr.Error(), err.Error())
+		}
+	}
+}
+
+func TestGetFileName(t *testing.T) {
+	tests := []struct {
+		input       string
+		expected    string
+		expectedErr error
+	}{
+		{
+			input: func() string {
+				filePath, err := os.Getwd()
+				if err != nil {
+					return ""
+				}
+				filePath += "/testdata/cluster-1"
+				return filePath
+			}(),
+			expected:    "cluster-1",
+			expectedErr: nil,
+		},
+		{
+			input:       "missing-file",
+			expected:    "",
+			expectedErr: fmt.Errorf("stat missing-file: no such file or directory"),
+		},
+	}
+
+	for _, tt := range tests {
+		actual, err := GetFileName(tt.input)
+		if tt.expectedErr == nil {
+			assert.Nil(t, err)
+		} else {
+			assert.Equal(t, tt.expectedErr.Error(), err.Error())
+		}
+		if actual != tt.expected {
+			t.Errorf("expected output %q, but got %q", tt.expected, actual)
+		}
 	}
 }
