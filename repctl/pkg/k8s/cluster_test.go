@@ -344,10 +344,12 @@ func (suite *ClusterTestSuite) TestListPersistentVolumeClaims() {
 
 func (suite *ClusterTestSuite) TestFilterPersistentVolumeClaims() {
 	usualSC := "simple-sc"
+	namespace := "test-ns"
+
 	pvc1 := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-pvc-1",
-			Namespace: "test-ns",
+			Namespace: namespace,
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			StorageClassName: &usualSC,
@@ -357,21 +359,26 @@ func (suite *ClusterTestSuite) TestFilterPersistentVolumeClaims() {
 	pvc2 := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-pvc-2",
-			Namespace: "test-ns",
+			Namespace: namespace,
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			StorageClassName: &usualSC,
 		},
 	}
 
+	remoteCluster := "cluster-2"
+	rgName := "myReplicationGroup"
 	repSC := "replicated-sc"
+
 	matchingLabels := make(map[string]string)
-	matchingLabels[metadata.RemoteClusterID] = "cluster-2"
+	matchingLabels[metadata.RemoteClusterID] = remoteCluster
+	matchingLabels[metadata.ReplicationGroup] = rgName
+	matchingLabels[metadata.RemotePVCNamespace] = namespace
 
 	repPVC := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "replicated-pvc",
-			Namespace: "test-ns",
+			Namespace: namespace,
 			Labels:    matchingLabels,
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
@@ -379,31 +386,50 @@ func (suite *ClusterTestSuite) TestFilterPersistentVolumeClaims() {
 		},
 	}
 
-	fake, err := fake_client.NewFakeClient([]runtime.Object{pvc1, pvc2, repPVC}, nil, nil)
-	suite.NoError(err)
+	suite.Suite.T().Run("success: get all PVC", func(t *testing.T) {
+		fake, err := fake_client.NewFakeClient([]runtime.Object{pvc1, pvc2}, nil, nil)
+		suite.NoError(err)
 
-	suite.cluster.SetClient(fake)
+		suite.cluster.SetClient(fake)
 
-	volumeList, err := suite.cluster.FilterPersistentVolumeClaims(context.Background(), "", "", "", "")
-	suite.NoError(err)
-	suite.NotNil(volumeList.PVCList)
-	suite.Equal(3, len(volumeList.PVCList))
-	var names []string
-	for _, v := range volumeList.PVCList {
-		names = append(names, v.Name)
-	}
-	suite.ElementsMatch(names, []string{"test-pvc-1", "test-pvc-2", "replicated-pvc"})
+		// Get all without matching labels.
+		volumeList, err := suite.cluster.FilterPersistentVolumeClaims(context.Background(), "", "", "", "")
+		suite.NoError(err)
+		suite.NotNil(volumeList.PVCList)
+		suite.Equal(2, len(volumeList.PVCList))
 
-	replicatedVolumes, err := suite.cluster.FilterPersistentVolumeClaims(context.Background(), "test-ns", "cluster-2", "", "")
-	suite.NoError(err)
-	suite.NotNil(replicatedVolumes.PVCList)
-	suite.Equal(1, len(replicatedVolumes.PVCList))
-	suite.Equal("replicated-pvc", replicatedVolumes.PVCList[0].Name)
+		var names []string
+		for _, v := range volumeList.PVCList {
+			names = append(names, v.Name)
+		}
+
+		suite.ElementsMatch(names, []string{"test-pvc-1", "test-pvc-2"})
+	})
+
+	suite.Suite.T().Run("success: match labels get PVC", func(t *testing.T) {
+
+		fake, err := fake_client.NewFakeClient([]runtime.Object{pvc1, pvc2, repPVC}, nil, nil)
+		suite.NoError(err)
+
+		suite.cluster.SetClient(fake)
+
+		// Match with labels.
+		replicatedVolumes, err := suite.cluster.FilterPersistentVolumeClaims(context.Background(), namespace, remoteCluster, namespace, rgName)
+		suite.NoError(err)
+		suite.NotNil(replicatedVolumes.PVCList)
+		suite.Equal(1, len(replicatedVolumes.PVCList))
+		suite.Equal("replicated-pvc", replicatedVolumes.PVCList[0].Name)
+	})
 }
 
 func (suite *ClusterTestSuite) TestCreatePVCsFromPVs() {
 	matchingLabels := make(map[string]string)
 	matchingLabels[metadata.RemoteClusterID] = "cluster-2"
+
+	replicationPrefix := "replication.storage.dell.com"
+	annotations := map[string]string{
+		replicationPrefix + "/myAnnot": "myAnnotation",
+	}
 
 	pv1 := types.PersistentVolume{
 		Name:          "pv-1",
@@ -412,6 +438,7 @@ func (suite *ClusterTestSuite) TestCreatePVCsFromPVs() {
 		RemotePVCName: "pvc-1",
 		ReclaimPolicy: "Delete",
 		Labels:        matchingLabels,
+		Annotations:   annotations,
 	}
 
 	pv2 := types.PersistentVolume{
@@ -421,28 +448,71 @@ func (suite *ClusterTestSuite) TestCreatePVCsFromPVs() {
 		RemotePVCName: "pvc-2",
 		ReclaimPolicy: "Delete",
 		Labels:        matchingLabels,
+		Annotations:   annotations,
 	}
 
-	fake, err := fake_client.NewFakeClient([]runtime.Object{}, nil, nil)
-	suite.NoError(err)
+	suite.Suite.T().Run("success: create pvc from pv", func(t *testing.T) {
+		fake, err := fake_client.NewFakeClient([]runtime.Object{}, nil, nil)
+		suite.NoError(err)
 
-	suite.cluster.SetClient(fake)
+		suite.cluster.SetClient(fake)
 
-	err = suite.cluster.CreatePersistentVolumeClaimsFromPVs(context.Background(), "remote-ns", []types.PersistentVolume{pv1, pv2}, "replication.storage.dell.com", false)
-	suite.NoError(err)
+		err = suite.cluster.CreatePersistentVolumeClaimsFromPVs(context.Background(), "remote-ns", []types.PersistentVolume{pv1, pv2}, replicationPrefix, false)
+		suite.NoError(err)
 
-	volumeList, err := suite.cluster.ListPersistentVolumeClaims(context.Background())
-	suite.NoError(err)
-	suite.NotNil(volumeList)
-	suite.Equal(2, len(volumeList.Items))
-	var names []string
-	var pvNames []string
-	for _, v := range volumeList.Items {
-		names = append(names, v.Name)
-		pvNames = append(pvNames, v.Spec.VolumeName)
-	}
-	suite.ElementsMatch(names, []string{"pvc-1", "pvc-2"})
-	suite.ElementsMatch(pvNames, []string{"pv-1", "pv-2"})
+		volumeList, err := suite.cluster.ListPersistentVolumeClaims(context.Background())
+		suite.NoError(err)
+		suite.NotNil(volumeList)
+		suite.Equal(2, len(volumeList.Items))
+		var names []string
+		var pvNames []string
+		for _, v := range volumeList.Items {
+			names = append(names, v.Name)
+			pvNames = append(pvNames, v.Spec.VolumeName)
+		}
+		suite.ElementsMatch(names, []string{"pvc-1", "pvc-2"})
+		suite.ElementsMatch(pvNames, []string{"pv-1", "pv-2"})
+	})
+
+	suite.Suite.T().Run("success: pvc already exist", func(t *testing.T) {
+		fake, err := fake_client.NewFakeClient([]runtime.Object{}, nil, nil)
+		suite.NoError(err)
+
+		suite.cluster.SetClient(fake)
+
+		myPV := pv1
+		myPV.PVCName = "myPVC"
+		err = suite.cluster.CreatePersistentVolumeClaimsFromPVs(context.Background(), "remote-ns", []types.PersistentVolume{myPV}, replicationPrefix, false)
+		suite.NoError(err)
+	})
+
+	suite.Suite.T().Run("success: dryrun only", func(t *testing.T) {
+		fake, err := fake_client.NewFakeClient([]runtime.Object{}, nil, nil)
+		suite.NoError(err)
+
+		suite.cluster.SetClient(fake)
+
+		err = suite.cluster.CreatePersistentVolumeClaimsFromPVs(context.Background(), "remote-ns", []types.PersistentVolume{pv1}, replicationPrefix, true)
+		suite.NoError(err)
+
+		// Do to fake_client implementation, dryRun does not work as it should.
+	})
+
+	suite.Suite.T().Run("fail: unable to create", func(t *testing.T) {
+		fake, err := fake_client.NewFakeClient([]runtime.Object{}, &errorInjector{}, nil)
+		suite.NoError(err)
+
+		suite.cluster.SetClient(fake)
+
+		err = suite.cluster.CreatePersistentVolumeClaimsFromPVs(context.Background(), "remote-ns", []types.PersistentVolume{pv1}, replicationPrefix, true)
+		suite.Error(err)
+	})
+}
+
+type errorInjector struct{}
+
+func (ei *errorInjector) ShouldFail(method string, _ runtime.Object) error {
+	return fmt.Errorf("error with call %s", method)
 }
 
 func (suite *ClusterTestSuite) TestCreateObject() {

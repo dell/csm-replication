@@ -35,8 +35,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
 
-type errorInjector interface {
-	shouldFail(method string, obj runtime.Object) error
+type ErrorInjector interface {
+	ShouldFail(method string, obj runtime.Object) error
 }
 
 type deleteSpoofer interface {
@@ -75,7 +75,7 @@ type storageKey struct {
 // Client is a fake k8s client
 type Client struct {
 	Objects       map[storageKey]runtime.Object
-	errorInjector errorInjector
+	errorInjector ErrorInjector
 	deleteSpoofer deleteSpoofer
 	SubResourceClient
 }
@@ -101,7 +101,7 @@ func getKey(obj runtime.Object) (storageKey, error) {
 
 // NewFakeClient initializes and returns new fake k8s client
 
-func NewFakeClient(initialObjects []runtime.Object, errorInjector errorInjector, deleteSpoofer deleteSpoofer) (*Client, error) {
+func NewFakeClient(initialObjects []runtime.Object, errorInjector ErrorInjector, deleteSpoofer deleteSpoofer) (*Client, error) {
 	err := repv1.AddToScheme(scheme.Scheme)
 	if err != nil {
 		return nil, err
@@ -126,7 +126,7 @@ func NewFakeClient(initialObjects []runtime.Object, errorInjector errorInjector,
 // Get finds object and puts it in client.Object obj argument
 func (f Client) Get(_ context.Context, key client.ObjectKey, obj client.Object, _ ...client.GetOption) error {
 	if f.errorInjector != nil {
-		if err := f.errorInjector.shouldFail("Get", obj); err != nil {
+		if err := f.errorInjector.ShouldFail("Get", obj); err != nil {
 			return err
 		}
 	}
@@ -161,7 +161,7 @@ func (f Client) Get(_ context.Context, key client.ObjectKey, obj client.Object, 
 // List list all requested items in fake cluster
 func (f Client) List(_ context.Context, list client.ObjectList, opts ...client.ListOption) error {
 	if f.errorInjector != nil {
-		if err := f.errorInjector.shouldFail("List", list); err != nil {
+		if err := f.errorInjector.ShouldFail("List", list); err != nil {
 			return err
 		}
 	}
@@ -268,7 +268,7 @@ func (f *Client) listReplicationGroup(list *repv1.DellCSIReplicationGroupList, o
 // Create creates new object in fake cluster by putting it in map
 func (f Client) Create(_ context.Context, obj client.Object, _ ...client.CreateOption) error {
 	if f.errorInjector != nil {
-		if err := f.errorInjector.shouldFail("Create", obj); err != nil {
+		if err := f.errorInjector.ShouldFail("Create", obj); err != nil {
 			return err
 		}
 	}
@@ -298,7 +298,7 @@ func (f Client) Delete(_ context.Context, obj client.Object, opts ...client.Dele
 		fmt.Printf("delete options are not supported")
 	}
 	if f.errorInjector != nil {
-		if err := f.errorInjector.shouldFail("Delete", obj); err != nil {
+		if err := f.errorInjector.ShouldFail("Delete", obj); err != nil {
 			return err
 		}
 	}
@@ -332,7 +332,7 @@ func (f Client) Delete(_ context.Context, obj client.Object, opts ...client.Dele
 // Update updates object in fake k8s cluster
 func (f Client) Update(_ context.Context, obj client.Object, _ ...client.UpdateOption) error {
 	if f.errorInjector != nil {
-		if err := f.errorInjector.shouldFail("Update", obj); err != nil {
+		if err := f.errorInjector.ShouldFail("Update", obj); err != nil {
 			return err
 		}
 	}

@@ -420,134 +420,94 @@ func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object
 		return nil, err
 	}
 
-	switch runtimeObj.(type) {
+	switch obj := runtimeObj.(type) {
 	case *storagev1.StorageClass:
-		scObj, ok := runtimeObj.(*storagev1.StorageClass)
-		if !ok {
-			return nil, fmt.Errorf("unsupported object type")
-		}
-		err := c.client.Create(ctx, scObj)
+		err := c.client.Create(ctx, obj)
 		if err != nil {
 			return nil, err
 		}
-		log.Print("Successfully created storage class: ", scObj.Name)
+		log.Print("Successfully created storage class: ", obj.Name)
 	case *v1.Namespace:
-		nsObj, ok := runtimeObj.(*v1.Namespace)
-		if !ok {
-			return nil, fmt.Errorf("unsupported object type")
-		}
-		err := c.client.Create(ctx, nsObj)
+		err := c.client.Create(ctx, obj)
 		if err != nil {
 			return nil, err
 		}
 	case *apiExtensionsv1.CustomResourceDefinition:
-		crdObj, ok := runtimeObj.(*apiExtensionsv1.CustomResourceDefinition)
-		if !ok {
-			return nil, fmt.Errorf("unsupported object type")
-		}
-		err := c.client.Create(ctx, crdObj)
+		err := c.client.Create(ctx, obj)
 		if err != nil {
 			return nil, err
 		}
-		log.Print("Successfully created crds: ", crdObj.Name)
+		log.Print("Successfully created crds: ", obj.Name)
 	case *rbacv1.ClusterRole:
-		crObj, ok := runtimeObj.(*rbacv1.ClusterRole)
-		if !ok {
-			return nil, fmt.Errorf("unsupported object type")
-		}
-		err := c.client.Create(ctx, crObj)
+		err := c.client.Create(ctx, obj)
 		if err != nil {
 			if strings.Contains(err.Error(), "already exists") {
-				err := c.client.Update(ctx, crObj)
+				err := c.client.Update(ctx, obj)
 				if err != nil {
 					return nil, err
 				}
-				log.Print("Successfully updated existing cluster role: ", crObj.Name)
+				log.Print("Successfully updated existing cluster role: ", obj.Name)
 			} else {
 				return nil, err
 			}
 		} else {
-			log.Print("Successfully created cluster role: ", crObj.Name)
+			log.Print("Successfully created cluster role: ", obj.Name)
 		}
 	case *rbacv1.ClusterRoleBinding:
-		crbObj, ok := runtimeObj.(*rbacv1.ClusterRoleBinding)
-		if !ok {
-			return nil, fmt.Errorf("unsupported object type")
-		}
-		err := c.client.Create(ctx, crbObj)
+		err := c.client.Create(ctx, obj)
 		if err != nil {
 			if strings.Contains(err.Error(), "already exists") {
-				err := c.client.Update(ctx, crbObj)
+				err := c.client.Update(ctx, obj)
 				if err != nil {
 					return nil, err
 				}
-				log.Print("Successfully updated existing cluster role binding: ", crbObj.Name)
+				log.Print("Successfully updated existing cluster role binding: ", obj.Name)
 			} else {
 				return nil, err
 			}
 		} else {
-			log.Print("Successfully created cluster role binding: ", crbObj.Name)
+			log.Print("Successfully created cluster role binding: ", obj.Name)
 		}
 	case *v1.Service:
-		svcObj, ok := runtimeObj.(*v1.Service)
-		if !ok {
-			return nil, fmt.Errorf("unsupported object type")
-		}
-		err := c.client.Create(ctx, svcObj)
+		err := c.client.Create(ctx, obj)
 		if err != nil {
 			return nil, err
 		}
 	case *appsv1.Deployment:
-		dplObj, ok := runtimeObj.(*appsv1.Deployment)
-		if !ok {
-			return nil, fmt.Errorf("unsupported object type")
-		}
-		err := c.client.Create(ctx, dplObj)
+		err := c.client.Create(ctx, obj)
 		if err != nil {
 			if strings.Contains(err.Error(), "already exists") {
-				err := c.client.Update(ctx, dplObj)
+				err := c.client.Update(ctx, obj)
 				if err != nil {
 					return nil, err
 				}
-				log.Print("Successfully updated existing deployment: ", dplObj.Name)
+				log.Print("Successfully updated existing deployment: ", obj.Name)
 			} else {
 				return nil, err
 			}
 		} else {
-			log.Print("Successfully created deployment: ", dplObj.Name)
+			log.Print("Successfully created deployment: ", obj.Name)
 		}
 	case *v1.ConfigMap:
-		cmObj, ok := runtimeObj.(*v1.ConfigMap)
-		if !ok {
-			return nil, fmt.Errorf("unsupported object type")
-		}
-		err := c.client.Create(ctx, cmObj)
+		err := c.client.Create(ctx, obj)
 		if err != nil {
 			return nil, err
 		}
-		log.Print("Successfully created config map: ", cmObj.Name)
+		log.Print("Successfully created config map: ", obj.Name)
 	case *v1.ServiceAccount:
-		cmObj, ok := runtimeObj.(*v1.ServiceAccount)
-		if !ok {
-			return nil, fmt.Errorf("unsupported object type")
-		}
-		err := c.client.Create(ctx, cmObj)
+		err := c.client.Create(ctx, obj)
 		if err != nil {
 			return nil, err
 		}
-		log.Print("Successfully created ServiceAccount: ", cmObj.Name)
+		log.Print("Successfully created ServiceAccount: ", obj.Name)
 	case *v1.Secret:
-		cmObj, ok := runtimeObj.(*v1.Secret)
-		if !ok {
-			return nil, fmt.Errorf("unsupported object type")
-		}
-		err := c.client.Create(ctx, cmObj)
+		err := c.client.Create(ctx, obj)
 		if err != nil {
 			return nil, err
 		}
-		log.Print("Successfully created Secret: ", cmObj.Name)
+		log.Print("Successfully created Secret: ", obj.Name)
 	default:
-		return nil, fmt.Errorf("unsupported object type %+v", runtimeObj.GetObjectKind())
+		return nil, fmt.Errorf("unsupported object type %+v", obj.GetObjectKind())
 	}
 
 	return runtimeObj, nil
