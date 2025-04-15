@@ -129,6 +129,58 @@ func (suite *ClusterTestSuite) TestInjectCluster() {
 	suite.NoError(err)
 }
 
+func (suite *ClusterTestSuite) TestGetInjectClustersCommand() {
+
+	mockClient := new(mocks.ClientInterface)
+	mockClient.On("Create", mock.Anything, mock.Anything).Return(nil)
+	mockClient.On("Update", mock.Anything, mock.Anything).Return(nil)
+
+	clusterIDs := []string{"test-cluster"}
+
+	mockClusterA := new(mocks.ClusterInterface)
+	mockClusterA.On("GetID").Return("cluster-A")
+	mockClusterA.On("GetHost").Return("192.168.0.1")
+	mockClusterA.On("GetKubeConfigFile").Return("testdata/config")
+	mockClusterA.
+		On("GetNamespace", mock.Anything, "dell-replication-controller").
+		Return(nil, errors.New("namespace not found")).Once()
+	mockClusterA.
+		On("CreateNamespace", mock.Anything, mock.Anything).Return(nil).Once()
+	mockClusterA.On("GetClient").Return(mockClient)
+
+	mockClusterB := new(mocks.ClusterInterface)
+	mockClusterB.On("GetID").Return("cluster-B")
+	mockClusterB.On("GetHost").Return("192.168.0.2")
+	mockClusterB.On("GetKubeConfigFile").Return("testdata/config")
+	mockClusterB.
+		On("GetNamespace", mock.Anything, "dell-replication-controller").
+		Return(nil, errors.New("namespace not found")).Once()
+	mockClusterB.
+		On("CreateNamespace", mock.Anything, mock.Anything).Return(nil).Once()
+	mockClusterB.On("GetClient").Return(mockClient)
+
+	clusters := &k8s.Clusters{
+		Clusters: []k8s.ClusterInterface{mockClusterA, mockClusterB},
+	}
+
+	path := filepath.Join(folderPath, "clusters")
+
+	mcMock := new(mocks.MultiClusterConfiguratorInterface)
+	mcMock.On("GetAllClusters", clusterIDs, path).Return(clusters, nil)
+
+	originalGetClustersFolderPathFunction := getClustersFolderPathFunction
+	defer func() {
+		getClustersFolderPathFunction = originalGetClustersFolderPathFunction
+	}()
+	getClustersFolderPathFunction = func(_ string) (string, error) {
+		return path, nil
+	}
+	viper.Set("clusters", clusterIDs)
+	defer viper.Reset()
+	cmd := getInjectClustersCommand(mcMock)
+	cmd.Run(nil, nil)
+}
+
 func TestClusterTestSuite(t *testing.T) {
 	suite.Run(t, new(ClusterTestSuite))
 }
