@@ -17,9 +17,205 @@ package cmd
 import (
 	"fmt"
 	"testing"
+	"time"
 
+	repv1 "github.com/dell/csm-replication/api/v1"
+	"github.com/dell/repctl/mocks"
 	"github.com/dell/repctl/pkg/config"
+	"github.com/dell/repctl/pkg/k8s"
+	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+func TestGetExecCommand(t *testing.T) {
+	t.Run("fail: invalid action", func(t *testing.T) {
+		viper.Set("action", "cluster2")
+		viper.Set(config.Verbose, true)
+		defer func() {
+			viper.Reset()
+		}()
+
+		originalClusterPath := clusterPath
+		defer func() {
+			clusterPath = originalClusterPath
+		}()
+
+		clusterPath = "testdata"
+
+		originalGetClustersFolderPathFunction := getClustersFolderPathFunction
+		defer func() {
+			getClustersFolderPathFunction = originalGetClustersFolderPathFunction
+		}()
+
+		getClustersFolderPathFunction = func(path string) (string, error) {
+			return path, nil
+		}
+
+		cmd := GetExecCommand()
+		assert.NotNil(t, cmd)
+
+		cmd.Run(nil, nil)
+	})
+
+	t.Run("fail: attempting to execute action on a non-source rg", func(t *testing.T) {
+		viper.Set("action", "resume")
+		viper.Set(config.Verbose, true)
+		defer func() {
+			viper.Reset()
+		}()
+
+		originalClusterPath := clusterPath
+		defer func() {
+			clusterPath = originalClusterPath
+		}()
+
+		clusterPath = "testdata"
+
+		originalGetClustersFolderPathFunction := getClustersFolderPathFunction
+		defer func() {
+			getClustersFolderPathFunction = originalGetClustersFolderPathFunction
+		}()
+
+		getClustersFolderPathFunction = func(path string) (string, error) {
+			return path, nil
+		}
+
+		rg := &repv1.DellCSIReplicationGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "rg-id",
+			},
+			Spec: repv1.DellCSIReplicationGroupSpec{
+				RemoteClusterID: "cluster-2",
+			},
+			Status: repv1.DellCSIReplicationGroupStatus{
+				ReplicationLinkState: repv1.ReplicationLinkState{
+					IsSource: false,
+					State:    "Synchronized",
+					LastSuccessfulUpdate: &metav1.Time{
+						Time: time.Now(),
+					},
+				},
+			},
+		}
+
+		mockClient := mocks.NewMockClientInterface(gomock.NewController(t))
+		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil).SetArg(2, *rg)
+
+		defaultGetControllerRuntimeClient := k8s.GetCtrlRuntimeClient
+		defer func() {
+			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
+		}()
+		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+			return mockClient, nil
+		}
+
+		cmd := GetExecCommand()
+		assert.NotNil(t, cmd)
+
+		cmd.Run(nil, nil)
+	})
+
+	t.Run("fail: get replication error", func(t *testing.T) {
+		viper.Set("action", "resume")
+		viper.Set(config.Verbose, true)
+		defer func() {
+			viper.Reset()
+		}()
+
+		originalClusterPath := clusterPath
+		defer func() {
+			clusterPath = originalClusterPath
+		}()
+
+		clusterPath = "testdata"
+
+		originalGetClustersFolderPathFunction := getClustersFolderPathFunction
+		defer func() {
+			getClustersFolderPathFunction = originalGetClustersFolderPathFunction
+		}()
+
+		getClustersFolderPathFunction = func(path string) (string, error) {
+			return path, nil
+		}
+
+		mockClient := mocks.NewMockClientInterface(gomock.NewController(t))
+		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(fmt.Errorf("error"))
+
+		defaultGetControllerRuntimeClient := k8s.GetCtrlRuntimeClient
+		defer func() {
+			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
+		}()
+		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+			return mockClient, nil
+		}
+
+		cmd := GetExecCommand()
+		assert.NotNil(t, cmd)
+
+		cmd.Run(nil, nil)
+	})
+
+	t.Run("success: execute/update rg", func(t *testing.T) {
+		viper.Set("action", "resume")
+		viper.Set(config.Verbose, true)
+		defer func() {
+			viper.Reset()
+		}()
+
+		originalClusterPath := clusterPath
+		defer func() {
+			clusterPath = originalClusterPath
+		}()
+
+		clusterPath = "testdata"
+
+		originalGetClustersFolderPathFunction := getClustersFolderPathFunction
+		defer func() {
+			getClustersFolderPathFunction = originalGetClustersFolderPathFunction
+		}()
+
+		getClustersFolderPathFunction = func(path string) (string, error) {
+			return path, nil
+		}
+		rg := &repv1.DellCSIReplicationGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "rg-id",
+			},
+			Spec: repv1.DellCSIReplicationGroupSpec{
+				RemoteClusterID: "cluster-2",
+			},
+			Status: repv1.DellCSIReplicationGroupStatus{
+				ReplicationLinkState: repv1.ReplicationLinkState{
+					IsSource: true,
+					State:    "Synchronized",
+					LastSuccessfulUpdate: &metav1.Time{
+						Time: time.Now(),
+					},
+				},
+			},
+		}
+
+		mockClient := mocks.NewMockClientInterface(gomock.NewController(t))
+		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil).SetArg(2, *rg)
+		mockClient.EXPECT().Update(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
+
+		defaultGetControllerRuntimeClient := k8s.GetCtrlRuntimeClient
+		defer func() {
+			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
+		}()
+		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+			return mockClient, nil
+		}
+
+		cmd := GetExecCommand()
+		assert.NotNil(t, cmd)
+
+		cmd.Run(nil, nil)
+	})
+}
 
 func TestGetSupportedMaintenanceAction(t *testing.T) {
 	tests := []struct {
