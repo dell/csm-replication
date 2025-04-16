@@ -29,5 +29,4 @@ jobs:
 
           cd ./repctl
           curl -sfL https://raw.githubusercontent.com/securego/gosec/master/install.sh | sh -s -- -b $(go env GOPATH)/bin $LATEST_VERSION
-          tar xzf gosec_$LATEST_VERSION_linux_amd64.tar.gz
           $(go env GOPATH)/bin/gosec  ./...
