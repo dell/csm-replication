@@ -38,7 +38,7 @@ rules:
     verbs:
       - create
       # - list
-      # - patch
+      - patch
       # - update
       # - watch
   - apiGroups:
@@ -159,7 +159,7 @@ rules:
     verbs:
       # - create
       - list
-      - patch
+      # - patch
       - update
       - watch
   - apiGroups:
