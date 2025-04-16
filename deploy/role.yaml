@@ -29,10 +29,10 @@ rules:
       - events
     verbs:
       - create
-      # - list
+      - list
       - patch
-      # - update
-      # - watch
+      - update
+      - watch
   - apiGroups:
       - ""
     resources:
@@ -133,16 +133,6 @@ rules:
       - delete
       - get
       - list
-      - update
-      - watch
-  - apiGroups:
-      - ""
-    resources:
-      - events
-    verbs:
-      # - create
-      - list
-      # - patch
       - update
       - watch
   - apiGroups:
