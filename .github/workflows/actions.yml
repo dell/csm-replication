@@ -28,6 +28,6 @@ jobs:
           LATEST_VERSION=$(curl -s https://api.github.com/repos/securego/gosec/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 
           cd ./repctl
-          wget https://github.com/securego/gosec/releases/download/$LATEST_VERSION/gosec_$LATEST_VERSION_linux_amd64.tar.gz
+          curl -sfL https://raw.githubusercontent.com/securego/gosec/master/install.sh | sh -s -- -b $(go env GOPATH)/bin $LATEST_VERSION
           tar xzf gosec_$LATEST_VERSION_linux_amd64.tar.gz
-          ./gosec  ./...
+          $(go env GOPATH)/bin/gosec  ./...
