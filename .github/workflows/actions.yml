@@ -22,9 +22,12 @@ jobs:
     steps:
       - name: Checkout the code
         uses: actions/checkout@v4
-      - name: Download GoSec
-        run: cd ./repctl && wget https://github.com/securego/gosec/releases/download/v2.22.3/gosec_2.22.3_linux_amd64.tar.gz
-      - name: Unpack GoSec
-        run: cd ./repctl && tar xzf gosec_2.22.3_linux_amd64.tar.gz
-      - name: GoSec scan
-        run: cd ./repctl && ./gosec  ./...
+
+      - name: Run gosec
+        run: |
+          LATEST_VERSION=$(curl -s https://api.github.com/repos/securego/gosec/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+
+          cd ./repctl
+          wget https://github.com/securego/gosec/releases/download/$(LATEST_VERSION)/gosec_$(LATEST_VERSION)_linux_amd64.tar.gz
+          tar xzf gosec_$(LATEST_VERSION)_linux_amd64.tar.gz
+          ./gosec  ./...
