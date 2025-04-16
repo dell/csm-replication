@@ -21,7 +21,6 @@ import (
 	"time"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
-	v1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/repctl/mocks"
 	"github.com/dell/repctl/pkg/config"
 	"github.com/dell/repctl/pkg/k8s"
@@ -129,21 +128,21 @@ func TestFailbackToRG(t *testing.T) {
 				wait:         false,
 			},
 			setup: func() {
-				getRGAndClusterFromRGIDFunction = func(_, _, _ string) (k8s.ClusterInterface, *v1.DellCSIReplicationGroup, error) {
-					return &k8s.Cluster{ClusterID: "cluster-1"}, &v1.DellCSIReplicationGroup{
+				getRGAndClusterFromRGIDFunction = func(_, _, _ string) (k8s.ClusterInterface, *repv1.DellCSIReplicationGroup, error) {
+					return &k8s.Cluster{ClusterID: "cluster-1"}, &repv1.DellCSIReplicationGroup{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "rg-id",
 						},
-						Spec: v1.DellCSIReplicationGroupSpec{},
-						Status: v1.DellCSIReplicationGroupStatus{
-							ReplicationLinkState: v1.ReplicationLinkState{
+						Spec: repv1.DellCSIReplicationGroupSpec{},
+						Status: repv1.DellCSIReplicationGroupStatus{
+							ReplicationLinkState: repv1.ReplicationLinkState{
 								IsSource:             true,
 								LastSuccessfulUpdate: &metav1.Time{Time: time.Now()},
 							},
 						},
 					}, nil
 				}
-				getUpdateReplicationGroupFunction = func(_ k8s.ClusterInterface, _ context.Context, _ *v1.DellCSIReplicationGroup) error {
+				getUpdateReplicationGroupFunction = func(_ k8s.ClusterInterface, _ context.Context, _ *repv1.DellCSIReplicationGroup) error {
 					return nil
 				}
 			},
@@ -159,24 +158,24 @@ func TestFailbackToRG(t *testing.T) {
 				wait:         true,
 			},
 			setup: func() {
-				getRGAndClusterFromRGIDFunction = func(_, _, _ string) (k8s.ClusterInterface, *v1.DellCSIReplicationGroup, error) {
-					return &k8s.Cluster{ClusterID: "cluster-1"}, &v1.DellCSIReplicationGroup{
+				getRGAndClusterFromRGIDFunction = func(_, _, _ string) (k8s.ClusterInterface, *repv1.DellCSIReplicationGroup, error) {
+					return &k8s.Cluster{ClusterID: "cluster-1"}, &repv1.DellCSIReplicationGroup{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "rg-id",
 						},
-						Spec: v1.DellCSIReplicationGroupSpec{},
-						Status: v1.DellCSIReplicationGroupStatus{
-							ReplicationLinkState: v1.ReplicationLinkState{
+						Spec: repv1.DellCSIReplicationGroupSpec{},
+						Status: repv1.DellCSIReplicationGroupStatus{
+							ReplicationLinkState: repv1.ReplicationLinkState{
 								IsSource:             true,
 								LastSuccessfulUpdate: &metav1.Time{Time: time.Now()},
 							},
 						},
 					}, nil
 				}
-				getUpdateReplicationGroupFunction = func(_ k8s.ClusterInterface, _ context.Context, _ *v1.DellCSIReplicationGroup) error {
+				getUpdateReplicationGroupFunction = func(_ k8s.ClusterInterface, _ context.Context, _ *repv1.DellCSIReplicationGroup) error {
 					return nil
 				}
-				getWaitForStateToUpdateFunction = func(rgName string, cluster k8s.ClusterInterface, rLinkState v1.ReplicationLinkState) bool {
+				getWaitForStateToUpdateFunction = func(rgName string, cluster k8s.ClusterInterface, rLinkState repv1.ReplicationLinkState) bool {
 					return false
 				}
 			},
@@ -192,14 +191,14 @@ func TestFailbackToRG(t *testing.T) {
 				wait:         true,
 			},
 			setup: func() {
-				getRGAndClusterFromRGIDFunction = func(_, _, _ string) (k8s.ClusterInterface, *v1.DellCSIReplicationGroup, error) {
-					return &k8s.Cluster{ClusterID: "cluster-1"}, &v1.DellCSIReplicationGroup{
+				getRGAndClusterFromRGIDFunction = func(_, _, _ string) (k8s.ClusterInterface, *repv1.DellCSIReplicationGroup, error) {
+					return &k8s.Cluster{ClusterID: "cluster-1"}, &repv1.DellCSIReplicationGroup{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "rg-id",
 						},
-						Spec: v1.DellCSIReplicationGroupSpec{},
-						Status: v1.DellCSIReplicationGroupStatus{
-							ReplicationLinkState: v1.ReplicationLinkState{
+						Spec: repv1.DellCSIReplicationGroupSpec{},
+						Status: repv1.DellCSIReplicationGroupStatus{
+							ReplicationLinkState: repv1.ReplicationLinkState{
 								IsSource:             true,
 								LastSuccessfulUpdate: nil,
 							},
@@ -212,10 +211,10 @@ func TestFailbackToRG(t *testing.T) {
 				fatalLog = func(_ ...interface{}) {
 					exitCode = 1
 				}
-				getUpdateReplicationGroupFunction = func(_ k8s.ClusterInterface, _ context.Context, _ *v1.DellCSIReplicationGroup) error {
+				getUpdateReplicationGroupFunction = func(_ k8s.ClusterInterface, _ context.Context, _ *repv1.DellCSIReplicationGroup) error {
 					return errors.New("failback: error executing UpdateAction")
 				}
-				getWaitForStateToUpdateFunction = func(rgName string, cluster k8s.ClusterInterface, rLinkState v1.ReplicationLinkState) bool {
+				getWaitForStateToUpdateFunction = func(rgName string, cluster k8s.ClusterInterface, rLinkState repv1.ReplicationLinkState) bool {
 					return true
 				}
 			},
@@ -279,9 +278,9 @@ func Test_failbackToCluster(t *testing.T) {
 				mockClusterA := new(mocks.ClusterInterface)
 				mockClusterA.On("GetID").Return("test-name")
 				mockClusterA.On("GetReplicationGroups", mock.Anything, mock.Anything).Return(
-					&v1.DellCSIReplicationGroup{
-						Status: v1.DellCSIReplicationGroupStatus{
-							ReplicationLinkState: v1.ReplicationLinkState{
+					&repv1.DellCSIReplicationGroup{
+						Status: repv1.DellCSIReplicationGroupStatus{
+							ReplicationLinkState: repv1.ReplicationLinkState{
 								IsSource: true,
 								LastSuccessfulUpdate: &metav1.Time{
 									Time: time.Now(),
@@ -323,9 +322,9 @@ func Test_failbackToCluster(t *testing.T) {
 				mockClusterA := new(mocks.ClusterInterface)
 				mockClusterA.On("GetID").Return("test-name")
 				mockClusterA.On("GetReplicationGroups", mock.Anything, mock.Anything).Return(
-					&v1.DellCSIReplicationGroup{
-						Status: v1.DellCSIReplicationGroupStatus{
-							ReplicationLinkState: v1.ReplicationLinkState{
+					&repv1.DellCSIReplicationGroup{
+						Status: repv1.DellCSIReplicationGroupStatus{
+							ReplicationLinkState: repv1.ReplicationLinkState{
 								IsSource:             false,
 								LastSuccessfulUpdate: nil,
 							},
@@ -345,7 +344,7 @@ func Test_failbackToCluster(t *testing.T) {
 					}, errors.New("failback: error in initializing cluster info")
 				}
 
-				waitForStateToUpdateFunc = func(_ string, _ k8s.ClusterInterface, _ v1.ReplicationLinkState) bool {
+				waitForStateToUpdateFunc = func(_ string, _ k8s.ClusterInterface, _ repv1.ReplicationLinkState) bool {
 					return true
 				}
 
@@ -372,9 +371,9 @@ func Test_failbackToCluster(t *testing.T) {
 				mockClusterA := new(mocks.ClusterInterface)
 				mockClusterA.On("GetID").Return("test-name")
 				mockClusterA.On("GetReplicationGroups", mock.Anything, mock.Anything).Return(
-					&v1.DellCSIReplicationGroup{
-						Status: v1.DellCSIReplicationGroupStatus{
-							ReplicationLinkState: v1.ReplicationLinkState{
+					&repv1.DellCSIReplicationGroup{
+						Status: repv1.DellCSIReplicationGroupStatus{
+							ReplicationLinkState: repv1.ReplicationLinkState{
 								IsSource:             false,
 								LastSuccessfulUpdate: nil,
 							},
@@ -394,7 +393,7 @@ func Test_failbackToCluster(t *testing.T) {
 					}, errors.New("failback: error in initializing cluster info")
 				}
 
-				waitForStateToUpdateFunc = func(_ string, _ k8s.ClusterInterface, _ v1.ReplicationLinkState) bool {
+				waitForStateToUpdateFunc = func(_ string, _ k8s.ClusterInterface, _ repv1.ReplicationLinkState) bool {
 					return false
 				}
 

@@ -23,7 +23,6 @@ import (
 	"time"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
-	v1 "github.com/dell/csm-replication/api/v1"
 	fake_client "github.com/dell/csm-replication/test/e2e-framework/fake-client"
 	"github.com/dell/repctl/pkg/cmd/mocks"
 	"github.com/dell/repctl/pkg/config"
@@ -36,6 +35,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	repMock "github.com/dell/repctl/mocks"
 )
 
 type SnapshotTestSuite struct {
@@ -67,11 +69,10 @@ func (suite *SnapshotTestSuite) TestGetSnapshotCommand() {
 		getClustersFolderPath func(string) (string, error)
 		expectedError         bool
 		//expectedOutputContains          string
-		objects                         []runtime.Object
-		getListReplicationGroups        func(cluster k8s.ClusterInterface, ctx context.Context) (*v1.DellCSIReplicationGroupList, error)
-		getVerifyInputForSnapshotAction func(mc GetClustersInterface, input string, rg string) (res string, tgt string)
-		getRGAndClusterFromRGID         func(configFolder string, rgID string, filter string) (k8s.ClusterInterface, *v1.DellCSIReplicationGroup, error)
-		getUpdateReplicationGroup       func(cluster k8s.ClusterInterface, ctx context.Context, rg *v1.DellCSIReplicationGroup) error
+		objects                   []runtime.Object
+		getListReplicationGroups  func(cluster k8s.ClusterInterface, ctx context.Context) (*repv1.DellCSIReplicationGroupList, error)
+		getRGAndClusterFromRGID   func(configFolder string, rgID string, filter string) (k8s.ClusterInterface, *repv1.DellCSIReplicationGroup, error)
+		getUpdateReplicationGroup func(cluster k8s.ClusterInterface, ctx context.Context, rg *repv1.DellCSIReplicationGroup) error
 	}{
 		{
 			name: "Successful snapshot creation",
@@ -79,69 +80,34 @@ func (suite *SnapshotTestSuite) TestGetSnapshotCommand() {
 				return clusterPath, nil
 			},
 			expectedError: false,
-			//expectedOutputContains: "Snapshot created successfully",
 			objects: []runtime.Object{
 				&repv1.DellCSIReplicationGroupList{
-					Items: []v1.DellCSIReplicationGroup{
+					Items: []repv1.DellCSIReplicationGroup{
 						{ObjectMeta: metav1.ObjectMeta{Name: "rg"}},
 					},
 				},
 			},
-			getListReplicationGroups: func(cluster k8s.ClusterInterface, ctx context.Context) (*v1.DellCSIReplicationGroupList, error) {
-				return &v1.DellCSIReplicationGroupList{
-					Items: []v1.DellCSIReplicationGroup{
+			getListReplicationGroups: func(cluster k8s.ClusterInterface, ctx context.Context) (*repv1.DellCSIReplicationGroupList, error) {
+				return &repv1.DellCSIReplicationGroupList{
+					Items: []repv1.DellCSIReplicationGroup{
 						{ObjectMeta: metav1.ObjectMeta{Name: "rg"}},
 					},
 				}, nil
 			},
-			getVerifyInputForSnapshotAction: func(mc GetClustersInterface, input string, rg string) (res string, tgt string) {
-				return "", ""
-			},
-			getRGAndClusterFromRGID: func(configFolder string, rgID string, filter string) (k8s.ClusterInterface, *v1.DellCSIReplicationGroup, error) {
-				return &k8s.Cluster{ClusterID: "cluster-1"}, &v1.DellCSIReplicationGroup{
+			getRGAndClusterFromRGID: func(configFolder string, rgID string, filter string) (k8s.ClusterInterface, *repv1.DellCSIReplicationGroup, error) {
+				return &k8s.Cluster{ClusterID: "cluster-1"}, &repv1.DellCSIReplicationGroup{
 					ObjectMeta: metav1.ObjectMeta{Name: "rg"},
-					Status: v1.DellCSIReplicationGroupStatus{
-						ReplicationLinkState: v1.ReplicationLinkState{
+					Status: repv1.DellCSIReplicationGroupStatus{
+						ReplicationLinkState: repv1.ReplicationLinkState{
 							LastSuccessfulUpdate: &metav1.Time{Time: time.Now()},
 						},
 					},
 				}, nil
 			},
-			getUpdateReplicationGroup: func(cluster k8s.ClusterInterface, ctx context.Context, rg *v1.DellCSIReplicationGroup) error {
+			getUpdateReplicationGroup: func(cluster k8s.ClusterInterface, ctx context.Context, rg *repv1.DellCSIReplicationGroup) error {
 				return nil
 			},
 		},
-		// {
-		// 	name: "Error getting clusters folder path",
-		// 	getClustersFolderPath: func(path string) (string, error) {
-		// 		return "", errors.New("error")
-		// 	},
-		// 	expectedError:          true,
-		// 	expectedOutputContains: "error getting clusters folder path",
-		// 	objects: []runtime.Object{
-		// 		&v1.DellCSIReplicationGroupList{
-		// 			Items: []v1.DellCSIReplicationGroup{
-		// 				{ObjectMeta: metav1.ObjectMeta{Name: "rg"}},
-		// 			},
-		// 		},
-		// 	},
-		// 	getListReplicationGroups: func(cluster k8s.ClusterInterface, ctx context.Context) (*v1.DellCSIReplicationGroupList, error) {
-		// 		return &v1.DellCSIReplicationGroupList{
-		// 			Items: []v1.DellCSIReplicationGroup{
-		// 				{ObjectMeta: metav1.ObjectMeta{Name: "rg"}},
-		// 			},
-		// 		}, nil
-		// 	},
-		// 	getVerifyInputForSnapshotAction: func(mc GetClustersInterface, input string, rg string) (res string, tgt string) {
-		// 		return "", ""
-		// 	},
-		// 	getRGAndClusterFromRGID: func(configFolder string, rgID string, filter string) (k8s.ClusterInterface, *v1.DellCSIReplicationGroup, error) {
-		// 		return nil, nil, fmt.Errorf("error fetching RG info")
-		// 	},
-		// 	getUpdateReplicationGroup: func(cluster k8s.ClusterInterface, ctx context.Context, rg *v1.DellCSIReplicationGroup) error {
-		// 		return nil
-		// 	},
-		// },
 	}
 
 	for _, tt := range tests {
@@ -149,14 +115,12 @@ func (suite *SnapshotTestSuite) TestGetSnapshotCommand() {
 			// Save original function references
 			originalGetClustersFolderPathFunction := getClustersFolderPathFunction
 			originalGetListReplicationGroupsFunction := getListReplicationGroupsFunction
-			originalGetVerifyInputForSnapshotActionFunction := getVerifyInputForSnapshotActionFunction
 			originalGetRGAndClusterFromRGIDFunction := getRGAndClusterFromRGIDFunction
 			originalGetUpdateReplicationGroupFunction := getUpdateReplicationGroupFunction
 
 			defer func() {
 				getClustersFolderPathFunction = originalGetClustersFolderPathFunction
 				getListReplicationGroupsFunction = originalGetListReplicationGroupsFunction
-				getVerifyInputForSnapshotActionFunction = originalGetVerifyInputForSnapshotActionFunction
 				getRGAndClusterFromRGIDFunction = originalGetRGAndClusterFromRGIDFunction
 				getUpdateReplicationGroupFunction = originalGetUpdateReplicationGroupFunction
 			}()
@@ -164,7 +128,6 @@ func (suite *SnapshotTestSuite) TestGetSnapshotCommand() {
 			// Override with test-specific functions
 			getClustersFolderPathFunction = tt.getClustersFolderPath
 			getListReplicationGroupsFunction = tt.getListReplicationGroups
-			getVerifyInputForSnapshotActionFunction = tt.getVerifyInputForSnapshotAction
 			getRGAndClusterFromRGIDFunction = tt.getRGAndClusterFromRGID
 			getUpdateReplicationGroupFunction = tt.getUpdateReplicationGroup
 
@@ -202,24 +165,12 @@ func (suite *SnapshotTestSuite) TestGetSnapshotCommand() {
 
 			// Capture output
 			rescueStdout := os.Stdout
-			//r, w, _ := os.Pipe()
-			//os.Stdout = w
 
 			defer func() {
 				os.Stdout = rescueStdout
 			}()
 
 			snapshotCmd.Run(nil, nil)
-			//w.Close()
-			// out, _ := io.ReadAll(r)
-			// os.Stdout = rescueStdout
-
-			// Assertions
-			// if tt.expectedError {
-			// 	//assert.Contains(t, string(out), tt.expectedOutputContains)
-			// } else {
-			// 	assert.Nil(t, err)
-			// }
 		})
 	}
 }
@@ -234,10 +185,9 @@ func (suite *SnapshotTestSuite) TestCreateSnapshot() {
 		snClass                   string
 		verbose                   bool
 		wait                      bool
-		getRGAndClusterFromRGID   func(string, string, string) (k8s.ClusterInterface, *v1.DellCSIReplicationGroup, error)
-		getUpdateReplicationGroup func(k8s.ClusterInterface, context.Context, *v1.DellCSIReplicationGroup) error
-		expectedError             string
-		getWaitForStateToUpdate   func(string, k8s.ClusterInterface, v1.ReplicationLinkState) bool
+		getRGAndClusterFromRGID   func(string, string, string) (k8s.ClusterInterface, *repv1.DellCSIReplicationGroup, error)
+		getUpdateReplicationGroup func(k8s.ClusterInterface, context.Context, *repv1.DellCSIReplicationGroup) error
+		getWaitForStateToUpdate   func(string, k8s.ClusterInterface, repv1.ReplicationLinkState) bool
 	}{
 		{
 			name:         "successful snapshot creation",
@@ -248,23 +198,21 @@ func (suite *SnapshotTestSuite) TestCreateSnapshot() {
 			snClass:      "class",
 			verbose:      true,
 			wait:         false,
-			getRGAndClusterFromRGID: func(configFolder, rgName, src string) (k8s.ClusterInterface, *v1.DellCSIReplicationGroup, error) {
-				return &k8s.Cluster{ClusterID: "cluster1"}, &v1.DellCSIReplicationGroup{
+			getRGAndClusterFromRGID: func(configFolder, rgName, src string) (k8s.ClusterInterface, *repv1.DellCSIReplicationGroup, error) {
+				return &k8s.Cluster{ClusterID: "cluster1"}, &repv1.DellCSIReplicationGroup{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:        "rg1",
-						Annotations: map[string]string{},
+						Name: "rg1",
 					},
-					Status: v1.DellCSIReplicationGroupStatus{
-						ReplicationLinkState: v1.ReplicationLinkState{
+					Status: repv1.DellCSIReplicationGroupStatus{
+						ReplicationLinkState: repv1.ReplicationLinkState{
 							LastSuccessfulUpdate: &metav1.Time{Time: time.Now()},
 						},
 					},
 				}, nil
 			},
-			getUpdateReplicationGroup: func(cluster k8s.ClusterInterface, ctx context.Context, rg *v1.DellCSIReplicationGroup) error {
+			getUpdateReplicationGroup: func(cluster k8s.ClusterInterface, ctx context.Context, rg *repv1.DellCSIReplicationGroup) error {
 				return nil
 			},
-			expectedError: "",
 		},
 		{
 			name:         "successful snapshot creation with wait and getWaitForStateToUpdate is true",
@@ -275,26 +223,24 @@ func (suite *SnapshotTestSuite) TestCreateSnapshot() {
 			snClass:      "class",
 			verbose:      true,
 			wait:         true,
-			getRGAndClusterFromRGID: func(configFolder, rgName, src string) (k8s.ClusterInterface, *v1.DellCSIReplicationGroup, error) {
-				return &k8s.Cluster{ClusterID: "cluster1"}, &v1.DellCSIReplicationGroup{
+			getRGAndClusterFromRGID: func(configFolder, rgName, src string) (k8s.ClusterInterface, *repv1.DellCSIReplicationGroup, error) {
+				return &k8s.Cluster{ClusterID: "cluster1"}, &repv1.DellCSIReplicationGroup{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:        "rg1",
-						Annotations: map[string]string{},
+						Name: "rg1",
 					},
-					Status: v1.DellCSIReplicationGroupStatus{
-						ReplicationLinkState: v1.ReplicationLinkState{
+					Status: repv1.DellCSIReplicationGroupStatus{
+						ReplicationLinkState: repv1.ReplicationLinkState{
 							LastSuccessfulUpdate: &metav1.Time{Time: time.Now()},
 						},
 					},
 				}, nil
 			},
-			getUpdateReplicationGroup: func(cluster k8s.ClusterInterface, ctx context.Context, rg *v1.DellCSIReplicationGroup) error {
+			getUpdateReplicationGroup: func(cluster k8s.ClusterInterface, ctx context.Context, rg *repv1.DellCSIReplicationGroup) error {
 				return nil
 			},
-			getWaitForStateToUpdate: func(rgName string, cluster k8s.ClusterInterface, rLinkState v1.ReplicationLinkState) bool {
+			getWaitForStateToUpdate: func(rgName string, cluster k8s.ClusterInterface, rLinkState repv1.ReplicationLinkState) bool {
 				return true
 			},
-			expectedError: "",
 		},
 		{
 			name:         "snapshot creation with wait but getWaitForStateToUpdate is false",
@@ -305,26 +251,126 @@ func (suite *SnapshotTestSuite) TestCreateSnapshot() {
 			snClass:      "class",
 			verbose:      true,
 			wait:         true,
-			getRGAndClusterFromRGID: func(configFolder, rgName, src string) (k8s.ClusterInterface, *v1.DellCSIReplicationGroup, error) {
-				return &k8s.Cluster{ClusterID: "cluster1"}, &v1.DellCSIReplicationGroup{
+			getRGAndClusterFromRGID: func(configFolder, rgName, src string) (k8s.ClusterInterface, *repv1.DellCSIReplicationGroup, error) {
+				return &k8s.Cluster{ClusterID: "cluster1"}, &repv1.DellCSIReplicationGroup{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:        "rg1",
-						Annotations: map[string]string{},
+						Name: "rg1",
 					},
-					Status: v1.DellCSIReplicationGroupStatus{
-						ReplicationLinkState: v1.ReplicationLinkState{
+					Status: repv1.DellCSIReplicationGroupStatus{
+						ReplicationLinkState: repv1.ReplicationLinkState{
 							LastSuccessfulUpdate: &metav1.Time{Time: time.Now()},
 						},
 					},
 				}, nil
 			},
-			getUpdateReplicationGroup: func(cluster k8s.ClusterInterface, ctx context.Context, rg *v1.DellCSIReplicationGroup) error {
+			getUpdateReplicationGroup: func(cluster k8s.ClusterInterface, ctx context.Context, rg *repv1.DellCSIReplicationGroup) error {
 				return nil
 			},
-			getWaitForStateToUpdate: func(rgName string, cluster k8s.ClusterInterface, rLinkState v1.ReplicationLinkState) bool {
+			getWaitForStateToUpdate: func(rgName string, cluster k8s.ClusterInterface, rLinkState repv1.ReplicationLinkState) bool {
 				return false
 			},
-			expectedError: "",
+		},
+		{
+			name:         "snapshot failed to get RG and cluster from rgID",
+			configFolder: "config",
+			rgName:       "rg1",
+			prefix:       "replication.storage.dell.com",
+			snNamespace:  "namespace",
+			snClass:      "class",
+			verbose:      true,
+			wait:         false,
+			getRGAndClusterFromRGID: func(configFolder, rgName, src string) (k8s.ClusterInterface, *repv1.DellCSIReplicationGroup, error) {
+				return nil, nil, fmt.Errorf("failed to get RG and cluster from rgID")
+			},
+			getUpdateReplicationGroup: func(cluster k8s.ClusterInterface, ctx context.Context, rg *repv1.DellCSIReplicationGroup) error {
+				return nil
+			},
+			getWaitForStateToUpdate: func(rgName string, cluster k8s.ClusterInterface, rLinkState repv1.ReplicationLinkState) bool {
+				return true
+			},
+		},
+
+		{
+			name:         "snapshot failed: link state is nil",
+			configFolder: "config",
+			rgName:       "rg1",
+			prefix:       "replication.storage.dell.com",
+			snNamespace:  "namespace",
+			snClass:      "class",
+			verbose:      true,
+			wait:         false,
+			getRGAndClusterFromRGID: func(configFolder, rgName, src string) (k8s.ClusterInterface, *repv1.DellCSIReplicationGroup, error) {
+				return &k8s.Cluster{ClusterID: "cluster1"}, &repv1.DellCSIReplicationGroup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "rg1",
+					},
+					Status: repv1.DellCSIReplicationGroupStatus{
+						ReplicationLinkState: repv1.ReplicationLinkState{},
+					},
+				}, nil
+			},
+			getUpdateReplicationGroup: func(cluster k8s.ClusterInterface, ctx context.Context, rg *repv1.DellCSIReplicationGroup) error {
+				return nil
+			},
+			getWaitForStateToUpdate: func(rgName string, cluster k8s.ClusterInterface, rLinkState repv1.ReplicationLinkState) bool {
+				return true
+			},
+		},
+		{
+			name:         "snapshot failed: snapshotclass is missing",
+			configFolder: "config",
+			rgName:       "rg1",
+			prefix:       "replication.storage.dell.com",
+			snNamespace:  "namespace",
+			snClass:      "",
+			verbose:      true,
+			wait:         false,
+			getRGAndClusterFromRGID: func(configFolder, rgName, src string) (k8s.ClusterInterface, *repv1.DellCSIReplicationGroup, error) {
+				return &k8s.Cluster{ClusterID: "cluster1"}, &repv1.DellCSIReplicationGroup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "rg1",
+					},
+					Status: repv1.DellCSIReplicationGroupStatus{
+						ReplicationLinkState: repv1.ReplicationLinkState{
+							LastSuccessfulUpdate: &metav1.Time{Time: time.Now()},
+						},
+					},
+				}, nil
+			},
+			getUpdateReplicationGroup: func(cluster k8s.ClusterInterface, ctx context.Context, rg *repv1.DellCSIReplicationGroup) error {
+				return nil
+			},
+			getWaitForStateToUpdate: func(rgName string, cluster k8s.ClusterInterface, rLinkState repv1.ReplicationLinkState) bool {
+				return true
+			},
+		},
+		{
+			name:         "snapshot failed: unable to update replication group",
+			configFolder: "config",
+			rgName:       "rg1",
+			prefix:       "replication.storage.dell.com",
+			snNamespace:  "namespace",
+			snClass:      "myClass",
+			verbose:      true,
+			wait:         false,
+			getRGAndClusterFromRGID: func(configFolder, rgName, src string) (k8s.ClusterInterface, *repv1.DellCSIReplicationGroup, error) {
+				return &k8s.Cluster{ClusterID: "cluster1"}, &repv1.DellCSIReplicationGroup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "rg1",
+					},
+					Status: repv1.DellCSIReplicationGroupStatus{
+						ReplicationLinkState: repv1.ReplicationLinkState{
+							LastSuccessfulUpdate: &metav1.Time{Time: time.Now()},
+						},
+					},
+				}, nil
+			},
+			getUpdateReplicationGroup: func(cluster k8s.ClusterInterface, ctx context.Context, rg *repv1.DellCSIReplicationGroup) error {
+				return fmt.Errorf("error")
+			},
+			getWaitForStateToUpdate: func(rgName string, cluster k8s.ClusterInterface, rLinkState repv1.ReplicationLinkState) bool {
+				return true
+			},
 		},
 	}
 
@@ -356,11 +402,74 @@ func (suite *SnapshotTestSuite) TestCreateSnapshot() {
 				tt.verbose,
 				tt.wait,
 			)
-
-			// Optional: Add assertions here if you capture logs or output
-			if tt.expectedError != "" {
-				assert.Contains(t, tt.expectedError, "error fetching RG info")
-			}
 		})
 	}
+}
+
+func (suite *SnapshotTestSuite) TestVerifyInputForSnapshotAction() {
+	rgName := "myRG"
+	suite.T().Run("fail: unable to get replication groups", func(t *testing.T) {
+		originalClusterPath := clusterPath
+		defer func() {
+			clusterPath = originalClusterPath
+		}()
+
+		clusterPath = "testdata"
+
+		originalGetClustersFolderPathFunction := getClustersFolderPathFunction
+		defer func() {
+			getClustersFolderPathFunction = originalGetClustersFolderPathFunction
+		}()
+
+		getClustersFolderPathFunction = func(path string) (string, error) {
+			return path, nil
+		}
+
+		res, tgt := verifyInputForSnapshotAction(&k8s.MultiClusterConfigurator{}, "", rgName)
+		assert.Empty(t, res)
+		assert.Empty(t, tgt)
+	})
+
+	suite.T().Run("success: rgList input matches", func(t *testing.T) {
+		originalClusterPath := clusterPath
+		defer func() {
+			clusterPath = originalClusterPath
+		}()
+
+		clusterPath = "testdata"
+
+		originalGetClustersFolderPathFunction := getClustersFolderPathFunction
+		defer func() {
+			getClustersFolderPathFunction = originalGetClustersFolderPathFunction
+		}()
+
+		getClustersFolderPathFunction = func(path string) (string, error) {
+			return path, nil
+		}
+
+		repList := &repv1.DellCSIReplicationGroupList{
+			Items: []repv1.DellCSIReplicationGroup{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "myRG",
+					},
+				},
+			},
+		}
+
+		mockClient := repMock.NewMockClientInterface(gomock.NewController(t))
+		mockClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil).SetArg(1, *repList)
+
+		defaultGetControllerRuntimeClient := k8s.GetCtrlRuntimeClient
+		defer func() {
+			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
+		}()
+		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+			return mockClient, nil
+		}
+
+		res, tgt := verifyInputForSnapshotAction(&k8s.MultiClusterConfigurator{}, "", rgName)
+		assert.Equal(t, res, "rg")
+		assert.Equal(t, tgt, "myRG")
+	})
 }

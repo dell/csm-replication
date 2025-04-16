@@ -58,7 +58,7 @@ This command will create a snapshot for the specified RG on the target cluster.\
 			snClass := viper.GetString("sn-class")
 			verbose := viper.GetBool(config.Verbose)
 			wait := viper.GetBool("snapshot-wait")
-			input, res := verifyInputForSnapshotAction(mc, inputCluster, rgName)
+			input, res := getVerifyInputForSnapshotActionFunction(mc, inputCluster, rgName)
 
 			configFolder, err := getClustersFolderPathFunction(clusterPath)
 			if err != nil {
@@ -100,7 +100,6 @@ func verifyInputForSnapshotAction(mc GetClustersInterface, input string, rg stri
 		log.Fatalf("snapshot: error getting clusters folder path: %s", err.Error())
 	}
 
-	//mc := &k8s.MultiClusterConfigurator{}
 	clusters, err := mc.GetAllClusters([]string{}, configFolder)
 	if err != nil {
 		log.Fatalf("error in initializing cluster info: %s", err.Error())
@@ -141,24 +140,22 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass string, v
 
 	cluster, rg, err := getRGAndClusterFromRGIDFunction(configFolder, rgName, "src")
 	if err != nil {
-		log.Fatalf("snapshot to RG: error fetching RG info: (%s)\n", err.Error())
+		log.Errorf("snapshot to RG: error fetching RG info: (%s)\n", err.Error())
 		return
 	}
 
 	if verbose {
 		log.Printf("found specified RG (%s) on cluster (%s)...\n", rg.Name, cluster.GetID())
-		log.Print("updating spec...", rg.Name)
-
 	}
 
 	rLinkState := rg.Status.ReplicationLinkState
 	if rLinkState.LastSuccessfulUpdate == nil {
-		log.Fatal("Aborted. One of your RGs is in an error state. Please verify RGs logs/events and try again.")
+		log.Errorf("Aborted. One of your RGs is in an error state. Please verify RGs logs/events and try again.")
 		return
 	}
 
 	if snClass == "" {
-		log.Fatal("Aborted. Snapshot class not provided.")
+		log.Errorf("Aborted. Snapshot class not provided.")
 		return
 	}
 
@@ -179,7 +176,7 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass string, v
 	rg.Annotations[prefix+"/snapshotClass"] = snClass
 
 	if err := getUpdateReplicationGroupFunction(cluster, context.Background(), rg); err != nil {
-		log.Fatalf("snapshot: error executing UpdateAction %s\n", err.Error())
+		log.Errorf("snapshot: error executing UpdateAction %s\n", err.Error())
 		return
 	}
 

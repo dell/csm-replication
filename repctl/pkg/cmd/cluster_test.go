@@ -33,7 +33,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
-	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -616,22 +615,22 @@ func TestGenerateConfigsFromSA(t *testing.T) {
 
 func TestAddKeyFromLiteralToSecret(t *testing.T) {
 	tests := []struct {
-		secret      *corev1.Secret
+		secret      *v1.Secret
 		keyName     string
 		data        []byte
 		expectedErr error
 	}{
 		{
-			secret: &corev1.Secret{
+			secret: &v1.Secret{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: corev1.SchemeGroupVersion.String(),
+					APIVersion: v1.SchemeGroupVersion.String(),
 					Kind:       "Secret",
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-secret",
 					Namespace: "test-namespace",
 				},
-				Type: corev1.SecretTypeOpaque,
+				Type: v1.SecretTypeOpaque,
 				Data: map[string][]byte{},
 			},
 			keyName:     "test-key",
@@ -639,16 +638,16 @@ func TestAddKeyFromLiteralToSecret(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			secret: &corev1.Secret{
+			secret: &v1.Secret{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: corev1.SchemeGroupVersion.String(),
+					APIVersion: v1.SchemeGroupVersion.String(),
 					Kind:       "Secret",
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-secret",
 					Namespace: "test-namespace",
 				},
-				Type: corev1.SecretTypeOpaque,
+				Type: v1.SecretTypeOpaque,
 				Data: map[string][]byte{"test-key": []byte("test-value")},
 			},
 			keyName:     "test-key",
@@ -656,16 +655,16 @@ func TestAddKeyFromLiteralToSecret(t *testing.T) {
 			expectedErr: fmt.Errorf("cannot add key %s, another key by that name already exists", "test-key"),
 		},
 		{
-			secret: &corev1.Secret{
+			secret: &v1.Secret{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: corev1.SchemeGroupVersion.String(),
+					APIVersion: v1.SchemeGroupVersion.String(),
 					Kind:       "Secret",
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-secret",
 					Namespace: "test-namespace",
 				},
-				Type: corev1.SecretTypeOpaque,
+				Type: v1.SecretTypeOpaque,
 				Data: map[string][]byte{},
 			},
 			keyName:     "invalid key",
