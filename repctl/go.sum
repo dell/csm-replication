@@ -39,6 +39,10 @@ github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSs
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/dell/csm-replication v1.11.0 h1:5UNECV0ZpA9h1aDxc4nABhbJBIdL/MpcULiB9ELm/Mg=
+github.com/dell/csm-replication v1.11.0/go.mod h1:V8hDXbryhseyp6TNlT1DeXsuJ19zGA1sSB4Ynz/pDU4=
+github.com/dell/csm-replication v1.11.1-0.20250416153617-b2a7d6526a1c h1:emBrSazkKJHbHSVvEhwYGX7fPn/MLY5+5dmd99t/wpU=
+github.com/dell/csm-replication v1.11.1-0.20250416153617-b2a7d6526a1c/go.mod h1:pKyuJ3+9uHwHkmyhz1JC4L6zQ0ygyqqQSQYk1I29zhk=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/dgryski/go-sip13 v0.0.0-20181026042036-e10d5fee7954/go.mod h1:vAd38F8PWV+bWy6jNmig1y/TA+kYO4g3RSRF0IAv0no=
 github.com/emicklei/go-restful/v3 v3.12.1 h1:PJMDIM/ak7btuL8Ex0iYET9hxM3CI2sjZtzpL63nKAU=
