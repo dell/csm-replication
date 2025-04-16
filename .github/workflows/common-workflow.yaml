@@ -12,3 +12,16 @@ jobs:
   common:
     name: Quality Checks
     uses: dell/common-github-actions/.github/workflows/go-common.yml@main
+  # gosec doesn't support project structures for nested go modules
+  # running gosec against repctl/ separately
+  gosec-for-repctl:
+    name: GoSec for Repctl
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v4
+      - name: Run Gosec Security Scanner
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          cd ./repctl
+          gosec ./...
