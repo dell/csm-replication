@@ -68,7 +68,7 @@ func (suite *PVReconcileSuite) Init() {
 	_ = repv1.AddToScheme(scheme.Scheme)
 
 	var obj []runtime.Object
-	c, err := fakeclient.NewFakeClient(obj, nil)
+	c, err := fakeclient.NewFakeClient(obj, nil, nil)
 	suite.NoError(err)
 
 	suite.mockUtils = &utils.MockUtils{
