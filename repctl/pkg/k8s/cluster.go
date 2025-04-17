@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	apiTypes "k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -49,10 +50,25 @@ type Clusters struct {
 	Clusters []ClusterInterface
 }
 
+var (
+	displayNewTableWriter         = display.NewTableWriter
+	clientcmdBuildConfigFromFlags = clientcmd.BuildConfigFromFlags
+	kubernetesNewForConfig        = kubernetes.NewForConfig
+	GetCtrlRuntimeClient          = func(kubeconfig string) (client.Client, error) {
+		return getControllerRuntimeClient(kubeconfig)
+	}
+	newClntSet = func(kubeconfig string) (*kubernetes.Clientset, *rest.Config, error) {
+		return newClientSet(kubeconfig)
+	}
+	getServiceVersion = func(clientset *kubernetes.Clientset) (*version.Info, error) {
+		return clientset.Discovery().ServerVersion()
+	}
+)
+
 // Print prints all currently managed clusters to stdout in form a table
 func (c *Clusters) Print() {
 	// Form an empty object and create a new table writer
-	t, err := display.NewTableWriter(Cluster{}, os.Stdout)
+	t, err := displayNewTableWriter(Cluster{}, os.Stdout)
 	if err != nil {
 		return
 	}
@@ -404,134 +420,94 @@ func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object
 		return nil, err
 	}
 
-	switch runtimeObj.(type) {
+	switch obj := runtimeObj.(type) {
 	case *storagev1.StorageClass:
-		scObj, ok := runtimeObj.(*storagev1.StorageClass)
-		if !ok {
-			return nil, fmt.Errorf("unsupported object type")
-		}
-		err := c.client.Create(ctx, scObj)
+		err := c.client.Create(ctx, obj)
 		if err != nil {
 			return nil, err
 		}
-		log.Print("Successfully created storage class: ", scObj.Name)
+		log.Print("Successfully created storage class: ", obj.Name)
 	case *v1.Namespace:
-		nsObj, ok := runtimeObj.(*v1.Namespace)
-		if !ok {
-			return nil, fmt.Errorf("unsupported object type")
-		}
-		err := c.client.Create(ctx, nsObj)
+		err := c.client.Create(ctx, obj)
 		if err != nil {
 			return nil, err
 		}
 	case *apiExtensionsv1.CustomResourceDefinition:
-		crdObj, ok := runtimeObj.(*apiExtensionsv1.CustomResourceDefinition)
-		if !ok {
-			return nil, fmt.Errorf("unsupported object type")
-		}
-		err := c.client.Create(ctx, crdObj)
+		err := c.client.Create(ctx, obj)
 		if err != nil {
 			return nil, err
 		}
-		log.Print("Successfully created crds: ", crdObj.Name)
+		log.Print("Successfully created crds: ", obj.Name)
 	case *rbacv1.ClusterRole:
-		crObj, ok := runtimeObj.(*rbacv1.ClusterRole)
-		if !ok {
-			return nil, fmt.Errorf("unsupported object type")
-		}
-		err := c.client.Create(ctx, crObj)
+		err := c.client.Create(ctx, obj)
 		if err != nil {
 			if strings.Contains(err.Error(), "already exists") {
-				err := c.client.Update(ctx, crObj)
+				err := c.client.Update(ctx, obj)
 				if err != nil {
 					return nil, err
 				}
-				log.Print("Successfully updated existing cluster role: ", crObj.Name)
+				log.Print("Successfully updated existing cluster role: ", obj.Name)
 			} else {
 				return nil, err
 			}
 		} else {
-			log.Print("Successfully created cluster role: ", crObj.Name)
+			log.Print("Successfully created cluster role: ", obj.Name)
 		}
 	case *rbacv1.ClusterRoleBinding:
-		crbObj, ok := runtimeObj.(*rbacv1.ClusterRoleBinding)
-		if !ok {
-			return nil, fmt.Errorf("unsupported object type")
-		}
-		err := c.client.Create(ctx, crbObj)
+		err := c.client.Create(ctx, obj)
 		if err != nil {
 			if strings.Contains(err.Error(), "already exists") {
-				err := c.client.Update(ctx, crbObj)
+				err := c.client.Update(ctx, obj)
 				if err != nil {
 					return nil, err
 				}
-				log.Print("Successfully updated existing cluster role binding: ", crbObj.Name)
+				log.Print("Successfully updated existing cluster role binding: ", obj.Name)
 			} else {
 				return nil, err
 			}
 		} else {
-			log.Print("Successfully created cluster role binding: ", crbObj.Name)
+			log.Print("Successfully created cluster role binding: ", obj.Name)
 		}
 	case *v1.Service:
-		svcObj, ok := runtimeObj.(*v1.Service)
-		if !ok {
-			return nil, fmt.Errorf("unsupported object type")
-		}
-		err := c.client.Create(ctx, svcObj)
+		err := c.client.Create(ctx, obj)
 		if err != nil {
 			return nil, err
 		}
 	case *appsv1.Deployment:
-		dplObj, ok := runtimeObj.(*appsv1.Deployment)
-		if !ok {
-			return nil, fmt.Errorf("unsupported object type")
-		}
-		err := c.client.Create(ctx, dplObj)
+		err := c.client.Create(ctx, obj)
 		if err != nil {
 			if strings.Contains(err.Error(), "already exists") {
-				err := c.client.Update(ctx, dplObj)
+				err := c.client.Update(ctx, obj)
 				if err != nil {
 					return nil, err
 				}
-				log.Print("Successfully updated existing deployment: ", dplObj.Name)
+				log.Print("Successfully updated existing deployment: ", obj.Name)
 			} else {
 				return nil, err
 			}
 		} else {
-			log.Print("Successfully created deployment: ", dplObj.Name)
+			log.Print("Successfully created deployment: ", obj.Name)
 		}
 	case *v1.ConfigMap:
-		cmObj, ok := runtimeObj.(*v1.ConfigMap)
-		if !ok {
-			return nil, fmt.Errorf("unsupported object type")
-		}
-		err := c.client.Create(ctx, cmObj)
+		err := c.client.Create(ctx, obj)
 		if err != nil {
 			return nil, err
 		}
-		log.Print("Successfully created config map: ", cmObj.Name)
+		log.Print("Successfully created config map: ", obj.Name)
 	case *v1.ServiceAccount:
-		cmObj, ok := runtimeObj.(*v1.ServiceAccount)
-		if !ok {
-			return nil, fmt.Errorf("unsupported object type")
-		}
-		err := c.client.Create(ctx, cmObj)
+		err := c.client.Create(ctx, obj)
 		if err != nil {
 			return nil, err
 		}
-		log.Print("Successfully created ServiceAccount: ", cmObj.Name)
+		log.Print("Successfully created ServiceAccount: ", obj.Name)
 	case *v1.Secret:
-		cmObj, ok := runtimeObj.(*v1.Secret)
-		if !ok {
-			return nil, fmt.Errorf("unsupported object type")
-		}
-		err := c.client.Create(ctx, cmObj)
+		err := c.client.Create(ctx, obj)
 		if err != nil {
 			return nil, err
 		}
-		log.Print("Successfully created Secret: ", cmObj.Name)
+		log.Print("Successfully created Secret: ", obj.Name)
 	default:
-		return nil, fmt.Errorf("unsupported object type %+v", runtimeObj.GetObjectKind())
+		return nil, fmt.Errorf("unsupported object type %+v", obj.GetObjectKind())
 	}
 
 	return runtimeObj, nil
@@ -626,11 +602,11 @@ func (*MultiClusterConfigurator) GetAllClusters(clusterIDs []string, configDir s
 
 func newClientSet(kubeconfig string) (*kubernetes.Clientset, *rest.Config, error) {
 	// Create a Config (k8s.io/client-go/rest)
-	restConfig, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	restConfig, err := clientcmdBuildConfigFromFlags("", kubeconfig)
 	if err != nil {
 		return nil, nil, err
 	}
-	clientset, err := kubernetes.NewForConfig(restConfig)
+	clientset, err := kubernetesNewForConfig(restConfig)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -639,7 +615,7 @@ func newClientSet(kubeconfig string) (*kubernetes.Clientset, *rest.Config, error
 
 // CreateCluster creates new k8s client for cluster
 func CreateCluster(clusterID, kubeconfig string) (ClusterInterface, error) {
-	k8sClient, err := getControllerRuntimeClient(kubeconfig)
+	k8sClient, err := GetCtrlRuntimeClient(kubeconfig)
 	if err != nil {
 		return nil, err
 	}
@@ -648,12 +624,12 @@ func CreateCluster(clusterID, kubeconfig string) (ClusterInterface, error) {
 
 	// Create a temporary clientset to get the server version
 	// controller runtime client doesnt provide the discovery interface
-	clientset, restConfig, err := newClientSet(kubeconfig)
+	clientset, restConfig, err := newClntSet(kubeconfig)
 	if err != nil {
 		// We can silently ignore this error
 	} else {
 		host = restConfig.Host
-		version, err := clientset.Discovery().ServerVersion()
+		version, err := getServiceVersion(clientset)
 		if err != nil {
 			// We can silently ignore this error
 		} else {
