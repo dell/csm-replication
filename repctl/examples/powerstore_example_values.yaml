@@ -18,3 +18,4 @@ parameters:
   mode: "ASYNC"    # For SYNC, rpo will be set to zero by default and not required to specify.
   ignoreNamespaces: "false"
   volumeGroupPrefix: "csi"
+  csiNfs: "" # Set to RWX if Host Based NFS is enabled
