@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package cmd
 import (
 	"context"
 
+	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/repctl/pkg/k8s"
 
 	"github.com/dell/repctl/pkg/config"
@@ -47,7 +48,7 @@ repctl will patch CR at cluster1 with action SWAP_LOCAL.`,
 			verbose := viper.GetBool(config.Verbose)
 			wait := viper.GetBool("swap-wait")
 			input, res := verifyInputForAction(inputCluster, rgName)
-			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
+			configFolder, err := getClustersFolderPathFunction(clusterPath)
 			if err != nil {
 				log.Fatalf("swap: error getting clusters folder path: %s", err.Error())
 			}
@@ -56,7 +57,8 @@ repctl will patch CR at cluster1 with action SWAP_LOCAL.`,
 			} else if input == "rg" {
 				swapAtRG(configFolder, res, verbose, wait)
 			} else {
-				log.Fatal("Unexpected input received")
+				log.Errorf("Unexpected input received")
+				return
 			}
 		},
 	}
@@ -75,7 +77,7 @@ func swapAtRG(configFolder string, rgName string, verbose bool, wait bool) {
 		log.Printf("fetching RG and cluster info...")
 	}
 	// fetch the specified RG and the cluster info
-	cluster, rg, err := GetRGAndClusterFromRGID(configFolder, rgName, "")
+	cluster, rg, err := getRGAndClusterFromRGIDFunction(configFolder, rgName, "")
 	if err != nil {
 		log.Fatalf("failover to RG: error fetching RG info: (%s)", err.Error())
 	}
@@ -89,11 +91,11 @@ func swapAtRG(configFolder string, rgName string, verbose bool, wait bool) {
 		log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
 	}
 	rg.Spec.Action = config.ActionSwap
-	if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
+	if err := getUpdateReplicationGroupFunction(cluster, context.Background(), rg); err != nil {
 		log.Fatalf("swap: error executing UpdateAction %s", err.Error())
 	}
 	if wait {
-		success := waitForStateToUpdate(rgName, cluster, rLinkState)
+		success := getWaitForStateToUpdateFunction(rgName, cluster, rLinkState)
 		if success {
 			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
 			return
@@ -108,8 +110,8 @@ func swapAtCluster(configFolder string, inputCluster string, rgName string, verb
 	if verbose {
 		log.Print("reading cluster configs...")
 	}
-	mc := &k8s.MultiClusterConfigurator{}
-	clusters, err := mc.GetAllClusters([]string{inputCluster}, configFolder)
+	// mc := &k8s.MultiClusterConfigurator{}
+	clusters, err := getAllClustersFunction([]string{inputCluster}, configFolder)
 	if err != nil {
 		log.Fatalf("swap: error in initializing cluster info: %s", err.Error())
 	}
@@ -117,7 +119,7 @@ func swapAtCluster(configFolder string, inputCluster string, rgName string, verb
 	if verbose {
 		log.Printf("found cluster (%s)", cluster.GetID())
 	}
-	rg, err := cluster.GetReplicationGroups(context.Background(), rgName)
+	rg, err := getReplicationGroupsFunction(cluster, context.Background(), rgName)
 	if err != nil {
 		log.Fatalf("swap: error in fecthing RG info: %s", err.Error())
 	}
@@ -129,11 +131,11 @@ func swapAtCluster(configFolder string, inputCluster string, rgName string, verb
 		log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
 	}
 	rg.Spec.Action = config.ActionSwap
-	if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
+	if err := getUpdateReplicationGroupFunction(cluster, context.Background(), rg); err != nil {
 		log.Fatalf("swap: error executing UpdateAction %s", err.Error())
 	}
 	if wait {
-		success := waitForStateToUpdate(rgName, cluster, rLinkState)
+		success := getWaitForStateToUpdateFunction(rgName, cluster, rLinkState)
 		if success {
 			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
 			return
@@ -142,4 +144,13 @@ func swapAtCluster(configFolder string, inputCluster string, rgName string, verb
 		return
 	}
 	log.Printf("RG (%s), successfully updated with action: swap", rg.Name)
+}
+
+var getReplicationGroupsFunction = func(cluster k8s.ClusterInterface, ctx context.Context, rgName string) (*repv1.DellCSIReplicationGroup, error) {
+	return cluster.GetReplicationGroups(ctx, rgName)
+}
+
+var getAllClustersFunction = func(clusterIDs []string, configDir string) (*k8s.Clusters, error) {
+	mc := &k8s.MultiClusterConfigurator{}
+	return mc.GetAllClusters(clusterIDs, configDir)
 }

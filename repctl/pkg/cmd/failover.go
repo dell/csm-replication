@@ -1,5 +1,5 @@
 /*
- Copyright © 2022-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2022-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -28,6 +28,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	maxWaitTimeout = 5 * time.Minute
+	waitRetryDelay = 5 * time.Second
+)
+
 // GetFailoverCommand returns 'failover' cobra command
 /* #nosec G104 */
 func GetFailoverCommand() *cobra.Command {
@@ -54,9 +59,10 @@ With --unplanned, this command will perform an unplanned failover to given clust
 			verbose := viper.GetBool(config.Verbose)
 			target := verifyInputForFailoverAction(inputTargetCluster)
 
-			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
+			configFolder, err := getClustersFolderPathFunction(clusterPath)
 			if err != nil {
-				log.Fatalf("failover: error getting clusters folder path: %s\n", err.Error())
+				log.Errorf("failover: error getting clusters folder path: %s\n", err.Error())
+				return
 			}
 
 			if target == "cluster" {
@@ -64,7 +70,8 @@ With --unplanned, this command will perform an unplanned failover to given clust
 			} else if target == "rg" {
 				failoverToRG(configFolder, inputTargetCluster, unplanned, verbose, wait)
 			} else {
-				log.Fatalf("Unexpected input")
+				log.Error("unexpected input")
+				return
 			}
 		},
 	}
@@ -87,7 +94,7 @@ func verifyInputForFailoverAction(input string) string {
 		log.Fatalf("failover: wrong input, no input provided. Either clusterID or RGID is needed.\n")
 	}
 
-	configFolder, err := getClustersFolderPath("/.repctl/clusters/")
+	configFolder, err := getClustersFolderPathFunction(clusterPath)
 	if err != nil {
 		log.Fatalf("list pvc: error getting clusters folder path: %s", err.Error())
 	}
@@ -284,13 +291,18 @@ func failoverToCluster(configFolder, inputTargetCluster, rgName string, unplanne
 
 func waitForStateToUpdate(rgName string, cluster k8s.ClusterInterface, repllinkstate repv1.ReplicationLinkState) bool {
 	ret := make(chan bool)
+	timeout := time.After(maxWaitTimeout)
+	ticker := time.NewTicker(waitRetryDelay)
+	defer ticker.Stop()
+
 	go func() {
 		log.Print("Waiting for action to complete ...")
 		for {
 			select {
-			case <-time.After(5 * time.Minute):
+			case <-timeout:
 				ret <- false
-			default:
+				return
+			case <-ticker.C:
 				rg, err := cluster.GetReplicationGroups(context.Background(), rgName)
 				if err != nil {
 					log.Fatalf("failover: error in fecthing RG info: %s\n", err.Error())
@@ -299,7 +311,6 @@ func waitForStateToUpdate(rgName string, cluster k8s.ClusterInterface, repllinks
 					ret <- true
 					return
 				}
-				time.Sleep(5 * time.Second)
 			}
 		}
 	}()

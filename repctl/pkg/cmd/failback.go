@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -17,12 +17,20 @@ package cmd
 import (
 	"context"
 
-	"github.com/dell/repctl/pkg/k8s"
-
 	"github.com/dell/repctl/pkg/config"
+	"github.com/dell/repctl/pkg/k8s"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+)
+
+var (
+	fatalfLog                  = log.Fatalf
+	fatalLog                   = log.Fatal
+	getMultiClusterAllClusters = func(mc *k8s.MultiClusterConfigurator, clusterIDs []string, configDir string) (*k8s.Clusters, error) {
+		return mc.GetAllClusters(clusterIDs, configDir)
+	}
+	waitForStateToUpdateFunc = waitForStateToUpdate
 )
 
 // GetFailbackCommand returns 'failback' cobra command
@@ -51,7 +59,7 @@ With --discard, this command will perform an failback but discard any writes at 
 			wait := viper.GetBool("failback-wait")
 			input := verifyInputForFailoverAction(inputSourceCluster)
 
-			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
+			configFolder, err := getClustersFolderPathFunction("/.repctl/clusters/")
 			if err != nil {
 				log.Fatalf("failback: error getting clusters folder path: %s\n", err.Error())
 			}
@@ -61,7 +69,8 @@ With --discard, this command will perform an failback but discard any writes at 
 			} else if input == "rg" {
 				failbackToRG(configFolder, inputSourceCluster, discard, verbose, wait)
 			} else {
-				log.Fatal("Unexpected input received")
+				log.Error("unexpected input")
+				return
 			}
 		},
 	}
@@ -83,16 +92,16 @@ func failbackToRG(configFolder, rgName string, discard, verbose bool, wait bool)
 		log.Printf("fetching RG and cluster info...\n")
 	}
 	// fetch the source RG and the cluster info
-	cluster, rg, err := GetRGAndClusterFromRGID(configFolder, rgName, "src")
+	cluster, rg, err := getRGAndClusterFromRGIDFunction(configFolder, rgName, "src")
 	if err != nil {
-		log.Fatalf("failback to RG: error fetching source RG info: (%s)\n", err.Error())
+		fatalfLog("failback to RG: error fetching source RG info: (%s)\n", err.Error())
 	}
 	if verbose {
 		log.Printf("found RG (%s) on cluster (%s)...\n", rg.Name, cluster.GetID())
 	}
 	rLinkState := rg.Status.ReplicationLinkState
 	if rLinkState.LastSuccessfulUpdate == nil {
-		log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
+		fatalLog("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
 	}
 	rg.Spec.Action = config.ActionFailbackLocal
 	if discard {
@@ -104,11 +113,11 @@ func failbackToRG(configFolder, rgName string, discard, verbose bool, wait bool)
 	if verbose {
 		log.Print("updating spec...")
 	}
-	if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
-		log.Fatalf("failback: error executing UpdateAction %s\n", err.Error())
+	if err := getUpdateReplicationGroupFunction(cluster, context.Background(), rg); err != nil {
+		fatalfLog("failback: error executing UpdateAction %s\n", err.Error())
 	}
 	if wait {
-		success := waitForStateToUpdate(rgName, cluster, rLinkState)
+		success := getWaitForStateToUpdateFunction(rgName, cluster, rLinkState)
 		if success {
 			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
 			return
@@ -125,9 +134,9 @@ func failbackToCluster(configFolder, inputSourceCluster, rgName string, discard,
 		log.Print("reading cluster configs...")
 	}
 	mc := &k8s.MultiClusterConfigurator{}
-	clusters, err := mc.GetAllClusters([]string{inputSourceCluster}, configFolder)
+	clusters, err := getMultiClusterAllClusters(mc, []string{inputSourceCluster}, configFolder)
 	if err != nil {
-		log.Fatalf("failback: error in initializing cluster info: %s\n", err.Error())
+		fatalfLog("failback: error in initializing cluster info: %s\n", err.Error())
 	}
 	sourceCluster := clusters.Clusters[0]
 	if verbose {
@@ -135,17 +144,17 @@ func failbackToCluster(configFolder, inputSourceCluster, rgName string, discard,
 	}
 	rg, err := sourceCluster.GetReplicationGroups(context.Background(), rgName)
 	if err != nil {
-		log.Fatalf("failback: error in fecthing RG info: %s\n", err.Error())
+		fatalfLog("failback: error in fecthing RG info: %s\n", err.Error())
 	}
 	if verbose {
 		log.Printf("found RG (%s) on cluster (%s)...\n", rg.Name, sourceCluster.GetID())
 	}
 	if !rg.Status.ReplicationLinkState.IsSource {
-		log.Fatalf("failback: error executing failback to target site.")
+		fatalfLog("failback: error executing failback to target site.")
 	}
 	rLinkState := rg.Status.ReplicationLinkState
 	if rLinkState.LastSuccessfulUpdate == nil {
-		log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
+		fatalLog("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
 	}
 	rg.Spec.Action = config.ActionFailbackLocal
 	if discard {
@@ -158,10 +167,10 @@ func failbackToCluster(configFolder, inputSourceCluster, rgName string, discard,
 		log.Printf("found RG (%s) on source cluster, updating spec...\n", rg.Name)
 	}
 	if err := sourceCluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
-		log.Fatalf("failback: error executing UpdateAction %s\n", err.Error())
+		fatalfLog("failback: error executing UpdateAction %s\n", err.Error())
 	}
 	if wait {
-		success := waitForStateToUpdate(rgName, sourceCluster, rLinkState)
+		success := waitForStateToUpdateFunc(rgName, sourceCluster, rLinkState)
 		if success {
 			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
 			return

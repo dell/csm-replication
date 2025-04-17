@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -20,8 +20,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+var (
+	clientNewFunc = func(config *rest.Config, options client.Options) (client.Client, error) {
+		return client.New(config, options)
+	}
+	buildConfigFromFlags = clientcmd.BuildConfigFromFlags
 )
 
 func getControllerRuntimeClient(kubeconfig string) (client.Client, error) {
@@ -29,11 +37,11 @@ func getControllerRuntimeClient(kubeconfig string) (client.Client, error) {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(apiExtensionsv1.AddToScheme(scheme))
 	utilruntime.Must(repv1.AddToScheme(scheme))
-	clientConfig, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	clientConfig, err := buildConfigFromFlags("", kubeconfig)
 	if err != nil {
 		return nil, err
 	}
-	k8sClient, err := client.New(clientConfig, client.Options{Scheme: scheme})
+	k8sClient, err := clientNewFunc(clientConfig, client.Options{Scheme: scheme})
 	if err != nil {
 		return nil, err
 	}
