@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -72,7 +72,7 @@ func (suite *CreateTestSuite) TestCreatePVCs() {
 		cmd := getCreatePersistentVolumeClaimsCommand()
 		suite.NotNil(cmd)
 
-		//cmd.Flag("rg").Value.Set(rgName)
+		// cmd.Flag("rg").Value.Set(rgName)
 		cmd.Flag("target-namespace").Value.Set("test-ns")
 		viper.Set("pvs", pvList)
 		cmd.Flag("dry-run").Value.Set("true")
@@ -91,7 +91,7 @@ func (suite *CreateTestSuite) TestCreatePVCs() {
 
 		createMultiClusterConfiguratorInterface = originalFunc
 
-		//err := createPVCs(pvList, mockCluster, rgName, "test-ns", prefix, dryRun)
+		// err := createPVCs(pvList, mockCluster, rgName, "test-ns", prefix, dryRun)
 	})
 
 	suite.Run("from provided pvs", func() {
@@ -129,7 +129,7 @@ func (suite *CreateTestSuite) TestCreatePVCs() {
 		cmd := getCreatePersistentVolumeClaimsCommand()
 		suite.NotNil(cmd)
 
-		//cmd.Flag("rg").Value.Set(rgName)
+		// cmd.Flag("rg").Value.Set(rgName)
 		cmd.Flag("target-namespace").Value.Set("test-ns")
 		viper.Set("pvs", pvList)
 		cmd.Flag("dry-run").Value.Set("true")
@@ -148,7 +148,7 @@ func (suite *CreateTestSuite) TestCreatePVCs() {
 
 		createMultiClusterConfiguratorInterface = originalFunc
 
-		//err := createPVCs(pvList, mockCluster, "", "test-ns", prefix, dryRun)
+		// err := createPVCs(pvList, mockCluster, "", "test-ns", prefix, dryRun)
 	})
 }
 
@@ -208,7 +208,7 @@ func (suite *CreateTestSuite) TestCreateSCs() {
 	cmd := getCreateStorageClassCommand()
 	suite.NotNil(cmd)
 
-	file, err := os.OpenFile("testdata/test.yaml", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	file, err := os.OpenFile("testdata/test.yaml", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 	suite.Nil(err)
 	defer file.Close()
 
@@ -218,7 +218,7 @@ func (suite *CreateTestSuite) TestCreateSCs() {
 	cmd.Flag("from-config").Value.Set("testdata/test.yaml")
 	cmd.Flag("dry-run").Value.Set("true")
 	cmd.Run(nil, []string{})
-	//err := createSCs(config, clusters, false)
+	// err := createSCs(config, clusters, false)
 
 	cmd.Flag("dry-run").Value.Set("fasle")
 	cmd.Run(nil, []string{})

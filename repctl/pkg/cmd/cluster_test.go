@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -91,7 +91,6 @@ func (suite *ClusterTestSuite) TestAddAndRemoveCluster() {
 }
 
 func (suite *ClusterTestSuite) TestInjectCluster() {
-
 	tests := []struct {
 		name                          string
 		clusters                      *k8s.Clusters
@@ -243,7 +242,6 @@ func (suite *ClusterTestSuite) TestInjectCluster() {
 
 	for _, tt := range tests {
 		suite.Suite.T().Run(tt.name, func(t *testing.T) {
-
 			mcMock := new(mocks.MultiClusterConfiguratorInterface)
 			mcMock.On("GetAllClusters", tt.clusterIDs, mock.Anything).Return(tt.clusters, tt.getAllClustersError)
 
@@ -274,7 +272,6 @@ func (suite *ClusterTestSuite) TestInjectCluster() {
 }
 
 func (suite *ClusterTestSuite) TestGetInjectClustersCommand() {
-
 	mockClient := new(mocks.ClientInterface)
 	mockClient.On("Create", mock.Anything, mock.Anything).Return(nil)
 	mockClient.On("Update", mock.Anything, mock.Anything).Return(nil)
@@ -334,7 +331,6 @@ func TestClusterTestSuite(t *testing.T) {
 }
 
 func (suite *ClusterTestSuite) TestAddClusterCommand() {
-
 	tests := []struct {
 		name                  string
 		getClustersFolderPath func(string) (string, error)
@@ -409,7 +405,6 @@ func (suite *ClusterTestSuite) TestAddClusterCommand() {
 }
 
 func (suite *ClusterTestSuite) TestRemoveClusterCommand() {
-
 	tests := []struct {
 		name                  string
 		getClustersFolderPath func(string) (string, error)
@@ -588,7 +583,6 @@ func TestGenerateConfigsFromSA(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			RunCommand = func(_ *exec.Cmd) error {
 				return tt.runCommandError
 			}

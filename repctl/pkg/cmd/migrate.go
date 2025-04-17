@@ -1,5 +1,5 @@
 /*
- Copyright © 2022-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2022-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -369,13 +369,13 @@ func migratePV(ctx context.Context, cluster k8s.ClusterInterface, pvName string,
 	if wait {
 		done := waitForPVToBeBound(pvName+"-to-"+toSC, cluster)
 		if done {
-			fmt.Printf("Successfully updated pv") //This message is validated in UT; do not delete or change
+			fmt.Printf("Successfully updated pv") // This message is validated in UT; do not delete or change
 			log.Infof("Successfully updated pv %s in cluster %s. Consider using new PV: [%s]", pv.Name, cluster.GetID(), pvName+"-to-"+toSC)
 		} else {
 			log.Error("time out waiting for the PV to be bound")
 		}
 	} else {
-		fmt.Printf("Successfully updated pv") //This message is validated in UT; do not delete or change
+		fmt.Printf("Successfully updated pv") // This message is validated in UT; do not delete or change
 		log.Infof("Successfully updated pv %s in cluster %s. Consider using new PV: [%s]", pv.Name, cluster.GetID(), pvName+"-to-"+toSC)
 	}
 }
@@ -538,13 +538,13 @@ func migrateArray(ctx context.Context, cluster k8s.ClusterInterface, mgName stri
 	if wait {
 		done := waitForArrayMigration(mgName, cluster)
 		if done {
-			fmt.Printf("Successfully migrated all volumes from source array to target") //This message is validated in UT; do not delete or change
+			fmt.Printf("Successfully migrated all volumes from source array to target") // This message is validated in UT; do not delete or change
 			log.Infof("Successfully migrated all volumes from source array to target")
 		} else {
 			log.Error("time out waiting for array migration")
 		}
 	} else {
-		fmt.Printf("Successfully migrated all volumes from source array to target") //This message is validated in UT; do not delete or change
+		fmt.Printf("Successfully migrated all volumes from source array to target") // This message is validated in UT; do not delete or change
 		log.Infof("Successfully migrated all volumes from source array to target")
 	}
 }
