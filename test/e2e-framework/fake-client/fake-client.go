@@ -1,5 +1,5 @@
 /*
-Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,8 +35,35 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
 
-type errorInjector interface {
-	shouldFail(method string, obj runtime.Object) error
+type ErrorInjector interface {
+	ShouldFail(method string, obj runtime.Object) error
+}
+
+type deleteSpoofer interface {
+	match(obj runtime.Object) bool
+}
+
+type deleteSpooferImpl struct {
+	allowedObject runtime.Object
+}
+
+func NewDeleteSpooferImpl(allowedObject runtime.Object) deleteSpoofer {
+	return &deleteSpooferImpl{allowedObject: allowedObject}
+}
+
+func (d *deleteSpooferImpl) match(obj runtime.Object) bool {
+	allowedKey, err := getKey(d.allowedObject)
+	if err != nil {
+		return false
+	}
+	key, err := getKey(obj)
+	if err != nil {
+		return false
+	}
+	if key.Name == allowedKey.Name && key.Kind == allowedKey.Kind {
+		return true
+	}
+	return false
 }
 
 type storageKey struct {
@@ -48,7 +75,8 @@ type storageKey struct {
 // Client is a fake k8s client
 type Client struct {
 	Objects       map[storageKey]runtime.Object
-	errorInjector errorInjector
+	errorInjector ErrorInjector
+	deleteSpoofer deleteSpoofer
 	SubResourceClient
 }
 
@@ -72,10 +100,17 @@ func getKey(obj runtime.Object) (storageKey, error) {
 }
 
 // NewFakeClient initializes and returns new fake k8s client
-func NewFakeClient(initialObjects []runtime.Object, errorInjector errorInjector) (*Client, error) {
+
+func NewFakeClient(initialObjects []runtime.Object, errorInjector ErrorInjector, deleteSpoofer deleteSpoofer) (*Client, error) {
+	err := repv1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		return nil, err
+	}
+
 	client := &Client{
 		Objects:       map[storageKey]runtime.Object{},
 		errorInjector: errorInjector,
+		deleteSpoofer: deleteSpoofer,
 	}
 
 	for _, obj := range initialObjects {
@@ -91,7 +126,7 @@ func NewFakeClient(initialObjects []runtime.Object, errorInjector errorInjector)
 // Get finds object and puts it in client.Object obj argument
 func (f Client) Get(_ context.Context, key client.ObjectKey, obj client.Object, _ ...client.GetOption) error {
 	if f.errorInjector != nil {
-		if err := f.errorInjector.shouldFail("Get", obj); err != nil {
+		if err := f.errorInjector.ShouldFail("Get", obj); err != nil {
 			return err
 		}
 	}
@@ -126,7 +161,7 @@ func (f Client) Get(_ context.Context, key client.ObjectKey, obj client.Object, 
 // List list all requested items in fake cluster
 func (f Client) List(_ context.Context, list client.ObjectList, opts ...client.ListOption) error {
 	if f.errorInjector != nil {
-		if err := f.errorInjector.shouldFail("List", list); err != nil {
+		if err := f.errorInjector.ShouldFail("List", list); err != nil {
 			return err
 		}
 	}
@@ -139,6 +174,8 @@ func (f Client) List(_ context.Context, list client.ObjectList, opts ...client.L
 		return f.listPersistentVolume(list.(*core_v1.PersistentVolumeList), opts...)
 	case *repv1.DellCSIReplicationGroupList:
 		return f.listReplicationGroup(list.(*repv1.DellCSIReplicationGroupList), opts...)
+	case *core_v1.PodList:
+		return f.listPod(list.(*core_v1.PodList), opts...)
 	default:
 		return fmt.Errorf("unknown type: %s", reflect.TypeOf(list))
 	}
@@ -165,7 +202,28 @@ func (f *Client) listPersistentVolumeClaim(list *core_v1.PersistentVolumeClaimLi
 			if lo.LabelSelector != nil && !lo.LabelSelector.Matches(labels.Set(pvc.Labels)) {
 				continue
 			}
+			if lo.Namespace != "" && lo.Namespace != pvc.Namespace {
+				continue
+			}
 			list.Items = append(list.Items, *v.(*core_v1.PersistentVolumeClaim))
+		}
+	}
+	return nil
+}
+
+func (f *Client) listPod(list *core_v1.PodList, opts ...client.ListOption) error {
+	lo := &client.ListOptions{}
+	for _, option := range opts {
+		option.ApplyToList(lo)
+	}
+
+	for k, v := range f.Objects {
+		if k.Kind == "Pod" {
+			pod := *v.(*core_v1.Pod)
+			if lo.LabelSelector != nil && !lo.LabelSelector.Matches(labels.Set(pod.Labels)) {
+				continue
+			}
+			list.Items = append(list.Items, *v.(*core_v1.Pod))
 		}
 	}
 	return nil
@@ -210,7 +268,7 @@ func (f *Client) listReplicationGroup(list *repv1.DellCSIReplicationGroupList, o
 // Create creates new object in fake cluster by putting it in map
 func (f Client) Create(_ context.Context, obj client.Object, _ ...client.CreateOption) error {
 	if f.errorInjector != nil {
-		if err := f.errorInjector.shouldFail("Create", obj); err != nil {
+		if err := f.errorInjector.ShouldFail("Create", obj); err != nil {
 			return err
 		}
 	}
@@ -237,10 +295,10 @@ func (f Client) Create(_ context.Context, obj client.Object, _ ...client.CreateO
 // Delete deletes existing object in fake cluster by removing it from map
 func (f Client) Delete(_ context.Context, obj client.Object, opts ...client.DeleteOption) error {
 	if len(opts) > 0 {
-		return fmt.Errorf("delete options are not supported")
+		fmt.Printf("delete options are not supported")
 	}
 	if f.errorInjector != nil {
-		if err := f.errorInjector.shouldFail("Delete", obj); err != nil {
+		if err := f.errorInjector.ShouldFail("Delete", obj); err != nil {
 			return err
 		}
 	}
@@ -261,6 +319,12 @@ func (f Client) Delete(_ context.Context, obj client.Object, opts ...client.Dele
 		}
 		return errors.NewNotFound(gvr, k.Name)
 	}
+	if f.deleteSpoofer != nil {
+		if f.deleteSpoofer.match(obj) {
+			// Return without actually removing object from map.
+			return nil
+		}
+	}
 	delete(f.Objects, k)
 	return nil
 }
@@ -268,7 +332,7 @@ func (f Client) Delete(_ context.Context, obj client.Object, opts ...client.Dele
 // Update updates object in fake k8s cluster
 func (f Client) Update(_ context.Context, obj client.Object, _ ...client.UpdateOption) error {
 	if f.errorInjector != nil {
-		if err := f.errorInjector.shouldFail("Update", obj); err != nil {
+		if err := f.errorInjector.ShouldFail("Update", obj); err != nil {
 			return err
 		}
 	}
