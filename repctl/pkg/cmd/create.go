@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -37,6 +37,8 @@ import (
 //go:embed templates/*
 //go:embed scripts/gen_kubeconfig.sh scripts/config-placeholder
 var f embed.FS
+
+var createMultiClusterConfiguratorInterface = createMultiClusterConfig
 
 // Mirrored is a struct that contains parameters for both src and dst systems
 type Mirrored struct {
@@ -131,7 +133,7 @@ cat <path-to-file> | ./repctl create -f -
 
 			clusterIDs := viper.GetStringSlice(config.Clusters)
 
-			mc := &k8s.MultiClusterConfigurator{}
+			mc := createMultiClusterConfiguratorInterface()
 			clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
 			if err != nil {
 				log.Fatalf("list pv: error in initializing cluster info: %s", err.Error())
@@ -202,7 +204,7 @@ re-run the command by removing the dry run flag.`,
 				log.Fatalf("create pvc: error getting clusters folder path: %s", err.Error())
 			}
 
-			mc := &k8s.MultiClusterConfigurator{}
+			mc := createMultiClusterConfiguratorInterface()
 			clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
 			if err != nil {
 				log.Fatalf("create pvc: error in initializing cluster info: %s", err.Error())
@@ -265,7 +267,7 @@ func getCreateStorageClassCommand() *cobra.Command {
 				log.Fatalf("create sc: error getting clusters folder path: %s", err.Error())
 			}
 
-			mc := &k8s.MultiClusterConfigurator{}
+			mc := createMultiClusterConfiguratorInterface()
 			clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
 			if err != nil {
 				log.Fatalf("create sc: error in initializing cluster info: %s", err.Error())
@@ -479,4 +481,8 @@ func splitFuncAt(substring string) func(data []byte, atEOF bool) (advance int, t
 		// Request more data.
 		return 0, nil, nil
 	}
+}
+
+func createMultiClusterConfig() k8s.MultiClusterConfiguratorInterface {
+	return &k8s.MultiClusterConfigurator{}
 }
