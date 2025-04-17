@@ -12,9 +12,7 @@ build-static:
 	CGO_ENABLED=1 CGO_LDFLAGS="-static" go build ./cmd/repctl
 
 test:
-	cp ../scripts/gen_kubeconfig.sh ./pkg/cmd/scripts/gen_kubeconfig.sh
-	cp ../scripts/config-placeholder ./pkg/cmd/scripts/config-placeholder
-	go clean -cache; cd ./pkg; go test -race -cover -coverprofile=coverage.out -coverpkg ./... ./...
+	go clean -cache; cd ./pkg; go test -race -cover -coverprofile=coverage.out ./...
 
 # Install Go tools to build the code
 tools:

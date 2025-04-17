@@ -11,7 +11,7 @@ require (
 	github.com/dell/dell-csi-extensions/replication v1.10.2-0.20250325135746-bee5d830cdce
 	github.com/dell/gobrick v1.13.2-0.20250324100052-8d8c8046d514
 	github.com/fatih/color v1.18.0
-	github.com/fsnotify/fsnotify v1.8.0
+	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/go-logr/logr v1.4.2
 	github.com/google/uuid v1.6.0
@@ -20,8 +20,8 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.20.0
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/net v0.38.0
-	golang.org/x/sync v0.12.0
+	golang.org/x/net v0.39.0
+	golang.org/x/sync v0.13.0
 	google.golang.org/grpc v1.71.0
 	google.golang.org/protobuf v1.36.4
 	k8s.io/api v0.32.1
@@ -80,9 +80,9 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/oauth2 v0.25.0 // indirect
-	golang.org/x/sys v0.31.0 // indirect
-	golang.org/x/term v0.30.0 // indirect
-	golang.org/x/text v0.23.0 // indirect
+	golang.org/x/sys v0.32.0 // indirect
+	golang.org/x/term v0.31.0 // indirect
+	golang.org/x/text v0.24.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250115164207-1a7da9e5054f // indirect

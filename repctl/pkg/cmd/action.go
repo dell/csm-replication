@@ -47,12 +47,14 @@ This command will perform a maintenance on current source site. repctl will patc
 			verbose := viper.GetBool(config.Verbose)
 			action, err := getSupportedMaintenanceAction(inputAction)
 			if err != nil {
-				log.Fatalf("exec: error in supported action: %s", err.Error())
+				log.Error(fmt.Sprintf("exec: error in supported action: %s", err.Error()))
+				return
 			}
+
 			if verbose {
 				log.Printf("Proceeding for action (%s)...", action)
 			}
-			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
+			configFolder, err := getClustersFolderPathFunction(clusterPath)
 			if err != nil {
 				log.Fatalf("exec: error getting clusters folder path: %s", err.Error())
 			}
@@ -85,7 +87,8 @@ This command will perform a maintenance on current source site. repctl will patc
 				}
 			}
 			if !found {
-				log.Fatalf("exec: no matching cluster found with RG as source (%s)", rgName)
+				log.Error(fmt.Sprintf("exec: no matching cluster found with RG as source (%s)", rgName))
+				return
 			}
 		},
 	}
