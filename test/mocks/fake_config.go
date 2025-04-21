@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -65,7 +65,7 @@ func New(source string, targets ...string) connection.MultiClusterClient {
 			ReclaimPolicy: &policy,
 		}
 		obj = append(obj, &scObj)
-		client, _ := fake_client.NewFakeClient(obj, nil)
+		client, _ := fake_client.NewFakeClient(obj, nil, nil)
 		config.clusterClient[target] = &connection.RemoteK8sControllerClient{
 			ClusterID: target,
 			Client:    client,

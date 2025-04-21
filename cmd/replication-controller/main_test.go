@@ -943,7 +943,7 @@ func TestCreateReplicationGroupReconciler(t *testing.T) {
 					}
 				}()
 			}
-			createReplicationGroupReconciler(tt.manager, tt.controllerMgr, tt.domain, tt.workerThreads, tt.expRateLimiter, tt.setupLog)
+			createReplicationGroupReconciler(tt.manager, tt.controllerMgr, tt.domain, tt.workerThreads, tt.expRateLimiter, false, tt.setupLog)
 			if tt.name == "Manager is not nil" {
 				if exitCode != 0 {
 					t.Errorf("Expected exit code 0, but got %d", exitCode)

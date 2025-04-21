@@ -1,5 +1,5 @@
 /*
- Copyright © 2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2022-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -40,6 +40,13 @@ type DecodedSecret struct {
 	StringData        map[string]string `json:"stringData,omitempty" protobuf:"bytes,4,rep,name=stringData"`
 	Type              v1.SecretType     `json:"type,omitempty" protobuf:"bytes,3,opt,name=type,casttype=SecretType"`
 }
+
+var (
+	readFile      = os.ReadFile
+	unmarshalYAML = yaml.Unmarshal
+	jsonMarshal   = json.Marshal
+	jsonToYAML    = yaml.JSONToYAML
+)
 
 // ToSecret converts Decoded Secret to Secret
 func (s *DecodedSecret) ToSecret() *v1.Secret {
@@ -106,6 +113,20 @@ func GetEditCommand() *cobra.Command {
 	return editCmd
 }
 
+var (
+	getMultiConfigClusters = func(mc *k8s.MultiClusterConfigurator, clusterIDs []string, configDir string) (*k8s.Clusters, error) {
+		return mc.GetAllClusters(clusterIDs, configDir)
+	}
+
+	getSecretFunction = func(cluster k8s.ClusterInterface, ctx context.Context, secretNamespace string, secretName string) (*v1.Secret, error) {
+		return cluster.GetSecret(ctx, secretNamespace, secretName)
+	}
+
+	getUpdateSecretFunction = func(cluster k8s.ClusterInterface, ctx context.Context, secret *v1.Secret) error {
+		return cluster.UpdateSecret(ctx, secret)
+	}
+)
+
 func editSecretCommand() *cobra.Command {
 	editSecretCmd := &cobra.Command{
 		Use:     "secret",
@@ -115,7 +136,7 @@ func editSecretCommand() *cobra.Command {
 ./repctl edit secret <secret name> --namespace <namespace>
 ./repctl edit secret <secret name> --namespace <namespace> --clusters <cluster name>`,
 		Run: func(cmd *cobra.Command, args []string) {
-			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
+			configFolder, err := getClustersFolderPathFunction(clusterPath)
 			if err != nil {
 				log.Fatalf("edit secret: error getting clusters folder path: %s", err.Error())
 			}
@@ -123,7 +144,7 @@ func editSecretCommand() *cobra.Command {
 			clusterIDs := viper.GetStringSlice(config.Clusters)
 
 			mc := &k8s.MultiClusterConfigurator{}
-			clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
+			clusters, err := getMultiConfigClusters(mc, clusterIDs, configFolder)
 			if err != nil {
 				log.Fatalf("edit secret: error in initializing cluster info: %s", err.Error())
 			}
@@ -133,7 +154,7 @@ func editSecretCommand() *cobra.Command {
 
 			secretName := args[0]
 			secretNamespace := viper.GetString("namespace")
-			s, err := cluster.GetSecret(context.Background(), secretNamespace, secretName)
+			s, err := getSecretFunction(cluster, context.Background(), secretNamespace, secretName)
 			if err != nil {
 				log.Fatalf("edit secret: error in getting secret: %s", err.Error())
 			}
@@ -176,7 +197,7 @@ func editSecretCommand() *cobra.Command {
 
 			for _, cluster := range clusters.Clusters {
 				copiedSecret := newSecret.DeepCopy()
-				err = cluster.UpdateSecret(context.Background(), copiedSecret)
+				err = getUpdateSecretFunction(cluster, context.Background(), copiedSecret)
 				if err != nil {
 					log.Fatalf("edit secret: error in updating secret in clusters: %s", err.Error())
 				}
@@ -195,11 +216,11 @@ func editSecretCommand() *cobra.Command {
 // objectYAML converts object into string
 func objectYAML(obj interface{}) string {
 	objString := ""
-	j, err := json.Marshal(obj)
+	j, err := jsonMarshal(obj)
 	if err != nil {
 		objString = err.Error()
 	} else {
-		y, err := yaml.JSONToYAML(j)
+		y, err := jsonToYAML(j)
 		if err != nil {
 			objString = err.Error()
 		} else {
@@ -211,13 +232,13 @@ func objectYAML(obj interface{}) string {
 
 // parseSecret parses *one* secret out of a YAML file and returns it
 func parseSecret(path string) (*v1.Secret, error) {
-	content, err := os.ReadFile(filepath.Clean(path))
+	content, err := readFile(filepath.Clean(path))
 	if err != nil {
 		return nil, err
 	}
 
 	var mySecret DecodedSecret
-	err = yaml.Unmarshal(content, &mySecret)
+	err = unmarshalYAML(content, &mySecret)
 	if err != nil {
 		return nil, err
 	}
