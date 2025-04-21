@@ -12,25 +12,6 @@ rules:
       - get
       - list
       - watch
-  # - apiGroups:
-  #     - apiextensions.k8s.io
-  #   resources:
-  #     - customresourcedefinitions/status
-  #   verbs:
-  #     - get
-  #     - list
-  #     - watch
-  # - apiGroups:
-  #     - coordination.k8s.io
-  #   resources:
-  #     - leases
-  #   verbs:
-  #     - create
-  #     - delete
-  #     - get
-  #     - list
-  #     - update
-  #     - watch
   - apiGroups:
       - ""
     resources:
@@ -54,21 +35,9 @@ rules:
     resources:
       - persistentvolumeclaims
     verbs:
-      # - create
-      # - delete
-      # - get
       - list
-      # - patch
       - update
       - watch
-  # - apiGroups:
-  #     - ""
-  #   resources:
-  #     - persistentvolumeclaims/status
-  #   verbs:
-  #     - get
-  #     - patch
-  #     - update
   - apiGroups:
       - ""
     resources:
@@ -86,7 +55,6 @@ rules:
     resources:
       - pods
     verbs:
-      # - get
       - list
       - watch
   - apiGroups:
@@ -94,7 +62,6 @@ rules:
     resources:
       - secrets
     verbs:
-      # - get
       - list
       - watch
   - apiGroups:
@@ -102,21 +69,9 @@ rules:
     resources:
       - dellcsireplicationgroups
     verbs:
-      # - create
-      # - delete
-      # - get
       - list
-      # - patch
       - update
       - watch
-  # - apiGroups:
-  #     - replication.storage.dell.com
-  #   resources:
-  #     - dellcsireplicationgroups/status
-  #   verbs:
-  #     - get
-  #     - patch
-  #     - update
   - apiGroups:
       - storage.k8s.io
     resources:
@@ -160,10 +115,7 @@ rules:
       - create
       - delete
       - get
-      # - list
       - patch
-      # - update
-      # - watch
   - apiGroups:
       - ""
     resources:
@@ -178,16 +130,12 @@ rules:
       - pods
     verbs:
       - get
-      # - list
-      # - watch
   - apiGroups:
       - ""
     resources:
       - secrets
     verbs:
       - get
-      # - list
-      # - watch
   - apiGroups:
       - replication.storage.dell.com
     resources:
@@ -196,10 +144,7 @@ rules:
       - create
       - delete
       - get
-      # - list
       - patch
-      # - update
-      # - watch
   - apiGroups:
       - replication.storage.dell.com
     resources:
