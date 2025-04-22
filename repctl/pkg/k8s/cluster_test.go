@@ -1748,7 +1748,7 @@ metadata:
 			data: []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: error-object`), 
+  name: error-object`),
 			expectedErr: true,
 		},
 		{
@@ -1756,7 +1756,7 @@ metadata:
 			data: []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: already-exists-object`), 
+  name: already-exists-object`),
 			expectedErr: false,
 		},
 		{
