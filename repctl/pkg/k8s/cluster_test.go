@@ -1744,6 +1744,22 @@ metadata:
 			expectedErr: false,
 		},
 		{
+			name: "Error creating Role",
+			data: []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: error-object`), 
+			expectedErr: true,
+		},
+		{
+			name: "Updating existing Role",
+			data: []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: already-exists-object`), 
+			expectedErr: false,
+		},
+		{
 			name: "Create ClusterRoleBinding",
 			data: []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -1757,6 +1773,22 @@ metadata:
 kind: RoleBinding
 metadata:
   name: test-rolebinding`),
+			expectedErr: false,
+		},
+		{
+			name: "Error Creating RoleBinding",
+			data: []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: error-object`),
+			expectedErr: true,
+		},
+		{
+			name: "Updating Existing RoleBinding",
+			data: []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: already-exists-object`),
 			expectedErr: false,
 		},
 		{
