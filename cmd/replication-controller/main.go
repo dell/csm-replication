@@ -119,6 +119,7 @@ var (
 		flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 			"Enable leader election for dell-replication-controller manager. "+
 				"Enabling this will ensure there is only one active dell-replication-controller manager.")
+		flag.BoolVar(&allowPVCCreationOnTarget, "allow-pvc-creation-on-target", false, "Allow PVC creation on target cluster")
 		flag.DurationVar(&retryIntervalStart, "retry-interval-start", time.Second, "Initial retry interval of failed reconcile request. It doubles with each failure, upto retry-interval-max")
 		flag.DurationVar(&retryIntervalMax, "retry-interval-max", 5*time.Minute, "Maximum retry interval of failed reconcile request")
 		flag.IntVar(&workerThreads, "worker-threads", 2, "Number of concurrent reconcilers for each of the controllers")

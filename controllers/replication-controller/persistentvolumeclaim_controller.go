@@ -16,6 +16,7 @@ package replicationcontroller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	controller "github.com/dell/csm-replication/controllers"
@@ -144,7 +145,33 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 	remoteClaim := &v1.PersistentVolumeClaim{}
 	remotePVCName := ""
 	remotePVCNamespace := ""
+	fmt.Printf("ssss allow pvc creation falg is %v \n", r.AllowPVCCreationOnTarget)
+	if remoteClusterID != controller.Self && r.AllowPVCCreationOnTarget {
+		//if its not single cluster then check the pv status and create pvc on target cluster
+		if remotePV.Status.Phase == v1.VolumeAvailable && remotePV.Spec.ClaimRef != nil {
+			fmt.Printf("ssss inside if check of volume available \n")
+			remoteClaim.Spec.AccessModes = remotePV.Spec.AccessModes
+			remoteClaim.Spec.Resources.Requests = v1.ResourceList{
+				v1.ResourceStorage: remotePV.Spec.Capacity[v1.ResourceStorage],
+			}
+			requests := remoteClaim.Spec.Resources.Requests
+			requestsStr := fmt.Sprintf("%v", requests)
+			fmt.Printf("ssss updating annotations for pvc \n")
+			//updating pvc annotations
+			updatePVCAnnotations(remoteClaim, remoteClusterID, requestsStr, remotePV)
+			fmt.Printf("ssss updating labels for pvc \n")
+			//updating pvc labels
+			updatePVCLabels(remoteClaim, claim, remoteClusterID)
+			err = rClient.CreatePersistentVolumeClaim(ctx, remoteClaim)
+			if err != nil {
+				log.Error(err, "Failed to create remote PVC on target cluster")
+				return ctrl.Result{}, err
+			}
+			fmt.Printf("ssss PVC created without error %+v\n", remoteClaim)
+		}
+	}
 	if remotePV.Status.Phase == v1.VolumeBound && remotePV.Spec.ClaimRef != nil {
+		fmt.Printf("ssss if volume is bound and claim ref not nil %+v\n", remotePV.Spec.ClaimRef)
 		remotePVCName = remotePV.Spec.ClaimRef.Name
 		remotePVCNamespace = remotePV.Spec.ClaimRef.Namespace
 		remoteClaim, err = rClient.GetPersistentVolumeClaim(ctx, remotePVCNamespace, remotePVCName)
@@ -153,6 +180,80 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 		}
 	} else {
 		remoteClaim = nil
+	}
+
+	//Shefali
+	// Handle PVC deletion if timestamp is set in remote PV
+	if remotePV.DeletionTimestamp.IsZero() {
+		fmt.Printf("ssss If deletion time stamp added to remote PVC namespace %s pvc name  %s \n", remotePVCNamespace, remotePV.Spec.ClaimRef.Name)
+		// Process deletion of remote PV
+		if _, ok := remoteClaim.Annotations[controller.DeletionRequested]; !ok {
+			log.V(common.InfoLevel).Info("Deletion requested annotation not found")
+			remoteVolumeClaim, err := rClient.GetPersistentVolumeClaim(ctx, remotePVCNamespace, remotePV.Spec.ClaimRef.Name)
+			fmt.Printf("ssss after get pvc \n")
+			if err != nil {
+				// If remote PVC doesn't exist, proceed to removing finalizer
+				if !errors.IsNotFound(err) {
+					log.Error(err, "Failed to get remote volume claim")
+					return ctrl.Result{}, err
+				}
+			} else {
+				log.V(common.DebugLevel).Info("Got remote PVC")
+				if remotePV.Annotations[controller.RemoteRGRetentionPolicy] == "delete" {
+					fmt.Printf("ssss RG retention policy is set to delete \n")
+					log.V(common.InfoLevel).Info("Retention policy is set to Delete")
+					if _, ok := remoteVolumeClaim.Annotations[controller.DeletionRequested]; !ok {
+						// Add annotation on the remote PV to request its deletion
+						remoteVolumeClaimCopy := remoteVolumeClaim.DeepCopy()
+						log.V(common.InfoLevel).Info("Adding deletion requested annotation to remote volume claim")
+						controller.AddAnnotation(remoteVolumeClaimCopy, controller.DeletionRequested, "yes")
+
+						// also apply new annotation - SynchronizedDeletionStatus
+						log.V(common.InfoLevel).Info("Adding sync delete annotation to remote pvc")
+						controller.AddAnnotation(remoteVolumeClaimCopy, controller.SynchronizedDeletionStatus, "requested")
+						err := rClient.UpdatePersistentVolumeClaim(ctx, remoteVolumeClaimCopy)
+						if err != nil {
+							log.V(common.InfoLevel).Info("Error encountered in updating remote volume claim")
+							return ctrl.Result{}, err
+						}
+
+						// Resetting the rate-limiter to requeue for the deletion of remote PV
+						return ctrl.Result{RequeueAfter: 1 * time.Millisecond}, nil
+					}
+					// Requeueing local PV because the remote PV still exists.
+					return ctrl.Result{Requeue: true}, nil
+				}
+			}
+		}
+
+		// Check for the sync deletion annotation. If it exists and is not complete, requeue.
+		// Otherwise, remove finalizer.
+		syncDeleteStatus, ok := remotePV.Annotations[controller.SynchronizedDeletionStatus]
+		if ok && syncDeleteStatus != "complete" {
+			fmt.Printf("ssss deletion annotation is not syncronized \n")
+			log.V(common.InfoLevel).Info("Synchronized Deletion annotation exists and is not complete, requeueing.")
+			return ctrl.Result{Requeue: true}, nil
+		}
+
+		log.V(common.InfoLevel).Info("Removing finalizer on remote volume claim")
+		finalizerRemoved := controller.RemoveFinalizerIfExists(remoteClaim, controller.ReplicationFinalizer)
+		fmt.Printf("ssss After removing finalizer \n")
+		if finalizerRemoved {
+			return ctrl.Result{}, r.Update(ctx, remoteClaim)
+		}
+	}
+
+	remoteClaimCopy := remoteClaim.DeepCopy()
+
+	// Check for the finalizer; add, if doesn't exist
+	if finalizerAdded := controller.AddFinalizerIfNotExist(remoteClaimCopy, controller.ReplicationFinalizer); finalizerAdded {
+		log.V(common.DebugLevel).Info("Finalizer not found, adding it")
+		return ctrl.Result{}, r.Update(ctx, remoteClaimCopy)
+	}
+	// Check for deletion request annotation.
+	if _, ok := remoteClaimCopy.Annotations[controller.DeletionRequested]; ok {
+		log.V(common.InfoLevel).Info("Deletion Requested by remote's controller, annotation found")
+		return ctrl.Result{}, r.Delete(ctx, remoteClaimCopy)
 	}
 
 	isRemotePVCUpdated := false
@@ -265,4 +366,47 @@ func pvcProtectionIsComplete() predicate.Predicate {
 		a := getAnnotations(meta)
 		return a != nil && a[controller.PVCProtectionComplete] == "yes"
 	})
+}
+
+func updatePVCAnnotations(pvc *v1.PersistentVolumeClaim, remoteClusterID, resourceRequest string, pv *v1.PersistentVolume) {
+
+	//Context prefix
+	contextPrefix, _ := getValueFromAnnotations(controller.ContextPrefix, pv.Annotations)
+	controller.AddAnnotation(pvc, controller.ContextPrefix, contextPrefix)
+	//pvc protection complete
+	pvcProtectionComplete, _ := getValueFromAnnotations(controller.PVCProtectionComplete, pv.Annotations)
+	controller.AddAnnotation(pvc, controller.PVCProtectionComplete, pvcProtectionComplete)
+	// Created By
+	controller.AddAnnotation(pvc, controller.CreatedBy, common.DellReplicationController)
+	// Remote PV Name
+	remoteVolume, _ := getValueFromAnnotations(controller.RemoteVolumeAnnotation, pv.Annotations)
+	pvc.Spec.VolumeName = remoteVolume
+	controller.AddAnnotation(pvc, controller.RemotePV, remoteVolume)
+	// Remote ClusterID
+	controller.AddAnnotation(pvc, controller.RemoteClusterID, remoteClusterID)
+	//Replication group
+	controller.AddAnnotation(pvc, controller.ReplicationGroup, pv.Labels[controller.ReplicationGroup])
+	// Remote Storage Class
+	pvc.Spec.StorageClassName = &pv.Spec.StorageClassName
+	controller.AddAnnotation(pvc, controller.RemoteStorageClassAnnotation, pv.Spec.StorageClassName)
+	//Remote Volume
+	remoteVolume, _ = getValueFromAnnotations(controller.RemoteVolumeAnnotation, pv.Annotations)
+	controller.AddAnnotation(pvc, controller.RemoteVolumeAnnotation, remoteVolume)
+	//remote PVC namespace
+	remotePVCNamespace, _ := getValueFromAnnotations(controller.RemotePVCNamespace, pv.Annotations)
+	pvc.Namespace = remotePVCNamespace
+	controller.AddAnnotation(pvc, controller.RemotePVCNamespace, remotePVCNamespace)
+	//remote PVC name
+	remotePVCName, _ := getValueFromAnnotations(controller.RemotePVC, pv.Annotations)
+	pvc.Name = remotePVCName
+	controller.AddAnnotation(pvc, controller.RemotePVC, remotePVCName)
+}
+
+func updatePVCLabels(pvc, volume *v1.PersistentVolumeClaim, remoteClusterID string) {
+	// Driver Name
+	controller.AddLabel(pvc, controller.DriverName, volume.Labels[controller.DriverName])
+	// Remote ClusterID
+	controller.AddLabel(pvc, controller.RemoteClusterID, remoteClusterID)
+	// Replication group name
+	controller.AddLabel(pvc, controller.ReplicationGroup, volume.Labels[controller.ReplicationGroup])
 }
