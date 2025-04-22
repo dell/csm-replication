@@ -1736,11 +1736,27 @@ metadata:
 			expectedErr: false,
 		},
 		{
+			name: "Create Role",
+			data: []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: test-role`),
+			expectedErr: false,
+		},
+		{
 			name: "Create ClusterRoleBinding",
 			data: []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: test-clusterrolebinding`),
+			expectedErr: false,
+		},
+		{
+			name: "Create RoleBinding",
+			data: []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: test-rolebinding`),
 			expectedErr: false,
 		},
 		{
