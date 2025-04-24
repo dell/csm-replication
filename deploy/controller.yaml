@@ -260,6 +260,7 @@ spec:
       containers:
         - args:
             - --disable-pvc-remap=false
+            - --allow-pvc-creation-on-target=false
             - --enable-leader-election
             - --prefix=replication.storage.dell.com
           command:
