@@ -974,25 +974,27 @@ func TestCreatePersistentVolumeClaimReconciler(t *testing.T) {
 		osExit = originalOsExit
 	}
 	tests := []struct {
-		name           string
-		manager        manager.Manager
-		controllerMgr  *ControllerManager
-		domain         string
-		workerThreads  int
-		expRateLimiter workqueue.TypedRateLimiter[reconcile.Request]
-		setupLog       logr.Logger
-		setup          func()
-		wantErr        bool
+		name                     string
+		manager                  manager.Manager
+		controllerMgr            *ControllerManager
+		domain                   string
+		workerThreads            int
+		expRateLimiter           workqueue.TypedRateLimiter[reconcile.Request]
+		setupLog                 logr.Logger
+		setup                    func()
+		wantErr                  bool
+		allowPVCCreationOnTarget bool
 	}{
 		{
-			name:           "Manager is nil",
-			manager:        nil,
-			controllerMgr:  nil,
-			domain:         "abc",
-			workerThreads:  2,
-			expRateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second),
-			setupLog:       ctrl.Log.WithName("test-logger"),
-			wantErr:        false,
+			name:                     "Manager is nil",
+			manager:                  nil,
+			controllerMgr:            nil,
+			domain:                   "abc",
+			workerThreads:            2,
+			expRateLimiter:           workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second),
+			setupLog:                 ctrl.Log.WithName("test-logger"),
+			wantErr:                  false,
+			allowPVCCreationOnTarget: false,
 		},
 		{
 			name:    "Manager is not nil",
@@ -1011,7 +1013,8 @@ func TestCreatePersistentVolumeClaimReconciler(t *testing.T) {
 					return nil
 				}
 			},
-			wantErr: false,
+			wantErr:                  false,
+			allowPVCCreationOnTarget: false,
 		},
 		{
 			name:    "Manager is not nil and expected error",
@@ -1030,7 +1033,8 @@ func TestCreatePersistentVolumeClaimReconciler(t *testing.T) {
 					return errors.New("problem running manager")
 				}
 			},
-			wantErr: true,
+			wantErr:                  true,
+			allowPVCCreationOnTarget: false,
 		},
 	}
 
@@ -1054,7 +1058,7 @@ func TestCreatePersistentVolumeClaimReconciler(t *testing.T) {
 					}
 				}()
 			}
-			createPersistentVolumeClaimReconciler(tt.manager, tt.controllerMgr, tt.domain, tt.workerThreads, tt.expRateLimiter, tt.setupLog)
+			createPersistentVolumeClaimReconciler(tt.manager, tt.controllerMgr, tt.domain, tt.workerThreads, tt.expRateLimiter, tt.allowPVCCreationOnTarget, tt.setupLog)
 			if tt.name == "Manager is not nil" {
 				if exitCode != 0 {
 					t.Errorf("Expected exit code 0, but got %d", exitCode)

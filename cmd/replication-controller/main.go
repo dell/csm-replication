@@ -299,7 +299,6 @@ func main() {
 
 			// Create PersistentVolumeClaimReconciler
 			expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](stringToTimeDuration(flagMap["retry-interval-start"]), stringToTimeDuration(flagMap["retry-interval-max"]))
-			//createPersistentVolumeClaimReconciler(mgr, controllerMgr, flagMap["prefix"], stringToInt(flagMap["worker-threads"]), expRateLimiter, setupLog)
 			createPersistentVolumeClaimReconciler(mgr, controllerMgr, flagMap["prefix"], stringToInt(flagMap["worker-threads"]), expRateLimiter, stringToBoolean(flagMap["allow-pvc-creation-on-target"]), setupLog)
 
 			// Create ReplicationGroupReconciler
