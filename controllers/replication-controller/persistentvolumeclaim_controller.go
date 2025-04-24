@@ -39,12 +39,13 @@ import (
 // PersistentVolumeClaimReconciler reconciles a PersistentVolumeClaim object
 type PersistentVolumeClaimReconciler struct {
 	client.Client
-	Log                logr.Logger
-	Scheme             *runtime.Scheme
-	EventRecorder      record.EventRecorder
-	PVCRequeueInterval time.Duration
-	Config             connection.MultiClusterClient
-	Domain             string
+	Log                      logr.Logger
+	Scheme                   *runtime.Scheme
+	EventRecorder            record.EventRecorder
+	PVCRequeueInterval       time.Duration
+	Config                   connection.MultiClusterClient
+	Domain                   string
+	AllowPVCCreationOnTarget bool
 }
 
 var (

@@ -112,6 +112,7 @@ var (
 
 		var metricsAddr string
 		var enableLeaderElection bool
+		var allowPVCCreationOnTarget bool
 
 		flag.StringVar(&metricsAddr, "metrics-addr", ":8081", "The address the metric endpoint binds to.")
 		flag.StringVar(&domain, "prefix", common.DefaultDomain, "Prefix used for creating labels/annotations")
@@ -122,6 +123,7 @@ var (
 		flag.DurationVar(&retryIntervalMax, "retry-interval-max", 5*time.Minute, "Maximum retry interval of failed reconcile request")
 		flag.IntVar(&workerThreads, "worker-threads", 2, "Number of concurrent reconcilers for each of the controllers")
 		flag.BoolVar(&disablePVCRemap, "disable-pvc-remap", false, "disables PVC remapping functionality")
+		flag.BoolVar(&allowPVCCreationOnTarget, "allow-pvc-creation-on-target", false, "allows PVC creation on target cluster")
 		flag.Parse()
 
 		logrusLog := logrus.New()
@@ -144,6 +146,7 @@ var (
 		flagMap["retry-interval-max"] = retryIntervalMax.String()
 		flagMap["worker-threads"] = strconv.Itoa(workerThreads)
 		flagMap["disable-pvc-remap"] = strconv.FormatBool(disablePVCRemap)
+		flagMap["allow-pvc-creation-on-target"] = strconv.FormatBool(allowPVCCreationOnTarget)
 
 		return flagMap, setupLog, logrusLog, context.Background()
 	}
@@ -296,7 +299,8 @@ func main() {
 
 			// Create PersistentVolumeClaimReconciler
 			expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](stringToTimeDuration(flagMap["retry-interval-start"]), stringToTimeDuration(flagMap["retry-interval-max"]))
-			createPersistentVolumeClaimReconciler(mgr, controllerMgr, flagMap["prefix"], stringToInt(flagMap["worker-threads"]), expRateLimiter, setupLog)
+			//createPersistentVolumeClaimReconciler(mgr, controllerMgr, flagMap["prefix"], stringToInt(flagMap["worker-threads"]), expRateLimiter, setupLog)
+			createPersistentVolumeClaimReconciler(mgr, controllerMgr, flagMap["prefix"], stringToInt(flagMap["worker-threads"]), expRateLimiter, stringToBoolean(flagMap["allow-pvc-creation-on-target"]), setupLog)
 
 			// Create ReplicationGroupReconciler
 			createReplicationGroupReconciler(mgr, controllerMgr, flagMap["prefix"], stringToInt(flagMap["worker-threads"]), expRateLimiter, stringToBoolean(flagMap["disable-pvc-remap"]), setupLog)
@@ -354,14 +358,15 @@ func createReplicationGroupReconciler(mgr manager.Manager, controllerMgr *Contro
 	}
 }
 
-func createPersistentVolumeClaimReconciler(mgr manager.Manager, controllerMgr *ControllerManager, domain string, workerThreads int, expRateLimiter workqueue.TypedRateLimiter[reconcile.Request], setupLog logr.Logger) {
+func createPersistentVolumeClaimReconciler(mgr manager.Manager, controllerMgr *ControllerManager, domain string, workerThreads int, expRateLimiter workqueue.TypedRateLimiter[reconcile.Request], allowPVCCreationOnTarget bool, setupLog logr.Logger) {
 	if err := getPersistentVolumeClaimReconciler(&repController.PersistentVolumeClaimReconciler{
-		Client:        mgr.GetClient(),
-		Log:           ctrl.Log.WithName("controllers").WithName("PersistentVolumeClaim"),
-		Scheme:        mgr.GetScheme(),
-		EventRecorder: mgr.GetEventRecorderFor(common.DellReplicationController),
-		Config:        controllerMgr.config,
-		Domain:        domain,
+		Client:                   mgr.GetClient(),
+		Log:                      ctrl.Log.WithName("controllers").WithName("PersistentVolumeClaim"),
+		Scheme:                   mgr.GetScheme(),
+		EventRecorder:            mgr.GetEventRecorderFor(common.DellReplicationController),
+		Config:                   controllerMgr.config,
+		Domain:                   domain,
+		AllowPVCCreationOnTarget: allowPVCCreationOnTarget,
 	}, mgr, expRateLimiter, workerThreads); err != nil {
 		setupLog.Error(err, "unable to create controller", common.DellReplicationController, "PersistentVolumeClaim")
 		osExit(1)
