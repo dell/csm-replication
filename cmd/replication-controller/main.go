@@ -123,7 +123,7 @@ var (
 		flag.DurationVar(&retryIntervalMax, "retry-interval-max", 5*time.Minute, "Maximum retry interval of failed reconcile request")
 		flag.IntVar(&workerThreads, "worker-threads", 2, "Number of concurrent reconcilers for each of the controllers")
 		flag.BoolVar(&disablePVCRemap, "disable-pvc-remap", false, "disables PVC remapping functionality")
-		flag.BoolVar(&allowPVCCreationOnTarget, "allow-pvc-creation-on-target", false, "allows PVC creation on target cluster")
+		flag.BoolVar(&allowPVCCreationOnTarget, "allow-pvc-creation-on-target", false, "allow PVC creation on target cluster")
 		flag.Parse()
 
 		logrusLog := logrus.New()
