@@ -146,7 +146,6 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 	remoteClaim := &v1.PersistentVolumeClaim{}
 	remotePVCName := ""
 	remotePVCNamespace := ""
-	fmt.Printf("ssss allow pvc creation falg is %v \n", r.AllowPVCCreationOnTarget)
 	if remoteClusterID != controller.Self && r.AllowPVCCreationOnTarget {
 		//if its not single cluster then check the pv status and create pvc on target cluster
 		if remotePV.Status.Phase == v1.VolumeAvailable && remotePV.Spec.ClaimRef != nil {
@@ -176,7 +175,6 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 		}
 	}
 	if remotePV.Status.Phase == v1.VolumeBound && remotePV.Spec.ClaimRef != nil {
-		fmt.Printf("ssss if volume is bound and claim ref not nil %+v\n", remotePV.Spec.ClaimRef)
 		remotePVCName = remotePV.Spec.ClaimRef.Name
 		remotePVCNamespace = remotePV.Spec.ClaimRef.Namespace
 		remoteClaim, err = rClient.GetPersistentVolumeClaim(ctx, remotePVCNamespace, remotePVCName)
@@ -185,81 +183,6 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 		}
 	} else {
 		remoteClaim = nil
-	}
-
-	// Handle PVC deletion if timestamp is set in remote PVC
-	if !claim.DeletionTimestamp.IsZero() {
-		//fmt.Printf("ssss If deletion time stamp added to PVC \n")
-		// Process deletion of remote PV
-		if _, ok := claim.Annotations[controller.DeletionRequested]; !ok {
-			log.V(common.InfoLevel).Info("Deletion requested for claim found")
-			fmt.Printf("ssss getting pvc name : %s from namespace : %s\n", remotePV.Spec.ClaimRef.Name, remotePV.Spec.ClaimRef.Namespace)
-			remoteVolumeClaim, err := rClient.GetPersistentVolumeClaim(ctx, remotePV.Spec.ClaimRef.Namespace, remotePV.Spec.ClaimRef.Name)
-			fmt.Printf("ssss after get pvc \n")
-			if err != nil {
-				// If remote PVC doesn't exist, proceed to removing finalizer
-				if !errors.IsNotFound(err) {
-					log.Error(err, "Failed to get remote volume claim")
-					return ctrl.Result{}, err
-				}
-			} else {
-				log.V(common.DebugLevel).Info("Got remote PVC")
-				if remotePV.Annotations[controller.RemotePVRetentionPolicy] == "delete" {
-					fmt.Printf("ssss RG retention policy is set to delete \n")
-					log.V(common.InfoLevel).Info("Retention policy is set to Delete")
-					if _, ok := remoteVolumeClaim.Annotations[controller.DeletionRequested]; !ok {
-						// Add annotation on the remote PVC to request its deletion
-						remoteVolumeClaimCopy := remoteVolumeClaim.DeepCopy()
-						log.V(common.InfoLevel).Info("Adding deletion requested annotation to remote volume claim")
-						controller.AddAnnotation(remoteVolumeClaimCopy, controller.DeletionRequested, "yes")
-
-						// also apply new annotation - SynchronizedDeletionStatus
-						log.V(common.InfoLevel).Info("Adding sync delete annotation to remote pvc")
-						controller.AddAnnotation(remoteVolumeClaimCopy, controller.SynchronizedDeletionStatus, "requested")
-						err := rClient.UpdatePersistentVolumeClaim(ctx, remoteVolumeClaimCopy)
-						if err != nil {
-							log.V(common.InfoLevel).Info(" updating remote volume claim")
-							return ctrl.Result{}, err
-						}
-
-						// Resetting the rate-limiter to requeue for the deletion of remote PV
-						return ctrl.Result{RequeueAfter: 1 * time.Millisecond}, nil
-					}
-					// Requeueing local PVC because the remote PVC still exists.
-					return ctrl.Result{Requeue: true}, nil
-				}
-			}
-		}
-		// Check for the sync deletion annotation. If it exists and is not complete, requeue.
-		// Otherwise, remove finalizer.
-		syncDeleteStatus, ok := claim.Annotations[controller.SynchronizedDeletionStatus]
-		if ok && syncDeleteStatus != "complete" {
-			fmt.Printf("ssss deletion annotation is not syncronized \n")
-			log.V(common.InfoLevel).Info("Synchronized Deletion annotation exists and is not complete, requeueing.")
-			return ctrl.Result{Requeue: true}, nil
-		}
-
-		log.V(common.InfoLevel).Info("Removing finalizer from volume claim")
-		finalizerRemoved := controller.RemoveFinalizerIfExists(claim, controller.ReplicationFinalizer)
-		fmt.Printf("ssss After removing finalizer \n")
-		if finalizerRemoved {
-			return ctrl.Result{}, r.Update(ctx, claim)
-		}
-	}
-
-	claimCopy := claim.DeepCopy()
-
-	fmt.Printf("ssss the claimcopy is %s", claimCopy)
-
-	// Check for the finalizer; add, if doesn't exist
-	if finalizerAdded := controller.AddFinalizerIfNotExist(claimCopy, controller.ReplicationFinalizer); finalizerAdded {
-		log.V(common.DebugLevel).Info("Finalizer not found, adding it")
-		return ctrl.Result{}, r.Update(ctx, claimCopy)
-	}
-	// Check for deletion request annotation.
-	if _, ok := claimCopy.Annotations[controller.DeletionRequested]; ok {
-		log.V(common.InfoLevel).Info("Deletion Requested by remote's controller, annotation found")
-		return ctrl.Result{}, r.Delete(ctx, claimCopy)
 	}
 
 	isRemotePVCUpdated := false
