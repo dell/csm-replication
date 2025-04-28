@@ -8,7 +8,7 @@ require (
 	github.com/dell/dell-csi-extensions/common v1.7.1-0.20250417144221-6fcddedebf59
 	github.com/dell/dell-csi-extensions/migration v1.7.2-0.20250417144221-6fcddedebf59
 	github.com/dell/dell-csi-extensions/replication v1.10.2-0.20250417144221-6fcddedebf59
-	github.com/dell/gobrick v1.13.2-0.20250410180029-6d79b5ff6cc8
+	github.com/dell/gobrick v1.13.2-0.20250421073258-7cd497fd44fe
 	github.com/fatih/color v1.18.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-chi/chi v4.1.2+incompatible

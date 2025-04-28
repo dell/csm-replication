@@ -50,8 +50,8 @@ github.com/dell/dell-csi-extensions/migration v1.7.2-0.20250417144221-6fcddedebf
 github.com/dell/dell-csi-extensions/migration v1.7.2-0.20250417144221-6fcddedebf59/go.mod h1:mQZvtmco3fO/RABSuxaPStqtcFSMxqEObjELffQtp18=
 github.com/dell/dell-csi-extensions/replication v1.10.2-0.20250417144221-6fcddedebf59 h1:XKi/LAVC/uOXrgC3oQBGZKLd5Ccx7RZzamtGYo2tHbI=
 github.com/dell/dell-csi-extensions/replication v1.10.2-0.20250417144221-6fcddedebf59/go.mod h1:0NHOpncXjfyrOaebh15ggnhb+Y2acKoF2/A/TVLwf9Y=
-github.com/dell/gobrick v1.13.2-0.20250410180029-6d79b5ff6cc8 h1:wNI0ZNfr7a36DJCv6IneJ4Fbm5a2rs8DPBdISMYx8Tc=
-github.com/dell/gobrick v1.13.2-0.20250410180029-6d79b5ff6cc8/go.mod h1:wYDF1TI5b/irR+CwkiY2jukUdL//+V/2+VI4BsxzqYA=
+github.com/dell/gobrick v1.13.2-0.20250421073258-7cd497fd44fe h1:VpHRqeQgbeOuwnvHf5nHWPLShsHmT7USHvi3yZfcWKs=
+github.com/dell/gobrick v1.13.2-0.20250421073258-7cd497fd44fe/go.mod h1:NnVMtnjjZUNESkHCx3KSNdGYdIa7WN3YRbW+fOr0LCA=
 github.com/dell/goiscsi v1.11.1-0.20250414073142-a69a338c4871 h1:oicdQXy5MpcrSW/zUzQnzC+u8Wu8PB+pZWobcePOdAc=
 github.com/dell/goiscsi v1.11.1-0.20250414073142-a69a338c4871/go.mod h1:nMLnEG6QBpouHxFRMxpmJA6X+Nrr3KeN9mr5n2gV+5M=
 github.com/dell/gonvme v1.10.2-0.20250414072949-5654e72314ec h1:mgXYH9Niraaxd706tFKpmUgZuqKh0dh1TQylbIdz7dI=
