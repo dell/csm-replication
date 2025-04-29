@@ -16,6 +16,7 @@ package replicationcontroller
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -525,3 +526,131 @@ func TestPersistentVolumeClaimReconciler_processLocalPVC(t *testing.T) {
 		})
 	}
 }
+
+func TestUpdatePVCLabels(t *testing.T) {
+	// Create a fake PVC representing the original volume (with labels)
+	original := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				controllers.DriverName:       "driverX",
+				controllers.ReplicationGroup: "repGroup1",
+			},
+		},
+	}
+	// Create target PVC to receive labels
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: make(map[string]string),
+		},
+	}
+
+	// Call the function under test
+	updatePVCLabels(pvc, original, "remote-456")
+
+	// Verify that labels were applied correctly
+	assert.Equal(t, "driverX", pvc.Labels[controllers.DriverName], "DriverName label")
+	assert.Equal(t, "remote-456", pvc.Labels[controllers.RemoteClusterID], "RemoteClusterID label")
+	assert.Equal(t, "repGroup1", pvc.Labels[controllers.ReplicationGroup], "ReplicationGroup label")
+}
+
+func TestUpdatePVCAnnotations(t *testing.T) {
+	// Create a fake PersistentVolume with annotations and labels
+	pv := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pv1",
+			Namespace: "ns1", // namespace is required for name formatting
+			Labels: map[string]string{
+				controllers.ReplicationGroup: "rg-1",
+			},
+			Annotations: map[string]string{
+				controllers.ContextPrefix:          "ctxPrefixVal",
+				controllers.PVCProtectionComplete:  "complete",
+				controllers.RemoteVolumeAnnotation: "remote-vol-id",
+				controllers.RemotePVC:              "target-pvc",
+				controllers.RemotePVCNamespace:     "target-ns",
+			},
+		},
+		Spec: corev1.PersistentVolumeSpec{
+			StorageClassName: "sc1",
+		},
+		Status: corev1.PersistentVolumeStatus{
+			Phase: corev1.VolumeBound,
+		},
+	}
+	// Create an empty PVC object
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: make(map[string]string),
+			Labels:      make(map[string]string),
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			// StorageClassName will be set by updatePVCAnnotations
+		},
+	}
+
+	// Call the function under test
+	updatePVCAnnotations(pvc, "remote-123", pv)
+
+	// Verify that annotations and spec fields were set correctly
+	assert.Equal(t, "ctxPrefixVal", pvc.Annotations[controllers.ContextPrefix], "ContextPrefix annotation")
+	assert.Equal(t, "complete", pvc.Annotations[controllers.PVCProtectionComplete], "PVCProtectionComplete annotation")
+	assert.Equal(t, constants.DellReplicationController, pvc.Annotations[controllers.CreatedBy], "CreatedBy annotation")
+	assert.Equal(t, "remote-vol-id", pvc.Spec.VolumeName, "PVC Spec.VolumeName should be set to remote volume ID")
+	assert.Equal(t, "remote-vol-id", pvc.Annotations[controllers.RemotePV], "RemotePV annotation")
+	assert.Equal(t, "remote-123", pvc.Annotations[controllers.RemoteClusterID], "RemoteClusterID annotation")
+	assert.Equal(t, "rg-1", pvc.Annotations[controllers.ReplicationGroup], "ReplicationGroup annotation")
+	// StorageClassName is a pointer; compare the string value
+	if pvc.Spec.StorageClassName == nil {
+		t.Error("Expected StorageClassName to be set")
+	} else {
+		assert.Equal(t, "sc1", *pvc.Spec.StorageClassName, "RemoteStorageClass annotation")
+	}
+	assert.Equal(t, "sc1", pvc.Annotations[controllers.RemoteStorageClassAnnotation], "RemoteStorageClass annotation")
+	// Name and Namespace of PVC should be set from annotations
+	assert.Equal(t, "target-pvc", pvc.Name, "PVC Name should be set to RemotePVC")
+	assert.Equal(t, "target-ns", pvc.Namespace, "PVC Namespace should be set to RemotePVCNamespace")
+	assert.Equal(t, "target-ns", pvc.Annotations[controllers.RemotePVCNamespace], "RemotePVCNamespace annotation")
+	assert.Equal(t, "target-pvc", pvc.Annotations[controllers.RemotePVC], "RemotePVC annotation")
+	// The RemoteVolumeAnnotation should be overwritten with "ns1/pv1 annotations: ... labels: ..."
+	expectedPrefix := "ns1/pv1"
+	actualRVAnn := pvc.Annotations[controllers.RemoteVolumeAnnotation]
+	if !strings.HasPrefix(actualRVAnn, expectedPrefix) {
+		t.Errorf("RemoteVolumeAnnotation should start with \"%s\", got \"%s\"", expectedPrefix, actualRVAnn)
+	}
+}
+
+func TestVerifyNamespaceExistence_NamespaceAlreadyExists(t *testing.T) {
+	// Setup fake multi-cluster config and get remote client
+	fakeConfig := mocks.New("sourceCluster", "remote-123")
+	remoteClient, err := fakeConfig.GetConnection("remote-123")
+	assert.NoError(t, err)
+
+	ctx := context.Background()
+	// Create a namespace on remote cluster beforehand
+	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "existing-ns"}}
+	err = remoteClient.CreateNamespace(ctx, ns)
+	assert.NoError(t, err)
+
+	// Call VerifyNamespaceExistence should find existing namespace and not error
+	err = VerifyNamespaceExistence(ctx, remoteClient, "existing-ns")
+	assert.NoError(t, err)
+}
+
+func TestVerifyNamespaceExistence_NamespaceCreated(t *testing.T) {
+	ctx := context.Background()
+	// Use the mock MultiClusterClient to get a fake remote client
+	fakeConfig := mocks.New("sourceCluster", "remote-123")
+	remoteClient, err := fakeConfig.GetConnection("remote-123")
+	assert.NoError(t, err, "expected no error getting fake remote client")
+
+	namespace := "test-namespace"
+	// Ensure the namespace does not exist initially (simulated NotFound)
+	_, err = remoteClient.GetNamespace(ctx, namespace)
+	assert.Error(t, err, "expected error when getting non-existent namespace")
+
+	// Call the function under test; it should create the namespace
+	err = VerifyNamespaceExistence(ctx, remoteClient, namespace)
+	assert.NoError(t, err, "expected VerifyNamespaceExistence to succeed on create")
+
+}
+
