@@ -153,10 +153,8 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 			remoteClaim.Spec.Resources.Requests = v1.ResourceList{
 				v1.ResourceStorage: remotePV.Spec.Capacity[v1.ResourceStorage],
 			}
-			requests := remoteClaim.Spec.Resources.Requests
-			requestsStr := fmt.Sprintf("%v", requests)
 			//updating pvc annotations
-			updatePVCAnnotations(remoteClaim, remoteClusterID, requestsStr, remotePV)
+			updatePVCAnnotations(remoteClaim, remoteClusterID, remotePV)
 			//Adding finalizer to pvc
 			remoteClaim.Finalizers = []string{controller.ReplicationFinalizer}
 			//updating pvc labels
@@ -298,7 +296,7 @@ func pvcProtectionIsComplete() predicate.Predicate {
 	})
 }
 
-func updatePVCAnnotations(pvc *v1.PersistentVolumeClaim, remoteClusterID, resourceRequest string, pv *v1.PersistentVolume) {
+func updatePVCAnnotations(pvc *v1.PersistentVolumeClaim, remoteClusterID string, pv *v1.PersistentVolume) {
 
 	//Context prefix
 	contextPrefix, _ := getValueFromAnnotations(controller.ContextPrefix, pv.Annotations)
