@@ -350,7 +350,6 @@ func updatePVCLabels(pvc, volume *v1.PersistentVolumeClaim, remoteClusterID stri
 }
 
 func VerifyNamespaceExistence(ctx context.Context, rClient connection.RemoteClusterClient, namespace string) error {
-
 	// Verify if the namespace exists
 	log := common.GetLoggerFromContext(ctx)
 	if _, err := rClient.GetNamespace(ctx, namespace); err != nil {
