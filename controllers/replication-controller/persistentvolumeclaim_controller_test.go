@@ -759,5 +759,4 @@ func TestVerifyNamespaceExistence_NamespaceCreated(t *testing.T) {
 	// Call the function under test; it should create the namespace
 	err = VerifyNamespaceExistence(ctx, remoteClient, namespace)
 	assert.NoError(t, err, "expected VerifyNamespaceExistence to succeed on create")
-
 }

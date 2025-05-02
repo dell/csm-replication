@@ -17,8 +17,9 @@ package replicationcontroller
 import (
 	"context"
 	"fmt"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	controller "github.com/dell/csm-replication/controllers"
 	"github.com/dell/csm-replication/pkg/common"
