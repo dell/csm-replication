@@ -148,7 +148,7 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 	remotePVCName := ""
 	remotePVCNamespace := ""
 	if remoteClusterID != controller.Self && r.AllowPVCCreationOnTarget {
-		//if its not single cluster then check the pv status and create pvc on target cluster
+		// if its not single cluster then check the pv status and create pvc on target cluster
 		if remotePV.Status.Phase == v1.VolumeAvailable && remotePV.Spec.ClaimRef != nil {
 			remoteClaim.Spec.AccessModes = remotePV.Spec.AccessModes
 			remoteClaim.Spec.Resources.Requests = v1.ResourceList{
