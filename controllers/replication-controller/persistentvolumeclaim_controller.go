@@ -298,7 +298,6 @@ func pvcProtectionIsComplete() predicate.Predicate {
 }
 
 func updatePVCAnnotations(pvc *v1.PersistentVolumeClaim, remoteClusterID string, pv *v1.PersistentVolume) {
-
 	// Context prefix
 	contextPrefix, _ := getValueFromAnnotations(controller.ContextPrefix, pv.Annotations)
 	controller.AddAnnotation(pvc, controller.ContextPrefix, contextPrefix)
