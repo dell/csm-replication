@@ -66,38 +66,6 @@ func (suite *PVControllerTestSuite) Init() {
 	suite.fakeConfig = mocks.New("sourceCluster", "remote-123")
 }
 
-func (suite *PVControllerTestSuite) getPV() corev1.PersistentVolume {
-	// creating fake PV to use with our fake PVC
-	volumeAttributes := map[string]string{
-		"fake-CapacityGB":     "3.00",
-		"RemoteSYMID":         "000000000002",
-		"SRP":                 "SRP_1",
-		"ServiceLevel":        "Bronze",
-		"StorageGroup":        "csi-UDI-Bronze-SRP_1-SG-test-2-ASYNC",
-		"VolumeContentSource": "",
-		"storage.kubernetes.io/csiProvisionerIdentity": "1611934095007-8081-csi-fake",
-	}
-	pvObj := corev1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "fake-pv",
-		},
-		Spec: corev1.PersistentVolumeSpec{
-			PersistentVolumeSource: corev1.PersistentVolumeSource{
-				CSI: &corev1.CSIPersistentVolumeSource{
-					Driver:           suite.driver.DriverName,
-					VolumeHandle:     "csivol-",
-					FSType:           "ext4",
-					VolumeAttributes: volumeAttributes,
-				},
-			},
-			StorageClassName: suite.driver.StorageClass,
-		},
-		Status: corev1.PersistentVolumeStatus{Phase: corev1.VolumeBound},
-	}
-
-	return pvObj
-}
-
 func (suite *PVControllerTestSuite) runFakeRemoteReplicationManager(fakeConfig connection.MultiClusterClient, remoteClient connection.RemoteClusterClient) {
 	fakeRecorder := record.NewFakeRecorder(100)
 	// Initialize the annotations & labels
@@ -215,13 +183,52 @@ func (suite *PVControllerTestSuite) runFakeRemoteReplicationManager(fakeConfig c
 	assert.NoError(suite.T(), e, "No Error while processing local PVC")
 }
 
+// Modified getPV to accept an optional name parameter
+func (suite *PVControllerTestSuite) getPV(name ...string) corev1.PersistentVolume {
+	// Use provided name or default "fake-pv"
+	pvName := "fake-pv"
+	if len(name) > 0 && name[0] != "" {
+		pvName = name[0]
+	}
+	// creating fake PV to use with our fake PVC
+	volumeAttributes := map[string]string{
+		"fake-CapacityGB":     "3.00",
+		"RemoteSYMID":         "000000000002",
+		"SRP":                 "SRP_1",
+		"ServiceLevel":        "Bronze",
+		"StorageGroup":        "csi-UDI-Bronze-SRP_1-SG-test-2-ASYNC",
+		"VolumeContentSource": "",
+		"storage.kubernetes.io/csiProvisionerIdentity": "1611934095007-8081-csi-fake",
+	}
+	pvObj := corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: pvName,
+		},
+		Spec: corev1.PersistentVolumeSpec{
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CSI: &corev1.CSIPersistentVolumeSource{
+					Driver:           suite.driver.DriverName,
+					VolumeHandle:     "csivol-",
+					FSType:           "ext4",
+					VolumeAttributes: volumeAttributes,
+				},
+			},
+			StorageClassName: suite.driver.StorageClass,
+		},
+		Status: corev1.PersistentVolumeStatus{Phase: corev1.VolumeBound},
+	}
+	return pvObj
+}
+
+// Modified TestRemoteReplication to use "fake-pv-remote-replication"
 func (suite *PVControllerTestSuite) TestRemoteReplication() {
 	ctx := context.Background()
 
 	remoteClient, err := suite.fakeConfig.GetConnection("remote-123")
 	assert.Nil(suite.T(), err)
 
-	pvObj := suite.getPV()
+	// Create a PV on the remote cluster with a unique name
+	pvObj := suite.getPV("fake-pv-remote-replication")
 	pvObj.Status.Phase = corev1.VolumeBound
 	pvObj.Spec.ClaimRef = &corev1.ObjectReference{
 		Kind:            "PersistentVolumeClaim",
@@ -234,7 +241,7 @@ func (suite *PVControllerTestSuite) TestRemoteReplication() {
 	err = remoteClient.CreatePersistentVolume(context.Background(), &pvObj)
 	assert.Nil(suite.T(), err)
 
-	// creating fake storage-class with replication params
+	// Create a fake storage class with replication params
 	parameters := map[string]string{
 		"RdfGroup":           "2",
 		"RdfMode":            "ASYNC",
@@ -256,8 +263,8 @@ func (suite *PVControllerTestSuite) TestRemoteReplication() {
 	err = suite.client.Create(ctx, &scObj)
 	assert.Nil(suite.T(), err)
 
-	// creating fake PV to use with our fake PVC
-	pvObj = suite.getPV()
+	// Create a PV in the local cluster for the fake PVC
+	pvObj = suite.getPV("fake-pv-remote-replication")
 	err = suite.client.Create(ctx, &pvObj)
 	assert.NotNil(suite.T(), pvObj)
 
@@ -267,12 +274,11 @@ func (suite *PVControllerTestSuite) TestRemoteReplication() {
 	annotations[controllers.RemoteClusterID] = "remote-123"
 	annotations[controllers.ContextPrefix] = "csi-fake"
 
-	// creating fake resource group
+	// Create a fake replication resource group
 	resourceGroup := repv1.DellCSIReplicationGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "fake-rg",
 			Annotations: annotations,
-			// Namespace: suite.mockUtils.Specs.Namespace,
 		},
 		Spec: repv1.DellCSIReplicationGroupSpec{
 			DriverName:                suite.driver.DriverName,
@@ -297,6 +303,7 @@ func (suite *PVControllerTestSuite) TestRemoteReplication() {
 	}
 	err = suite.client.Create(ctx, &resourceGroup)
 
+	// Run the fake replication manager; note the PV name parameter
 	suite.runFakeRemoteReplicationManager(suite.fakeConfig, remoteClient)
 }
 
@@ -527,6 +534,107 @@ func TestPersistentVolumeClaimReconciler_processLocalPVC(t *testing.T) {
 	}
 }
 
+func (suite *PVControllerTestSuite) TestAllowPVCCreationOnTarget_CreatesRemotePVC() {
+	ctx := context.Background()
+	remoteClient, err := suite.fakeConfig.GetConnection("remote-123")
+	assert.Nil(suite.T(), err)
+	controllers.InitLabelsAndAnnotations(constants.DefaultDomain)
+
+	// Set up a remote PV in the target cluster with Phase=Available and a ClaimRef
+	pvObj := suite.getPV("pv-create-target")
+	pvObj.Status.Phase = corev1.VolumeAvailable
+	pvObj.Spec.ClaimRef = &corev1.ObjectReference{
+		Kind:       "PersistentVolumeClaim",
+		Namespace:  suite.driver.Namespace,
+		Name:       "allow-create-pvc",
+		APIVersion: "v1",
+	}
+	if pvObj.Annotations == nil {
+		pvObj.Annotations = make(map[string]string)
+	}
+	// Add required annotations so updatePVCAnnotations can fill PVC metadata
+	pvObj.Annotations[controllers.ContextPrefix] = suite.driver.DriverName
+	pvObj.Annotations[controllers.PVCProtectionComplete] = "yes"
+	pvObj.Annotations[controllers.RemoteVolumeAnnotation] = pvObj.Name
+	pvObj.Annotations[controllers.RemotePVCNamespace] = suite.driver.Namespace
+	pvObj.Annotations[controllers.RemotePVC] = "allow-create-pvc-remote"
+	// Add required labels for updatePVCLabels
+	if pvObj.Labels == nil {
+		pvObj.Labels = make(map[string]string)
+	}
+	pvObj.Labels[controllers.DriverName] = suite.driver.DriverName
+	pvObj.Labels[controllers.ReplicationGroup] = "rg0"
+	// Create the remote PV in the fake remote cluster
+	err = remoteClient.CreatePersistentVolume(ctx, &pvObj)
+	assert.Nil(suite.T(), err, "expected no error creating remote PV on target cluster")
+
+	// Set up a local PVC in the source cluster
+	pvcObj := utils.GetPVCObj("allow-create-pvc", suite.driver.Namespace, suite.driver.StorageClass)
+	pvcAnnotations := make(map[string]string)
+	pvcAnnotations[controllers.RemoteClusterID] = "remote-123"
+	pvcObj.Status.Phase = corev1.ClaimBound
+	pvcObj.Spec.VolumeName = pvObj.Name
+	pvcObj.Annotations = pvcAnnotations
+	// Add labels to local PVC so updatePVCLabels has values
+	if pvcObj.Labels == nil {
+		pvcObj.Labels = make(map[string]string)
+	}
+	pvcObj.Labels[controllers.DriverName] = suite.driver.DriverName
+	pvcObj.Labels[controllers.ReplicationGroup] = "rg0"
+	err = suite.client.Create(ctx, pvcObj)
+	assert.Nil(suite.T(), err, "expected no error creating local PVC in source cluster")
+
+	// Perform reconciliation with AllowPVCCreationOnTarget = true
+	pvcReq := reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Namespace: suite.driver.Namespace,
+			Name:      "allow-create-pvc",
+		},
+	}
+	fakeRecorder := record.NewFakeRecorder(100)
+	externalReconcile := PersistentVolumeClaimReconciler{
+		Client:                   suite.client,
+		Log:                      ctrl.Log.WithName("controllers").WithName("DellCSIReplicationGroup"),
+		Scheme:                   utils.Scheme,
+		EventRecorder:            fakeRecorder,
+		Config:                   suite.fakeConfig,
+		AllowPVCCreationOnTarget: true,
+	}
+	res, err := externalReconcile.Reconcile(ctx, pvcReq)
+	assert.Nil(suite.T(), err, "expected no error on PVC reconcile")
+	assert.False(suite.T(), res.Requeue, "expected no requeue on successful reconcile")
+
+	// Verify that the remote PVC was created in the remote cluster
+	remotePVC, err := remoteClient.GetPersistentVolumeClaim(ctx, suite.driver.Namespace, "allow-create-pvc-remote")
+	assert.Nil(suite.T(), err, "expected remote PVC to be created on target cluster")
+	assert.Equal(suite.T(), "allow-create-pvc-remote", remotePVC.Name, "remote PVC should have correct name")
+	assert.Equal(suite.T(), suite.driver.Namespace, remotePVC.Namespace, "remote PVC should have correct namespace")
+
+	// Verify metadata on the created remote PVC
+	assert.Equal(suite.T(), constants.DellReplicationController, remotePVC.Annotations[controllers.CreatedBy], "CreatedBy annotation")
+	assert.Equal(suite.T(), pvObj.Name, remotePVC.Spec.VolumeName, "PVC Spec.VolumeName should be set to remote volume name")
+	assert.Equal(suite.T(), pvObj.Name, remotePVC.Annotations[controllers.RemotePV], "RemotePV annotation")
+	assert.Equal(suite.T(), "remote-123", remotePVC.Annotations[controllers.RemoteClusterID], "RemoteClusterID annotation")
+
+	// Verify that StorageClassName is set correctly
+	if assert.NotNil(suite.T(), remotePVC.Spec.StorageClassName, "StorageClassName should be set") {
+		assert.Equal(suite.T(), suite.driver.StorageClass, *remotePVC.Spec.StorageClassName, "StorageClassName")
+	}
+	assert.Equal(suite.T(), suite.driver.StorageClass, remotePVC.Annotations[controllers.RemoteStorageClassAnnotation], "RemoteStorageClass annotation")
+
+	// Verify name/namespace annotations
+	assert.Equal(suite.T(), suite.driver.Namespace, remotePVC.Annotations[controllers.RemotePVCNamespace], "RemotePVCNamespace annotation")
+	assert.Equal(suite.T(), "allow-create-pvc-remote", remotePVC.Annotations[controllers.RemotePVC], "RemotePVC annotation")
+
+	// Verify labels on remote PVC
+	assert.Equal(suite.T(), suite.driver.DriverName, remotePVC.Labels[controllers.DriverName], "DriverName label")
+	assert.Equal(suite.T(), "remote-123", remotePVC.Labels[controllers.RemoteClusterID], "RemoteClusterID label")
+	assert.Equal(suite.T(), "rg0", remotePVC.Labels[controllers.ReplicationGroup], "ReplicationGroup label")
+
+	// Verify finalizer is added
+	assert.Contains(suite.T(), remotePVC.Finalizers, controllers.ReplicationFinalizer, "Replication finalizer should be added")
+}
+
 func TestUpdatePVCLabels(t *testing.T) {
 	// Create a fake PVC representing the original volume (with labels)
 	original := &corev1.PersistentVolumeClaim{
@@ -644,7 +752,7 @@ func TestVerifyNamespaceExistence_NamespaceCreated(t *testing.T) {
 	assert.NoError(t, err, "expected no error getting fake remote client")
 
 	namespace := "test-namespace"
-	// Ensure the namespace does not exist initially (simulated NotFound)
+
 	_, err = remoteClient.GetNamespace(ctx, namespace)
 	assert.Error(t, err, "expected error when getting non-existent namespace")
 
@@ -653,4 +761,3 @@ func TestVerifyNamespaceExistence_NamespaceCreated(t *testing.T) {
 	assert.NoError(t, err, "expected VerifyNamespaceExistence to succeed on create")
 
 }
-
