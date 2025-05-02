@@ -27,6 +27,6 @@ parameters:
   {{ .ReplicationPrefix }}/remoteRGRetentionPolicy: {{ .RemoteRetentionPolicy.RG }}
   {{ .ReplicationPrefix }}/remotePVRetentionPolicy: {{ .RemoteRetentionPolicy.PV }}
   arrayID: {{ .Parameters.ArrayID.Target }}
-  {{- if ne .Parameters.CsiNfs "" }}
-  csi-nfs: {{ .Parameters.CsiNfs }}
+  {{- if ne .Parameters.SharedNfs "" }}
+  shared-nfs: {{ .Parameters.SharedNfs }}
   {{- end }}
