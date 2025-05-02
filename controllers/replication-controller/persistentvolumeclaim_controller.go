@@ -154,18 +154,18 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 			remoteClaim.Spec.Resources.Requests = v1.ResourceList{
 				v1.ResourceStorage: remotePV.Spec.Capacity[v1.ResourceStorage],
 			}
-			//updating pvc annotations
+			// updating pvc annotations
 			updatePVCAnnotations(remoteClaim, remoteClusterID, remotePV)
-			//Adding finalizer to pvc
+			// Adding finalizer to pvc
 			remoteClaim.Finalizers = []string{controller.ReplicationFinalizer}
-			//updating pvc labels
+			// updating pvc labels
 			updatePVCLabels(remoteClaim, claim, remoteClusterID)
-			//Check if the namespace exists
+			// Check if the namespace exists
 			err := VerifyNamespaceExistence(ctx, rClient, remoteClaim.Namespace)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-			//creating PVC on target
+			// creating PVC on target
 			err = rClient.CreatePersistentVolumeClaim(ctx, remoteClaim)
 			if err != nil {
 				log.Error(err, "Failed to create remote PVC on target cluster")
@@ -299,10 +299,10 @@ func pvcProtectionIsComplete() predicate.Predicate {
 
 func updatePVCAnnotations(pvc *v1.PersistentVolumeClaim, remoteClusterID string, pv *v1.PersistentVolume) {
 
-	//Context prefix
+	// Context prefix
 	contextPrefix, _ := getValueFromAnnotations(controller.ContextPrefix, pv.Annotations)
 	controller.AddAnnotation(pvc, controller.ContextPrefix, contextPrefix)
-	//pvc protection complete
+	// pvc protection complete
 	pvcProtectionComplete, _ := getValueFromAnnotations(controller.PVCProtectionComplete, pv.Annotations)
 	controller.AddAnnotation(pvc, controller.PVCProtectionComplete, pvcProtectionComplete)
 	// Created By
@@ -313,24 +313,24 @@ func updatePVCAnnotations(pvc *v1.PersistentVolumeClaim, remoteClusterID string,
 	controller.AddAnnotation(pvc, controller.RemotePV, remoteVolume)
 	// Remote ClusterID
 	controller.AddAnnotation(pvc, controller.RemoteClusterID, remoteClusterID)
-	//Replication group
+	// Replication group
 	controller.AddAnnotation(pvc, controller.ReplicationGroup, pv.Labels[controller.ReplicationGroup])
 	// Remote Storage Class
 	pvc.Spec.StorageClassName = &pv.Spec.StorageClassName
 	controller.AddAnnotation(pvc, controller.RemoteStorageClassAnnotation, pv.Spec.StorageClassName)
-	//Remote Volume
+	// Remote Volume
 	remoteVolume, _ = getValueFromAnnotations(controller.RemoteVolumeAnnotation, pv.Annotations)
 	controller.AddAnnotation(pvc, controller.RemoteVolumeAnnotation, remoteVolume)
-	//remote PVC namespace
+	// remote PVC namespace
 	remotePVCNamespace, _ := getValueFromAnnotations(controller.RemotePVCNamespace, pv.Annotations)
 	pvc.Namespace = remotePVCNamespace
 	controller.AddAnnotation(pvc, controller.RemotePVCNamespace, remotePVCNamespace)
-	//remote PVC name
+	// remote PVC name
 	remotePVCName, _ := getValueFromAnnotations(controller.RemotePVC, pv.Annotations)
 	pvc.Name = remotePVCName
 	controller.AddAnnotation(pvc, controller.RemotePVC, remotePVCName)
 
-	//Remote PV Annotation
+	// Remote PV Annotation
 	remotePVString := fmt.Sprintf("%s/%s", pv.Namespace, pv.Name)
 	if pv.Annotations != nil {
 		remotePVString += fmt.Sprintf(" annotations: %v", pv.Annotations)
