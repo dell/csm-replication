@@ -586,19 +586,16 @@ func updatePVLabels(pv, volume *v1.PersistentVolume, remoteClusterID string) {
 func UpdateRemotePVDetails(ctx context.Context, client connection.RemoteClusterClient, remotePV *v1.PersistentVolume, volume *v1.PersistentVolume, remoteClusterID string, log logr.Logger) error {
 	// Update the remote PV claimref if it differs from the local PV
 	if volume.Spec.ClaimRef != nil && remoteClusterID != controller.Self {
-
 		if remotePV.Spec.ClaimRef != nil && volume.Spec.ClaimRef.Name != remotePV.Spec.ClaimRef.Name {
 			log.V(common.InfoLevel).Info(fmt.Sprintf("Remote PV claimref differs from the local PV claimref. Hence updating remote PV"))
 			remotePV.Annotations[controller.RemotePVC] = volume.Spec.ClaimRef.Name
 			remotePV.Annotations[controller.RemotePVCNamespace] = volume.Spec.ClaimRef.Namespace
-
 			err := client.UpdatePersistentVolume(ctx, remotePV)
 			if err != nil {
 				if !errors.IsConflict(err) {
 					return fmt.Errorf("error updating PV %s: %s", remotePV.Name, err.Error())
 				}
 			}
-
 		}
 	}
 	return nil
