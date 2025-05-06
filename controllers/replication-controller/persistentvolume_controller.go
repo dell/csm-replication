@@ -584,7 +584,6 @@ func updatePVLabels(pv, volume *v1.PersistentVolume, remoteClusterID string) {
 }
 
 func UpdateRemotePVDetails(ctx context.Context, client connection.RemoteClusterClient, remotePV *v1.PersistentVolume, volume *v1.PersistentVolume, remoteClusterID string, log logr.Logger) error {
-
 	// Update the remote PV claimref if it differs from the local PV
 	if volume.Spec.ClaimRef != nil && remoteClusterID != controller.Self {
 
