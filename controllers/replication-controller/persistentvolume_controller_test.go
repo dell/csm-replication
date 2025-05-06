@@ -1042,17 +1042,9 @@ func TestUpdateRemotePVDetails(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-
-			defer func() {
-				if r := recover(); r != nil {
-					assert.Equal(t, "something went wrong", r)
-				}
-			}()
-
 			err := UpdateRemotePVDetails(tc.ctx, remoteClient, tc.remotePV, tc.volume, tc.remoteClusterID, tc.log)
 			assert.NotNil(t, tc.remotePV.Spec.ClaimRef)
 			assert.NotNil(t, tc.remotePV.Spec.ClaimRef.Name)
-			// assert.ErrorContains(t, tc.remotePV.Spec.ClaimRef.Name, "fake-pvc")
 			assert.Error(t, err)
 		})
 	}

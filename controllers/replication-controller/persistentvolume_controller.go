@@ -388,7 +388,7 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		//Update remotePV parameters
+		// Update remotePV parameters
 		err = UpdateRemotePVDetails(ctx, rClient, remotePV, volume, remoteClusterID, log)
 		if err != nil {
 			return ctrl.Result{}, err
