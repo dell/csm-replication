@@ -28,9 +28,11 @@ import (
 	fakeclient "github.com/dell/csm-replication/test/e2e-framework/fake-client"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
 	"github.com/dell/csm-replication/test/mocks"
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -104,6 +106,16 @@ func (suite *PVReconcileSuite) runRemoteReplicationManager(fakeConfig connection
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "fake-pv",
 			Annotations: map[string]string{},
+		},
+		Spec: v1.PersistentVolumeSpec{
+			ClaimRef: &v1.ObjectReference{
+				Kind:            "PersistentVolumeClaim",
+				Namespace:       "fake-ns",
+				Name:            "fake-pvc-2",
+				UID:             "fake-uid",
+				APIVersion:      "v1",
+				ResourceVersion: "32776691",
+			},
 		},
 	}
 	suite.mockUtils.FakeClient.Create(context.TODO(), localPV)
@@ -973,6 +985,75 @@ func TestProcessLocalPV(t *testing.T) {
 				t.Errorf("PersistentVolumeReconciler.processLocalPV() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+		})
+	}
+}
+
+func TestUpdateRemotePVDetails(t *testing.T) {
+	fakeConfig := mocks.New("sourceCluster", "remote-123")
+	remoteClient, _ := fakeConfig.GetConnection("remote-123")
+	testCases := []struct {
+		ctx             context.Context
+		name            string
+		volume          *v1.PersistentVolume
+		remotePV        *v1.PersistentVolume
+		remoteClusterID string
+		log             logr.Logger
+		expected        error
+	}{
+		{
+			name: "Remote PV claimref differs from the local PV claimref",
+			ctx:  context.TODO(),
+			volume: &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					ClaimRef: &v1.ObjectReference{
+						Kind:            "PersistentVolumeClaim",
+						Namespace:       "fake-ns",
+						Name:            "fake-pvc-2",
+						UID:             "fake-uid",
+						APIVersion:      "v1",
+						ResourceVersion: "32776691",
+					},
+				},
+			},
+			remotePV: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: make(map[string]string),
+					Name:        "RemotePV",
+				},
+				Spec: v1.PersistentVolumeSpec{
+					ClaimRef: &v1.ObjectReference{
+						Kind:            "PersistentVolumeClaim",
+						Namespace:       "fake-ns",
+						Name:            "fake-pvc-1",
+						UID:             "fake-uid",
+						APIVersion:      "v1",
+						ResourceVersion: "32776691",
+					},
+				},
+			},
+			remoteClusterID: "xyz066",
+			// log: logr.Logger{
+			// 	InfoLevel: common.InfoLevel,
+			// },
+			expected: nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			defer func() {
+				if r := recover(); r != nil {
+					assert.Equal(t, "something went wrong", r)
+				}
+			}()
+
+			err := UpdateRemotePVDetails(tc.ctx, remoteClient, tc.remotePV, tc.volume, tc.remoteClusterID, tc.log)
+			assert.NotNil(t, tc.remotePV.Spec.ClaimRef)
+			assert.NotNil(t, tc.remotePV.Spec.ClaimRef.Name)
+			// assert.ErrorContains(t, tc.remotePV.Spec.ClaimRef.Name, "fake-pvc")
+			assert.Error(t, err)
 		})
 	}
 }
