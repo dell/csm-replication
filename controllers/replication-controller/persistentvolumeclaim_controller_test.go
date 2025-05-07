@@ -697,7 +697,7 @@ func TestUpdatePVCAnnotations(t *testing.T) {
 	}
 
 	// Call the function under test
-	updatePVCAnnotations(pvc, "remote-123", pv)
+	updatePVCAnnotationsAndSpec(pvc, "remote-123", pv)
 
 	// Verify that annotations and spec fields were set correctly
 	assert.Equal(t, "ctxPrefixVal", pvc.Annotations[controllers.ContextPrefix], "ContextPrefix annotation")
@@ -740,7 +740,7 @@ func TestVerifyNamespaceExistence_NamespaceAlreadyExists(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Call VerifyNamespaceExistence should find existing namespace and not error
-	err = VerifyNamespaceExistence(ctx, remoteClient, "existing-ns")
+	err = VerifyAndCreateNamespace(ctx, remoteClient, "existing-ns")
 	assert.NoError(t, err)
 }
 
@@ -757,6 +757,6 @@ func TestVerifyNamespaceExistence_NamespaceCreated(t *testing.T) {
 	assert.Error(t, err, "expected error when getting non-existent namespace")
 
 	// Call the function under test; it should create the namespace
-	err = VerifyNamespaceExistence(ctx, remoteClient, namespace)
+	err = VerifyAndCreateNamespace(ctx, remoteClient, namespace)
 	assert.NoError(t, err, "expected VerifyNamespaceExistence to succeed on create")
 }
