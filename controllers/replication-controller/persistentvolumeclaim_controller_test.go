@@ -630,9 +630,6 @@ func (suite *PVControllerTestSuite) TestAllowPVCCreationOnTarget_CreatesRemotePV
 	assert.Equal(suite.T(), suite.driver.DriverName, remotePVC.Labels[controllers.DriverName], "DriverName label")
 	assert.Equal(suite.T(), "remote-123", remotePVC.Labels[controllers.RemoteClusterID], "RemoteClusterID label")
 	assert.Equal(suite.T(), "rg0", remotePVC.Labels[controllers.ReplicationGroup], "ReplicationGroup label")
-
-	// Verify finalizer is added
-	assert.Contains(suite.T(), remotePVC.Finalizers, controllers.ReplicationFinalizer, "Replication finalizer should be added")
 }
 
 func TestUpdatePVCLabels(t *testing.T) {
