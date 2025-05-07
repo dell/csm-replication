@@ -608,7 +608,13 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 
 	// The target PV should be unclaimed.
 	if pv.Spec.ClaimRef != nil {
-		return fmt.Errorf("target PV %s is claimed", pv.Name)
+		// Check if the target PV claimRef if set to "reserved/reserved" This is done as part of claimRef feature
+		if pv.Spec.ClaimRef.Name == controller.ReservedPVCName && pv.Spec.ClaimRef.Namespace == controller.ReservedPVCNamespace {
+			// Update the claimRef to nil so that PVC can be created
+			pv.Spec.ClaimRef = nil
+		} else {
+			return fmt.Errorf("target PV %s is claimed", pv.Name)
+		}
 	}
 
 	remotePVPolicy := pv.Spec.PersistentVolumeReclaimPolicy

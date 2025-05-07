@@ -1722,3 +1722,125 @@ func TestSwapPVC(t *testing.T) {
 		})
 	}
 }
+
+func TestSwapPVCWithClaimRef(t *testing.T) {
+	originalGetPersistentVolumeClaim := getPersistentVolumeClaim
+	originalGetPersistentVolume := getPersistentVolume
+
+	after := func() {
+		getPersistentVolumeClaim = originalGetPersistentVolumeClaim
+		getPersistentVolume = originalGetPersistentVolume
+	}
+
+	fakeConfig := mocks.New("sourceCluster", "remote-123")
+	remoteClient, _ := fakeConfig.GetConnection("remote-123")
+
+	tests := []struct {
+		name        string
+		pvc         *v1.PersistentVolumeClaim
+		client      connection.RemoteClusterClient
+		pvcName     string
+		namespace   string
+		targetPV    string
+		rgTarget    string
+		log         logr.Logger
+		setup       func()
+		expectedErr bool
+	}{
+		{
+			name:      "When claimRef is set to reserved",
+			namespace: "fake-ns",
+			pvcName:   "fake-pvc",
+			client:    remoteClient,
+			setup: func() {
+				pvc := &corev1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "fake-pvc",
+						Namespace: "fake-ns",
+					},
+					Spec: corev1.PersistentVolumeClaimSpec{
+						VolumeName: "fake-pv",
+					},
+				}
+
+				pv := &corev1.PersistentVolume{}
+				pv.Spec.ClaimRef = &corev1.ObjectReference{
+					Name:      controllers.ReservedPVCName,
+					Namespace: controllers.ReservedPVCNamespace,
+				}
+				getPersistentVolumeClaim = func(_ context.Context, _ connection.RemoteClusterClient, _ string, _ string) (*v1.PersistentVolumeClaim, error) {
+					return pvc, nil
+				}
+				getPersistentVolume = func(_ context.Context, _ connection.RemoteClusterClient, _ string) (*v1.PersistentVolume, error) {
+					return pv, nil
+				}
+			},
+			expectedErr: true,
+		},
+		{
+			name:      "When claimRef is set to something other than reserved",
+			namespace: "fake-ns",
+			pvcName:   "fake-pvc",
+			client:    remoteClient,
+			setup: func() {
+				pvc := &corev1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "fake-pvc",
+						Namespace: "fake-ns",
+					},
+					Spec: corev1.PersistentVolumeClaimSpec{
+						VolumeName: "fake-pv",
+					},
+				}
+
+				pv := &corev1.PersistentVolume{}
+				pv.Name = "fake-pv"
+				pv.Spec.ClaimRef = &corev1.ObjectReference{
+					Name:      "xyz",
+					Namespace: "xyz",
+				}
+				getPersistentVolumeClaim = func(_ context.Context, _ connection.RemoteClusterClient, _ string, _ string) (*v1.PersistentVolumeClaim, error) {
+					return pvc, nil
+				}
+				getPersistentVolume = func(_ context.Context, _ connection.RemoteClusterClient, _ string) (*v1.PersistentVolume, error) {
+					return pv, nil
+				}
+			},
+			expectedErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setup()
+			defer after()
+			pvcName := tt.pvcName
+			namespace := tt.namespace
+			targetPV := tt.targetPV
+			rgTarget := tt.rgTarget
+			log := tt.log
+			client := tt.client
+			ctx := context.Background()
+
+			r := &ReplicationGroupReconciler{
+				Client:          nil,
+				Log:             ctrl.Log.WithName("controllers").WithName("DellCSIReplicationGroup"),
+				Scheme:          nil,
+				EventRecorder:   nil,
+				Config:          nil,
+				Domain:          "",
+				DisablePVCRemap: false,
+			}
+			err := r.swapPVC(ctx, client, pvcName, namespace, targetPV, rgTarget, log)
+			if tt.expectedErr {
+				if tt.name == "When claimRef is set to reserved" && !strings.Contains(err.Error(), "error updating PV fake-pv") {
+					t.Errorf("expected error, got %s", err)
+				} else if tt.name == "When claimRef is set to something other than reserved" && !strings.Contains(err.Error(), "target PV fake-pv is claimed") {
+					t.Errorf("expected error, got %s", err)
+				}
+			} else {
+				t.Logf("Expected no error, got %s", err)
+			}
+		})
+	}
+}
