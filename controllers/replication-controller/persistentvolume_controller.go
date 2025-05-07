@@ -612,6 +612,9 @@ func UpdateRemotePVDetails(ctx context.Context, client connection.RemoteClusterC
 	if volume.Spec.ClaimRef != nil && remoteClusterID != controller.Self {
 		if remotePV.Spec.ClaimRef != nil && volume.Spec.ClaimRef.Name != remotePV.Spec.ClaimRef.Name {
 			log.V(common.InfoLevel).Info(fmt.Sprintf("Remote PV claimref differs from the local PV claimref. Hence updating remote PV"))
+			remotePV.Spec.ClaimRef.Namespace = volume.Spec.ClaimRef.Namespace
+			remotePV.Spec.ClaimRef.Name = volume.Spec.ClaimRef.Name
+			remotePV.Spec.ClaimRef.ResourceVersion = volume.Spec.ClaimRef.ResourceVersion
 			remotePV.Annotations[controller.RemotePVC] = volume.Spec.ClaimRef.Name
 			remotePV.Annotations[controller.RemotePVCNamespace] = volume.Spec.ClaimRef.Namespace
 			err := client.UpdatePersistentVolume(ctx, remotePV)
