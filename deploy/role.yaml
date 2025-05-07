@@ -76,6 +76,15 @@ rules:
       - list
       - update
       - watch
+      - patch
+  - apiGroups:
+      - replication.storage.dell.com
+    resources:
+      - dellcsireplicationgroups/status
+    verbs:
+      - get
+      - patch
+      - update
   - apiGroups:
       - storage.k8s.io
     resources:
@@ -130,17 +139,3 @@ rules:
       - secrets
     verbs:
       - get
-  - apiGroups:
-      - replication.storage.dell.com
-    resources:
-      - dellcsireplicationgroups
-    verbs:
-      - patch
-  - apiGroups:
-      - replication.storage.dell.com
-    resources:
-      - dellcsireplicationgroups/status
-    verbs:
-      - get
-      - patch
-      - update
