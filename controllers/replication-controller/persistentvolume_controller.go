@@ -375,9 +375,6 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				pv.Spec.ClaimRef = claimRef
 				log.V(common.InfoLevel).Info(fmt.Sprintf("added remote pv %s claimref %s/%s", pv.Name, remotePVCNamespace, remotePVCName))
 			}
-		}
-
-		if createRemotePV {
 			// We need to create the PV
 			err = rClient.CreatePersistentVolume(ctx, pv)
 			if err != nil {

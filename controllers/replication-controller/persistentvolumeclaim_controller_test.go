@@ -183,7 +183,7 @@ func (suite *PVControllerTestSuite) runFakeRemoteReplicationManager(fakeConfig c
 	assert.NoError(suite.T(), e, "No Error while processing local PVC")
 }
 
-// Modified getPV to accept an optional name parameter
+// To create PV obj with PV name
 func (suite *PVControllerTestSuite) getPV(name ...string) corev1.PersistentVolume {
 	// Use provided name or default "fake-pv"
 	pvName := "fake-pv"

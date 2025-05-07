@@ -154,14 +154,12 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 			remoteClaim.Spec.Resources.Requests = v1.ResourceList{
 				v1.ResourceStorage: remotePV.Spec.Capacity[v1.ResourceStorage],
 			}
-			// updating pvc annotations
-			updatePVCAnnotations(remoteClaim, remoteClusterID, remotePV)
-			// Adding finalizer to pvc
-			remoteClaim.Finalizers = []string{controller.ReplicationFinalizer}
+			// updating pvc annotations and spec
+			updatePVCAnnotationsAndSpec(remoteClaim, remoteClusterID, remotePV)
 			// updating pvc labels
 			updatePVCLabels(remoteClaim, claim, remoteClusterID)
 			// Check if the namespace exists
-			err := VerifyNamespaceExistence(ctx, rClient, remoteClaim.Namespace)
+			err := VerifyAndCreateNamespace(ctx, rClient, remoteClaim.Namespace)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -297,7 +295,7 @@ func pvcProtectionIsComplete() predicate.Predicate {
 	})
 }
 
-func updatePVCAnnotations(pvc *v1.PersistentVolumeClaim, remoteClusterID string, pv *v1.PersistentVolume) {
+func updatePVCAnnotationsAndSpec(pvc *v1.PersistentVolumeClaim, remoteClusterID string, pv *v1.PersistentVolume) {
 	// Context prefix
 	contextPrefix, _ := getValueFromAnnotations(controller.ContextPrefix, pv.Annotations)
 	controller.AddAnnotation(pvc, controller.ContextPrefix, contextPrefix)
@@ -349,7 +347,7 @@ func updatePVCLabels(pvc, volume *v1.PersistentVolumeClaim, remoteClusterID stri
 	controller.AddLabel(pvc, controller.ReplicationGroup, volume.Labels[controller.ReplicationGroup])
 }
 
-func VerifyNamespaceExistence(ctx context.Context, rClient connection.RemoteClusterClient, namespace string) error {
+func VerifyAndCreateNamespace(ctx context.Context, rClient connection.RemoteClusterClient, namespace string) error {
 	// Verify if the namespace exists
 	log := common.GetLoggerFromContext(ctx)
 	if _, err := rClient.GetNamespace(ctx, namespace); err != nil {
