@@ -356,10 +356,14 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		// 2. The remotePVCNamespace and remotePVName must be supplied.
 		if createRemotePV {
 			log.V(common.DebugLevel).Info(fmt.Sprintf("checking for need to create claimRef on remote PV: %+v", pv))
-			remoteVolume, _ := getValueFromAnnotations(controller.RemoteVolumeAnnotation, pv.Annotations)
-			remotePVCNamespace, _ := getValueFromAnnotations(controller.RemotePVCNamespace, pv.Annotations)
-			remotePVCName, _ := getValueFromAnnotations(controller.RemotePVC, pv.Annotations)
-			remoteClusterID, _ := getValueFromAnnotations(controller.RemoteClusterID, pv.Annotations)
+			remoteVolume, err := getValueFromAnnotations(controller.RemoteVolumeAnnotation, pv.Annotations)
+			remotePVCNamespace, err := getValueFromAnnotations(controller.RemotePVCNamespace, pv.Annotations)
+			remotePVCName, err := getValueFromAnnotations(controller.RemotePVC, pv.Annotations)
+			remoteClusterID, err := getValueFromAnnotations(controller.RemoteClusterID, pv.Annotations)
+			if err != nil {
+				log.Error(err, "Failed to fetch the annotation to update claim-ref")
+				return ctrl.Result{}, err
+			}
 			if remoteVolume == "" && remotePVCNamespace != "" && remotePVCName != "" {
 				if remoteClusterID == controller.Self {
 					// If single cluster replication, just make the namespace/name in the claim "reserved"
