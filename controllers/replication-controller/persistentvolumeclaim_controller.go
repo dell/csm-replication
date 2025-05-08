@@ -16,7 +16,10 @@ package replicationcontroller
 
 import (
 	"context"
+	"fmt"
 	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	controller "github.com/dell/csm-replication/controllers"
 	"github.com/dell/csm-replication/pkg/common"
@@ -144,6 +147,30 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 	remoteClaim := &v1.PersistentVolumeClaim{}
 	remotePVCName := ""
 	remotePVCNamespace := ""
+	if remoteClusterID != controller.Self && r.AllowPVCCreationOnTarget {
+		// if its not single cluster then check the pv status and create pvc on target cluster
+		if remotePV.Status.Phase == v1.VolumeAvailable && remotePV.Spec.ClaimRef != nil {
+			remoteClaim.Spec.AccessModes = remotePV.Spec.AccessModes
+			remoteClaim.Spec.Resources.Requests = v1.ResourceList{
+				v1.ResourceStorage: remotePV.Spec.Capacity[v1.ResourceStorage],
+			}
+			// updating pvc annotations and spec
+			updatePVCAnnotationsAndSpec(remoteClaim, remoteClusterID, remotePV)
+			// updating pvc labels
+			updatePVCLabels(remoteClaim, claim, remoteClusterID)
+			// Check if the namespace exists
+			err := VerifyAndCreateNamespace(ctx, rClient, remoteClaim.Namespace)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			// creating PVC on target
+			err = rClient.CreatePersistentVolumeClaim(ctx, remoteClaim)
+			if err != nil {
+				log.Error(err, "Failed to create remote PVC on target cluster")
+				return ctrl.Result{}, err
+			}
+		}
+	}
 	if remotePV.Status.Phase == v1.VolumeBound && remotePV.Spec.ClaimRef != nil {
 		remotePVCName = remotePV.Spec.ClaimRef.Name
 		remotePVCNamespace = remotePV.Spec.ClaimRef.Namespace
@@ -175,6 +202,7 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 	return ctrl.Result{}, nil
 }
 
+// processRemotePVC
 func (r *PersistentVolumeClaimReconciler) processRemotePVC(ctx context.Context,
 	rClient connection.RemoteClusterClient,
 	claim *v1.PersistentVolumeClaim,
@@ -261,8 +289,84 @@ func (r *PersistentVolumeClaimReconciler) SetupWithManager(mgr ctrl.Manager, lim
 }
 
 func pvcProtectionIsComplete() predicate.Predicate {
-	return newPredicateFuncs(func(meta client.Object) bool {
-		a := getAnnotations(meta)
+	return predicate.NewPredicateFuncs(func(meta client.Object) bool {
+		a := meta.GetAnnotations()
 		return a != nil && a[controller.PVCProtectionComplete] == "yes"
 	})
+}
+
+func updatePVCAnnotationsAndSpec(pvc *v1.PersistentVolumeClaim, remoteClusterID string, pv *v1.PersistentVolume) {
+	// Context prefix
+	contextPrefix, _ := getValueFromAnnotations(controller.ContextPrefix, pv.Annotations)
+	controller.AddAnnotation(pvc, controller.ContextPrefix, contextPrefix)
+	// pvc protection complete
+	pvcProtectionComplete, _ := getValueFromAnnotations(controller.PVCProtectionComplete, pv.Annotations)
+	controller.AddAnnotation(pvc, controller.PVCProtectionComplete, pvcProtectionComplete)
+	// Created By
+	controller.AddAnnotation(pvc, controller.CreatedBy, common.DellReplicationController)
+	// Remote PV Name
+	remoteVolume, _ := getValueFromAnnotations(controller.RemoteVolumeAnnotation, pv.Annotations)
+	pvc.Spec.VolumeName = remoteVolume
+	controller.AddAnnotation(pvc, controller.RemotePV, remoteVolume)
+	// Remote ClusterID
+	controller.AddAnnotation(pvc, controller.RemoteClusterID, remoteClusterID)
+	// Replication group
+	controller.AddAnnotation(pvc, controller.ReplicationGroup, pv.Labels[controller.ReplicationGroup])
+	// Remote Storage Class
+	pvc.Spec.StorageClassName = &pv.Spec.StorageClassName
+	controller.AddAnnotation(pvc, controller.RemoteStorageClassAnnotation, pv.Spec.StorageClassName)
+	// Remote Volume
+	remoteVolume, _ = getValueFromAnnotations(controller.RemoteVolumeAnnotation, pv.Annotations)
+	controller.AddAnnotation(pvc, controller.RemoteVolumeAnnotation, remoteVolume)
+	// remote PVC namespace
+	remotePVCNamespace, _ := getValueFromAnnotations(controller.RemotePVCNamespace, pv.Annotations)
+	pvc.Namespace = remotePVCNamespace
+	controller.AddAnnotation(pvc, controller.RemotePVCNamespace, remotePVCNamespace)
+	// remote PVC name
+	remotePVCName, _ := getValueFromAnnotations(controller.RemotePVC, pv.Annotations)
+	pvc.Name = remotePVCName
+	controller.AddAnnotation(pvc, controller.RemotePVC, remotePVCName)
+
+	// Remote PV Annotation
+	remotePVString := fmt.Sprintf("%s/%s", pv.Namespace, pv.Name)
+	if pv.Annotations != nil {
+		remotePVString += fmt.Sprintf(" annotations: %v", pv.Annotations)
+	}
+	if pv.Labels != nil {
+		remotePVString += fmt.Sprintf(" labels: %v", pv.Labels)
+	}
+	pvc.Annotations[controller.RemoteVolumeAnnotation] = remotePVString
+}
+
+func updatePVCLabels(pvc, volume *v1.PersistentVolumeClaim, remoteClusterID string) {
+	// Driver Name
+	controller.AddLabel(pvc, controller.DriverName, volume.Labels[controller.DriverName])
+	// Remote ClusterID
+	controller.AddLabel(pvc, controller.RemoteClusterID, remoteClusterID)
+	// Replication group name
+	controller.AddLabel(pvc, controller.ReplicationGroup, volume.Labels[controller.ReplicationGroup])
+}
+
+func VerifyAndCreateNamespace(ctx context.Context, rClient connection.RemoteClusterClient, namespace string) error {
+	// Verify if the namespace exists
+	log := common.GetLoggerFromContext(ctx)
+	if _, err := rClient.GetNamespace(ctx, namespace); err != nil {
+		log.V(common.InfoLevel).Info("Namespace - " + namespace + " not found, creating it.")
+		NewNamespace := &v1.Namespace{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "Namespace",
+				Kind:       "Namespace",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: namespace,
+			},
+		}
+		err = rClient.CreateNamespace(ctx, NewNamespace)
+		if err != nil {
+			msg := "unable to create the desired namespace" + namespace
+			log.V(common.ErrorLevel).Error(err, msg)
+			return err
+		}
+	}
+	return nil
 }
