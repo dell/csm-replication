@@ -612,6 +612,10 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 		if pv.Spec.ClaimRef.Name == controller.ReservedPVCName && pv.Spec.ClaimRef.Namespace == controller.ReservedPVCNamespace {
 			// Update the claimRef to nil so that PVC can be created
 			pv.Spec.ClaimRef = nil
+			err = updatePersistentVolume(ctx, client, pv)
+			if err != nil {
+				return fmt.Errorf("error updating target PV  in case of single/stretched cluster %s: %s", pv.Name, err)
+			}
 		} else {
 			return fmt.Errorf("target PV %s is claimed", pv.Name)
 		}

@@ -1806,7 +1806,7 @@ func TestSwapPVCWithClaimRef(t *testing.T) {
 					return pv, nil
 				}
 			},
-			expectedErr: true,
+			expectedErr: false,
 		},
 	}
 
@@ -1833,13 +1833,9 @@ func TestSwapPVCWithClaimRef(t *testing.T) {
 			}
 			err := r.swapPVC(ctx, client, pvcName, namespace, targetPV, rgTarget, log)
 			if tt.expectedErr {
-				if tt.name == "When claimRef is set to reserved" && !strings.Contains(err.Error(), "error updating PV fake-pv") {
-					t.Errorf("expected error, got %s", err)
-				} else if tt.name == "When claimRef is set to something other than reserved" && !strings.Contains(err.Error(), "target PV fake-pv is claimed") {
+				if tt.name == "When claimRef is set to something other than reserved" && !strings.Contains(err.Error(), "target PV fake-pv is claimed") {
 					t.Errorf("expected error, got %s", err)
 				}
-			} else {
-				t.Logf("Expected no error, got %s", err)
 			}
 		})
 	}
