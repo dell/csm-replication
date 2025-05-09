@@ -611,10 +611,9 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 		// Check if the target PV claimRef if set to "reserved/reserved" This is done as part of claimRef feature
 		if pv.Spec.ClaimRef.Name == controller.ReservedPVCName && pv.Spec.ClaimRef.Namespace == controller.ReservedPVCNamespace {
 			// Update the claimRef to nil so that PVC can be created
-			pv.Spec.ClaimRef = nil
-			err = updatePersistentVolume(ctx, client, pv)
+			err = removeReservedClaimRefforTargetPV(ctx, client, pv.Name, log)
 			if err != nil {
-				return fmt.Errorf("error updating target PV  in case of single/stretched cluster %s: %s", pv.Name, err)
+				return fmt.Errorf("error removing PV claim ref from %s: %s", pv, err.Error())
 			}
 		} else {
 			return fmt.Errorf("target PV %s is claimed", pv.Name)
@@ -636,7 +635,7 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	// Delete the existing PVC
 	err = client.DeletePersistentVolumeClaim(ctx, pvc)
 	if err != nil {
-		return fmt.Errorf("error deleting PVC %s", pvcName)
+		return fmt.Errorf("error deleting PVC %s with errror %s", pvcName, err)
 	}
 
 	// Wait until PVC is deleted
@@ -781,6 +780,34 @@ func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 	}
 
 	return fmt.Errorf("timed out waiting on Local PV Claim Ref to be removed")
+}
+
+func removeReservedClaimRefforTargetPV(ctx context.Context, client connection.RemoteClusterClient, pvName string, log logr.Logger) error {
+	log.V(common.InfoLevel).Info(fmt.Sprintf("Removing ClaimRef on Target PV: %s", pvName))
+	for iteration := 0; iteration < 30; iteration++ {
+		pv, err := getPersistentVolume(ctx, client, pvName)
+		if err != nil {
+			return fmt.Errorf("error retrieving PV %s: %s", pvName, err.Error())
+		}
+
+		if pv.Spec.ClaimRef == nil {
+			log.V(common.InfoLevel).Info(fmt.Sprintf("Reserved ClaimRef removed from TargetPV: %s", pvName))
+			return nil
+		}
+
+		pv.Spec.ClaimRef = nil
+		err = updatePersistentVolume(ctx, client, pv)
+		if err != nil {
+			if !errors.IsConflict(err) {
+				return fmt.Errorf("error updating PV %s: %s", pvName, err.Error())
+			}
+
+			log.V(common.InfoLevel).Info(fmt.Sprintf("Issue retrieving latest for %s and trying again", pvName))
+			time.Sleep(2 * time.Second)
+		}
+	}
+
+	return fmt.Errorf("timed out waiting on Target PV Reserved Claim Ref to be removed")
 }
 
 func updatePVClaimRef(ctx context.Context, client connection.RemoteClusterClient, pvName, pvcNamespace, pvcResourceVersion, pvcName string, pvcUID types.UID, log logr.Logger) error {

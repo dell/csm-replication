@@ -1840,3 +1840,67 @@ func TestSwapPVCWithClaimRef(t *testing.T) {
 		})
 	}
 }
+
+func TestRemoveReservedClaimRefforTargetPV(t *testing.T) {
+	originalGetPersistentVolume := getPersistentVolume
+
+	after := func() {
+		getPersistentVolume = originalGetPersistentVolume
+	}
+
+	fakeConfig := mocks.New("sourceCluster", "remote-123")
+	remoteClient, _ := fakeConfig.GetConnection("remote-123")
+	type args struct {
+		ctx    context.Context
+		client connection.RemoteClusterClient
+		pvName string
+		log    logr.Logger
+	}
+	tests := []struct {
+		name    string
+		args    args
+		setup   func()
+		wantErr bool
+	}{
+		{
+			name: "Error Retrieving PV",
+			args: args{
+				ctx:    context.TODO(),
+				client: remoteClient,
+				pvName: "fake-pv",
+			},
+			setup: func() {
+				getPersistentVolume = func(_ context.Context, _ connection.RemoteClusterClient, _ string) (*v1.PersistentVolume, error) {
+					return nil, fmt.Errorf("error")
+				}
+			},
+			wantErr: true,
+		},
+		{
+			name: "No claimRef for PV",
+			args: args{
+				ctx:    context.TODO(),
+				client: remoteClient,
+				pvName: "fake-pv",
+			},
+			setup: func() {
+				pv := &corev1.PersistentVolume{}
+				pv.Spec.ClaimRef = nil
+				getPersistentVolume = func(_ context.Context, _ connection.RemoteClusterClient, _ string) (*v1.PersistentVolume, error) {
+					return pv, nil
+				}
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setup()
+			defer after()
+			err := removeReservedClaimRefforTargetPV(tt.args.ctx, tt.args.client, tt.args.pvName, tt.args.log)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("PersistentVolumeReconciler.removeReservedClaimRefforTargetPV() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
