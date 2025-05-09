@@ -31,10 +31,21 @@ rules:
     resources:
       - persistentvolumeclaims
     verbs:
+      - create
+      - delete
       - get
       - list
+      - patch
       - update
       - watch
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumeclaims/status
+    verbs:
+      - get
+      - patch
+      - update
   - apiGroups:
       - ""
     resources:
@@ -88,19 +99,3 @@ rules:
       - list
       - update
       - watch
-  - apiGroups:
-      - ""
-    resources:
-      - persistentvolumeclaims
-    verbs:
-      - create
-      - delete
-      - patch
-  - apiGroups:
-      - ""
-    resources:
-      - persistentvolumeclaims/status
-    verbs:
-      - get
-      - patch
-      - update
