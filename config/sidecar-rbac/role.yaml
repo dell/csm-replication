@@ -5,17 +5,6 @@ metadata:
   name: sidecar-manager-role
 rules:
   - apiGroups:
-      - coordination.k8s.io
-    resources:
-      - leases
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - update
-      - watch
-  - apiGroups:
       - ""
     resources:
       - configmaps
@@ -42,21 +31,10 @@ rules:
     resources:
       - persistentvolumeclaims
     verbs:
-      - create
-      - delete
       - get
       - list
-      - patch
       - update
       - watch
-  - apiGroups:
-      - ""
-    resources:
-      - persistentvolumeclaims/status
-    verbs:
-      - get
-      - patch
-      - update
   - apiGroups:
       - ""
     resources:
@@ -91,3 +69,38 @@ rules:
       - storageclasses
     verbs:
       - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  creationTimestamp: null
+  name: sidecar-manager-role
+  namespace: dell-replication-controller
+rules:
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - update
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumeclaims
+    verbs:
+      - create
+      - delete
+      - patch
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumeclaims/status
+    verbs:
+      - get
+      - patch
+      - update
