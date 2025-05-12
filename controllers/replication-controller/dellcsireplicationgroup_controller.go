@@ -611,7 +611,7 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 		// Check if the target PV claimRef if set to "reserved/reserved" This is done as part of claimRef feature
 		if pv.Spec.ClaimRef.Name == controller.ReservedPVCName && pv.Spec.ClaimRef.Namespace == controller.ReservedPVCNamespace {
 			// Update the claimRef to nil so that PVC can be created
-			err = removeReservedClaimRefforTargetPV(ctx, client, pv.Name, log)
+			err = removeReservedClaimRefForTargetPV(ctx, client, pv.Name, log)
 			if err != nil {
 				return fmt.Errorf("error removing PV claim ref from %s: %s", pv, err.Error())
 			}
@@ -782,9 +782,10 @@ func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 	return fmt.Errorf("timed out waiting on Local PV Claim Ref to be removed")
 }
 
-func removeReservedClaimRefforTargetPV(ctx context.Context, client connection.RemoteClusterClient, pvName string, log logr.Logger) error {
+func removeReservedClaimRefForTargetPV(ctx context.Context, client connection.RemoteClusterClient, pvName string, log logr.Logger) error {
 	log.V(common.InfoLevel).Info(fmt.Sprintf("Removing ClaimRef on Target PV: %s", pvName))
 	for iteration := 0; iteration < 30; iteration++ {
+		log.V(common.DebugLevel).Info(fmt.Sprintf("*** ITERATION: %d ***", iteration))
 		pv, err := getPersistentVolume(ctx, client, pvName)
 		if err != nil {
 			return fmt.Errorf("error retrieving PV %s: %s", pvName, err.Error())

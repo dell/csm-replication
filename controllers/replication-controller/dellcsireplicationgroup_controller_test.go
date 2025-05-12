@@ -1841,7 +1841,7 @@ func TestSwapPVCWithClaimRef(t *testing.T) {
 	}
 }
 
-func TestRemoveReservedClaimRefforTargetPV(t *testing.T) {
+func TestRemoveReservedClaimRefForTargetPV(t *testing.T) {
 	originalGetPersistentVolume := getPersistentVolume
 
 	after := func() {
@@ -1897,7 +1897,7 @@ func TestRemoveReservedClaimRefforTargetPV(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setup()
 			defer after()
-			err := removeReservedClaimRefforTargetPV(tt.args.ctx, tt.args.client, tt.args.pvName, tt.args.log)
+			err := removeReservedClaimRefForTargetPV(tt.args.ctx, tt.args.client, tt.args.pvName, tt.args.log)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("PersistentVolumeReconciler.removeReservedClaimRefforTargetPV() error = %v, wantErr %v", err, tt.wantErr)
 			}
