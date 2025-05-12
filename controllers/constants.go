@@ -136,4 +136,6 @@ const (
 
 	XCSIReplicationPodName      = "X_CSI_REPLICATION_POD_NAME"
 	XCSIReplicationPodNamespace = "X_CSI_REPLICATION_POD_NAMESPACE"
+	ReservedPVCName             = "reserved"
+	ReservedPVCNamespace        = "reserved"
 )
