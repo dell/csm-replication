@@ -6,10 +6,10 @@ toolchain go1.24.2
 
 require (
 	github.com/bombsimon/logrusr/v4 v4.1.0
-	github.com/dell/dell-csi-extensions/common v1.7.1-0.20250512061334-fccb033d256a
-	github.com/dell/dell-csi-extensions/migration v1.7.2-0.20250512061334-fccb033d256a
-	github.com/dell/dell-csi-extensions/replication v1.10.2-0.20250512061334-fccb033d256a
-	github.com/dell/gobrick v1.13.2-0.20250505070918-a64b56d5a9f7
+	github.com/dell/dell-csi-extensions/common v1.8.0
+	github.com/dell/dell-csi-extensions/migration v1.8.0
+	github.com/dell/dell-csi-extensions/replication v1.11.0
+	github.com/dell/gobrick v1.14.0
 	github.com/fatih/color v1.18.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-chi/chi v4.1.2+incompatible
@@ -35,8 +35,8 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/dell/goiscsi v1.11.1-0.20250414073142-a69a338c4871 // indirect
-	github.com/dell/gonvme v1.10.2-0.20250502050802-983cf3a533b7 // indirect
+	github.com/dell/goiscsi v1.12.0 // indirect
+	github.com/dell/gonvme v1.11.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
 	github.com/evanphx/json-patch v5.9.10+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
