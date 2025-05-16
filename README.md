@@ -1,5 +1,5 @@
 <!--
- Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -50,9 +50,8 @@ For documentation, please visit [Container Storage Modules documentation](https:
 * [Committer Guide](https://github.com/dell/csm/blob/main/docs/COMMITTER_GUIDE.md)
 * [Contributing Guide](https://github.com/dell/csm/blob/main/docs/CONTRIBUTING.md)
 * [List of Adopters](https://github.com/dell/csm/blob/main/docs/ADOPTERS.md)
-* [Support](https://github.com/dell/csm/blob/main/docs/SUPPORT.md)
+* [Dell support](https://www.dell.com/support/incidents-online/en-us/contactus/product/container-storage-modules).
 * [Security](https://github.com/dell/csm/blob/main/docs/SECURITY.md)
-* [About](#about)
 
 ## Build
 
@@ -116,12 +115,6 @@ There are various Makefile targets available for building and pushing container 
 ### RBAC manifests
 For building the RBAC rules for the sidecar, run `make sidecar-rbac`.
 For building the RBAC rules for the controller, run `make controller-rbac`.
-
-## Installation
-
-Please consult the [Installation Guide](https://dell.github.io/csm-docs/docs/deployment/helm/modules/installation/replication/installation/) for instructions on installing the replication controller and sidecar.
-
-To build and install your own images using the provided Makefile targets, below information may be useful:
 
 ### Custom Resource Definitions
 
