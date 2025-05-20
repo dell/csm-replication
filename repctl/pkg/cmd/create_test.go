@@ -201,9 +201,8 @@ func (suite *CreateTestSuite) TestCreateSCs() {
 				Source: "WX-0001",
 				Target: "WX-0002",
 			},
-			Rpo:       "Five_Minutes",
-			Mode:      "ASYNC",
-			SharedNfs: "RWX",
+			Rpo:  "Five_Minutes",
+			Mode: "ASYNC",
 		},
 	}
 	cmd := getCreateStorageClassCommand()
