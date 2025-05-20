@@ -55,7 +55,6 @@ type GlobalParameters struct {
 	IgnoreNamespaces  bool
 	VolumeGroupPrefix string
 	Mode              string
-	SharedNfs         string
 
 	// PowerMax
 	Srp          Mirrored
