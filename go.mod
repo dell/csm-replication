@@ -6,7 +6,7 @@ toolchain go1.24.2
 
 require (
 	github.com/bombsimon/logrusr/v4 v4.1.0
-	github.com/dell/dell-csi-extensions/common v1.8.0
+	github.com/dell/dell-csi-extensions/common v1.8.1-0.20250514175456-5ddd200c5e5c
 	github.com/dell/dell-csi-extensions/migration v1.8.0
 	github.com/dell/dell-csi-extensions/replication v1.11.0
 	github.com/dell/gobrick v1.14.0
