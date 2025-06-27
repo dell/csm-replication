@@ -1470,7 +1470,7 @@ func TestUpdatePVClaimRef(t *testing.T) {
 	}
 }
 
-func TestRemovePVClaimRef(t *testing.T) {
+func TestUpdaetPVClaimRefForLocalPV(t *testing.T) {
 	originalGetPersistentVolume := getPersistentVolume
 	originalUpdatePersistentVolume := updatePersistentVolume
 
@@ -1518,7 +1518,17 @@ func TestRemovePVClaimRef(t *testing.T) {
 				},
 			},
 			setup: func() {
-				pv := &corev1.PersistentVolume{}
+				pv := &corev1.PersistentVolume{
+					Spec: corev1.PersistentVolumeSpec{
+						ClaimRef: &corev1.ObjectReference{
+							Kind:            "PersistentVolumeClaim",
+							Namespace:       "fake-ns",
+							Name:            "",
+							UID:             "fake-uid",
+							ResourceVersion: "fake-version",
+						},
+					},
+				}
 				getPersistentVolume = func(_ context.Context, _ connection.RemoteClusterClient, _ string) (*v1.PersistentVolume, error) {
 					return pv, nil
 				}
@@ -1540,7 +1550,7 @@ func TestRemovePVClaimRef(t *testing.T) {
 			log := tt.log
 			client := tt.client
 			ctx := context.Background()
-			err := removePVClaimRef(ctx, client, pvName, pvcNamespace, pvcName, log)
+			err := updatePVClaimRefForLocalPV(ctx, client, pvName, pvcNamespace, pvcName, log)
 			if tt.expectedErr && err != nil {
 				if tt.name == "When PV cannot be retrieved" && err.Error() != "Error retrieving PV" {
 					t.Errorf("expected error, got %s", err)
