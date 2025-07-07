@@ -7,8 +7,17 @@
 # be requested for review when someone opens a pull request.
 # Order is alphabetical for easier maintenance.
 #
+# Aaron Tye (atye)
+# Abhilash (abhi16394)
+# Alex Babiychuk (alexemc)
+# Aly Nathoo (anathoodell)
 # Chaganti Rajitha (chaganti-rajitha)
+# Christian Coffield (ChristianAtDell)
+# Evgeny Uglov (EvgenyUglov)
+# Fernando Alfaro Campos (falfaroc)
+# Jacob Grosner (JacobGros)
 # Karthik K (karthikk92)
+# Kumar Karthik Gosa (kumarkgosa)
 # Niranjan N (niranjan-n1)
 # Nitesh Rewatkar (nitesh3108)
 # Rajendra Indukuri (rajendraindukuri)
@@ -18,4 +27,4 @@
 # Satya Narayana Konduri (satyakonduri)
 
 # for all files
-* @chaganti-rajitha @karthikk92 @niranjan-n1 @nitesh3108 @rajendraindukuri @khareRajshree @samihan-dell @santhoshatdell @satyakonduri
+* @anathoodell @alexemc @atye @chaganti-rajitha @karthikk92 @niranjan-n1 @nitesh3108 @rajendraindukuri @khareRajshree @samihan-dell @santhoshatdell @satyakonduri @abhi16394 @ChristianAtDell @EvgenyUglov @falfaroc @JacobGros @kumarkgosa
