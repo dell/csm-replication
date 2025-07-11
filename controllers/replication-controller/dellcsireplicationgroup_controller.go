@@ -691,10 +691,25 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	}
 
 	// Remove the PVC reclaim of local PV
-	err = updatePVClaimRefForLocalPV(ctx, client, localPV, namespace, pvcName, log)
+	err = removePVClaimRef(ctx, client, localPV, namespace, pvcName, log)
 	if err != nil {
 		return fmt.Errorf("error updating PV claim ref from %s: %s", localPV, err.Error())
 	}
+
+	// Updating the claimRef of localPV to reservd/reserved
+	pv, err = getPersistentVolume(ctx, client, localPV)
+	if err != nil {
+		return fmt.Errorf("error retrieving PV %s: %s", localPV, err.Error())
+	}
+
+	claimRef := &v1.ObjectReference{
+		APIVersion: "v1",
+		Kind:       "PersistentVolumeClaim",
+		Name:       controller.ReservedPVCName,
+		Namespace:  controller.ReservedPVCNamespace,
+	}
+	pv.Spec.ClaimRef = claimRef
+	log.V(common.InfoLevel).Info(fmt.Sprintf("added remote pv %s claimref %s/%s", pv.Name, controller.ReservedPVCName, controller.ReservedPVCNamespace))
 
 	// Restore the PVs original volume reclaim policy
 	err = setPVReclaimPolicy(ctx, client, pvc.Spec.VolumeName, remotePVPolicy)
@@ -749,7 +764,7 @@ func setPVReclaimPolicy(ctx context.Context, client connection.RemoteClusterClie
 	}
 	return fmt.Errorf("timed out waiting on PV VolumeReclaimPolicy to be set to previous policy")
 }
-func updatePVClaimRefForLocalPV(ctx context.Context, client connection.RemoteClusterClient, pvName, pvcNamespace, pvcName string, log logr.Logger) error {
+func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient, pvName, pvcNamespace, pvcName string, log logr.Logger) error {
 	log.V(common.InfoLevel).Info(fmt.Sprintf("Removing ClaimRef on LocalPV: %s", pvName))
 	for iteration := 0; iteration < 30; iteration++ {
 		pv, err := getPersistentVolume(ctx, client, pvName)
@@ -757,18 +772,11 @@ func updatePVClaimRefForLocalPV(ctx context.Context, client connection.RemoteClu
 			return fmt.Errorf("error retrieving PV %s: %s", pvName, err.Error())
 		}
 
-		if pv.Spec.ClaimRef != nil {
-			log.V(common.InfoLevel).Info(fmt.Sprintf("ClaimRef is updated for LocalPV: %s", pvName))
+		if pv.Spec.ClaimRef == nil {
+			log.V(common.InfoLevel).Info(fmt.Sprintf("ClaimRef removed from for LocalPV: %s", pvName))
 			return nil
 		}
-
-		claimRef := &v1.ObjectReference{
-			APIVersion: "v1",
-			Kind:       "PersistentVolumeClaim",
-			Name:       controller.ReservedPVCName,
-			Namespace:  controller.ReservedPVCNamespace,
-		}
-		pv.Spec.ClaimRef = claimRef
+		pv.Spec.ClaimRef = nil
 		pv.Annotations[controller.RemotePVCNamespace] = pvcNamespace
 		pv.Labels[controller.RemotePVCNamespace] = pvcNamespace
 		pv.Annotations[controller.RemotePVC] = pvcName
@@ -784,7 +792,7 @@ func updatePVClaimRefForLocalPV(ctx context.Context, client connection.RemoteClu
 		}
 	}
 
-	return fmt.Errorf("timed out waiting on Local PV Claim Ref to be updated")
+	return fmt.Errorf("timed out waiting on Local PV Claim Ref to be removed")
 }
 
 func removeReservedClaimRefForTargetPV(ctx context.Context, client connection.RemoteClusterClient, pvName string, log logr.Logger) error {
