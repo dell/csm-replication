@@ -1425,7 +1425,7 @@ func TestUpdatePVClaimRef(t *testing.T) {
 					ClaimRef: &corev1.ObjectReference{
 						Kind:            "PersistentVolumeClaim",
 						Namespace:       "fake-ns",
-						Name:            "",
+						Name:            "fake-pvc",
 						UID:             "fake-uid",
 						ResourceVersion: "fake-version",
 					},
@@ -1470,7 +1470,7 @@ func TestUpdatePVClaimRef(t *testing.T) {
 	}
 }
 
-func TestUpdaetPVClaimRefForLocalPV(t *testing.T) {
+func TestRemovePVClaimRef(t *testing.T) {
 	originalGetPersistentVolume := getPersistentVolume
 	originalUpdatePersistentVolume := updatePersistentVolume
 
@@ -1504,14 +1504,16 @@ func TestUpdaetPVClaimRefForLocalPV(t *testing.T) {
 			},
 		},
 		{
-			name:   "Error in updating persisitent volume",
-			pvName: "fake-pv",
+			name:         "Error in updating persisitent volume",
+			pvName:       "fake-pv",
+			pvcNamespace: "fake-ns",
+			pvcName:      "fake-pvc",
 			pv: &corev1.PersistentVolume{
 				Spec: corev1.PersistentVolumeSpec{
 					ClaimRef: &corev1.ObjectReference{
 						Kind:            "PersistentVolumeClaim",
 						Namespace:       "fake-ns",
-						Name:            "",
+						Name:            "fake-pvc",
 						UID:             "fake-uid",
 						ResourceVersion: "fake-version",
 					},
@@ -1523,10 +1525,14 @@ func TestUpdaetPVClaimRefForLocalPV(t *testing.T) {
 						ClaimRef: &corev1.ObjectReference{
 							Kind:            "PersistentVolumeClaim",
 							Namespace:       "fake-ns",
-							Name:            "",
+							Name:            "fake-pvc",
 							UID:             "fake-uid",
 							ResourceVersion: "fake-version",
 						},
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: make(map[string]string),
+						Labels:      make(map[string]string),
 					},
 				}
 				getPersistentVolume = func(_ context.Context, _ connection.RemoteClusterClient, _ string) (*v1.PersistentVolume, error) {
@@ -1550,7 +1556,7 @@ func TestUpdaetPVClaimRefForLocalPV(t *testing.T) {
 			log := tt.log
 			client := tt.client
 			ctx := context.Background()
-			err := updatePVClaimRefForLocalPV(ctx, client, pvName, pvcNamespace, pvcName, log)
+			err := removePVClaimRef(ctx, client, pvName, pvcNamespace, pvcName, log)
 			if tt.expectedErr && err != nil {
 				if tt.name == "When PV cannot be retrieved" && err.Error() != "Error retrieving PV" {
 					t.Errorf("expected error, got %s", err)

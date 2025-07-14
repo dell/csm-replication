@@ -693,7 +693,7 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	// Remove the PVC reclaim of local PV
 	err = removePVClaimRef(ctx, client, localPV, namespace, pvcName, log)
 	if err != nil {
-		return fmt.Errorf("error updating PV claim ref from %s: %s", localPV, err.Error())
+		return fmt.Errorf("error removing PV claim ref from %s: %s", localPV, err.Error())
 	}
 
 	// Updating the claimRef of localPV to reservd/reserved
