@@ -1206,7 +1206,8 @@ func (suite *RGControllerTestSuite) TestPVCRemapPlanned() {
 	var updatedLocalPV corev1.PersistentVolume
 	err = suite.client.Get(context.Background(), types.NamespacedName{Name: "local-pv"}, &updatedLocalPV)
 	suite.NoError(err)
-	suite.Nil(updatedLocalPV.Spec.ClaimRef, "Local PV's claim reference should be removed")
+	suite.Equal("reserved", updatedLocalPV.Spec.ClaimRef.Name, "Remote PV should now be claimed by the PVC")
+	suite.Equal("reserved", updatedLocalPV.Spec.ClaimRef.Namespace)
 	suite.Equal(controllers.RemoteRetentionValueDelete, string(updatedLocalPV.Spec.PersistentVolumeReclaimPolicy), "Local PV reclaim policy should be 'Delete' after swapAllPVC")
 }
 
@@ -1261,7 +1262,8 @@ func (suite *RGControllerTestSuite) TestPVCRemapUnplanned() {
 	var updatedLocalPV corev1.PersistentVolume
 	err = suite.client.Get(context.Background(), types.NamespacedName{Name: "local-pv"}, &updatedLocalPV)
 	suite.NoError(err)
-	suite.Nil(updatedLocalPV.Spec.ClaimRef, "Local PV's claim reference should be removed")
+	suite.Equal("reserved", updatedLocalPV.Spec.ClaimRef.Name, "Remote PV should now be claimed by the PVC")
+	suite.Equal("reserved", updatedLocalPV.Spec.ClaimRef.Namespace)
 	suite.Equal(controllers.RemoteRetentionValueDelete, string(updatedLocalPV.Spec.PersistentVolumeReclaimPolicy), "Local PV reclaim policy should be 'Delete' after swapAllPVC")
 }
 
