@@ -711,6 +711,16 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	pv.Spec.ClaimRef = claimRef
 	log.V(common.InfoLevel).Info(fmt.Sprintf("added remote pv %s claimref %s/%s", pv.Name, controller.ReservedPVCName, controller.ReservedPVCNamespace))
 
+	err = updatePersistentVolume(ctx, client, pv)
+	if err != nil {
+		if !errors.IsConflict(err) {
+			return fmt.Errorf("error updating PV %s: %s", localPV, err.Error())
+		}
+
+		log.V(common.InfoLevel).Info(fmt.Sprintf("Issue updating PV %s so trying again", localPV))
+		time.Sleep(2 * time.Second)
+	}
+
 	// Restore the PVs original volume reclaim policy
 	err = setPVReclaimPolicy(ctx, client, pvc.Spec.VolumeName, remotePVPolicy)
 	if err != nil {
@@ -787,7 +797,7 @@ func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 				return fmt.Errorf("error updating PV %s: %s", pvName, err.Error())
 			}
 
-			log.V(common.InfoLevel).Info(fmt.Sprintf("Issue retrieving latest for %s and trying again", pvName))
+			log.V(common.InfoLevel).Info(fmt.Sprintf("Issue updating PV %s so trying again", pvName))
 			time.Sleep(2 * time.Second)
 		}
 	}
@@ -816,7 +826,7 @@ func removeReservedClaimRefForTargetPV(ctx context.Context, client connection.Re
 				return fmt.Errorf("error updating PV %s: %s", pvName, err.Error())
 			}
 
-			log.V(common.InfoLevel).Info(fmt.Sprintf("Issue retrieving latest for %s and trying again", pvName))
+			log.V(common.InfoLevel).Info(fmt.Sprintf("Issue updating PV %s so trying again", pvName))
 			time.Sleep(2 * time.Second)
 		}
 	}
