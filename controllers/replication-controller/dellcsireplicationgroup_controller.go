@@ -774,6 +774,7 @@ func setPVReclaimPolicy(ctx context.Context, client connection.RemoteClusterClie
 	}
 	return fmt.Errorf("timed out waiting on PV VolumeReclaimPolicy to be set to previous policy")
 }
+
 func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient, pvName, pvcNamespace, pvcName string, log logr.Logger) error {
 	log.V(common.InfoLevel).Info(fmt.Sprintf("Removing ClaimRef on LocalPV: %s", pvName))
 	for iteration := 0; iteration < 30; iteration++ {
