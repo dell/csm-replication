@@ -792,7 +792,7 @@ func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 		}
 
 		if pv.Spec.ClaimRef == nil {
-			log.V(common.InfoLevel).Info(fmt.Sprintf("ClaimRef removed from for LocalPV: %s", pvName))
+			log.V(common.InfoLevel).Info(fmt.Sprintf("ClaimRef removed from LocalPV: %s", pvName))
 			return nil
 		}
 		pv.Spec.ClaimRef = nil
