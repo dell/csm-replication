@@ -717,12 +717,12 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 		Namespace:  controller.ReservedPVCNamespace,
 	}
 	pv.Spec.ClaimRef = claimRef
-	log.V(common.InfoLevel).Info(fmt.Sprintf("added remote pv %s claimref %s/%s", pv.Name, controller.ReservedPVCName, controller.ReservedPVCNamespace))
 
 	err = updatePersistentVolume(ctx, client, pv)
 	if err != nil {
 		return fmt.Errorf("error updating PV %s: %s", localPV, err.Error())
 	}
+	log.V(common.InfoLevel).Info(fmt.Sprintf("added remote pv %s claimref %s/%s", pv.Name, controller.ReservedPVCName, controller.ReservedPVCNamespace))
 
 	// Restore the PVs original volume reclaim policy
 	err = setPVReclaimPolicy(ctx, client, pvc.Spec.VolumeName, remotePVPolicy)
