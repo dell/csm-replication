@@ -721,12 +721,7 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 
 	err = updatePersistentVolume(ctx, client, pv)
 	if err != nil {
-		if !errors.IsConflict(err) {
-			return fmt.Errorf("error updating PV %s: %s", localPV, err.Error())
-		}
-
-		log.V(common.InfoLevel).Info(fmt.Sprintf("Issue updating PV %s so trying again", localPV))
-		sleep(2 * time.Second)
+		return fmt.Errorf("error updating PV %s: %s", localPV, err.Error())
 	}
 
 	// Restore the PVs original volume reclaim policy
