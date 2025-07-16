@@ -1206,7 +1206,8 @@ func (suite *RGControllerTestSuite) TestPVCRemapPlanned() {
 	var updatedLocalPV corev1.PersistentVolume
 	err = suite.client.Get(context.Background(), types.NamespacedName{Name: "local-pv"}, &updatedLocalPV)
 	suite.NoError(err)
-	suite.Nil(updatedLocalPV.Spec.ClaimRef, "Local PV's claim reference should be removed")
+	suite.Equal("reserved", updatedLocalPV.Spec.ClaimRef.Name, "Remote PV should now be claimed by the PVC")
+	suite.Equal("reserved", updatedLocalPV.Spec.ClaimRef.Namespace)
 	suite.Equal(controllers.RemoteRetentionValueDelete, string(updatedLocalPV.Spec.PersistentVolumeReclaimPolicy), "Local PV reclaim policy should be 'Delete' after swapAllPVC")
 }
 
@@ -1261,7 +1262,8 @@ func (suite *RGControllerTestSuite) TestPVCRemapUnplanned() {
 	var updatedLocalPV corev1.PersistentVolume
 	err = suite.client.Get(context.Background(), types.NamespacedName{Name: "local-pv"}, &updatedLocalPV)
 	suite.NoError(err)
-	suite.Nil(updatedLocalPV.Spec.ClaimRef, "Local PV's claim reference should be removed")
+	suite.Equal("reserved", updatedLocalPV.Spec.ClaimRef.Name, "Remote PV should now be claimed by the PVC")
+	suite.Equal("reserved", updatedLocalPV.Spec.ClaimRef.Namespace)
 	suite.Equal(controllers.RemoteRetentionValueDelete, string(updatedLocalPV.Spec.PersistentVolumeReclaimPolicy), "Local PV reclaim policy should be 'Delete' after swapAllPVC")
 }
 
@@ -1425,7 +1427,7 @@ func TestUpdatePVClaimRef(t *testing.T) {
 					ClaimRef: &corev1.ObjectReference{
 						Kind:            "PersistentVolumeClaim",
 						Namespace:       "fake-ns",
-						Name:            "",
+						Name:            "fake-pvc",
 						UID:             "fake-uid",
 						ResourceVersion: "fake-version",
 					},
@@ -1504,21 +1506,37 @@ func TestRemovePVClaimRef(t *testing.T) {
 			},
 		},
 		{
-			name:   "Error in updating persisitent volume",
-			pvName: "fake-pv",
+			name:         "Error in updating persisitent volume",
+			pvName:       "fake-pv",
+			pvcNamespace: "fake-ns",
+			pvcName:      "fake-pvc",
 			pv: &corev1.PersistentVolume{
 				Spec: corev1.PersistentVolumeSpec{
 					ClaimRef: &corev1.ObjectReference{
 						Kind:            "PersistentVolumeClaim",
 						Namespace:       "fake-ns",
-						Name:            "",
+						Name:            "fake-pvc",
 						UID:             "fake-uid",
 						ResourceVersion: "fake-version",
 					},
 				},
 			},
 			setup: func() {
-				pv := &corev1.PersistentVolume{}
+				pv := &corev1.PersistentVolume{
+					Spec: corev1.PersistentVolumeSpec{
+						ClaimRef: &corev1.ObjectReference{
+							Kind:            "PersistentVolumeClaim",
+							Namespace:       "fake-ns",
+							Name:            "fake-pvc",
+							UID:             "fake-uid",
+							ResourceVersion: "fake-version",
+						},
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: make(map[string]string),
+						Labels:      make(map[string]string),
+					},
+				}
 				getPersistentVolume = func(_ context.Context, _ connection.RemoteClusterClient, _ string) (*v1.PersistentVolume, error) {
 					return pv, nil
 				}
@@ -1644,10 +1662,18 @@ func TestSetPVClaimRef(t *testing.T) {
 func TestSwapPVC(t *testing.T) {
 	originalGetPersistentVolumeClaim := getPersistentVolumeClaim
 	originalGetPersistentVolume := getPersistentVolume
+	originalDeletePersistentVolumeClaim := deletePersistentVolumeClaim
+	originalUpdatePersistentVolume := updatePersistentVolume
+	originalCreatePersistentVolumeClaim := createPersistentVolumeClaim
+	originalSleep := sleep
 
 	after := func() {
 		getPersistentVolumeClaim = originalGetPersistentVolumeClaim
 		getPersistentVolume = originalGetPersistentVolume
+		deletePersistentVolumeClaim = originalDeletePersistentVolumeClaim
+		updatePersistentVolume = originalUpdatePersistentVolume
+		createPersistentVolumeClaim = originalCreatePersistentVolumeClaim
+		sleep = originalSleep
 	}
 	tests := []struct {
 		name        string
@@ -1683,6 +1709,110 @@ func TestSwapPVC(t *testing.T) {
 				}
 				getPersistentVolume = func(_ context.Context, _ connection.RemoteClusterClient, _ string) (*v1.PersistentVolume, error) {
 					return nil, errors.New("error getting pv")
+				}
+			},
+			expectedErr: true,
+		},
+		{
+			name:      "Error deleting PVC",
+			namespace: "fake-ns",
+			pvcName:   "fake-pvc",
+			setup: func() {
+				pvc := &corev1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "fake-pvc",
+						Namespace: "fake-ns",
+					},
+					Spec: corev1.PersistentVolumeClaimSpec{
+						VolumeName: "fake-pv",
+					},
+				}
+				pv := &corev1.PersistentVolume{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pv",
+						Annotations: map[string]string{
+							"migration.storage.dell.com/migrate-to": "sc2",
+							"migration.storage.dell.com/namespace":  "namespace",
+						},
+					},
+					Spec: corev1.PersistentVolumeSpec{
+						PersistentVolumeSource: corev1.PersistentVolumeSource{
+							CSI: &corev1.CSIPersistentVolumeSource{
+								Driver:       "provisionerName",
+								VolumeHandle: "volHandle",
+								FSType:       "ext4",
+							},
+						},
+						StorageClassName: "name",
+					},
+					Status: corev1.PersistentVolumeStatus{Phase: corev1.VolumeBound},
+				}
+				getPersistentVolumeClaim = func(_ context.Context, _ connection.RemoteClusterClient, _ string, _ string) (*v1.PersistentVolumeClaim, error) {
+					return pvc, nil
+				}
+				getPersistentVolume = func(_ context.Context, _ connection.RemoteClusterClient, _ string) (*v1.PersistentVolume, error) {
+					return pv, nil
+				}
+				deletePersistentVolumeClaim = func(_ context.Context, _ connection.RemoteClusterClient, _ *v1.PersistentVolumeClaim) error {
+					return errors.New("error deleting PVC")
+				}
+				updatePersistentVolume = func(_ context.Context, _ connection.RemoteClusterClient, _ *v1.PersistentVolume) error {
+					return nil
+				}
+			},
+			expectedErr: true,
+		},
+		{
+			name:      "Error recreating PVC",
+			namespace: "fake-ns",
+			pvcName:   "fake-pvc",
+			setup: func() {
+				pvc := &corev1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "fake-pvc",
+						Namespace: "fake-ns",
+					},
+					Spec: corev1.PersistentVolumeClaimSpec{
+						VolumeName: "fake-pv",
+					},
+				}
+				pv := &corev1.PersistentVolume{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pv",
+						Annotations: map[string]string{
+							"migration.storage.dell.com/migrate-to": "sc2",
+							"migration.storage.dell.com/namespace":  "namespace",
+						},
+					},
+					Spec: corev1.PersistentVolumeSpec{
+						PersistentVolumeSource: corev1.PersistentVolumeSource{
+							CSI: &corev1.CSIPersistentVolumeSource{
+								Driver:       "provisionerName",
+								VolumeHandle: "volHandle",
+								FSType:       "ext4",
+							},
+						},
+						StorageClassName: "name",
+					},
+					Status: corev1.PersistentVolumeStatus{Phase: corev1.VolumeBound},
+				}
+				getPersistentVolumeClaim = func(_ context.Context, _ connection.RemoteClusterClient, _ string, _ string) (*v1.PersistentVolumeClaim, error) {
+					return pvc, nil
+				}
+				getPersistentVolume = func(_ context.Context, _ connection.RemoteClusterClient, _ string) (*v1.PersistentVolume, error) {
+					return pv, nil
+				}
+				deletePersistentVolumeClaim = func(_ context.Context, _ connection.RemoteClusterClient, _ *v1.PersistentVolumeClaim) error {
+					return nil
+				}
+				updatePersistentVolume = func(_ context.Context, _ connection.RemoteClusterClient, _ *v1.PersistentVolume) error {
+					return nil
+				}
+				sleep = func(_ time.Duration) {
+					// Mock sleep function to do nothing
+				}
+				createPersistentVolumeClaim = func(_ context.Context, _ connection.RemoteClusterClient, _ *v1.PersistentVolumeClaim) error {
+					return errors.New("unable to create PVC")
 				}
 			},
 			expectedErr: true,
