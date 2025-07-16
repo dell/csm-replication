@@ -79,9 +79,17 @@ var (
 	updatePersistentVolume = func(ctx context.Context, client connection.RemoteClusterClient, pv *v1.PersistentVolume) error {
 		return client.UpdatePersistentVolume(ctx, pv)
 	}
-
+	deletePersistentVolumeClaim = func(ctx context.Context, client connection.RemoteClusterClient, pvc *v1.PersistentVolumeClaim) error {
+		return client.DeletePersistentVolumeClaim(ctx, pvc)
+	}
+	createPersistentVolumeClaim = func(ctx context.Context, client connection.RemoteClusterClient, pvc *v1.PersistentVolumeClaim) error {
+		return client.CreatePersistentVolumeClaim(ctx, pvc)
+	}
 	getPersistentVolumeClaim = func(ctx context.Context, client connection.RemoteClusterClient, namespace string, pvcName string) (*v1.PersistentVolumeClaim, error) {
 		return client.GetPersistentVolumeClaim(ctx, namespace, pvcName)
+	}
+	sleep = func(d time.Duration) {
+		time.Sleep(d)
 	}
 )
 
@@ -633,7 +641,7 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	}
 
 	// Delete the existing PVC
-	err = client.DeletePersistentVolumeClaim(ctx, pvc)
+	err = deletePersistentVolumeClaim(ctx, client, pvc)
 	if err != nil {
 		return fmt.Errorf("error deleting PVC %s with errror %s", pvcName, err)
 	}
@@ -641,7 +649,7 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	// Wait until PVC is deleted
 	done := false
 	for iteration := 0; !done; iteration++ {
-		time.Sleep(2 * time.Second)
+		sleep(2 * time.Second)
 		_, err := getPersistentVolumeClaim(ctx, client, namespace, pvcName)
 		if err != nil {
 			if errors.IsNotFound(err) {
@@ -670,7 +678,7 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	pvc.ObjectMeta.ResourceVersion = ""
 
 	// Re-create the PVC, now pointing to the target.
-	err = client.CreatePersistentVolumeClaim(ctx, pvc)
+	err = createPersistentVolumeClaim(ctx, client, pvc)
 	if err != nil {
 		return fmt.Errorf("unable to create PVC %s: %s", pvc.Name, err.Error())
 	}
@@ -718,7 +726,7 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 		}
 
 		log.V(common.InfoLevel).Info(fmt.Sprintf("Issue updating PV %s so trying again", localPV))
-		time.Sleep(2 * time.Second)
+		sleep(2 * time.Second)
 	}
 
 	// Restore the PVs original volume reclaim policy
@@ -742,7 +750,7 @@ func verifyPVC(ctx context.Context, client connection.RemoteClusterClient, local
 			return nil
 		}
 
-		time.Sleep(2 * time.Second)
+		sleep(2 * time.Second)
 	}
 
 	return fmt.Errorf("timed out waiting on PVC %s/%s to be created and bound", namespace, pvcName)
@@ -770,7 +778,7 @@ func setPVReclaimPolicy(ctx context.Context, client connection.RemoteClusterClie
 			return nil
 		}
 
-		time.Sleep(2 * time.Second)
+		sleep(2 * time.Second)
 	}
 	return fmt.Errorf("timed out waiting on PV VolumeReclaimPolicy to be set to previous policy")
 }
@@ -799,7 +807,7 @@ func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 			}
 
 			log.V(common.InfoLevel).Info(fmt.Sprintf("Issue updating PV %s so trying again", pvName))
-			time.Sleep(2 * time.Second)
+			sleep(2 * time.Second)
 		}
 	}
 
@@ -828,7 +836,7 @@ func removeReservedClaimRefForTargetPV(ctx context.Context, client connection.Re
 			}
 
 			log.V(common.InfoLevel).Info(fmt.Sprintf("Issue updating PV %s so trying again", pvName))
-			time.Sleep(2 * time.Second)
+			sleep(2 * time.Second)
 		}
 	}
 
@@ -875,7 +883,7 @@ func updatePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 			}
 
 			log.V(common.InfoLevel).Info(fmt.Sprintf("Issue retrieving latest for %s and trying again", pvName))
-			time.Sleep(2 * time.Second)
+			sleep(2 * time.Second)
 		}
 	}
 
