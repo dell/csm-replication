@@ -23,7 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	controller "github.com/dell/csm-replication/controllers"
-	"github.com/dell/csm-replication/pkg/common"
 	csimigration "github.com/dell/csm-replication/pkg/csi-clients/migration"
 	"github.com/go-logr/logr"
 	"golang.org/x/sync/singleflight"
@@ -60,9 +59,9 @@ const protectionIndexKey = "protection_id"
 // Reconcile contains reconciliation logic that updates PersistentVolume depending on it's current state
 func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("persistentvolume", req.NamespacedName)
-	ctx = context.WithValue(ctx, common.LoggerContextKey, log)
+	ctx = context.WithValue(ctx, logger.LoggerContextKey, log)
 
-	log.V(common.InfoLevel).Info("Begin reconcile - PV Controller")
+	log.V(logger.InfoLevel).Info("Begin reconcile - PV Controller")
 
 	pv := new(v1.PersistentVolume)
 	if err := r.Get(ctx, req.NamespacedName, pv); err != nil {
@@ -132,7 +131,7 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	log.V(common.DebugLevel).Info("Checking if a Migrated PV instance already exists")
+	log.V(logger.DebugLevel).Info("Checking if a Migrated PV instance already exists")
 
 	gotPv := new(v1.PersistentVolume)
 	if err = r.Get(ctx, client.ObjectKey{
@@ -141,7 +140,7 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		log.Error(err, "Failed to check for a pre-existing PV")
 		return ctrl.Result{}, err
 	}
-	log.V(common.InfoLevel).Info("checked for already created PV. Result: ", err)
+	log.V(logger.InfoLevel).Info("checked for already created PV. Result: ", err)
 	if _, ok := gotPv.Annotations[controller.CreatedByMigrator]; !ok {
 		pvT := &v1.PersistentVolume{
 			ObjectMeta: metav1.ObjectMeta{
@@ -169,23 +168,23 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				Capacity:                      v1.ResourceList{v1.ResourceStorage: bytesToQuantity(migrate.GetMigratedVolume().CapacityBytes)},
 			},
 		}
-		log.V(common.InfoLevel).Info("trying to create migrated PV")
+		log.V(logger.InfoLevel).Info("trying to create migrated PV")
 		err = r.Create(ctx, pvT, &client.CreateOptions{})
 		if err != nil {
-			log.V(common.ErrorLevel).Error(err, "migrated PV creation failed")
+			log.V(logger.ErrorLevel).Error(err, "migrated PV creation failed")
 			return ctrl.Result{}, err
 		}
 	}
 
 	pv.Spec.PersistentVolumeReclaimPolicy = v1.PersistentVolumeReclaimRetain
-	log.V(common.InfoLevel).Info("removing annotation..")
+	log.V(logger.InfoLevel).Info("removing annotation..")
 	delete(pv.Annotations, controller.MigrationRequested)
 	err = r.Update(ctx, pv, &client.UpdateOptions{})
 	if err != nil {
-		log.V(common.ErrorLevel).Error(err, "failed to update the PV")
+		log.V(logger.ErrorLevel).Error(err, "failed to update the PV")
 		return ctrl.Result{}, err
 	}
-	log.V(common.InfoLevel).Info("Successfully created PV, publishing event..")
+	log.V(logger.InfoLevel).Info("Successfully created PV, publishing event..")
 	r.EventRecorder.Eventf(pv, "Normal", "Migrated", "This PV has been successfully migrated to SC %s,"+
 		" consider using new PV %s.", targetStorageClassName, pv.Name+"-to-"+targetStorageClassName)
 	return ctrl.Result{}, nil

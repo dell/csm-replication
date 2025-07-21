@@ -56,7 +56,7 @@ import (
 
 	"github.com/dell/csm-replication/controllers"
 	controller "github.com/dell/csm-replication/controllers/csi-replicator"
-	"github.com/dell/csm-replication/pkg/common"
+	"github.com/dell/csm-replication/pkg/common/constants"
 	"github.com/dell/csm-replication/pkg/connection"
 	csiidentity "github.com/dell/csm-replication/pkg/csi-clients/identity"
 	csireplication "github.com/dell/csm-replication/pkg/csi-clients/replication"
@@ -250,7 +250,7 @@ func (ss *SidecarTestSuite) createClaimController() error {
 		Client:            ss.manager.GetClient(),
 		Log:               log.WithName("controllers").WithName("PersistentVolumeClaim"),
 		Scheme:            ss.manager.GetScheme(),
-		EventRecorder:     ss.manager.GetEventRecorderFor(common.DellCSIReplicator),
+		EventRecorder:     ss.manager.GetEventRecorderFor(constants.DellCSIReplicator),
 		SingleFlightGroup: singleflight.Group{},
 		ReplicationClient: csireplication.New(ss.csiConn, log.WithName("replication-client"), ss.timeout),
 		DriverName:        ss.driverName,
@@ -265,7 +265,7 @@ func (ss *SidecarTestSuite) createVolumeController() error {
 		Log:               log.WithName("controllers").WithName("PersistentVolume"),
 		Scheme:            ss.manager.GetScheme(),
 		SingleFlightGroup: singleflight.Group{},
-		EventRecorder:     ss.manager.GetEventRecorderFor(common.DellCSIReplicator),
+		EventRecorder:     ss.manager.GetEventRecorderFor(constants.DellCSIReplicator),
 		ReplicationClient: csireplication.New(ss.csiConn, log.WithName("replication-client"), ss.timeout),
 		Domain:            ss.domain,
 		DriverName:        ss.driverName,
@@ -277,7 +277,7 @@ func (ss *SidecarTestSuite) createReplicationGroupController() error {
 	return (&controller.ReplicationGroupReconciler{
 		Client:                     ss.manager.GetClient(),
 		Scheme:                     ss.manager.GetScheme(),
-		EventRecorder:              ss.manager.GetEventRecorderFor(common.DellCSIReplicator),
+		EventRecorder:              ss.manager.GetEventRecorderFor(constants.DellCSIReplicator),
 		Log:                        log.WithName("controllers").WithName("DellCSIReplicationGroup"),
 		SupportedActions:           ss.supportedActions,
 		DriverName:                 ss.driverName,

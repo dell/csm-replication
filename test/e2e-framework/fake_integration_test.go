@@ -26,7 +26,7 @@ import (
 	"github.com/dell/csm-replication/controllers"
 	controller "github.com/dell/csm-replication/controllers/csi-replicator"
 	replicationController "github.com/dell/csm-replication/controllers/replication-controller"
-	constants "github.com/dell/csm-replication/pkg/common"
+	"github.com/dell/csm-replication/pkg/common/constants"
 	"github.com/dell/csm-replication/pkg/connection"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
 	"github.com/dell/csm-replication/test/mocks"

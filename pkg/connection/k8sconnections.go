@@ -20,7 +20,6 @@ import (
 	"log"
 	"sync"
 
-	"github.com/dell/csm-replication/pkg/common"
 	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
@@ -59,15 +58,15 @@ func (k8sConnHandler *RemoteK8sConnHandler) AddOrUpdateConfig(clusterID string, 
 	defer k8sConnHandler.lock.Unlock()
 	k8sConnHandler.init()
 	if _, ok := k8sConnHandler.configs[clusterID]; ok {
-		log.V(common.DebugLevel).Info(fmt.Sprintf("Updating REST config for ClusterId: %s", clusterID))
+		log.V(logger.DebugLevel).Info(fmt.Sprintf("Updating REST config for ClusterId: %s", clusterID))
 		delete(k8sConnHandler.configs, clusterID)
 		// Also delete any cached clients
 		if _, ok := k8sConnHandler.cachedClients[clusterID]; ok {
-			log.V(common.DebugLevel).Info(fmt.Sprintf("Deleting cached client for ClusterId: %s", clusterID))
+			log.V(logger.DebugLevel).Info(fmt.Sprintf("Deleting cached client for ClusterId: %s", clusterID))
 			delete(k8sConnHandler.cachedClients, clusterID)
 		}
 	} else {
-		log.V(common.InfoLevel).Info(fmt.Sprintf("Adding REST config for ClusterId: %s\n", clusterID))
+		log.V(logger.InfoLevel).Info(fmt.Sprintf("Adding REST config for ClusterId: %s\n", clusterID))
 	}
 	k8sConnHandler.configs[clusterID] = config
 }

@@ -26,7 +26,7 @@ import (
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
 	csireplicator "github.com/dell/csm-replication/controllers/csi-replicator"
-	constants "github.com/dell/csm-replication/pkg/common"
+	"github.com/dell/csm-replication/pkg/common/constants"
 	"github.com/dell/csm-replication/pkg/connection"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
 	"github.com/dell/csm-replication/test/mocks"

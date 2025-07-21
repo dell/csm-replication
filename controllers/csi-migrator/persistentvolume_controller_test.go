@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/dell/csm-replication/controllers"
-	constants "github.com/dell/csm-replication/pkg/common"
+	"github.com/dell/csm-replication/pkg/common/constants"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
 	csimigration "github.com/dell/csm-replication/test/mocks"
 	"github.com/stretchr/testify/assert"

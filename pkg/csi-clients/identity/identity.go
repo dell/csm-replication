@@ -18,9 +18,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/dell/csm-replication/pkg/common"
 	"github.com/dell/dell-csi-extensions/migration"
 
+	"github.com/dell/csm-replication/pkg/common/logger"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -78,7 +78,7 @@ type identity struct {
 
 // ProbeController queries driver controller
 func (r *identity) ProbeController(ctx context.Context) (string, bool, error) {
-	r.log.V(common.InfoLevel).Info("Probing controller")
+	r.log.V(logger.InfoLevel).Info("Probing controller")
 	tctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
@@ -101,7 +101,7 @@ func (r *identity) ProbeController(ctx context.Context) (string, bool, error) {
 // ProbeForever launches loop that continuously queries controller state
 func (r *identity) ProbeForever(ctx context.Context) (string, error) {
 	for {
-		r.log.V(common.DebugLevel).Info("Probing driver for readiness")
+		r.log.V(logger.DebugLevel).Info("Probing driver for readiness")
 		driverName, ready, err := getProbeController(r, ctx)
 		if err != nil {
 			st, ok := status.FromError(err)
@@ -112,12 +112,12 @@ func (r *identity) ProbeForever(ctx context.Context) (string, error) {
 			if st.Code() != codes.DeadlineExceeded {
 				return "", err
 			}
-			r.log.V(common.InfoLevel).Info("CSI driver probe timed out")
+			r.log.V(logger.InfoLevel).Info("CSI driver probe timed out")
 		} else {
 			if ready {
 				return driverName, nil
 			}
-			r.log.V(common.InfoLevel).Info("CSI Driver not ready yet")
+			r.log.V(logger.InfoLevel).Info("CSI Driver not ready yet")
 		}
 		time.Sleep(r.frequency)
 	}
@@ -127,7 +127,7 @@ func (r *identity) ProbeForever(ctx context.Context) (string, error) {
 func (r *identity) GetReplicationCapabilities(ctx context.Context) (ReplicationCapabilitySet,
 	[]*replication.SupportedActions, error,
 ) {
-	r.log.V(common.InfoLevel).Info("Requesting replication capabilities")
+	r.log.V(logger.InfoLevel).Info("Requesting replication capabilities")
 	tctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
@@ -153,7 +153,7 @@ func (r *identity) GetReplicationCapabilities(ctx context.Context) (ReplicationC
 }
 
 func (r *identity) GetMigrationCapabilities(ctx context.Context) (MigrationCapabilitySet, error) {
-	r.log.V(common.InfoLevel).Info("Requesting migration capabilities")
+	r.log.V(logger.InfoLevel).Info("Requesting migration capabilities")
 	tctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 

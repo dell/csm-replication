@@ -2,6 +2,15 @@ module github.com/dell/csm-replication
 
 go 1.24.0
 
+require (
+	github.com/dell/csm-replication/pkg/common/constants v0.0.0
+	github.com/dell/csm-replication/pkg/common/logger v0.0.0
+)
+
+replace github.com/dell/csm-replication/pkg/common/constants => ./pkg/common/constants
+
+replace github.com/dell/csm-replication/pkg/common/logger => ./pkg/common/logger
+
 toolchain go1.24.4
 
 require (

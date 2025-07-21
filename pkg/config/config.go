@@ -24,8 +24,9 @@ import (
 	"sync"
 
 	"github.com/dell/csm-replication/controllers"
-	"github.com/dell/csm-replication/pkg/common"
+	"github.com/dell/csm-replication/pkg/common/constants"
 	"github.com/dell/csm-replication/pkg/connection"
+	"github.com/dell/csm-replication/pkg/logger"
 	"github.com/go-logr/logr"
 	"github.com/spf13/viper"
 	v1 "k8s.io/api/core/v1"
@@ -52,15 +53,15 @@ var isInInvalidState bool
 
 // GetControllerManagerOpts initializes and returns new ControllerManagerOpts object
 func GetControllerManagerOpts() ControllerManagerOpts {
-	defaultNameSpace := getEnv(common.EnvWatchNameSpace, common.DefaultNameSpace)
-	configFile := getEnv(common.EnvConfigFileName, common.DefaultConfigFileName)
-	configDir := getEnv(common.EnvConfigDirName, common.DefaultConfigDir)
-	inClusterEnvVal := getEnv(common.EnvInClusterConfig, "false")
+	defaultNameSpace := getEnv(constants.EnvWatchNameSpace, constants.DefaultNameSpace)
+	configFile := getEnv(constants.EnvConfigFileName, constants.DefaultConfigFileName)
+	configDir := getEnv(constants.EnvConfigDirName, constants.DefaultConfigDir)
+	inClusterEnvVal := getEnv(constants.EnvInClusterConfig, "false")
 	inCluster := false
 	if strings.ToLower(inClusterEnvVal) == "true" {
 		inCluster = true
 	}
-	useConfFileFormatEnvVal := getEnv(common.EnvUseConfFileFormat, "true")
+	useConfFileFormatEnvVal := getEnv(constants.EnvUseConfFileFormat, "true")
 	useConfFileFormat := true
 	if strings.ToLower(useConfFileFormatEnvVal) == "false" {
 		useConfFileFormat = false
@@ -111,7 +112,7 @@ func (c *Config) UpdateConfigOnSecretEvent(ctx context.Context, client ctrlClien
 	for _, target := range c.repConfig.Targets {
 		if secretName == target.SecretRef {
 			found = true
-			log.V(common.DebugLevel).Info(fmt.Sprintf("Received event for secret: %s configured for ClusterId: %s\n", secretName, target.ClusterID))
+			log.V(logger.DebugLevel).Info(fmt.Sprintf("Received event for secret: %s configured for ClusterId: %s\n", secretName, target.ClusterID))
 			break
 		}
 	}
@@ -121,7 +122,7 @@ func (c *Config) UpdateConfigOnSecretEvent(ctx context.Context, client ctrlClien
 		err := c.updateConfig(ctx, client, opts, recorder, log)
 		return err
 	}
-	log.V(common.DebugLevel).Info("Ignoring event for secret as it is not related to us")
+	log.V(logger.DebugLevel).Info("Ignoring event for secret as it is not related to us")
 	return nil
 }
 
@@ -141,7 +142,7 @@ func (c *Config) updateConfig(ctx context.Context, client ctrlClient.Client, opt
 	}
 	c.repConfig = replicationConfig
 	c.LogLevel = cmap.LogLevel
-	log.V(common.InfoLevel).Info("Updated config")
+	log.V(logger.InfoLevel).Info("Updated config")
 	return nil
 }
 
@@ -252,7 +253,7 @@ func getReplicationConfig(ctx context.Context, client ctrlClient.Client, opts Co
 		repConfig := newReplicationConfig(configMap, connHandler)
 		err = repConfig.VerifyConfig(ctx)
 		if err != nil && opts.Mode == "controller" {
-			log.V(common.InfoLevel).Info("Wrong config, publishing event. ", err.Error(), isInInvalidState)
+			log.V(logger.InfoLevel).Info("Wrong config, publishing event. ", err.Error(), isInInvalidState)
 			err := controllers.PublishControllerEvent(ctx, client, recorder, "Warning", "Invalid", "Config update won't be applied because of invalid configmap/secrets. Please fix the invalid configuration.")
 			isInInvalidState = true
 			if err != nil {
@@ -261,11 +262,11 @@ func getReplicationConfig(ctx context.Context, client ctrlClient.Client, opts Co
 		} else {
 			if isInInvalidState == true && opts.Mode == "controller" {
 
-				log.V(common.InfoLevel).Info("Correct config, publishing event. ")
+				log.V(logger.InfoLevel).Info("Correct config, publishing event. ")
 				err := controllers.PublishControllerEvent(ctx, client, recorder, "Normal", "Correct config applied", "Correct configuration has been applied to cluster.")
 				isInInvalidState = false
 				if err != nil {
-					log.V(common.InfoLevel).Info(err.Error())
+					log.V(logger.InfoLevel).Info(err.Error())
 					return nil, nil, err
 				}
 			}
@@ -287,13 +288,13 @@ func getConnHandler(ctx context.Context, targets []target, client ctrlClient.Cli
 	var err error
 	for _, target := range targets {
 		if opts.UseConfFileFormat {
-			log.V(common.DebugLevel).Info("Expecting secret data to be in format of conf file")
+			log.V(logger.DebugLevel).Info("Expecting secret data to be in format of conf file")
 			restConfig, err = buildRestConfigFromSecretConfFileFormat(ctx, target.SecretRef, opts.WatchNamespace, client)
 			if err != nil {
 				return nil, err
 			}
 		} else {
-			log.V(common.InfoLevel).Info("Expecting secret data to be in form of a service account token/custom format")
+			log.V(logger.InfoLevel).Info("Expecting secret data to be in form of a service account token/custom format")
 			// restConfig, err = buildRestConfigFromCustomFormat(target.SecretRef, opts.WatchNamespace, client)
 			restConfig, err = buildRestConfigFromServiceAccountToken(ctx, target.SecretRef, opts.WatchNamespace, client, target.Address)
 			if err != nil {
@@ -303,7 +304,7 @@ func getConnHandler(ctx context.Context, targets []target, client ctrlClient.Cli
 		k8sConnHandler.AddOrUpdateConfig(target.ClusterID, restConfig, log)
 	}
 	// Let's add a connection handler by default for self (single cluster scenario)
-	inCluster, _ := strconv.ParseBool(getEnv(common.EnvInClusterConfig, "false"))
+	inCluster, _ := strconv.ParseBool(getEnv(constants.EnvInClusterConfig, "false"))
 
 	if inCluster {
 		restConfig, err = InClusterConfig()

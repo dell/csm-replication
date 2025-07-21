@@ -24,7 +24,6 @@ import (
 	"time"
 
 	csireplicator "github.com/dell/csm-replication/controllers/csi-replicator"
-	"github.com/dell/csm-replication/pkg/common"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	controller "github.com/dell/csm-replication/controllers"
@@ -112,14 +111,14 @@ type ReplicationGroupReconciler struct {
 // Reconcile contains reconciliation logic that updates ReplicationGroup depending on it's current state
 func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("dellcsireplicationgroup", req.Name)
-	ctx = context.WithValue(ctx, common.LoggerContextKey, log)
+	ctx = context.WithValue(ctx, logger.LoggerContextKey, log)
 
 	localRG := new(repv1.DellCSIReplicationGroup)
 	err := r.Get(ctx, req.NamespacedName, localRG)
 	if err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	log.V(common.InfoLevel).Info("Reconciling RG event!!!")
+	log.V(logger.InfoLevel).Info("Reconciling RG event!!!")
 	localRGName := req.Name
 	remoteRGName := localRG.Annotations[controller.RemoteReplicationGroup]
 	if remoteRGName == "" {
@@ -128,10 +127,10 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	rgSyncComplete := false
 
 	if localRG.Annotations == nil {
-		log.V(common.InfoLevel).Info("RG is not ready yet, requeue as we will get another event")
+		log.V(logger.InfoLevel).Info("RG is not ready yet, requeue as we will get another event")
 		return ctrl.Result{}, nil
 	} else if localRG.Annotations[controller.RGSyncComplete] == "yes" {
-		log.V(common.DebugLevel).Info("RG Sync already completed")
+		log.V(logger.DebugLevel).Info("RG Sync already completed")
 		remoteRGName = localRG.Annotations[controller.RemoteReplicationGroup]
 		rgSyncComplete = true
 		// Continue as we can re verify
@@ -204,23 +203,23 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	// Handle RG deletion if timestamp is set
 	if !localRG.DeletionTimestamp.IsZero() {
 		// Process deletion of remote RG
-		log.V(common.InfoLevel).Info("Deletion timestamp is not zero")
-		log.V(common.InfoLevel).WithValues(localRG.Annotations).Info("Annotations")
+		log.V(logger.InfoLevel).Info("Deletion timestamp is not zero")
+		log.V(logger.InfoLevel).WithValues(localRG.Annotations).Info("Annotations")
 		_, ok := localRG.Annotations[controller.DeletionRequested]
-		log.V(common.InfoLevel).WithValues(ok).Info("Deletion requested?", ok)
+		log.V(logger.InfoLevel).WithValues(ok).Info("Deletion requested?", ok)
 
 		if _, ok := localRG.Annotations[controller.DeletionRequested]; !ok {
-			log.V(common.InfoLevel).Info("Deletion requested annotation not found")
+			log.V(logger.InfoLevel).Info("Deletion requested annotation not found")
 			remoteRG, err := remoteClient.GetReplicationGroup(ctx, localRG.Annotations[controller.RemoteReplicationGroup])
 			if err != nil {
-				log.V(common.ErrorLevel).WithValues(err.Error()).Info("error getting replication group")
+				log.V(logger.ErrorLevel).WithValues(err.Error()).Info("error getting replication group")
 				// If remote RG doesn't exist, proceed to removing finalizer
 				if !errors.IsNotFound(err) {
 					log.Error(err, "Failed to get remote replication group")
 					return ctrl.Result{}, err
 				}
 			} else {
-				log.V(common.InfoLevel).Info("Got remote RG")
+				log.V(logger.InfoLevel).Info("Got remote RG")
 				if strings.ToLower(retentionPolicy) == controller.RemoteRetentionValueDelete {
 					log.Info("Retention policy is set to Delete")
 					if _, ok := remoteRG.Annotations[controller.DeletionRequested]; !ok {
@@ -240,26 +239,26 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			}
 		}
 
-		log.V(common.InfoLevel).Info("Removing finalizer RGFinalizer")
+		log.V(logger.InfoLevel).Info("Removing finalizer RGFinalizer")
 		finalizerRemoved := controller.RemoveFinalizerIfExists(localRG, controller.RGFinalizer)
 		if finalizerRemoved {
-			log.V(common.InfoLevel).Info("Updating rg copy to remove finalizer")
+			log.V(logger.InfoLevel).Info("Updating rg copy to remove finalizer")
 			return ctrl.Result{}, r.Update(ctx, localRG)
 		}
 	}
 
 	rgCopy := localRG.DeepCopy()
 
-	log.V(common.InfoLevel).Info("Adding finalizer RGFinalizer")
+	log.V(logger.InfoLevel).Info("Adding finalizer RGFinalizer")
 	// Check for the finalizer; add, if doesn't exist
 	if finalizerAdded := controller.AddFinalizerIfNotExist(rgCopy, controller.RGFinalizer); finalizerAdded {
-		log.V(common.InfoLevel).Info("Finalizer not found adding it")
+		log.V(logger.InfoLevel).Info("Finalizer not found adding it")
 		return ctrl.Result{}, r.Update(ctx, rgCopy)
 	}
-	log.V(common.InfoLevel).Info("Trying to delete RG if deletion request annotation found")
+	log.V(logger.InfoLevel).Info("Trying to delete RG if deletion request annotation found")
 	// Check for deletion request annotation
 	if _, ok := rgCopy.Annotations[controller.DeletionRequested]; ok {
-		log.V(common.InfoLevel).Info("Deletion Requested annotation found and deleting the remote RG")
+		log.V(logger.InfoLevel).Info("Deletion Requested annotation found and deleting the remote RG")
 		return ctrl.Result{}, r.Delete(ctx, rgCopy)
 	}
 
@@ -267,7 +266,7 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	// If the RG already exists on the Remote Cluster,
 	// We treat this as idempotent.
-	log.V(common.InfoLevel).Info(fmt.Sprintf("Checking if remote RG with the name %s exists on ClusterId: %s",
+	log.V(logger.InfoLevel).Info(fmt.Sprintf("Checking if remote RG with the name %s exists on ClusterId: %s",
 		remoteRGName, remoteClusterID))
 	rgObj, err := remoteClient.GetReplicationGroup(ctx, remoteRGName)
 	if err != nil && !errors.IsNotFound(err) {
@@ -279,7 +278,7 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			// If the RG has been successfully synced to the remote cluster once
 			// and now it's not found,
 			// Let's not recreate the RGs in this case.
-			log.V(common.InfoLevel).Info("RG not found on target cluster. " +
+			log.V(logger.InfoLevel).Info("RG not found on target cluster. " +
 				"Since the local RG carries a SyncComplete annotation, " +
 				"we will not be creating RG on remote once again.")
 			return ctrl.Result{}, nil
@@ -294,7 +293,7 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 	} else {
 		// We got the object
-		log.V(common.InfoLevel).Info(" The RG already exists on the remote cluster")
+		log.V(logger.InfoLevel).Info(" The RG already exists on the remote cluster")
 		// First verify the source cluster for this RG
 		if rgObj.Spec.RemoteClusterID == localClusterID {
 			// Confirmed that this object was created by this controller
@@ -336,7 +335,7 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				"Failed to create remote CR for DellCSIReplicationGroup on ClusterId: %s", remoteClusterID)
 			return ctrl.Result{}, err
 		}
-		log.V(common.InfoLevel).Info("The remote RG has been successfully created!!")
+		log.V(logger.InfoLevel).Info("The remote RG has been successfully created!!")
 		r.EventRecorder.Eventf(localRG, eventTypeNormal, eventReasonUpdated,
 			"Created remote ReplicationGroup with name: %s on cluster: %s", remoteRGName, remoteClusterID)
 	}
@@ -354,18 +353,18 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	err = r.processLastActionResult(ctx, localRG, remoteRG, remoteClient, log)
 	if err != nil {
-		log.V(common.ErrorLevel).Error(err, "failed to process the last action")
+		log.V(logger.ErrorLevel).Error(err, "failed to process the last action")
 		r.EventRecorder.Eventf(localRG, eventTypeWarning, eventReasonUpdated,
 			"failed to process the last action %s", localRG.Status.LastAction.Condition)
 	}
 
-	log.V(common.InfoLevel).Info("RG has already been synced to the remote cluster")
+	log.V(logger.InfoLevel).Info("RG has already been synced to the remote cluster")
 	return ctrl.Result{}, nil
 }
 
 func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteGroup *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
 	if len(group.Status.Conditions) == 0 || group.Status.LastAction.Time == nil {
-		log.V(common.InfoLevel).Info("No action to process")
+		log.V(logger.InfoLevel).Info("No action to process")
 		return nil
 	}
 
@@ -375,12 +374,12 @@ func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context
 
 	val, ok := group.Annotations[controller.ActionProcessedTime]
 	if !ok {
-		log.V(common.InfoLevel).Info("Action Processed does not exist.")
+		log.V(logger.InfoLevel).Info("Action Processed does not exist.")
 		return nil
 	}
 
 	if val == group.Status.LastAction.Time.GoString() {
-		log.V(common.InfoLevel).Info("Last action has already been processed")
+		log.V(logger.InfoLevel).Info("Last action has already been processed")
 		return nil
 	}
 
@@ -431,7 +430,7 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 
 	val, ok := group.Annotations[csireplicator.Action]
 	if !ok {
-		log.V(common.InfoLevel).Info("No action", "val", val)
+		log.V(logger.InfoLevel).Info("No action", "val", val)
 		return nil
 	}
 
@@ -448,20 +447,20 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 	}
 
 	if _, err := getDellCsiReplicationGroupGetNamespace(remoteClient, ctx, actionAnnotation.SnapshotNamespace); err != nil {
-		log.V(common.InfoLevel).Info("Namespace - " + actionAnnotation.SnapshotNamespace + " not found, creating it.")
+		log.V(logger.InfoLevel).Info("Namespace - " + actionAnnotation.SnapshotNamespace + " not found, creating it.")
 		nsRef := makeNamespaceReference(actionAnnotation.SnapshotNamespace)
 
 		err = getDellCsiReplicationGroupCreateNamespace(remoteClient, ctx, nsRef)
 		if err != nil {
 			msg := "unable to create the desired namespace" + actionAnnotation.SnapshotNamespace
-			log.V(common.ErrorLevel).Error(err, msg)
+			log.V(logger.ErrorLevel).Error(err, msg)
 			return err
 		}
 	}
 
 	for volumeHandle, snapshotHandle := range lastAction.ActionAttributes {
 		msg := "ActionAttributes - volumeHandle: " + volumeHandle + ", snapshotHandle: " + snapshotHandle
-		log.V(common.InfoLevel).Info(msg)
+		log.V(logger.InfoLevel).Info(msg)
 
 		snapRef := makeSnapReference(snapshotHandle, actionAnnotation.SnapshotNamespace)
 		sc := makeStorageClassContent(group.Labels[controller.DriverName], actionAnnotation.SnapshotClass)
@@ -722,7 +721,7 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	if err != nil {
 		return fmt.Errorf("error updating PV %s: %s", localPV, err.Error())
 	}
-	log.V(common.InfoLevel).Info(fmt.Sprintf("added remote pv %s claimref %s/%s", pv.Name, controller.ReservedPVCName, controller.ReservedPVCNamespace))
+	log.V(logger.InfoLevel).Info(fmt.Sprintf("added remote pv %s claimref %s/%s", pv.Name, controller.ReservedPVCName, controller.ReservedPVCNamespace))
 
 	// Restore the PVs original volume reclaim policy
 	err = setPVReclaimPolicy(ctx, client, pvc.Spec.VolumeName, remotePVPolicy)
@@ -779,7 +778,7 @@ func setPVReclaimPolicy(ctx context.Context, client connection.RemoteClusterClie
 }
 
 func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient, pvName, pvcNamespace, pvcName string, log logr.Logger) error {
-	log.V(common.InfoLevel).Info(fmt.Sprintf("Removing ClaimRef on LocalPV: %s", pvName))
+	log.V(logger.InfoLevel).Info(fmt.Sprintf("Removing ClaimRef on LocalPV: %s", pvName))
 	for iteration := 0; iteration < 30; iteration++ {
 		pv, err := getPersistentVolume(ctx, client, pvName)
 		if err != nil {
@@ -787,7 +786,7 @@ func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 		}
 
 		if pv.Spec.ClaimRef == nil {
-			log.V(common.InfoLevel).Info(fmt.Sprintf("ClaimRef removed from LocalPV: %s", pvName))
+			log.V(logger.InfoLevel).Info(fmt.Sprintf("ClaimRef removed from LocalPV: %s", pvName))
 			return nil
 		}
 		pv.Spec.ClaimRef = nil
@@ -801,7 +800,7 @@ func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 				return fmt.Errorf("error updating PV %s: %s", pvName, err.Error())
 			}
 
-			log.V(common.InfoLevel).Info(fmt.Sprintf("Issue updating PV %s so trying again", pvName))
+			log.V(logger.InfoLevel).Info(fmt.Sprintf("Issue updating PV %s so trying again", pvName))
 			sleep(2 * time.Second)
 		}
 	}
@@ -810,16 +809,16 @@ func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 }
 
 func removeReservedClaimRefForTargetPV(ctx context.Context, client connection.RemoteClusterClient, pvName string, log logr.Logger) error {
-	log.V(common.InfoLevel).Info(fmt.Sprintf("Removing ClaimRef on Target PV: %s", pvName))
+	log.V(logger.InfoLevel).Info(fmt.Sprintf("Removing ClaimRef on Target PV: %s", pvName))
 	for iteration := 0; iteration < 30; iteration++ {
-		log.V(common.DebugLevel).Info(fmt.Sprintf("*** ITERATION: %d ***", iteration))
+		log.V(logger.DebugLevel).Info(fmt.Sprintf("*** ITERATION: %d ***", iteration))
 		pv, err := getPersistentVolume(ctx, client, pvName)
 		if err != nil {
 			return fmt.Errorf("error retrieving PV %s: %s", pvName, err.Error())
 		}
 
 		if pv.Spec.ClaimRef == nil {
-			log.V(common.InfoLevel).Info(fmt.Sprintf("Reserved ClaimRef removed from TargetPV: %s", pvName))
+			log.V(logger.InfoLevel).Info(fmt.Sprintf("Reserved ClaimRef removed from TargetPV: %s", pvName))
 			return nil
 		}
 
@@ -830,7 +829,7 @@ func removeReservedClaimRefForTargetPV(ctx context.Context, client connection.Re
 				return fmt.Errorf("error updating PV %s: %s", pvName, err.Error())
 			}
 
-			log.V(common.InfoLevel).Info(fmt.Sprintf("Issue updating PV %s so trying again", pvName))
+			log.V(logger.InfoLevel).Info(fmt.Sprintf("Issue updating PV %s so trying again", pvName))
 			sleep(2 * time.Second)
 		}
 	}
@@ -842,7 +841,7 @@ func updatePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 	for iteration := 0; iteration < 30; iteration++ {
 		pv, err := getPersistentVolume(ctx, client, pvName)
 		if err != nil {
-			log.V(common.InfoLevel).Info(fmt.Sprintf("Error retrieving PV %s: %s", pvName, err.Error()))
+			log.V(logger.InfoLevel).Info(fmt.Sprintf("Error retrieving PV %s: %s", pvName, err.Error()))
 
 			return err
 		}
@@ -877,7 +876,7 @@ func updatePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 				return fmt.Errorf("error updating PV %s: %s", pvName, err.Error())
 			}
 
-			log.V(common.InfoLevel).Info(fmt.Sprintf("Issue retrieving latest for %s and trying again", pvName))
+			log.V(logger.InfoLevel).Info(fmt.Sprintf("Issue retrieving latest for %s and trying again", pvName))
 			sleep(2 * time.Second)
 		}
 	}

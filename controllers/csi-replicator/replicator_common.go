@@ -19,35 +19,35 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/dell/csm-replication/common/logger"
 	controller "github.com/dell/csm-replication/controllers"
-	"github.com/dell/csm-replication/pkg/common"
 	storageV1 "k8s.io/api/storage/v1"
 )
 
 func shouldContinue(ctx context.Context, class *storageV1.StorageClass, driverName string) bool {
-	log := common.GetLoggerFromContext(ctx)
+	log := logger.GetLoggerFromContext(ctx)
 	// Check for the driver match
 	if class.Provisioner != driverName {
-		log.V(common.InfoLevel).Info("PVC created using the driver name, not matching one on this replicator", "driverName", class.Provisioner)
+		log.V(logger.InfoLevel).Info("PVC created using the driver name, not matching one on this replicator", "driverName", class.Provisioner)
 		return false
 	}
 
 	// Check for the replication params to make sure, this PVC
 	// has a replica created for it
 	if value, ok := class.Parameters[controller.StorageClassReplicationParam]; !ok || value != controller.StorageClassReplicationParamEnabledValue {
-		log.V(common.InfoLevel).Info("StorageClass used to provision the PVC is not replication-enabled", "StorageClass", class)
+		log.V(logger.InfoLevel).Info("StorageClass used to provision the PVC is not replication-enabled", "StorageClass", class)
 		return false
 	}
 
 	// Check for PowerMax SRDF Metro and skip since it is only supported at the driver level
 	if value, ok := class.Parameters["replication.storage.dell.com/RdfMode"]; ok && strings.ToUpper(value) == "METRO" {
-		log.V(common.InfoLevel).Info("Metro replication is not supported by Dell CSI Replication Controllers")
+		log.V(logger.InfoLevel).Info("Metro replication is not supported by Dell CSI Replication Controllers")
 		return false
 	}
 
 	// Check for PowerStore Metro and skip since it is only supported at the driver level
 	if value, ok := class.Parameters["replication.storage.dell.com/mode"]; ok && strings.ToUpper(value) == "METRO" {
-		log.V(common.InfoLevel).Info("Metro replication is not supported by Dell CSI Replication Controllers")
+		log.V(logger.InfoLevel).Info("Metro replication is not supported by Dell CSI Replication Controllers")
 		return false
 	}
 

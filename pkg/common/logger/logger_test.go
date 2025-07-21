@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // revive:disable:var-naming
-package common
+package logger
 
 // revive:enable:var-naming
 

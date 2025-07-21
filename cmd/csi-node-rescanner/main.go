@@ -30,7 +30,8 @@ import (
 	"github.com/dell/csm-replication/controllers"
 	controller "github.com/dell/csm-replication/controllers/csi-node-rescanner"
 	"github.com/dell/csm-replication/core"
-	"github.com/dell/csm-replication/pkg/common"
+	"github.com/dell/csm-replication/pkg/common/constants"
+	"github.com/dell/csm-replication/pkg/common/logger"
 	"github.com/dell/csm-replication/pkg/config"
 	csiidentity "github.com/dell/csm-replication/pkg/csi-clients/identity"
 	"github.com/dell/dell-csi-extensions/migration"
@@ -114,7 +115,7 @@ func (mgr *NodeRescanner) processConfigMapChanges(loggerConfig *logrus.Logger) {
 	}
 	mgr.config.Lock.Lock()
 	defer mgr.config.Lock.Unlock()
-	level, err := common.ParseLevel(mgr.config.LogLevel)
+	level, err := logger.ParseLevel(mgr.config.LogLevel)
 	if err != nil {
 		loggerConfig.Error("Unable to parse ", err)
 	}
@@ -138,7 +139,7 @@ func createNodeReScannerManager(_ context.Context, mgr ctrl.Manager) *NodeRescan
 	//if err != nil {
 	//	return nil, err
 	//}
-	nodeName, found := os.LookupEnv(common.EnvNodeName)
+	nodeName, found := os.LookupEnv(constants.EnvNodeName)
 	if !found {
 		logrus.Warning("Node name not found")
 		nodeName = ""
@@ -193,8 +194,8 @@ func setupFlags() (map[string]string, logr.Logger, context.Context) {
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.StringVar(&csiAddress, "csi-address", "/var/run/csi.sock", "Address for the csi driver socket")
-	flag.StringVar(&domain, "prefix", common.DefaultMigrationDomain, "Prefix used for creating labels/annotations")
-	flag.StringVar(&replicationDomain, "repl-prefix", common.DefaultDomain, "Replication prefix used for creating labels/annotations")
+	flag.StringVar(&domain, "prefix", constants.DefaultMigrationDomain, "Prefix used for creating labels/annotations")
+	flag.StringVar(&replicationDomain, "repl-prefix", constants.DefaultDomain, "Replication prefix used for creating labels/annotations")
 	flag.IntVar(&workerThreads, "worker-threads", 2, "Number of concurrent reconcilers for each of the controllers")
 	flag.DurationVar(&retryIntervalStart, "retry-interval-start", time.Second, "Initial retry interval of failed reconcile request. It doubles with each failure, upto retry-interval-max")
 	flag.DurationVar(&retryIntervalMax, "retry-interval-max", 5*time.Minute, "Maximum retry interval of failed reconcile request")
@@ -206,7 +207,7 @@ func setupFlags() (map[string]string, logr.Logger, context.Context) {
 	controllers.InitLabelsAndAnnotations(domain)
 
 	setupLog.V(1).Info("Prefix", "Domain", domain)
-	setupLog.V(1).Info(common.DellCSINodeReScanner, "Version", core.SemVer, "Commit ID", core.CommitSha32, "Commit SHA", core.CommitTime.Format(time.RFC1123))
+	setupLog.V(1).Info(constants.DellCSINodeReScanner, "Version", core.SemVer, "Commit ID", core.CommitSha32, "Commit SHA", core.CommitTime.Format(time.RFC1123))
 
 	flags := make(map[string]string)
 	flags["metrics-addr"] = metricsAddr
@@ -268,7 +269,7 @@ func createMetricsServer(ctx context.Context, driverName string, metricsAddr str
 	logger := logrusr.New(logrusLog)
 	ctrl.SetLogger(logger)
 
-	leaderElectionID := common.DellCSINodeReScanner + strings.ReplaceAll(driverName, ".", "-")
+	leaderElectionID := constants.DellCSINodeReScanner + strings.ReplaceAll(driverName, ".", "-")
 
 	mgr, err := getCtrlNewManager(ctrl.Options{
 		Scheme: scheme,
@@ -297,7 +298,7 @@ func createRescanManager(ctx context.Context, mgr manager.Manager, driverName st
 	// rescanMgr.setupConfigMapWatcher(logrusLog)
 
 	// Process the config. Get initial log level
-	level, _ := common.ParseLevel("debug")
+	level, _ := logger.ParseLevel("debug")
 	logrusLog.Info("set level to", level)
 	logrusLog.SetLevel(level)
 
@@ -308,7 +309,7 @@ func createRescanManager(ctx context.Context, mgr manager.Manager, driverName st
 		Client:                     mgr.GetClient(),
 		Log:                        ctrl.Log.WithName("controllers").WithName("DellCSINodeReScanner"),
 		Scheme:                     mgr.GetScheme(),
-		EventRecorder:              mgr.GetEventRecorderFor(common.DellCSINodeReScanner),
+		EventRecorder:              mgr.GetEventRecorderFor(constants.DellCSINodeReScanner),
 		DriverName:                 driverName,
 		NodeName:                   rescanMgr.NodeName,
 		MaxRetryDurationForActions: maxRetryDurationForActions,
