@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dell/csm-replication/common/logger"
+	"github.com/dell/csm-replication/pkg/common/logger"
 
 	"golang.org/x/sync/singleflight"
 

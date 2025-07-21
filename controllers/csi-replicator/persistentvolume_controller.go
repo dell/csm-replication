@@ -21,8 +21,8 @@ import (
 	"strings"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
-	"github.com/dell/csm-replication/common/logger"
 	controller "github.com/dell/csm-replication/controllers"
+	"github.com/dell/csm-replication/pkg/common/logger"
 	csireplication "github.com/dell/csm-replication/pkg/csi-clients/replication"
 	"github.com/dell/dell-csi-extensions/replication"
 	"github.com/go-logr/logr"

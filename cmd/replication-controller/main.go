@@ -132,8 +132,8 @@ var (
 			TimestampFormat: time.RFC3339Nano,
 		})
 
-		logger := logrusr.New(logrusLog)
-		ctrl.SetLogger(logger)
+		loggerInstance := logrusr.New(logrusLog)
+		ctrl.SetLogger(loggerInstance)
 		setupLog.V(logger.InfoLevel).Info(constants.DellReplicationController, "Version", core.SemVer, "Commit ID", core.CommitSha32, "Commit SHA", core.CommitTime.Format(time.RFC1123))
 
 		setupLog.V(logger.InfoLevel).Info("Prefix", "Domain", domain)

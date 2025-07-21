@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dell/csm-replication/common/logger"
+	"github.com/dell/csm-replication/pkg/common/logger"
 	v1 "k8s.io/api/core/v1"
 
 	csiext "github.com/dell/dell-csi-extensions/replication"

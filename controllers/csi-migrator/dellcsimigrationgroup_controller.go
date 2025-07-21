@@ -27,8 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 
 	storagev1 "github.com/dell/csm-replication/api/v1"
-	"github.com/dell/csm-replication/common/logger"
 	"github.com/dell/csm-replication/controllers"
+	"github.com/dell/csm-replication/pkg/common/logger"
 	reconciler "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 

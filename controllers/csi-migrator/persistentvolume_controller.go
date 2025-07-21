@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	controller "github.com/dell/csm-replication/controllers"
+	"github.com/dell/csm-replication/pkg/common/logger"
 	csimigration "github.com/dell/csm-replication/pkg/csi-clients/migration"
 	"github.com/go-logr/logr"
 	"golang.org/x/sync/singleflight"

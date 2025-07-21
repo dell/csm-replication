@@ -22,8 +22,8 @@ import (
 	"time"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
-	"github.com/dell/csm-replication/common/logger"
 	controller "github.com/dell/csm-replication/controllers"
+	"github.com/dell/csm-replication/pkg/common/logger"
 	"github.com/dell/dell-csi-extensions/replication"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

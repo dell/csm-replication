@@ -25,8 +25,8 @@ import (
 
 	"github.com/dell/csm-replication/controllers"
 	"github.com/dell/csm-replication/pkg/common/constants"
+	"github.com/dell/csm-replication/pkg/common/logger"
 	"github.com/dell/csm-replication/pkg/connection"
-	"github.com/dell/csm-replication/pkg/logger"
 	"github.com/go-logr/logr"
 	"github.com/spf13/viper"
 	v1 "k8s.io/api/core/v1"

@@ -23,6 +23,7 @@ import (
 	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
+	"github.com/dell/csm-replication/pkg/common/logger"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	storageV1 "k8s.io/api/storage/v1"

@@ -22,8 +22,8 @@ import (
 	"time"
 
 	storagev1 "github.com/dell/csm-replication/api/v1"
-	"github.com/dell/csm-replication/common/logger"
 	controller "github.com/dell/csm-replication/controllers"
+	"github.com/dell/csm-replication/pkg/common/logger"
 	"github.com/dell/csm-replication/pkg/utils"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"

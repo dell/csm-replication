@@ -24,6 +24,7 @@ import (
 	"github.com/dell/csm-replication/controllers"
 	controller "github.com/dell/csm-replication/controllers"
 	"github.com/dell/csm-replication/pkg/common/constants"
+	"github.com/dell/csm-replication/pkg/common/logger"
 	"github.com/dell/csm-replication/pkg/connection"
 	fakeclient "github.com/dell/csm-replication/test/e2e-framework/fake-client"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
@@ -154,23 +155,23 @@ func (suite *PVReconcileSuite) runRemoteReplicationManager(fakeConfig connection
 	}
 
 	// scenario: processLocalPV should fail with an error
-	logger := PVReconciler.Log.WithValues("persistentvolumeclaim")
+	loggerInstance := PVReconciler.Log.WithValues("persistentvolumeclaim")
 
 	// Test case where PV has already been synced
 	localPV.Annotations[controller.PVSyncComplete] = "yes"
-	e := PVReconciler.processLocalPV(context.WithValue(context.TODO(), constants.LoggerContextKey, logger), localPV, "", "")
+	e := PVReconciler.processLocalPV(context.WithValue(context.TODO(), logger.LoggerContextKey, loggerInstance), localPV, "", "")
 	assert.NoError(suite.T(), e, "PV has already been synced")
 
 	// Test case where processLocalPV should fail with an error
-	e = PVReconciler.processLocalPV(context.WithValue(context.TODO(), constants.LoggerContextKey, logger), &corev1.PersistentVolume{}, "", "")
+	e = PVReconciler.processLocalPV(context.WithValue(context.TODO(), logger.LoggerContextKey, loggerInstance), &corev1.PersistentVolume{}, "", "")
 	assert.Error(suite.T(), e, "Process local PV failed with an error")
 
 	// scenario: process remotePV should fail with an error
-	_, e = PVReconciler.processRemotePV(context.WithValue(context.TODO(), constants.LoggerContextKey, logger), remoteClient, &corev1.PersistentVolume{}, "xyz")
+	_, e = PVReconciler.processRemotePV(context.WithValue(context.TODO(), logger.LoggerContextKey, loggerInstance), remoteClient, &corev1.PersistentVolume{}, "xyz")
 	assert.Error(suite.T(), e, "Process remote PV failed with an error")
 
 	// scenario: process remotePV should work with no error
-	_, e = PVReconciler.processRemotePV(context.WithValue(context.TODO(), constants.LoggerContextKey, logger), remoteClient, localPV, "")
+	_, e = PVReconciler.processRemotePV(context.WithValue(context.TODO(), logger.LoggerContextKey, loggerInstance), remoteClient, localPV, "")
 	assert.NoError(suite.T(), e, "Process remote PV with no error")
 
 	annotations := make(map[string]string)
