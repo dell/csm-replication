@@ -37,7 +37,7 @@ func (m *mockMigrationClient) ArrayMigrate(_ context.Context, _ *csiext.ArrayMig
 }
 
 func createFakeConnection() *grpc.ClientConn {
-	conn, _ := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, _ := grpc.NewClient("localhost:50055", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	return conn
 }
 
