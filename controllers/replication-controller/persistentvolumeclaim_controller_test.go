@@ -22,7 +22,8 @@ import (
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
-	constants "github.com/dell/csm-replication/pkg/common"
+	"github.com/dell/csm-replication/pkg/common/constants"
+	"github.com/dell/csm-replication/pkg/common/logger"
 	"github.com/dell/csm-replication/pkg/connection"
 	fakeclient "github.com/dell/csm-replication/test/e2e-framework/fake-client"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
@@ -106,7 +107,7 @@ func (suite *PVControllerTestSuite) runFakeRemoteReplicationManager(fakeConfig c
 	assert.NoError(suite.T(), err, "No error on PVC reconcile")
 	assert.Equal(suite.T(), res.Requeue, false, "Requeue should be set to false")
 
-	logger := externalReconcile.Log.WithValues("persistentvolumeclaim")
+	loggerInstance := externalReconcile.Log.WithValues("persistentvolumeclaim")
 
 	remotePVC := &corev1.PersistentVolumeClaim{}
 	remotePVCAnnotations := make(map[string]string)
@@ -116,7 +117,7 @@ func (suite *PVControllerTestSuite) runFakeRemoteReplicationManager(fakeConfig c
 	remotePVC.Annotations = remotePVCAnnotations
 
 	// scenario: process Remote PVC should fail with an error
-	_, e := externalReconcile.processRemotePVC(context.WithValue(context.TODO(), constants.LoggerContextKey, logger), remoteClient, remotePVC, "xyz", "xyz", "xyz")
+	_, e := externalReconcile.processRemotePVC(context.WithValue(context.TODO(), logger.LoggerContextKey, loggerInstance), remoteClient, remotePVC, "xyz", "xyz", "xyz")
 	assert.Error(suite.T(), e, "Process remote PVC failed with an error")
 
 	remotePVC1 := &corev1.PersistentVolumeClaim{}
@@ -128,7 +129,7 @@ func (suite *PVControllerTestSuite) runFakeRemoteReplicationManager(fakeConfig c
 	remotePVC1.Annotations = remotePVCAnnotations1
 
 	// scenario: process local PVC should fail with an error
-	e = externalReconcile.processLocalPVC(context.WithValue(context.TODO(), constants.LoggerContextKey, logger), remotePVC1, "xyz", "xyz", "xyz", "xyz", true)
+	e = externalReconcile.processLocalPVC(context.WithValue(context.TODO(), logger.LoggerContextKey, loggerInstance), remotePVC1, "xyz", "xyz", "xyz", "xyz", true)
 	assert.Error(suite.T(), e, "Process remote PVC failed with an error")
 
 	// scenario: remoteClusterId annotation is missing
@@ -179,7 +180,7 @@ func (suite *PVControllerTestSuite) runFakeRemoteReplicationManager(fakeConfig c
 
 	// scenario: process local PVC when PVC sync is complete
 	remotePVC1.Annotations[controllers.PVCSyncComplete] = "yes"
-	e = externalReconcile.processLocalPVC(context.WithValue(context.TODO(), constants.LoggerContextKey, logger), remotePVC1, "xyz", "xyz", "xyz", "xyz", true)
+	e = externalReconcile.processLocalPVC(context.WithValue(context.TODO(), logger.LoggerContextKey, loggerInstance), remotePVC1, "xyz", "xyz", "xyz", "xyz", true)
 	assert.NoError(suite.T(), e, "No Error while processing local PVC")
 }
 

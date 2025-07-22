@@ -1,5 +1,5 @@
 /*
-Copyright © 2021 Dell Inc. or its subsidiaries. All Rights Reserved.
+Copyright © 2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // revive:disable:var-naming
-package common
+package logger
 
 // revive:enable:var-naming
 
@@ -45,15 +45,15 @@ func (suite *ConstantsTestSuite) TestParseLevelInvalid() {
 	suite.Error(err, "not a valid logrus level")
 }
 
-func (suite *ConstantsTestSuite) TestGetLoggerFromContext() {
+func (suite *ConstantsTestSuite) TestFromContext() {
 	// Test case: Context with logger
 	ctxWithLogger := context.WithValue(context.Background(), LoggerContextKey, logr.Discard())
-	logger := GetLoggerFromContext(ctxWithLogger)
+	logger := FromContext(ctxWithLogger)
 	suite.NotNil(logger)
 
 	// Test case: Context without logger
 	ctxWithoutLogger := context.Background()
-	logger = GetLoggerFromContext(ctxWithoutLogger)
+	logger = FromContext(ctxWithoutLogger)
 	suite.NotNil(logger)
 }
 

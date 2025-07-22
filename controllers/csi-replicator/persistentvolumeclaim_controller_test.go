@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -20,7 +20,8 @@ import (
 	"time"
 
 	"github.com/dell/csm-replication/controllers"
-	constants "github.com/dell/csm-replication/pkg/common"
+	"github.com/dell/csm-replication/pkg/common/constants"
+	"github.com/dell/csm-replication/pkg/common/logger"
 	fakeclient "github.com/dell/csm-replication/test/e2e-framework/fake-client"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
 	csireplication "github.com/dell/csm-replication/test/mocks"
@@ -113,8 +114,8 @@ func (suite *PVControllerTestSuite) TestVolumeCreationFail() {
 			Name:      "fake-pvc1",
 		},
 	}
-	logger := PVCReconciler.Log.WithValues("persistentvolumeclaim", req.NamespacedName)
-	e := PVCReconciler.processClaimForRemoteVolume(context.WithValue(ctx, constants.LoggerContextKey, logger), &corev1.PersistentVolumeClaim{},
+	loggerInstance := PVCReconciler.Log.WithValues("persistentvolumeclaim", req.NamespacedName)
+	e := PVCReconciler.processClaimForRemoteVolume(context.WithValue(ctx, logger.LoggerContextKey, loggerInstance), &corev1.PersistentVolumeClaim{},
 		&corev1.PersistentVolume{}, map[string]string{}, dummyBuffer)
 	suite.Error(e, "CreateRemoteVolume failed with an error")
 }
@@ -143,8 +144,8 @@ func (suite *PVControllerTestSuite) TestPVProcessingFailure() {
 		},
 	}
 
-	logger := PVCReconciler.Log.WithValues("persistentvolumeclaim", req.NamespacedName)
-	e := PVCReconciler.processClaimForReplicationGroup(context.WithValue(ctx, constants.LoggerContextKey, logger), &corev1.PersistentVolumeClaim{},
+	loggerInstance := PVCReconciler.Log.WithValues("persistentvolumeclaim", req.NamespacedName)
+	e := PVCReconciler.processClaimForReplicationGroup(context.WithValue(ctx, logger.LoggerContextKey, loggerInstance), &corev1.PersistentVolumeClaim{},
 		pvObj)
 	suite.Error(e, "CreateRemoteVolume failed with an error")
 }
@@ -173,8 +174,8 @@ func (suite *PVControllerTestSuite) TestRGCreationFailure() {
 		},
 	}
 
-	logger := PVCReconciler.Log.WithValues("persistentvolumeclaim", req.NamespacedName)
-	e := PVCReconciler.processClaimForReplicationGroup(context.WithValue(ctx, constants.LoggerContextKey, logger), &corev1.PersistentVolumeClaim{},
+	loggerInstance := PVCReconciler.Log.WithValues("persistentvolumeclaim", req.NamespacedName)
+	e := PVCReconciler.processClaimForReplicationGroup(context.WithValue(ctx, logger.LoggerContextKey, loggerInstance), &corev1.PersistentVolumeClaim{},
 		pvObj)
 	suite.Error(e, "CreateRemoteVolume failed with an error")
 }

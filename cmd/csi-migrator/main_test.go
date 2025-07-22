@@ -23,7 +23,7 @@ import (
 	"time"
 
 	controller "github.com/dell/csm-replication/controllers/csi-migrator"
-	"github.com/dell/csm-replication/pkg/common"
+	"github.com/dell/csm-replication/pkg/common/constants"
 	"github.com/dell/csm-replication/pkg/config"
 	csiidentity "github.com/dell/csm-replication/pkg/csi-clients/identity"
 	"github.com/dell/dell-csi-extensions/migration"
@@ -483,8 +483,8 @@ func TestMain(t *testing.T) {
 						retryIntervalStart:   time.Second,
 						retryIntervalMax:     5 * time.Minute,
 						operationTimeout:     300 * time.Second,
-						domain:               common.DefaultMigrationDomain,
-						replicationDomain:    common.DefaultDomain,
+						domain:               constants.DefaultMigrationDomain,
+						replicationDomain:    constants.DefaultDomain,
 						probeFrequency:       5 * time.Second,
 					}
 				}
@@ -549,8 +549,8 @@ func TestMain(t *testing.T) {
 						retryIntervalStart:   time.Second,
 						retryIntervalMax:     5 * time.Minute,
 						operationTimeout:     300 * time.Second,
-						domain:               common.DefaultMigrationDomain,
-						replicationDomain:    common.DefaultDomain,
+						domain:               constants.DefaultMigrationDomain,
+						replicationDomain:    constants.DefaultDomain,
 						probeFrequency:       5 * time.Second,
 					}
 				}
@@ -615,8 +615,8 @@ func TestMain(t *testing.T) {
 						retryIntervalStart:   time.Second,
 						retryIntervalMax:     5 * time.Minute,
 						operationTimeout:     300 * time.Second,
-						domain:               common.DefaultMigrationDomain,
-						replicationDomain:    common.DefaultDomain,
+						domain:               constants.DefaultMigrationDomain,
+						replicationDomain:    constants.DefaultDomain,
 						probeFrequency:       5 * time.Second,
 					}
 				}
@@ -681,8 +681,8 @@ func TestMain(t *testing.T) {
 						retryIntervalStart:   time.Second,
 						retryIntervalMax:     5 * time.Minute,
 						operationTimeout:     300 * time.Second,
-						domain:               common.DefaultMigrationDomain,
-						replicationDomain:    common.DefaultDomain,
+						domain:               constants.DefaultMigrationDomain,
+						replicationDomain:    constants.DefaultDomain,
 						probeFrequency:       5 * time.Second,
 					}
 				}
@@ -749,8 +749,8 @@ func TestMain(t *testing.T) {
 						retryIntervalStart:   time.Second,
 						retryIntervalMax:     5 * time.Minute,
 						operationTimeout:     300 * time.Second,
-						domain:               common.DefaultMigrationDomain,
-						replicationDomain:    common.DefaultDomain,
+						domain:               constants.DefaultMigrationDomain,
+						replicationDomain:    constants.DefaultDomain,
 						probeFrequency:       5 * time.Second,
 					}
 				}
@@ -818,8 +818,8 @@ func TestMain(t *testing.T) {
 						retryIntervalStart:   time.Second,
 						retryIntervalMax:     5 * time.Minute,
 						operationTimeout:     300 * time.Second,
-						domain:               common.DefaultMigrationDomain,
-						replicationDomain:    common.DefaultDomain,
+						domain:               constants.DefaultMigrationDomain,
+						replicationDomain:    constants.DefaultDomain,
 						probeFrequency:       5 * time.Second,
 					}
 				}
@@ -887,8 +887,8 @@ func TestMain(t *testing.T) {
 						retryIntervalStart:   time.Second,
 						retryIntervalMax:     5 * time.Minute,
 						operationTimeout:     300 * time.Second,
-						domain:               common.DefaultMigrationDomain,
-						replicationDomain:    common.DefaultDomain,
+						domain:               constants.DefaultMigrationDomain,
+						replicationDomain:    constants.DefaultDomain,
 						probeFrequency:       5 * time.Second,
 					}
 				}
@@ -956,8 +956,8 @@ func TestMain(t *testing.T) {
 						retryIntervalStart:   time.Second,
 						retryIntervalMax:     5 * time.Minute,
 						operationTimeout:     300 * time.Second,
-						domain:               common.DefaultMigrationDomain,
-						replicationDomain:    common.DefaultDomain,
+						domain:               constants.DefaultMigrationDomain,
+						replicationDomain:    constants.DefaultDomain,
 						probeFrequency:       5 * time.Second,
 					}
 				}

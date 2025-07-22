@@ -1,5 +1,5 @@
 /*
-Copyright © 2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+Copyright © 2023-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import (
 
 	storagev1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
-	constants "github.com/dell/csm-replication/pkg/common"
+	"github.com/dell/csm-replication/pkg/common/constants"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
 	"github.com/stretchr/testify/suite"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

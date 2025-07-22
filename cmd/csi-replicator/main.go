@@ -32,7 +32,8 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/dell/csm-replication/controllers"
-	"github.com/dell/csm-replication/pkg/common"
+	"github.com/dell/csm-replication/pkg/common/constants"
+	"github.com/dell/csm-replication/pkg/common/logger"
 
 	"golang.org/x/sync/singleflight"
 
@@ -130,7 +131,7 @@ var (
 	}
 
 	getParseLevelFunc = func(level string) (logrus.Level, error) {
-		return common.ParseLevel(level)
+		return logger.ParseLevel(level)
 	}
 
 	getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
@@ -161,7 +162,7 @@ var (
 			"Enable leader election for controller manager. "+
 				"Enabling this will ensure there is only one active controller manager.")
 		flag.StringVar(&flags.csiAddress, "csi-address", "/var/run/csi.sock", "Address for the csi driver socket")
-		flag.StringVar(&flags.domain, "prefix", common.DefaultDomain, "Prefix used for creating labels/annotations")
+		flag.StringVar(&flags.domain, "prefix", constants.DefaultDomain, "Prefix used for creating labels/annotations")
 		flag.IntVar(&flags.workerThreads, "worker-threads", 2, "Number of concurrent reconcilers for each of the controllers")
 		flag.DurationVar(&flags.retryIntervalStart, "retry-interval-start", time.Second, "Initial retry interval of failed reconcile request. It doubles with each failure, upto retry-interval-max")
 		flag.DurationVar(&flags.retryIntervalMax, "retry-interval-max", 5*time.Minute, "Maximum retry interval of failed reconcile request")
@@ -186,7 +187,7 @@ func (mgr *ReplicatorManager) processConfigMapChanges(loggerConfig *logrus.Logge
 	}
 	mgr.config.Lock.Lock()
 	defer mgr.config.Lock.Unlock()
-	level, err := common.ParseLevel(mgr.config.LogLevel)
+	level, err := logger.ParseLevel(mgr.config.LogLevel)
 	if err != nil {
 		loggerConfig.Error("Unable to parse ", err)
 	}
@@ -233,7 +234,7 @@ func main() {
 	ctrl.SetLogger(logger)
 
 	setupLog.V(1).Info("Prefix", "Domain", flags.domain)
-	setupLog.V(1).Info(common.DellCSIReplicator, "Version", core.SemVer, "Commit ID", core.CommitSha32, "Commit SHA", core.CommitTime.Format(time.RFC1123))
+	setupLog.V(1).Info(constants.DellCSIReplicator, "Version", core.SemVer, "Commit ID", core.CommitSha32, "Commit SHA", core.CommitTime.Format(time.RFC1123))
 
 	ctx := context.Background()
 
@@ -270,7 +271,7 @@ func main() {
 		}
 	}
 
-	leaderElectionID := common.DellCSIReplicator + strings.ReplaceAll(driverName, ".", "-")
+	leaderElectionID := constants.DellCSIReplicator + strings.ReplaceAll(driverName, ".", "-")
 	mgr, err := getCtrlNewManager(ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsServer.Options{
@@ -317,7 +318,7 @@ func main() {
 		Client:            mgr.GetClient(),
 		Log:               ctrl.Log.WithName("controllers").WithName("PersistentVolumeClaim"),
 		Scheme:            mgr.GetScheme(),
-		EventRecorder:     mgr.GetEventRecorderFor(common.DellCSIReplicator),
+		EventRecorder:     mgr.GetEventRecorderFor(constants.DellCSIReplicator),
 		DriverName:        driverName,
 		ReplicationClient: csireplication.New(csiConn, ctrl.Log.WithName("replication-client"), flags.operationTimeout),
 		ContextPrefix:     flags.pgContextKeyPrefix,
@@ -332,7 +333,7 @@ func main() {
 		Client:            mgr.GetClient(),
 		Log:               ctrl.Log.WithName("controllers").WithName("PersistentVolume"),
 		Scheme:            mgr.GetScheme(),
-		EventRecorder:     mgr.GetEventRecorderFor(common.DellCSIReplicator),
+		EventRecorder:     mgr.GetEventRecorderFor(constants.DellCSIReplicator),
 		DriverName:        driverName,
 		ReplicationClient: csireplication.New(csiConn, ctrl.Log.WithName("replication-client"), flags.operationTimeout),
 		ContextPrefix:     flags.pgContextKeyPrefix,
@@ -348,7 +349,7 @@ func main() {
 		Client:                     mgr.GetClient(),
 		Log:                        ctrl.Log.WithName("controllers").WithName("DellCSIReplicationGroup"),
 		Scheme:                     mgr.GetScheme(),
-		EventRecorder:              mgr.GetEventRecorderFor(common.DellCSIReplicator),
+		EventRecorder:              mgr.GetEventRecorderFor(constants.DellCSIReplicator),
 		DriverName:                 driverName,
 		ReplicationClient:          csireplication.New(csiConn, ctrl.Log.WithName("replication-client"), flags.operationTimeout),
 		SupportedActions:           supportedActions,
@@ -362,8 +363,8 @@ func main() {
 		setupLog.Info("driver supports monitoring capability. we will monitor the RGs")
 		rgMonitor := controller.ReplicationGroupMonitoring{
 			Client:             mgr.GetClient(),
-			Log:                ctrl.Log.WithName("controllers").WithName(common.Monitoring),
-			EventRecorder:      mgr.GetEventRecorderFor(common.Monitoring),
+			Log:                ctrl.Log.WithName("controllers").WithName(constants.Monitoring),
+			EventRecorder:      mgr.GetEventRecorderFor(constants.Monitoring),
 			DriverName:         driverName,
 			ReplicationClient:  csireplication.New(csiConn, ctrl.Log.WithName("replication-client"), flags.operationTimeout),
 			MonitoringInterval: flags.monitoringInterval,

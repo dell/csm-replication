@@ -23,7 +23,7 @@ import (
 	"time"
 
 	repController "github.com/dell/csm-replication/controllers/replication-controller"
-	"github.com/dell/csm-replication/pkg/common"
+	"github.com/dell/csm-replication/pkg/common/constants"
 	"github.com/dell/csm-replication/pkg/config"
 	"github.com/go-logr/logr"
 	"github.com/go-logr/logr/funcr"
@@ -515,7 +515,7 @@ func TestSetupFlags(t *testing.T) {
 	expected := map[string]string{
 		"metrics-addr":         ":8081",
 		"leader-election":      "false",
-		"prefix":               common.DefaultDomain,
+		"prefix":               constants.DefaultDomain,
 		"worker-threads":       "2",
 		"retry-interval-start": "1s",
 		"retry-interval-max":   "5m0s",
