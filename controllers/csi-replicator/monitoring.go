@@ -166,7 +166,7 @@ func updateRGLinkState(rg *repv1.DellCSIReplicationGroup, status string, isSourc
 func updateRGLinkStatus(ctx context.Context, client client.Client, rg *repv1.DellCSIReplicationGroup, status string,
 	isSource bool, errMsg string,
 ) error {
-	log := logger.GetLoggerFromContext(ctx)
+	log := logger.FromContext(ctx)
 	updateRGLinkState(rg, status, isSource, errMsg)
 	if err := client.Status().Update(ctx, rg); err != nil {
 		log.Error(err, "Failed to update the state")

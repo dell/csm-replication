@@ -447,7 +447,7 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 func (r *PersistentVolumeReconciler) processRemotePV(ctx context.Context,
 	rClient connection.RemoteClusterClient, remotePV *v1.PersistentVolume, remoteRGName string,
 ) (bool, error) {
-	log := logger.GetLoggerFromContext(ctx)
+	log := logger.FromContext(ctx)
 	if remoteRGName != "" {
 		// Update the annotation for the remote PV object
 		// controller.AddAnnotation(remotePV, controller.ReplicationGroup, remoteRGName)
@@ -469,7 +469,7 @@ func (r *PersistentVolumeReconciler) processRemotePV(ctx context.Context,
 }
 
 func (r *PersistentVolumeReconciler) processLocalPV(ctx context.Context, localPV *v1.PersistentVolume, remotePVName, remoteClusterID string) error {
-	log := logger.GetLoggerFromContext(ctx)
+	log := logger.FromContext(ctx)
 	// Update the local PV with the remote details
 	// First check if the PV sync has been completed
 	if localPV.Annotations[controller.PVSyncComplete] == "yes" {

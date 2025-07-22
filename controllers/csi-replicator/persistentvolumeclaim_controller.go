@@ -179,7 +179,7 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 func (r *PersistentVolumeClaimReconciler) processClaimForRemoteVolume(ctx context.Context, claim *v1.PersistentVolumeClaim,
 	pv *v1.PersistentVolume, scParams map[string]string, buffer string,
 ) error {
-	log := logger.GetLoggerFromContext(ctx)
+	log := logger.FromContext(ctx)
 	log.V(logger.InfoLevel).Info("Begin process claim for remote-volume")
 
 	log.V(logger.DebugLevel).Info("Adding remote-volume annotation to the PVC")
@@ -213,7 +213,7 @@ func (r *PersistentVolumeClaimReconciler) processClaimForRemoteVolume(ctx contex
 }
 
 func (r *PersistentVolumeClaimReconciler) processClaimForReplicationGroup(ctx context.Context, claim *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) error {
-	log := logger.GetLoggerFromContext(ctx)
+	log := logger.FromContext(ctx)
 	log.V(logger.InfoLevel).Info("Begin process claim for replication-group")
 
 	log.V(logger.DebugLevel).Info("Adding replication-group annotation to the PVC")

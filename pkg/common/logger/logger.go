@@ -72,8 +72,8 @@ const (
 	LoggerContextKey key = iota
 )
 
-// GetLoggerFromContext serves to pass the logger instance to the context
-func GetLoggerFromContext(ctx context.Context) logr.Logger {
+// FromContext serves to pass the logger instance to the context
+func FromContext(ctx context.Context) logr.Logger {
 	log, ok := ctx.Value(LoggerContextKey).(logr.Logger)
 	if !ok {
 		logrusLog := logrus.New()

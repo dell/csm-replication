@@ -251,7 +251,7 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 // Getting MG to its first valid state
 func (r *MigrationGroupReconciler) processMGInNoState(ctx context.Context, dellCSIMigrationGroup *storagev1.DellCSIMigrationGroup) (ctrl.Result, error) {
-	log := logger.GetLoggerFromContext(ctx)
+	log := logger.FromContext(ctx)
 	log.V(logger.InfoLevel).Info("Processing MG in NoState")
 	ok, err := r.addFinalizer(ctx, dellCSIMigrationGroup.DeepCopy())
 	if err != nil {
@@ -268,7 +268,7 @@ func (r *MigrationGroupReconciler) processMGInNoState(ctx context.Context, dellC
 
 // Update mg spec with current state
 func (r *MigrationGroupReconciler) updateMGSpecWithState(ctx context.Context, mg *storagev1.DellCSIMigrationGroup, NextState string) error {
-	log := logger.GetLoggerFromContext(ctx)
+	log := logger.FromContext(ctx)
 	log.V(logger.InfoLevel).Info("Begin updating MG spec with", "State", NextState)
 	mg.Status.State = NextState
 	if err := r.Status().Update(ctx, mg.DeepCopy()); err != nil {
@@ -281,7 +281,7 @@ func (r *MigrationGroupReconciler) updateMGSpecWithState(ctx context.Context, mg
 
 // Update mg on error
 func (r *MigrationGroupReconciler) updateMGOnError(ctx context.Context, mg *storagev1.DellCSIMigrationGroup, currentState string, _ string) error {
-	log := logger.GetLoggerFromContext(ctx)
+	log := logger.FromContext(ctx)
 	log.V(logger.InfoLevel).Info("Begin updating MG status with", "ErrorState", ErrorState)
 	mg.Status.LastAction = currentState
 	/*
@@ -294,7 +294,7 @@ func (r *MigrationGroupReconciler) updateMGOnError(ctx context.Context, mg *stor
 
 // Update mg with annotation
 func (r *MigrationGroupReconciler) updateMGSpecWithActionResult(ctx context.Context, mg *storagev1.DellCSIMigrationGroup, NextAnnotation string) bool {
-	log := logger.GetLoggerFromContext(ctx)
+	log := logger.FromContext(ctx)
 	log.V(logger.InfoLevel).Info("Begin updating MG status with", "Annotation", NextAnnotation)
 
 	isUpdated := false
@@ -331,7 +331,7 @@ func (r *MigrationGroupReconciler) SetupWithManager(mgr ctrl.Manager, limiter wo
 
 // Function to add a Finalizer to MG
 func (r *MigrationGroupReconciler) addFinalizer(ctx context.Context, mg *storagev1.DellCSIMigrationGroup) (bool, error) {
-	log := logger.GetLoggerFromContext(ctx)
+	log := logger.FromContext(ctx)
 	log.V(logger.InfoLevel).Info("Adding finalizer")
 
 	ok := controllers.AddFinalizerIfNotExist(mg, controllers.MigrationFinalizer)
@@ -347,7 +347,6 @@ func (r *MigrationGroupReconciler) addFinalizer(ctx context.Context, mg *storage
 
 // processing for deletion
 func (r *MigrationGroupReconciler) processMGForDeletion(ctx context.Context, dellCSIMigrationGroup *storagev1.DellCSIMigrationGroup) (ctrl.Result, error) {
-	// log := logger.GetLoggerFromContext(ctx)
 	if dellCSIMigrationGroup.Status.State != DeletingState {
 		err := r.updateMGSpecWithState(ctx, dellCSIMigrationGroup.DeepCopy(), DeletingState)
 		return ctrl.Result{}, err
@@ -359,7 +358,7 @@ func (r *MigrationGroupReconciler) processMGForDeletion(ctx context.Context, del
 }
 
 func (r *MigrationGroupReconciler) removeFinalizer(ctx context.Context, mg *storagev1.DellCSIMigrationGroup) error {
-	log := logger.GetLoggerFromContext(ctx)
+	log := logger.FromContext(ctx)
 	log.V(logger.InfoLevel).Info("Removing finalizer")
 
 	// Remove migration group finalizer

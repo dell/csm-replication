@@ -25,7 +25,7 @@ import (
 )
 
 func shouldContinue(ctx context.Context, class *storageV1.StorageClass, driverName string) bool {
-	log := logger.GetLoggerFromContext(ctx)
+	log := logger.FromContext(ctx)
 	// Check for the driver match
 	if class.Provisioner != driverName {
 		log.V(logger.InfoLevel).Info("PVC created using the driver name, not matching one on this replicator", "driverName", class.Provisioner)

@@ -180,7 +180,7 @@ func (r *PersistentVolumeReconciler) processVolumeForReplicationGroup(ctx contex
 	replicationGroupName string,
 	scParams map[string]string,
 ) error {
-	log := logger.GetLoggerFromContext(ctx)
+	log := logger.FromContext(ctx)
 	log.V(logger.InfoLevel).Info("Begin process volume for replication-group")
 
 	log.V(logger.DebugLevel).Info("Adding replication-group and remote-cluster annotation to the PV")
@@ -244,7 +244,7 @@ func (r *PersistentVolumeReconciler) processVolumeForReplicationGroup(ctx contex
 }
 
 func (r *PersistentVolumeReconciler) createProtectionGroupAndRG(ctx context.Context, volumeHandle string, scParams map[string]string) (string, error) {
-	log := logger.GetLoggerFromContext(ctx)
+	log := logger.FromContext(ctx)
 	log.V(logger.InfoLevel).Info("Creating protection-group and RG")
 
 	if r.ClusterUID != "" {
@@ -297,7 +297,7 @@ func (r *PersistentVolumeReconciler) createReplicationGroupOnce(ctx context.Cont
 }
 
 func (r *PersistentVolumeReconciler) createReplicationGroup(ctx context.Context, res *replication.CreateStorageProtectionGroupResponse, remoteClusterID string, remoteRGRetentionPolicy string) (*repv1.DellCSIReplicationGroup, error) {
-	log := logger.GetLoggerFromContext(ctx)
+	log := logger.FromContext(ctx)
 	log.V(logger.InfoLevel).Info("Creating replication-group")
 
 	annotations := make(map[string]string)

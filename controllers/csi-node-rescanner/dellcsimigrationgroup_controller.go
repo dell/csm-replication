@@ -107,7 +107,7 @@ func (r *NodeRescanReconciler) processMGForRescan(ctx context.Context, mg *stora
 	if err != nil && errors.IsNotFound(err) {
 		return ctrl.Result{}, err
 	}
-	log := logger.GetLoggerFromContext(ctx)
+	log := logger.FromContext(ctx)
 	// Check if rescanned label is already on the pod
 	for _, pod := range podList.Items {
 		if pod.Spec.NodeName == r.NodeName {
@@ -154,7 +154,7 @@ func (r *NodeRescanReconciler) processMGinDeletingState(ctx context.Context, mg 
 	if err != nil && errors.IsNotFound(err) {
 		return ctrl.Result{}, nil
 	}
-	log := logger.GetLoggerFromContext(ctx)
+	log := logger.FromContext(ctx)
 	// Check if rescanned label is already on the pod
 	for _, pod := range podList.Items {
 		if pod.Spec.NodeName == r.NodeName {

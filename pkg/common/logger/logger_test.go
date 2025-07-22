@@ -45,15 +45,15 @@ func (suite *ConstantsTestSuite) TestParseLevelInvalid() {
 	suite.Error(err, "not a valid logrus level")
 }
 
-func (suite *ConstantsTestSuite) TestGetLoggerFromContext() {
+func (suite *ConstantsTestSuite) TestFromContext() {
 	// Test case: Context with logger
 	ctxWithLogger := context.WithValue(context.Background(), LoggerContextKey, logr.Discard())
-	logger := GetLoggerFromContext(ctxWithLogger)
+	logger := FromContext(ctxWithLogger)
 	suite.NotNil(logger)
 
 	// Test case: Context without logger
 	ctxWithoutLogger := context.Background()
-	logger = GetLoggerFromContext(ctxWithoutLogger)
+	logger = FromContext(ctxWithoutLogger)
 	suite.NotNil(logger)
 }
 

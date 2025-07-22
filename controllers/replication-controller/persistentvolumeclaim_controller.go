@@ -209,7 +209,7 @@ func (r *PersistentVolumeClaimReconciler) processRemotePVC(ctx context.Context,
 	claim *v1.PersistentVolumeClaim,
 	remotePVCName, remotePVCNamespace, remotePVName string,
 ) (bool, error) {
-	log := logger.GetLoggerFromContext(ctx)
+	log := logger.FromContext(ctx)
 	isUpdated := false
 	// Just apply the missing annotation
 	if claim.Annotations[controller.RemotePVC] == "" {
@@ -241,7 +241,7 @@ func (r *PersistentVolumeClaimReconciler) processLocalPVC(ctx context.Context,
 	claim *v1.PersistentVolumeClaim, remotePVName, remotePVCName, remotePVCNamespace,
 	remoteClusterID string, isRemotePVCUpdated bool,
 ) error {
-	log := logger.GetLoggerFromContext(ctx)
+	log := logger.FromContext(ctx)
 	if claim.Annotations[controller.PVCSyncComplete] == "yes" {
 		log.V(logger.InfoLevel).Info("PVC Sync already completed")
 		return nil
@@ -350,7 +350,7 @@ func updatePVCLabels(pvc, volume *v1.PersistentVolumeClaim, remoteClusterID stri
 
 func VerifyAndCreateNamespace(ctx context.Context, rClient connection.RemoteClusterClient, namespace string) error {
 	// Verify if the namespace exists
-	log := logger.GetLoggerFromContext(ctx)
+	log := logger.FromContext(ctx)
 	if _, err := rClient.GetNamespace(ctx, namespace); err != nil {
 		log.V(logger.InfoLevel).Info("Namespace - " + namespace + " not found, creating it.")
 		NewNamespace := &v1.Namespace{
