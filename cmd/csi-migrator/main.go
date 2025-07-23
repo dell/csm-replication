@@ -36,7 +36,8 @@ import (
 
 	storagev1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
-	"github.com/dell/csm-replication/pkg/common"
+	"github.com/dell/csm-replication/pkg/common/constants"
+	"github.com/dell/csm-replication/pkg/common/logger"
 
 	"golang.org/x/sync/singleflight"
 
@@ -109,7 +110,7 @@ var (
 	}
 
 	getParseLevelFunc = func(level string) (logrus.Level, error) {
-		return common.ParseLevel(level)
+		return logger.ParseLevel(level)
 	}
 
 	getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
@@ -137,8 +138,8 @@ var (
 			"Enable leader election for controller manager. "+
 				"Enabling this will ensure there is only one active controller manager.")
 		flag.StringVar(&flags.csiAddress, "csi-address", "/var/run/csi.sock", "Address for the csi driver socket")
-		flag.StringVar(&flags.domain, "prefix", common.DefaultMigrationDomain, "Prefix used for creating labels/annotations")
-		flag.StringVar(&flags.replicationDomain, "repl-prefix", common.DefaultDomain, "Replication prefix used for creating labels/annotations")
+		flag.StringVar(&flags.domain, "prefix", constants.DefaultMigrationDomain, "Prefix used for creating labels/annotations")
+		flag.StringVar(&flags.replicationDomain, "repl-prefix", constants.DefaultDomain, "Replication prefix used for creating labels/annotations")
 		flag.IntVar(&flags.workerThreads, "worker-threads", 2, "Number of concurrent reconcilers for each of the controllers")
 		flag.DurationVar(&flags.retryIntervalStart, "retry-interval-start", time.Second, "Initial retry interval of failed reconcile request. It doubles with each failure, upto retry-interval-max")
 		flag.DurationVar(&flags.retryIntervalMax, "retry-interval-max", 5*time.Minute, "Maximum retry interval of failed reconcile request")
@@ -160,7 +161,7 @@ func (mgr *MigratorManager) processConfigMapChanges(loggerConfig *logrus.Logger)
 	}
 	mgr.config.Lock.Lock()
 	defer mgr.config.Lock.Unlock()
-	level, err := common.ParseLevel(mgr.config.LogLevel)
+	level, err := logger.ParseLevel(mgr.config.LogLevel)
 	if err != nil {
 		loggerConfig.Error("Unable to parse ", err)
 	}
@@ -227,7 +228,7 @@ func main() {
 	ctrl.SetLogger(logger)
 
 	setupLog.V(1).Info("Prefix", "Domain", flags.domain)
-	setupLog.V(1).Info(common.DellCSIMigrator, "Version", core.SemVer, "Commit ID", core.CommitSha32, "Commit SHA", core.CommitTime.Format(time.RFC1123))
+	setupLog.V(1).Info(constants.DellCSIMigrator, "Version", core.SemVer, "Commit ID", core.CommitSha32, "Commit SHA", core.CommitTime.Format(time.RFC1123))
 
 	ctx := context.Background()
 
@@ -262,7 +263,7 @@ func main() {
 			osExit(1)
 		}
 	}
-	leaderElectionID := common.DellCSIMigrator + strings.ReplaceAll(driverName, ".", "-")
+	leaderElectionID := constants.DellCSIMigrator + strings.ReplaceAll(driverName, ".", "-")
 	mgr, err := getCtrlNewManager(ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsServer.Options{
@@ -300,7 +301,7 @@ func main() {
 		Client:            mgr.GetClient(),
 		Log:               ctrl.Log.WithName("controllers").WithName("PersistentVolume"),
 		Scheme:            mgr.GetScheme(),
-		EventRecorder:     mgr.GetEventRecorderFor(common.DellCSIReplicator),
+		EventRecorder:     mgr.GetEventRecorderFor(constants.DellCSIReplicator),
 		DriverName:        driverName,
 		MigrationClient:   csimigration.New(csiConn, ctrl.Log.WithName("migration-client"), flags.operationTimeout),
 		ContextPrefix:     flags.pgContextKeyPrefix,
@@ -316,7 +317,7 @@ func main() {
 		Client:                     mgr.GetClient(),
 		Log:                        ctrl.Log.WithName("controllers").WithName("DellCSIMigrationGroup"),
 		Scheme:                     mgr.GetScheme(),
-		EventRecorder:              mgr.GetEventRecorderFor(common.DellCSIMigrator),
+		EventRecorder:              mgr.GetEventRecorderFor(constants.DellCSIMigrator),
 		DriverName:                 driverName,
 		MigrationClient:            csimigration.New(csiConn, ctrl.Log.WithName("migration-client"), flags.operationTimeout),
 		MaxRetryDurationForActions: flags.maxRetryDurationForActions,

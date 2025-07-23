@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dell/csm-replication/pkg/common"
+	"github.com/dell/csm-replication/pkg/common/logger"
 	v1 "k8s.io/api/core/v1"
 
 	csiext "github.com/dell/dell-csi-extensions/replication"
@@ -76,12 +76,12 @@ func (a ActionType) String() string {
 
 // Equals allows to check if provided string is equal to current action type
 func (a ActionType) Equals(ctx context.Context, val string) bool {
-	log := common.GetLoggerFromContext(ctx)
+	log := logger.FromContext(ctx)
 	if strings.ToUpper(string(a)) == strings.ToUpper(val) {
-		log.V(common.DebugLevel).Info("Current action type is equal", "val", val, "a", string(a))
+		log.V(logger.DebugLevel).Info("Current action type is equal", "val", val, "a", string(a))
 		return true
 	}
-	log.V(common.DebugLevel).Info("Current action type is not equal", "val", val, "a", string(a))
+	log.V(logger.DebugLevel).Info("Current action type is not equal", "val", val, "a", string(a))
 	return false
 }
 
@@ -119,8 +119,8 @@ type ActionAnnotation struct {
 }
 
 func updateRGSpecWithActionResult(ctx context.Context, rg *repv1.DellCSIReplicationGroup, result *ActionResult) bool {
-	log := common.GetLoggerFromContext(ctx)
-	log.V(common.InfoLevel).Info("Begin updating RG spec with", "Action Result", result)
+	log := logger.FromContext(ctx)
+	log.V(logger.InfoLevel).Info("Begin updating RG spec with", "Action Result", result)
 
 	isUpdated := false
 	actionAnnotation := ActionAnnotation{
@@ -153,9 +153,9 @@ func updateRGSpecWithActionResult(ctx context.Context, rg *repv1.DellCSIReplicat
 		bytes, _ := json.Marshal(&actionAnnotation)
 		controllers.AddAnnotation(rg, Action, string(bytes))
 
-		log.V(common.InfoLevel).Info("RG was successfully updated with", "Action Result", result)
+		log.V(logger.InfoLevel).Info("RG was successfully updated with", "Action Result", result)
 
-		log.V(common.InfoLevel).Info("Resetting the action processed time annotation.")
+		log.V(logger.InfoLevel).Info("Resetting the action processed time annotation.")
 		// Indicates that the action needs to be processed by the controller.
 		controllers.AddAnnotation(rg, controllers.ActionProcessedTime, "")
 
@@ -163,18 +163,18 @@ func updateRGSpecWithActionResult(ctx context.Context, rg *repv1.DellCSIReplicat
 		return isUpdated
 	}
 
-	log.V(common.InfoLevel).Info("RG was not updated with", "Action Result", result)
+	log.V(logger.InfoLevel).Info("RG was not updated with", "Action Result", result)
 	return isUpdated
 }
 
 func getActionResultFromActionAnnotation(ctx context.Context, actionAnnotation ActionAnnotation) (*ActionResult, error) {
-	log := common.GetLoggerFromContext(ctx)
-	log.V(common.InfoLevel).Info("Getting result from action annotation..")
+	log := logger.FromContext(ctx)
+	log.V(logger.InfoLevel).Info("Getting result from action annotation..")
 
 	var finalErr error
 	finalError := false
 	if actionAnnotation.FinalError != "" {
-		log.V(common.InfoLevel).Info("There is final error", "actionAnnotation.FinalError", actionAnnotation.FinalError)
+		log.V(logger.InfoLevel).Info("There is final error", "actionAnnotation.FinalError", actionAnnotation.FinalError)
 		finalErr = fmt.Errorf("%s", actionAnnotation.FinalError)
 		finalError = true
 	}
@@ -206,8 +206,8 @@ func getActionResultFromActionAnnotation(ctx context.Context, actionAnnotation A
 }
 
 func updateRGStatusWithActionResult(ctx context.Context, rg *repv1.DellCSIReplicationGroup, actionResult *ActionResult) error {
-	log := common.GetLoggerFromContext(ctx)
-	log.V(common.InfoLevel).Info("Begin updating RG status with action result")
+	log := logger.FromContext(ctx)
+	log.V(logger.InfoLevel).Info("Begin updating RG status with action result")
 
 	var result *ActionResult
 	if actionResult == nil {
@@ -224,11 +224,11 @@ func updateRGStatusWithActionResult(ctx context.Context, rg *repv1.DellCSIReplic
 	}
 	if result.Error == nil {
 		// Update to ReadyState
-		log.V(common.InfoLevel).Info("Update RG status to ReadyState")
+		log.V(logger.InfoLevel).Info("Update RG status to ReadyState")
 		rg.Status.State = ReadyState
 	} else {
 		if result.IsFinalError {
-			log.V(common.InfoLevel).Info("Update RG status to ErrorState")
+			log.V(logger.InfoLevel).Info("Update RG status to ErrorState")
 			rg.Status.State = ErrorState
 		}
 	}
@@ -239,20 +239,20 @@ func updateRGStatusWithActionResult(ctx context.Context, rg *repv1.DellCSIReplic
 
 	// Update the RG link state if we got a status
 	if result.PGStatus != nil {
-		log.V(common.InfoLevel).Info("RG link state was updated")
+		log.V(logger.InfoLevel).Info("RG link state was updated")
 		updateRGLinkState(rg, result.PGStatus.State.String(), result.PGStatus.IsSource, "")
 
 		return nil
 	}
 
-	log.V(common.InfoLevel).Info("RG link state was not updated. There is no PG status")
+	log.V(logger.InfoLevel).Info("RG link state was not updated. There is no PG status")
 
 	return nil
 }
 
 func updateConditionsWithActionResult(ctx context.Context, rg *repv1.DellCSIReplicationGroup, result *ActionResult) {
-	log := common.GetLoggerFromContext(ctx)
-	log.V(common.InfoLevel).Info("Begin updating condition with action result")
+	log := logger.FromContext(ctx)
+	log.V(logger.InfoLevel).Info("Begin updating condition with action result")
 
 	condition := repv1.LastAction{
 		Condition:        result.ActionType.getSuccessfulString(),
@@ -266,12 +266,12 @@ func updateConditionsWithActionResult(ctx context.Context, rg *repv1.DellCSIRepl
 		controllers.UpdateConditions(rg, condition, MaxNumberOfConditions)
 	}
 
-	log.V(common.InfoLevel).Info("Condition was updated")
+	log.V(logger.InfoLevel).Info("Condition was updated")
 }
 
 func updateLastAction(ctx context.Context, rg *repv1.DellCSIReplicationGroup, result *ActionResult) {
-	log := common.GetLoggerFromContext(ctx)
-	log.V(common.InfoLevel).Info("Updating last action..")
+	log := logger.FromContext(ctx)
+	log.V(logger.InfoLevel).Info("Updating last action..")
 
 	rg.Status.LastAction.Time = &metav1.Time{Time: result.Time}
 	if result.Error != nil {
@@ -285,23 +285,23 @@ func updateLastAction(ctx context.Context, rg *repv1.DellCSIReplicationGroup, re
 		rg.Status.LastAction.ErrorMessage = "" // Reset any older errors
 	}
 
-	log.V(common.InfoLevel).Info("Last action was updated")
+	log.V(logger.InfoLevel).Info("Last action was updated")
 }
 
 func updateActionAttributes(ctx context.Context, rg *repv1.DellCSIReplicationGroup, result *ActionResult) {
-	log := common.GetLoggerFromContext(ctx)
-	log.V(common.InfoLevel).Info("Updating the action attributes")
+	log := logger.FromContext(ctx)
+	log.V(logger.InfoLevel).Info("Updating the action attributes")
 
 	switch result.ActionType {
 	case ActionType(csiext.ActionTypes_CREATE_SNAPSHOT.String()):
-		log.V(common.InfoLevel).Info("Finished Create Snapshot, Attributes:")
+		log.V(logger.InfoLevel).Info("Finished Create Snapshot, Attributes:")
 		for key, val := range result.ActionAttributes {
-			log.V(common.InfoLevel).Info("Key: " + key + " Value: " + val)
+			log.V(logger.InfoLevel).Info("Key: " + key + " Value: " + val)
 		}
 
 		rg.Status.LastAction.ActionAttributes = result.ActionAttributes
 	default:
-		log.V(common.InfoLevel).Info("Update Action Attributes to default")
+		log.V(logger.InfoLevel).Info("Update Action Attributes to default")
 	}
 }
 
@@ -324,7 +324,7 @@ type ReplicationGroupReconciler struct {
 // Reconcile contains reconciliation logic that updates ReplicationGroup depending on it's current state
 func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("persistentvolumeclaim", req.NamespacedName)
-	ctx = context.WithValue(ctx, common.LoggerContextKey, log)
+	ctx = context.WithValue(ctx, logger.LoggerContextKey, log)
 
 	rg := new(repv1.DellCSIReplicationGroup)
 	err := r.Get(ctx, req.NamespacedName, rg)
@@ -342,7 +342,7 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	// If no protection group ID set(the only mandatory field), we set it to Invalid state and return
 	if rg.Spec.ProtectionGroupID == "" {
 		r.EventRecorder.Event(rg, v1.EventTypeWarning, "Invalid", "Missing mandatory value - protectionGroupID")
-		log.V(common.InfoLevel).Info("Missing mandatory value - protectionGroupID", "rg", rg, "v1.EventTypeWarning", v1.EventTypeWarning)
+		log.V(logger.InfoLevel).Info("Missing mandatory value - protectionGroupID", "rg", rg, "v1.EventTypeWarning", v1.EventTypeWarning)
 		if rg.Status.State != InvalidState {
 			if err := r.updateState(ctx, rg.DeepCopy(), InvalidState); err != nil {
 				return ctrl.Result{}, err
@@ -390,23 +390,23 @@ func (r *ReplicationGroupReconciler) getAction(actionType ActionType) (*csiext.E
 }
 
 func (r *ReplicationGroupReconciler) deleteProtectionGroup(ctx context.Context, rg *repv1.DellCSIReplicationGroup) error {
-	log := common.GetLoggerFromContext(ctx)
-	log.V(common.InfoLevel).Info("Deleting protection-group")
+	log := logger.FromContext(ctx)
+	log.V(logger.InfoLevel).Info("Deleting protection-group")
 
-	log.V(common.DebugLevel).Info("Making CSI call to delete replication group")
+	log.V(logger.DebugLevel).Info("Making CSI call to delete replication group")
 
 	err := r.ReplicationClient.DeleteStorageProtectionGroup(ctx, rg.Spec.ProtectionGroupID, rg.Spec.ProtectionGroupAttributes)
 	if err != nil {
 		log.Error(err, "Failed to delete protection-group", "ProtectionGroupID", rg.Spec.ProtectionGroupID)
 		return err
 	}
-	log.V(common.InfoLevel).Info("Successfully deleted the protection-group")
+	log.V(logger.InfoLevel).Info("Successfully deleted the protection-group")
 	return nil
 }
 
 func (r *ReplicationGroupReconciler) removeFinalizer(ctx context.Context, rg *repv1.DellCSIReplicationGroup) error {
-	log := common.GetLoggerFromContext(ctx)
-	log.V(common.InfoLevel).Info("Removing finalizer")
+	log := logger.FromContext(ctx)
+	log.V(logger.InfoLevel).Info("Removing finalizer")
 
 	// Remove replication-protection finalizer
 	if ok := controllers.RemoveFinalizerIfExists(rg, controllers.ReplicationFinalizer); ok {
@@ -416,14 +416,14 @@ func (r *ReplicationGroupReconciler) removeFinalizer(ctx context.Context, rg *re
 			log.Error(err, "Failed to remove finalizer", "rg", rg, "ProtectionGroupRemovedAnnotation", controllers.ProtectionGroupRemovedAnnotation)
 			return err
 		}
-		log.V(common.InfoLevel).Info("Finalizer removed successfully")
+		log.V(logger.InfoLevel).Info("Finalizer removed successfully")
 	}
 	return nil
 }
 
 func (r *ReplicationGroupReconciler) addFinalizer(ctx context.Context, rg *repv1.DellCSIReplicationGroup) (bool, error) {
-	log := common.GetLoggerFromContext(ctx)
-	log.V(common.InfoLevel).Info("Adding finalizer")
+	log := logger.FromContext(ctx)
+	log.V(logger.InfoLevel).Info("Adding finalizer")
 
 	ok := controllers.AddFinalizerIfNotExist(rg, controllers.ReplicationFinalizer)
 	if ok {
@@ -431,21 +431,21 @@ func (r *ReplicationGroupReconciler) addFinalizer(ctx context.Context, rg *repv1
 			log.Error(err, "Failed to add finalizer", "rg", rg)
 			return ok, err
 		}
-		log.V(common.DebugLevel).Info("Successfully add finalizer. Requesting a requeue")
+		log.V(logger.DebugLevel).Info("Successfully add finalizer. Requesting a requeue")
 	}
 	return ok, nil
 }
 
 func (r *ReplicationGroupReconciler) updateState(ctx context.Context, rg *repv1.DellCSIReplicationGroup, state string) error {
-	log := common.GetLoggerFromContext(ctx)
-	log.V(common.InfoLevel).Info("Updating to", "state", state)
+	log := logger.FromContext(ctx)
+	log.V(logger.InfoLevel).Info("Updating to", "state", state)
 
 	rg.Status.State = state
 	if err := r.Status().Update(ctx, rg); err != nil {
 		log.Error(err, "Failed updating to", "state", state)
 		return err
 	}
-	log.V(common.InfoLevel).Info("Successfully updated to", "state", state)
+	log.V(logger.InfoLevel).Info("Successfully updated to", "state", state)
 	return nil
 }
 
@@ -464,12 +464,12 @@ func (r *ReplicationGroupReconciler) SetupWithManager(mgr ctrl.Manager, limiter 
 }
 
 func getActionInProgress(ctx context.Context, annotations map[string]string) (*ActionAnnotation, error) {
-	log := common.GetLoggerFromContext(ctx)
-	log.V(common.DebugLevel).Info("Getting the action in progress from annotation")
+	log := logger.FromContext(ctx)
+	log.V(logger.DebugLevel).Info("Getting the action in progress from annotation")
 
 	val, ok := annotations[Action]
 	if !ok {
-		log.V(common.InfoLevel).Info("No action", "val", val)
+		log.V(logger.InfoLevel).Info("No action", "val", val)
 		return nil, nil
 	}
 	var actionAnnotation ActionAnnotation
@@ -478,7 +478,7 @@ func getActionInProgress(ctx context.Context, annotations map[string]string) (*A
 		log.Error(err, "JSON unmarshal error", "actionAnnotation", actionAnnotation)
 		return nil, err
 	}
-	log.V(common.InfoLevel).Info("Action was got", "actionAnnotation", actionAnnotation)
+	log.V(logger.InfoLevel).Info("Action was got", "actionAnnotation", actionAnnotation)
 	return &actionAnnotation, nil
 }
 
@@ -490,7 +490,7 @@ func resetRGSpecForInvalidAction(rg *repv1.DellCSIReplicationGroup) {
 func (r *ReplicationGroupReconciler) processRGInActionInProgressState(ctx context.Context,
 	rg *repv1.DellCSIReplicationGroup,
 ) (ctrl.Result, error) {
-	log := common.GetLoggerFromContext(ctx)
+	log := logger.FromContext(ctx)
 	// Get action in progress from annotation
 	inProgress, err := getActionInProgress(ctx, rg.Annotations)
 	if err != nil || inProgress == nil {
@@ -498,7 +498,7 @@ func (r *ReplicationGroupReconciler) processRGInActionInProgressState(ctx contex
 		// Mostly points to User error
 		if rg.Spec.Action != "" {
 
-			log.V(common.DebugLevel).Info("Action set")
+			log.V(logger.DebugLevel).Info("Action set")
 
 			actionType := ActionType(rg.Spec.Action)
 			_, err := r.getAction(actionType)
@@ -506,8 +506,8 @@ func (r *ReplicationGroupReconciler) processRGInActionInProgressState(ctx contex
 				// Action invalid
 				r.EventRecorder.Event(rg, v1.EventTypeWarning, "Invalid",
 					"State is InProgress & Invalid action set in spec")
-				log.V(common.InfoLevel).Info("Warning: State is InProgress but invalid action set in spec")
-				log.V(common.InfoLevel).Info("Resetting the CR state to Ready")
+				log.V(logger.InfoLevel).Info("Warning: State is InProgress but invalid action set in spec")
+				log.V(logger.InfoLevel).Info("Resetting the CR state to Ready")
 				resetRGSpecForInvalidAction(rg)
 				err = r.Update(ctx, rg)
 				return ctrl.Result{}, err
@@ -527,14 +527,14 @@ func (r *ReplicationGroupReconciler) processRGInActionInProgressState(ctx contex
 			inProgress = &actionAnnotation
 		} else {
 
-			log.V(common.DebugLevel).Info("Action not set")
+			log.V(logger.DebugLevel).Info("Action not set")
 
 			// Nothing to do here
 			// What should be the final state?
 			r.EventRecorder.Event(rg, v1.EventTypeWarning, "Invalid",
 				"State is InProgress but action & action annotation not set")
-			log.V(common.InfoLevel).Info("Warning: State is InProgress but action & action annotation not set")
-			log.V(common.InfoLevel).Info("Resetting the CR state to Ready")
+			log.V(logger.InfoLevel).Info("Warning: State is InProgress but action & action annotation not set")
+			log.V(logger.InfoLevel).Info("Resetting the CR state to Ready")
 			// Delete any incorrect annotation
 			resetRGSpecForInvalidAction(rg)
 			if err := r.Update(ctx, rg); err != nil {
@@ -589,7 +589,7 @@ func (r *ReplicationGroupReconciler) processRGInActionInProgressState(ctx contex
 			log.Error(err, "Failed to update spec", "rg", rg, "Action Result", actionResult)
 			return ctrl.Result{}, err
 		}
-		log.V(common.InfoLevel).Info("Successfully updated spec", "Action Result", actionResult)
+		log.V(logger.InfoLevel).Info("Successfully updated spec", "Action Result", actionResult)
 	}
 	// Update status
 	err = updateRGStatusWithActionResult(ctx, rg, actionResult)
@@ -617,15 +617,15 @@ func (r *ReplicationGroupReconciler) processRGInActionInProgressState(ctx contex
 func (r *ReplicationGroupReconciler) executeAction(ctx context.Context, rg *repv1.DellCSIReplicationGroup,
 	actionType ActionType, action *csiext.ExecuteActionRequest_Action,
 ) *ActionResult {
-	log := common.GetLoggerFromContext(ctx)
-	log.V(common.InfoLevel).Info("Executing action", "actionType", actionType)
+	log := logger.FromContext(ctx)
+	log.V(logger.InfoLevel).Info("Executing action", "actionType", actionType)
 
 	actionResult := ActionResult{
 		ActionType: actionType,
 		PGStatus:   nil,
 	}
 
-	log.V(common.DebugLevel).Info("Making API call to Execute Action", "actionType", actionType)
+	log.V(logger.DebugLevel).Info("Making API call to Execute Action", "actionType", actionType)
 
 	res, err := r.ReplicationClient.ExecuteAction(ctx, rg.Spec.ProtectionGroupID, action,
 		rg.Spec.ProtectionGroupAttributes, rg.Spec.RemoteProtectionGroupID, rg.Spec.RemoteProtectionGroupAttributes)
@@ -639,12 +639,12 @@ func (r *ReplicationGroupReconciler) executeAction(ctx context.Context, rg *repv
 	if err != nil {
 		log.Error(err, "Failure encountered in executing action", "action", action)
 		if controllers.IsCSIFinalError(err) {
-			log.V(common.InfoLevel).Info("Final error from driver: no more retries")
+			log.V(logger.InfoLevel).Info("Final error from driver: no more retries")
 			actionResult.IsFinalError = true
 		} else if rg.Status.LastAction.FirstFailure != nil {
 			if time.Since(rg.Status.LastAction.FirstFailure.Time) > r.MaxRetryDurationForActions {
 				actionResult.IsFinalError = true
-				log.V(common.InfoLevel).Info("Final error: exceeded max retry duration, no more retries")
+				log.V(logger.InfoLevel).Info("Final error: exceeded max retry duration, no more retries")
 			}
 		}
 	}
@@ -661,8 +661,8 @@ func (r *ReplicationGroupReconciler) executeAction(ctx context.Context, rg *repv
 //   - Update the spec
 //   - Update status.State to <ACTION>_IN_PROGRESS
 func (r *ReplicationGroupReconciler) processRG(ctx context.Context, dellCSIReplicationGroup *repv1.DellCSIReplicationGroup) (ctrl.Result, error) {
-	log := common.GetLoggerFromContext(ctx)
-	log.V(common.InfoLevel).Info("Start process RG")
+	log := logger.FromContext(ctx)
+	log.V(logger.InfoLevel).Info("Start process RG")
 
 	if dellCSIReplicationGroup.Spec.ProtectionGroupID != "" &&
 		dellCSIReplicationGroup.Spec.Action != "" {
@@ -687,7 +687,7 @@ func (r *ReplicationGroupReconciler) processRG(ctx context.Context, dellCSIRepli
 				log.Error(err, "Failed to update", "dellCSIReplicationGroup", dellCSIReplicationGroup)
 				return ctrl.Result{}, err1
 			}
-			log.V(common.InfoLevel).Info("Unsupported action was successfully reset to empty")
+			log.V(logger.InfoLevel).Info("Unsupported action was successfully reset to empty")
 			r.EventRecorder.Eventf(dellCSIReplicationGroup, v1.EventTypeWarning,
 				"Unsupported", "Cannot proceed with action %s. [%s]", actionType.String(), err.Error())
 			log.Error(err, "Can not proceed with reconcile!", "actionType", actionType)
@@ -704,7 +704,7 @@ func (r *ReplicationGroupReconciler) processRG(ctx context.Context, dellCSIRepli
 			}
 			bytes, _ := json.Marshal(&actionAnnotation)
 			controllers.AddAnnotation(dellCSIReplicationGroup, Action, string(bytes))
-			log.V(common.InfoLevel).Info("Updating", "annotation", string(bytes))
+			log.V(logger.InfoLevel).Info("Updating", "annotation", string(bytes))
 			err := r.Update(ctx, dellCSIReplicationGroup)
 			log.Error(err, "Failed to update", "annotation", string(bytes))
 			return ctrl.Result{}, err
@@ -721,7 +721,7 @@ func (r *ReplicationGroupReconciler) processRG(ctx context.Context, dellCSIRepli
 		}
 		dellCSIReplicationGroup.Status.LastAction = lastAction
 		dellCSIReplicationGroup.Status.State = actionType.getInProgressState()
-		log.V(common.InfoLevel).Info("Updating", "state", actionType.getInProgressState())
+		log.V(logger.InfoLevel).Info("Updating", "state", actionType.getInProgressState())
 		err = r.Status().Update(ctx, dellCSIReplicationGroup.DeepCopy())
 		log.Error(err, "Failed to update", "state", actionType.getInProgressState())
 		return ctrl.Result{}, err
@@ -744,10 +744,10 @@ func (r *ReplicationGroupReconciler) processRGInNoState(ctx context.Context, del
 }
 
 func (r *ReplicationGroupReconciler) processRGForDeletion(ctx context.Context, dellCSIReplicationGroup *repv1.DellCSIReplicationGroup) (ctrl.Result, error) {
-	log := common.GetLoggerFromContext(ctx)
+	log := logger.FromContext(ctx)
 
 	if dellCSIReplicationGroup.Spec.ProtectionGroupID != "" {
-		log.V(common.DebugLevel).Info("Deleting the protection-group associated with this replication-group")
+		log.V(logger.DebugLevel).Info("Deleting the protection-group associated with this replication-group")
 		if err := r.deleteProtectionGroup(ctx, dellCSIReplicationGroup.DeepCopy()); err != nil {
 			if !controllers.IsCSIFinalError(err) && dellCSIReplicationGroup.Status.State != DeletingState {
 				if err := r.updateState(ctx, dellCSIReplicationGroup.DeepCopy(), DeletingState); err != nil {

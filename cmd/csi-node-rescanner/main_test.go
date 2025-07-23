@@ -27,7 +27,7 @@ import (
 	"time"
 
 	controller "github.com/dell/csm-replication/controllers/csi-node-rescanner"
-	"github.com/dell/csm-replication/pkg/common"
+	"github.com/dell/csm-replication/pkg/common/constants"
 	"github.com/dell/csm-replication/pkg/config"
 	csiidentity "github.com/dell/csm-replication/pkg/csi-clients/identity"
 	"github.com/dell/dell-csi-extensions/migration"
@@ -647,8 +647,8 @@ func TestSetupFlags(t *testing.T) {
 		"metrics-addr":         ":8001",
 		"leader-election":      "false",
 		"csi-address":          "/var/run/csi.sock",
-		"prefix":               common.DefaultMigrationDomain,
-		"repl-prefix":          common.DefaultDomain,
+		"prefix":               constants.DefaultMigrationDomain,
+		"repl-prefix":          constants.DefaultDomain,
 		"worker-threads":       "2",
 		"retry-interval-start": "1s",
 		"retry-interval-max":   "5m0s",

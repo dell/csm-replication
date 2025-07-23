@@ -27,7 +27,8 @@ import (
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
 	repController "github.com/dell/csm-replication/controllers/replication-controller"
-	"github.com/dell/csm-replication/pkg/common"
+	"github.com/dell/csm-replication/pkg/common/constants"
+	"github.com/dell/csm-replication/pkg/common/logger"
 	"github.com/dell/csm-replication/pkg/config"
 	"github.com/dell/csm-replication/pkg/connection"
 	"github.com/fsnotify/fsnotify"
@@ -115,7 +116,7 @@ var (
 		var allowPVCCreationOnTarget bool
 
 		flag.StringVar(&metricsAddr, "metrics-addr", ":8081", "The address the metric endpoint binds to.")
-		flag.StringVar(&domain, "prefix", common.DefaultDomain, "Prefix used for creating labels/annotations")
+		flag.StringVar(&domain, "prefix", constants.DefaultDomain, "Prefix used for creating labels/annotations")
 		flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 			"Enable leader election for dell-replication-controller manager. "+
 				"Enabling this will ensure there is only one active dell-replication-controller manager.")
@@ -131,11 +132,11 @@ var (
 			TimestampFormat: time.RFC3339Nano,
 		})
 
-		logger := logrusr.New(logrusLog)
-		ctrl.SetLogger(logger)
-		setupLog.V(common.InfoLevel).Info(common.DellReplicationController, "Version", core.SemVer, "Commit ID", core.CommitSha32, "Commit SHA", core.CommitTime.Format(time.RFC1123))
+		loggerInstance := logrusr.New(logrusLog)
+		ctrl.SetLogger(loggerInstance)
+		setupLog.V(logger.InfoLevel).Info(constants.DellReplicationController, "Version", core.SemVer, "Commit ID", core.CommitSha32, "Commit SHA", core.CommitTime.Format(time.RFC1123))
 
-		setupLog.V(common.InfoLevel).Info("Prefix", "Domain", domain)
+		setupLog.V(logger.InfoLevel).Info("Prefix", "Domain", domain)
 		controllers.InitLabelsAndAnnotations(domain)
 
 		flagMap := make(map[string]string)
@@ -160,7 +161,7 @@ var (
 			WebhookServer:              webhook.NewServer(webhook.Options{Port: 9443}),
 			LeaderElection:             stringToBoolean(flagMap["leader-election"]),
 			LeaderElectionResourceLock: "leases",
-			LeaderElectionID:           fmt.Sprintf("%s-manager", common.DellReplicationController),
+			LeaderElectionID:           fmt.Sprintf("%s-manager", constants.DellReplicationController),
 		})
 		if err != nil {
 			setupLog.Error(err, "unable to start manager")
@@ -199,7 +200,7 @@ type ControllerManager struct {
 func (mgr *ControllerManager) reconcileSecretUpdates(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	secretLog := getSecretControllerLogger(mgr, request)
 
-	er := mgr.Manager.GetEventRecorderFor(common.DellReplicationController)
+	er := mgr.Manager.GetEventRecorderFor(constants.DellReplicationController)
 	err := getUpdateConfigOnSecretEvent(mgr, ctx, request, er, secretLog)
 	if err != nil {
 		secretLog.Error(err, "failed to update the configuration")
@@ -225,7 +226,7 @@ func (mgr *ControllerManager) startSecretController() error {
 
 func (mgr *ControllerManager) processConfigMapChanges(loggerConfig *logrus.Logger) {
 	loggerConfig.Info("Received a config change event")
-	er := mgr.Manager.GetEventRecorderFor(common.DellReplicationController)
+	er := mgr.Manager.GetEventRecorderFor(constants.DellReplicationController)
 	err := getUpdateConfigMap(mgr, context.Background(), er)
 	if err != nil {
 		log.Printf("Error parsing the config: %v\n", err)
@@ -233,7 +234,7 @@ func (mgr *ControllerManager) processConfigMapChanges(loggerConfig *logrus.Logge
 	}
 	mgr.config.Lock.Lock()
 	defer mgr.config.Lock.Unlock()
-	level, err := common.ParseLevel(mgr.config.LogLevel)
+	level, err := logger.ParseLevel(mgr.config.LogLevel)
 	if err != nil {
 		loggerConfig.Error("Unable to parse ", err)
 	}
@@ -259,7 +260,7 @@ func createControllerManager(ctx context.Context, mgr ctrl.Manager) (*Controller
 	}
 	mgrLogger := mgr.GetLogger()
 
-	er := mgr.GetEventRecorderFor(common.DellReplicationController)
+	er := mgr.GetEventRecorderFor(constants.DellReplicationController)
 	repConfig, err := getConfig(ctx, client, opts, er, mgrLogger)
 	if err != nil {
 		return nil, err
@@ -332,12 +333,12 @@ func createPersistentVolumeReconciler(mgr manager.Manager, controllerMgr *Contro
 		Client:        mgr.GetClient(),
 		Log:           ctrl.Log.WithName("controllers").WithName("PersistentVolume"),
 		Scheme:        mgr.GetScheme(),
-		EventRecorder: mgr.GetEventRecorderFor(common.DellReplicationController),
+		EventRecorder: mgr.GetEventRecorderFor(constants.DellReplicationController),
 		Config:        controllerMgr.config,
 		Domain:        domain,
 	}, mgr, expRateLimiter, workerThreads); err != nil {
-		log.Println("unable to create controller", common.DellReplicationController, "PersistentVolume")
-		setupLog.Error(err, "unable to create controller", common.DellReplicationController, "PersistentVolume")
+		log.Println("unable to create controller", constants.DellReplicationController, "PersistentVolume")
+		setupLog.Error(err, "unable to create controller", constants.DellReplicationController, "PersistentVolume")
 		osExit(1)
 	}
 }
@@ -347,12 +348,12 @@ func createReplicationGroupReconciler(mgr manager.Manager, controllerMgr *Contro
 		Client:          mgr.GetClient(),
 		Log:             ctrl.Log.WithName("controllers").WithName("DellCSIReplicationGroup"),
 		Scheme:          mgr.GetScheme(),
-		EventRecorder:   mgr.GetEventRecorderFor(common.DellReplicationController),
+		EventRecorder:   mgr.GetEventRecorderFor(constants.DellReplicationController),
 		Config:          controllerMgr.config,
 		Domain:          domain,
 		DisablePVCRemap: disablePVCRemap,
 	}, mgr, expRateLimiter, workerThreads); err != nil {
-		setupLog.Error(err, "unable to create controller", common.DellReplicationController, "DellCSIReplicationGroup")
+		setupLog.Error(err, "unable to create controller", constants.DellReplicationController, "DellCSIReplicationGroup")
 		osExit(1)
 	}
 }
@@ -362,12 +363,12 @@ func createPersistentVolumeClaimReconciler(mgr manager.Manager, controllerMgr *C
 		Client:                   mgr.GetClient(),
 		Log:                      ctrl.Log.WithName("controllers").WithName("PersistentVolumeClaim"),
 		Scheme:                   mgr.GetScheme(),
-		EventRecorder:            mgr.GetEventRecorderFor(common.DellReplicationController),
+		EventRecorder:            mgr.GetEventRecorderFor(constants.DellReplicationController),
 		Config:                   controllerMgr.config,
 		Domain:                   domain,
 		AllowPVCCreationOnTarget: allowPVCCreationOnTarget,
 	}, mgr, expRateLimiter, workerThreads); err != nil {
-		setupLog.Error(err, "unable to create controller", common.DellReplicationController, "PersistentVolumeClaim")
+		setupLog.Error(err, "unable to create controller", constants.DellReplicationController, "PersistentVolumeClaim")
 		osExit(1)
 	}
 }
@@ -380,7 +381,7 @@ func startSecretController(controllerMgr *ControllerManager, setupLog logr.Logge
 }
 
 func processLogLevel(logLevel string, logrusLog *logrus.Logger) {
-	level, err := common.ParseLevel(logLevel)
+	level, err := logger.ParseLevel(logLevel)
 	if err != nil {
 		logrusLog.Error("Unable to parse ", err)
 	}

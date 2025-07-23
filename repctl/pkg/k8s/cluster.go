@@ -19,13 +19,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/repctl/pkg/display"
 	"github.com/dell/repctl/pkg/metadata"
 	"github.com/dell/repctl/pkg/types"
-	"github.com/dell/repctl/pkg/utils"
 	log "github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -614,7 +614,7 @@ func (*MultiClusterConfigurator) GetAllClusters(clusterIDs []string, configDir s
 			kubeConfigFile = filepath.Join(configDir, fileName)
 
 			if strictCheck {
-				if !utils.IsStringInSlice(clusterID, clusterIDs) {
+				if !slices.Contains(clusterIDs, clusterID) {
 					// skip this cluster id as it was not provided in list of clusterids
 					continue
 				}
