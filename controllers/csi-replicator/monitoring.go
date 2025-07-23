@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import (
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
-	"github.com/dell/csm-replication/pkg/common"
+	"github.com/dell/csm-replication/pkg/common/logger"
 	csireplication "github.com/dell/csm-replication/pkg/csi-clients/replication"
 	"github.com/dell/dell-csi-extensions/replication"
 	"github.com/go-logr/logr"
@@ -59,7 +59,7 @@ func (r *ReplicationGroupMonitoring) Monitor(_ context.Context) error {
 }
 
 func (r *ReplicationGroupMonitoring) monitorReplicationGroups(ticker <-chan time.Time) {
-	r.Log.V(common.InfoLevel).Info("Start monitoring replication-group")
+	r.Log.V(logger.InfoLevel).Info("Start monitoring replication-group")
 
 	dellCSIReplicationGroupsList := new(repv1.DellCSIReplicationGroupList)
 	select {
@@ -77,7 +77,7 @@ func (r *ReplicationGroupMonitoring) monitorReplicationGroups(ticker <-chan time
 				// silently ignore the RGs not owned by this sidecar
 				continue
 			}
-			r.Log.V(common.DebugLevel).Info("Processing RG " + rg.Name + " for monitoring")
+			r.Log.V(logger.DebugLevel).Info("Processing RG " + rg.Name + " for monitoring")
 			// Check if there are any PVs in the cluster with the RG label
 			var persistentVolumes v1.PersistentVolumeList
 			matchingLabels := make(map[string]string)
@@ -89,7 +89,7 @@ func (r *ReplicationGroupMonitoring) monitorReplicationGroups(ticker <-chan time
 				r.Log.Error(err, "failed to fetch associated PVs with this RG")
 			} else {
 				if len(persistentVolumes.Items) == 0 {
-					r.Log.V(common.DebugLevel).Info(
+					r.Log.V(logger.DebugLevel).Info(
 						"Skipping RG " + rg.Name + "as there are no associated PVs")
 					// Update status to EMPTY
 					err := updateRGLinkStatus(ctx, r.Client, &rg, replication.StorageProtectionGroupStatus_EMPTY.String(), rg.Status.ReplicationLinkState.IsSource, "")
@@ -166,7 +166,7 @@ func updateRGLinkState(rg *repv1.DellCSIReplicationGroup, status string, isSourc
 func updateRGLinkStatus(ctx context.Context, client client.Client, rg *repv1.DellCSIReplicationGroup, status string,
 	isSource bool, errMsg string,
 ) error {
-	log := common.GetLoggerFromContext(ctx)
+	log := logger.FromContext(ctx)
 	updateRGLinkState(rg, status, isSource, errMsg)
 	if err := client.Status().Update(ctx, rg); err != nil {
 		log.Error(err, "Failed to update the state")

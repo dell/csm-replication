@@ -22,7 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	controller "github.com/dell/csm-replication/controllers"
-	"github.com/dell/csm-replication/pkg/common"
+	"github.com/dell/csm-replication/pkg/common/logger"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/dell/csm-replication/pkg/common/constants"
 	"github.com/dell/csm-replication/pkg/connection"
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -74,7 +75,7 @@ var (
 func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// If we have received the reconcile request, it means that the sidecar has completed its protection
 	log := r.Log.WithValues("persistentvolumeclaim", req.NamespacedName)
-	ctx = context.WithValue(ctx, common.LoggerContextKey, log)
+	ctx = context.WithValue(ctx, logger.LoggerContextKey, log)
 
 	claim := new(v1.PersistentVolumeClaim)
 	err := r.Get(ctx, req.NamespacedName, claim)
@@ -89,7 +90,7 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 	// Lets start with the assumption that remote PV name is same as local PV
 	remotePVName := localPVName
 
-	log.V(common.InfoLevel).Info("Reconciling PVC event!!!")
+	log.V(logger.InfoLevel).Info("Reconciling PVC event!!!")
 
 	// Parse the local annotations
 	localAnnotations := claim.Annotations
@@ -125,10 +126,10 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 		remotePVAnnotationSet = true
 		// Update the remote PV name to point to the one in annotation
 		remotePVName = localAnnotations[controller.RemotePV]
-		log.V(common.DebugLevel).Info("Remote PV annotation already set. Verifying details")
+		log.V(logger.DebugLevel).Info("Remote PV annotation already set. Verifying details")
 	}
 
-	log.V(common.DebugLevel).Info("Checking if the PV already exists " + remotePVName)
+	log.V(logger.DebugLevel).Info("Checking if the PV already exists " + remotePVName)
 	remotePV, err := rClient.GetPersistentVolume(ctx, remotePVName)
 	if err != nil && errors.IsNotFound(err) {
 		if remotePVAnnotationSet {
@@ -136,7 +137,7 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 			log.Error(err, "Something went wrong. Remote PV annotation already set")
 			return ctrl.Result{}, err
 		}
-		log.V(common.InfoLevel).Info("Will wait for remote PV to be created...")
+		log.V(logger.InfoLevel).Info("Will wait for remote PV to be created...")
 		return ctrl.Result{RequeueAfter: controller.DefaultRetryInterval}, nil
 	} else if err != nil {
 		log.Error(err, "failed to check if remote PV exists")
@@ -190,7 +191,7 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 			return ctrl.Result{}, err
 		}
 	} else {
-		log.V(common.InfoLevel).Info("Remote PVC has not been created yet. Information can't be synced")
+		log.V(logger.InfoLevel).Info("Remote PVC has not been created yet. Information can't be synced")
 	}
 
 	err = r.processLocalPVC(ctx, claim, remotePVName, remotePVCName, remotePVCNamespace, remoteClusterID, isRemotePVCUpdated)
@@ -198,7 +199,7 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 		return ctrl.Result{}, err
 	}
 
-	log.V(common.InfoLevel).Info("PVC Reconcile complete!!!!")
+	log.V(logger.InfoLevel).Info("PVC Reconcile complete!!!!")
 	return ctrl.Result{}, nil
 }
 
@@ -208,7 +209,7 @@ func (r *PersistentVolumeClaimReconciler) processRemotePVC(ctx context.Context,
 	claim *v1.PersistentVolumeClaim,
 	remotePVCName, remotePVCNamespace, remotePVName string,
 ) (bool, error) {
-	log := common.GetLoggerFromContext(ctx)
+	log := logger.FromContext(ctx)
 	isUpdated := false
 	// Just apply the missing annotation
 	if claim.Annotations[controller.RemotePVC] == "" {
@@ -228,11 +229,11 @@ func (r *PersistentVolumeClaimReconciler) processRemotePVC(ctx context.Context,
 		if err != nil {
 			return false, err
 		}
-		log.V(common.InfoLevel).Info("Successfully updated remote PVC with annotation")
+		log.V(logger.InfoLevel).Info("Successfully updated remote PVC with annotation")
 		return true, nil
 	}
 
-	log.V(common.InfoLevel).Info("Remote PVC already has the annotations set")
+	log.V(logger.InfoLevel).Info("Remote PVC already has the annotations set")
 	return true, nil
 }
 
@@ -240,9 +241,9 @@ func (r *PersistentVolumeClaimReconciler) processLocalPVC(ctx context.Context,
 	claim *v1.PersistentVolumeClaim, remotePVName, remotePVCName, remotePVCNamespace,
 	remoteClusterID string, isRemotePVCUpdated bool,
 ) error {
-	log := common.GetLoggerFromContext(ctx)
+	log := logger.FromContext(ctx)
 	if claim.Annotations[controller.PVCSyncComplete] == "yes" {
-		log.V(common.InfoLevel).Info("PVC Sync already completed")
+		log.V(logger.InfoLevel).Info("PVC Sync already completed")
 		return nil
 	}
 	// Apply the remote PV annotation if required
@@ -303,7 +304,7 @@ func updatePVCAnnotationsAndSpec(pvc *v1.PersistentVolumeClaim, remoteClusterID 
 	pvcProtectionComplete, _ := getValueFromAnnotations(controller.PVCProtectionComplete, pv.Annotations)
 	controller.AddAnnotation(pvc, controller.PVCProtectionComplete, pvcProtectionComplete)
 	// Created By
-	controller.AddAnnotation(pvc, controller.CreatedBy, common.DellReplicationController)
+	controller.AddAnnotation(pvc, controller.CreatedBy, constants.DellReplicationController)
 	// Remote PV Name
 	remoteVolume, _ := getValueFromAnnotations(controller.RemoteVolumeAnnotation, pv.Annotations)
 	pvc.Spec.VolumeName = remoteVolume
@@ -349,9 +350,9 @@ func updatePVCLabels(pvc, volume *v1.PersistentVolumeClaim, remoteClusterID stri
 
 func VerifyAndCreateNamespace(ctx context.Context, rClient connection.RemoteClusterClient, namespace string) error {
 	// Verify if the namespace exists
-	log := common.GetLoggerFromContext(ctx)
+	log := logger.FromContext(ctx)
 	if _, err := rClient.GetNamespace(ctx, namespace); err != nil {
-		log.V(common.InfoLevel).Info("Namespace - " + namespace + " not found, creating it.")
+		log.V(logger.InfoLevel).Info("Namespace - " + namespace + " not found, creating it.")
 		NewNamespace := &v1.Namespace{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: "Namespace",
@@ -364,7 +365,7 @@ func VerifyAndCreateNamespace(ctx context.Context, rClient connection.RemoteClus
 		err = rClient.CreateNamespace(ctx, NewNamespace)
 		if err != nil {
 			msg := "unable to create the desired namespace" + namespace
-			log.V(common.ErrorLevel).Error(err, msg)
+			log.V(logger.ErrorLevel).Error(err, msg)
 			return err
 		}
 	}

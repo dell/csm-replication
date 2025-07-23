@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/bombsimon/logrusr/v4"
-	"github.com/dell/csm-replication/pkg/common"
+	"github.com/dell/csm-replication/pkg/common/constants"
 	"github.com/dell/csm-replication/pkg/connection"
 	"github.com/go-logr/logr"
 	"github.com/sirupsen/logrus"
@@ -58,11 +58,11 @@ func TestGetControllerManagerOpts(t *testing.T) {
 		{
 			name: "Custom values",
 			envVars: map[string]string{
-				common.EnvWatchNameSpace:    "default",
-				common.EnvConfigFileName:    "config.yaml",
-				common.EnvConfigDirName:     "config",
-				common.EnvInClusterConfig:   "true",
-				common.EnvUseConfFileFormat: "true",
+				constants.EnvWatchNameSpace:    "default",
+				constants.EnvConfigFileName:    "config.yaml",
+				constants.EnvConfigDirName:     "config",
+				constants.EnvInClusterConfig:   "true",
+				constants.EnvUseConfFileFormat: "true",
 			},
 			wantOpts: ControllerManagerOpts{
 				UseConfFileFormat: true,
@@ -76,11 +76,11 @@ func TestGetControllerManagerOpts(t *testing.T) {
 		{
 			name: "Custom values EnvUseConfFileFormat false",
 			envVars: map[string]string{
-				common.EnvWatchNameSpace:    "default",
-				common.EnvConfigFileName:    "config.yaml",
-				common.EnvConfigDirName:     "config",
-				common.EnvInClusterConfig:   "true",
-				common.EnvUseConfFileFormat: "false",
+				constants.EnvWatchNameSpace:    "default",
+				constants.EnvConfigFileName:    "config.yaml",
+				constants.EnvConfigDirName:     "config",
+				constants.EnvInClusterConfig:   "true",
+				constants.EnvUseConfFileFormat: "false",
 			},
 			wantOpts: ControllerManagerOpts{
 				UseConfFileFormat: false,
@@ -674,7 +674,7 @@ func Test_getConnHandler(t *testing.T) {
 	}
 
 	t.Run("SecretFoundAndValidDataWithTargets", func(t *testing.T) {
-		os.Setenv(common.EnvInClusterConfig, "true")
+		os.Setenv(constants.EnvInClusterConfig, "true")
 		secretName := "valid-secret"
 		namespace := "default"
 
@@ -731,7 +731,7 @@ users:
 		assert.Error(t, err)
 	})
 	t.Run("SecretFoundAndValidDataWithTargetsUseConfFileFormatToFalse", func(t *testing.T) {
-		os.Setenv(common.EnvInClusterConfig, "true")
+		os.Setenv(constants.EnvInClusterConfig, "true")
 
 		args := args{
 			ctx: context.Background(),
@@ -769,7 +769,7 @@ users:
 				},
 			}, nil
 		}
-		os.Setenv(common.EnvInClusterConfig, "true")
+		os.Setenv(constants.EnvInClusterConfig, "true")
 
 		args := args{
 			ctx:     context.Background(),
@@ -790,7 +790,7 @@ users:
 		assert.NoError(t, err)
 	})
 	t.Run("InCluster to false", func(t *testing.T) {
-		os.Setenv(common.EnvInClusterConfig, "false")
+		os.Setenv(constants.EnvInClusterConfig, "false")
 
 		args := args{
 			ctx:     context.Background(),
@@ -811,7 +811,7 @@ users:
 		assert.Equal(t, err.Error(), "failed to get kube config path")
 	})
 	t.Run("InCluster to false with kubeconfig path", func(t *testing.T) {
-		os.Setenv(common.EnvInClusterConfig, "false")
+		os.Setenv(constants.EnvInClusterConfig, "false")
 		os.Setenv("X_CSI_KUBECONFIG_PATH", "/path/to/kubeconfig")
 
 		args := args{
@@ -834,7 +834,7 @@ users:
 	})
 
 	t.Run("InCluster to true", func(t *testing.T) {
-		os.Setenv(common.EnvInClusterConfig, "true")
+		os.Setenv(constants.EnvInClusterConfig, "true")
 		originalValue2 := InClusterConfig
 		defer func() {
 			InClusterConfig = originalValue2
@@ -962,7 +962,7 @@ func Test_getReplicationConfig(t *testing.T) {
 			Mode:              "",
 		}
 
-		// os.Setenv(common.EnvInClusterConfig, "true")
+		// os.Setenv(constants.EnvInClusterConfig, "true")
 		client := fake.NewClientBuilder().Build()
 		got, got1, err := getReplicationConfig(ctx, client, opts, nil, log)
 		if (got != nil) && (got1 != nil) && (err == nil) {
@@ -992,7 +992,7 @@ func Test_getReplicationConfig(t *testing.T) {
 		Verify = func(_ *replicationConfig, _ context.Context) error {
 			return errors.New("verification failed")
 		}
-		os.Setenv(common.EnvInClusterConfig, "true")
+		os.Setenv(constants.EnvInClusterConfig, "true")
 		secretName := "valid-secret"
 		namespace := "default"
 
@@ -1044,7 +1044,7 @@ users:
 			Mode:              "controller",
 		}
 		fakeRecorder := record.NewFakeRecorder(100)
-		os.Setenv(common.EnvInClusterConfig, "true")
+		os.Setenv(constants.EnvInClusterConfig, "true")
 		got, got1, err := getReplicationConfig(ctx, client, opts, fakeRecorder, log)
 		assert.Error(t, err)
 		assert.Nil(t, got)
@@ -1102,7 +1102,7 @@ CSI_LOG_LEVEL: "INFO"`)
 		Verify = func(_ *replicationConfig, _ context.Context) error {
 			return nil
 		}
-		os.Setenv(common.EnvInClusterConfig, "true")
+		os.Setenv(constants.EnvInClusterConfig, "true")
 		isInInvalidState = true
 		secretName := "valid-secret"
 		namespace := "default"
@@ -1148,7 +1148,7 @@ users:
 			Mode:              "controller",
 		}
 		fakeRecorder := record.NewFakeRecorder(100)
-		os.Setenv(common.EnvInClusterConfig, "true")
+		os.Setenv(constants.EnvInClusterConfig, "true")
 		got, got1, err := getReplicationConfig(ctx, client, opts, fakeRecorder, log)
 		assert.Error(t, err)
 		assert.Nil(t, got)
@@ -1181,7 +1181,7 @@ users:
 		Verify = func(_ *replicationConfig, _ context.Context) error {
 			return errors.New("verification failed")
 		}
-		os.Setenv(common.EnvInClusterConfig, "true")
+		os.Setenv(constants.EnvInClusterConfig, "true")
 		secretName := "valid-secret"
 		namespace := "default"
 
@@ -1226,7 +1226,7 @@ users:
 			Mode:              "",
 		}
 		fakeRecorder := record.NewFakeRecorder(100)
-		os.Setenv(common.EnvInClusterConfig, "true")
+		os.Setenv(constants.EnvInClusterConfig, "true")
 		_, _, err := getReplicationConfig(ctx, client, opts, fakeRecorder, log)
 		assert.NoError(t, err)
 	})

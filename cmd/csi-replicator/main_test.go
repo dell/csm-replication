@@ -26,7 +26,7 @@ import (
 	"time"
 
 	controller "github.com/dell/csm-replication/controllers/csi-replicator"
-	"github.com/dell/csm-replication/pkg/common"
+	"github.com/dell/csm-replication/pkg/common/constants"
 	repcnf "github.com/dell/csm-replication/pkg/config"
 	csiidentity "github.com/dell/csm-replication/pkg/csi-clients/identity"
 	"github.com/dell/dell-csi-extensions/replication"
@@ -572,7 +572,7 @@ func TestMain(t *testing.T) {
 						retryIntervalMax:           5 * time.Minute,
 						operationTimeout:           300 * time.Second,
 						pgContextKeyPrefix:         "prefix",
-						domain:                     common.DefaultDomain,
+						domain:                     constants.DefaultDomain,
 						monitoringInterval:         10 * time.Second,
 						probeFrequency:             5 * time.Second,
 						maxRetryDurationForActions: 10 * time.Minute,
@@ -644,7 +644,7 @@ func TestMain(t *testing.T) {
 						retryIntervalMax:           5 * time.Minute,
 						operationTimeout:           300 * time.Second,
 						pgContextKeyPrefix:         "prefix",
-						domain:                     common.DefaultDomain,
+						domain:                     constants.DefaultDomain,
 						monitoringInterval:         10 * time.Second,
 						probeFrequency:             5 * time.Second,
 						maxRetryDurationForActions: 10 * time.Minute,
@@ -716,7 +716,7 @@ func TestMain(t *testing.T) {
 						retryIntervalMax:           5 * time.Minute,
 						operationTimeout:           300 * time.Second,
 						pgContextKeyPrefix:         "prefix",
-						domain:                     common.DefaultDomain,
+						domain:                     constants.DefaultDomain,
 						monitoringInterval:         10 * time.Second,
 						probeFrequency:             5 * time.Second,
 						maxRetryDurationForActions: 10 * time.Minute,
@@ -788,7 +788,7 @@ func TestMain(t *testing.T) {
 						retryIntervalMax:           5 * time.Minute,
 						operationTimeout:           300 * time.Second,
 						pgContextKeyPrefix:         "prefix",
-						domain:                     common.DefaultDomain,
+						domain:                     constants.DefaultDomain,
 						monitoringInterval:         10 * time.Second,
 						probeFrequency:             5 * time.Second,
 						maxRetryDurationForActions: 10 * time.Minute,
@@ -860,7 +860,7 @@ func TestMain(t *testing.T) {
 						retryIntervalMax:           5 * time.Minute,
 						operationTimeout:           300 * time.Second,
 						pgContextKeyPrefix:         "prefix",
-						domain:                     common.DefaultDomain,
+						domain:                     constants.DefaultDomain,
 						monitoringInterval:         10 * time.Second,
 						probeFrequency:             5 * time.Second,
 						maxRetryDurationForActions: 10 * time.Minute,
@@ -932,7 +932,7 @@ func TestMain(t *testing.T) {
 						retryIntervalMax:           5 * time.Minute,
 						operationTimeout:           300 * time.Second,
 						pgContextKeyPrefix:         "prefix",
-						domain:                     common.DefaultDomain,
+						domain:                     constants.DefaultDomain,
 						monitoringInterval:         10 * time.Second,
 						probeFrequency:             5 * time.Second,
 						maxRetryDurationForActions: 10 * time.Minute,
@@ -1004,7 +1004,7 @@ func TestMain(t *testing.T) {
 						retryIntervalMax:           5 * time.Minute,
 						operationTimeout:           300 * time.Second,
 						pgContextKeyPrefix:         "prefix",
-						domain:                     common.DefaultDomain,
+						domain:                     constants.DefaultDomain,
 						monitoringInterval:         10 * time.Second,
 						probeFrequency:             5 * time.Second,
 						maxRetryDurationForActions: 10 * time.Minute,
@@ -1076,7 +1076,7 @@ func TestMain(t *testing.T) {
 						retryIntervalMax:           5 * time.Minute,
 						operationTimeout:           300 * time.Second,
 						pgContextKeyPrefix:         "prefix",
-						domain:                     common.DefaultDomain,
+						domain:                     constants.DefaultDomain,
 						monitoringInterval:         10 * time.Second,
 						probeFrequency:             5 * time.Second,
 						maxRetryDurationForActions: 10 * time.Minute,
@@ -1148,7 +1148,7 @@ func TestMain(t *testing.T) {
 						retryIntervalMax:           5 * time.Minute,
 						operationTimeout:           300 * time.Second,
 						pgContextKeyPrefix:         "prefix",
-						domain:                     common.DefaultDomain,
+						domain:                     constants.DefaultDomain,
 						monitoringInterval:         10 * time.Second,
 						probeFrequency:             5 * time.Second,
 						maxRetryDurationForActions: 10 * time.Minute,

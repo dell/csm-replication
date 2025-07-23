@@ -1,5 +1,5 @@
 /*
-Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import (
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
-	constants "github.com/dell/csm-replication/pkg/common"
+	"github.com/dell/csm-replication/pkg/common/constants"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"

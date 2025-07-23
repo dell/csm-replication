@@ -24,8 +24,7 @@ import (
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
-	"github.com/dell/csm-replication/pkg/common"
-	constants "github.com/dell/csm-replication/pkg/common"
+	"github.com/dell/csm-replication/pkg/common/constants"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
 	csireplication "github.com/dell/csm-replication/test/mocks"
 	"github.com/stretchr/testify/suite"
@@ -96,7 +95,7 @@ func (suite *PersistentVolumeControllerTestSuite) getTypicalManagerManager() man
 		WebhookServer:              webhook.NewServer(webhook.Options{Port: 9443}),
 		LeaderElection:             enableLeaderElection,
 		LeaderElectionResourceLock: "leases",
-		LeaderElectionID:           fmt.Sprintf("%s-manager", common.DellReplicationController),
+		LeaderElectionID:           fmt.Sprintf("%s-manager", constants.DellReplicationController),
 	})
 	return mgr
 }

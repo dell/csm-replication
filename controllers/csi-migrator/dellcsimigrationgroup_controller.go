@@ -1,5 +1,5 @@
 /*
-Copyright © 2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+Copyright © 2023-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,10 +28,10 @@ import (
 
 	storagev1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
+	"github.com/dell/csm-replication/pkg/common/logger"
 	reconciler "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/dell/csm-replication/pkg/common"
 	csimigration "github.com/dell/csm-replication/pkg/csi-clients/migration"
 	"github.com/dell/dell-csi-extensions/migration"
 	"github.com/go-logr/logr"
@@ -104,9 +104,9 @@ var NodesToRescan NodeList
 // Reconcile contains reconciliation logic that updates MigrationGroup depending on it's current state
 func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("MigrationGroup", req.NamespacedName)
-	ctx = context.WithValue(ctx, common.LoggerContextKey, log)
+	ctx = context.WithValue(ctx, logger.LoggerContextKey, log)
 
-	log.V(common.InfoLevel).Info("Begin reconcile - MG Controller")
+	log.V(logger.InfoLevel).Info("Begin reconcile - MG Controller")
 
 	mg := new(storagev1.DellCSIMigrationGroup)
 	err := r.Get(ctx, req.NamespacedName, mg)
@@ -131,7 +131,7 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	var ArrayMigrationAction migration.ActionTypes
 	switch currentState {
 	case NoState:
-		log.V(common.InfoLevel).Info("Processing MG with no state")
+		log.V(logger.InfoLevel).Info("Processing MG with no state")
 		return r.processMGInNoState(ctx, mg.DeepCopy())
 	case ErrorState:
 		if mg.Status.LastAction != "" {
@@ -224,7 +224,7 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 
 		if ArrayMigrateResponse.GetSuccess() {
-			log.V(common.InfoLevel).Info("Successfully executed action [%s]", CurrentAction.String())
+			log.V(logger.InfoLevel).Info("Successfully executed action [%s]", CurrentAction.String())
 		}
 	} else if NextAnnotationAction == "Delete" {
 		// reset NodesToRescan
@@ -244,15 +244,15 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			log.Error(err, "Failed to update spec", "mg", mg, "Next State", NextState)
 			return ctrl.Result{}, err
 		}
-		log.V(common.InfoLevel).Info("Successfully updated spec", "Next State", NextState)
+		log.V(logger.InfoLevel).Info("Successfully updated spec", "Next State", NextState)
 	}
 	return ctrl.Result{}, err
 }
 
 // Getting MG to its first valid state
 func (r *MigrationGroupReconciler) processMGInNoState(ctx context.Context, dellCSIMigrationGroup *storagev1.DellCSIMigrationGroup) (ctrl.Result, error) {
-	log := common.GetLoggerFromContext(ctx)
-	log.V(common.InfoLevel).Info("Processing MG in NoState")
+	log := logger.FromContext(ctx)
+	log.V(logger.InfoLevel).Info("Processing MG in NoState")
 	ok, err := r.addFinalizer(ctx, dellCSIMigrationGroup.DeepCopy())
 	if err != nil {
 		return ctrl.Result{}, err
@@ -268,21 +268,21 @@ func (r *MigrationGroupReconciler) processMGInNoState(ctx context.Context, dellC
 
 // Update mg spec with current state
 func (r *MigrationGroupReconciler) updateMGSpecWithState(ctx context.Context, mg *storagev1.DellCSIMigrationGroup, NextState string) error {
-	log := common.GetLoggerFromContext(ctx)
-	log.V(common.InfoLevel).Info("Begin updating MG spec with", "State", NextState)
+	log := logger.FromContext(ctx)
+	log.V(logger.InfoLevel).Info("Begin updating MG spec with", "State", NextState)
 	mg.Status.State = NextState
 	if err := r.Status().Update(ctx, mg.DeepCopy()); err != nil {
 		log.Error(err, "Failed updating to", "State", NextState)
 		return err
 	}
-	log.V(common.InfoLevel).Info("Successfully updated to", "state", NextState)
+	log.V(logger.InfoLevel).Info("Successfully updated to", "state", NextState)
 	return nil
 }
 
 // Update mg on error
 func (r *MigrationGroupReconciler) updateMGOnError(ctx context.Context, mg *storagev1.DellCSIMigrationGroup, currentState string, _ string) error {
-	log := common.GetLoggerFromContext(ctx)
-	log.V(common.InfoLevel).Info("Begin updating MG status with", "ErrorState", ErrorState)
+	log := logger.FromContext(ctx)
+	log.V(logger.InfoLevel).Info("Begin updating MG status with", "ErrorState", ErrorState)
 	mg.Status.LastAction = currentState
 	/*
 		r.EventRecorder.Eventf(mg, v1.EventTypeWarning, "Error",
@@ -294,8 +294,8 @@ func (r *MigrationGroupReconciler) updateMGOnError(ctx context.Context, mg *stor
 
 // Update mg with annotation
 func (r *MigrationGroupReconciler) updateMGSpecWithActionResult(ctx context.Context, mg *storagev1.DellCSIMigrationGroup, NextAnnotation string) bool {
-	log := common.GetLoggerFromContext(ctx)
-	log.V(common.InfoLevel).Info("Begin updating MG status with", "Annotation", NextAnnotation)
+	log := logger.FromContext(ctx)
+	log.V(logger.InfoLevel).Info("Begin updating MG status with", "Annotation", NextAnnotation)
 
 	isUpdated := false
 	actionAnnotation := ActionAnnotation{
@@ -303,13 +303,13 @@ func (r *MigrationGroupReconciler) updateMGSpecWithActionResult(ctx context.Cont
 	}
 	bytes, _ := json.Marshal(&actionAnnotation)
 	controllers.AddAnnotation(mg, ArrayMigrationState, string(bytes))
-	log.V(common.InfoLevel).Info("Updating", "annotation", string(bytes))
+	log.V(logger.InfoLevel).Info("Updating", "annotation", string(bytes))
 	err := r.Update(ctx, mg.DeepCopy())
 	if err != nil {
 		log.Error(err, "Failed to update", "annotation", string(bytes))
 		return false
 	}
-	log.V(common.InfoLevel).Info("MG was successfully updated with", "Action Result", NextAnnotation)
+	log.V(logger.InfoLevel).Info("MG was successfully updated with", "Action Result", NextAnnotation)
 
 	isUpdated = true
 	return isUpdated
@@ -331,8 +331,8 @@ func (r *MigrationGroupReconciler) SetupWithManager(mgr ctrl.Manager, limiter wo
 
 // Function to add a Finalizer to MG
 func (r *MigrationGroupReconciler) addFinalizer(ctx context.Context, mg *storagev1.DellCSIMigrationGroup) (bool, error) {
-	log := common.GetLoggerFromContext(ctx)
-	log.V(common.InfoLevel).Info("Adding finalizer")
+	log := logger.FromContext(ctx)
+	log.V(logger.InfoLevel).Info("Adding finalizer")
 
 	ok := controllers.AddFinalizerIfNotExist(mg, controllers.MigrationFinalizer)
 	if ok {
@@ -340,14 +340,13 @@ func (r *MigrationGroupReconciler) addFinalizer(ctx context.Context, mg *storage
 			log.Error(err, "Failed to add finalizer", "mg", mg)
 			return ok, err
 		}
-		log.V(common.DebugLevel).Info("Successfully add finalizer. Requesting a requeue")
+		log.V(logger.DebugLevel).Info("Successfully add finalizer. Requesting a requeue")
 	}
 	return ok, nil
 }
 
 // processing for deletion
 func (r *MigrationGroupReconciler) processMGForDeletion(ctx context.Context, dellCSIMigrationGroup *storagev1.DellCSIMigrationGroup) (ctrl.Result, error) {
-	// log := common.GetLoggerFromContext(ctx)
 	if dellCSIMigrationGroup.Status.State != DeletingState {
 		err := r.updateMGSpecWithState(ctx, dellCSIMigrationGroup.DeepCopy(), DeletingState)
 		return ctrl.Result{}, err
@@ -359,8 +358,8 @@ func (r *MigrationGroupReconciler) processMGForDeletion(ctx context.Context, del
 }
 
 func (r *MigrationGroupReconciler) removeFinalizer(ctx context.Context, mg *storagev1.DellCSIMigrationGroup) error {
-	log := common.GetLoggerFromContext(ctx)
-	log.V(common.InfoLevel).Info("Removing finalizer")
+	log := logger.FromContext(ctx)
+	log.V(logger.InfoLevel).Info("Removing finalizer")
 
 	// Remove migration group finalizer
 	if ok := controllers.RemoveFinalizerIfExists(mg, controllers.MigrationFinalizer); ok {
@@ -370,7 +369,7 @@ func (r *MigrationGroupReconciler) removeFinalizer(ctx context.Context, mg *stor
 			log.Error(err, "Failed to remove finalizer", "mg", mg, "MigrationGroupRemovedAnnotation")
 			return err
 		}
-		log.V(common.InfoLevel).Info("Finalizer removed successfully")
+		log.V(logger.InfoLevel).Info("Finalizer removed successfully")
 	}
 	return nil
 }
