@@ -24,7 +24,7 @@ import (
 	storagev1 "github.com/dell/csm-replication/api/v1"
 	controller "github.com/dell/csm-replication/controllers"
 	"github.com/dell/csm-replication/pkg/common/logger"
-	"github.com/dell/csm-replication/pkg/utils"
+	"github.com/dell/csm-replication/pkg/noderescan"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -126,7 +126,7 @@ func (r *NodeRescanReconciler) processMGForRescan(ctx context.Context, mg *stora
 
 	log.V(logger.DebugLevel).Info("Begin rescan on node for MG spec", "Name: ", mg.Name, "Node:", myNode.Name)
 	// Perform rescan on the node
-	err = utils.RescanNode(ctx)
+	err = noderescan.RescanNode(ctx)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
