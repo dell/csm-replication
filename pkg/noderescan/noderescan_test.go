@@ -12,10 +12,7 @@
  limitations under the License.
 */
 
-// revive:disable:var-naming
-package utils
-
-// revive:enable:var-naming
+package noderescan
 
 import (
 	"context"
