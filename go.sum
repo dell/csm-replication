@@ -52,8 +52,8 @@ github.com/dell/dell-csi-extensions/migration v1.8.1-0.20250717054012-23ceaf9c96
 github.com/dell/dell-csi-extensions/migration v1.8.1-0.20250717054012-23ceaf9c9606/go.mod h1:tehBKVIlmo9PuZ3fAWyLutSxonQ0i7VdCMpX0Rvjwho=
 github.com/dell/dell-csi-extensions/replication v1.11.1-0.20250717054012-23ceaf9c9606 h1:qxgv+wXakOn1Fo1lY/T2N/o8TDuolMyKtnp2yVUnBlg=
 github.com/dell/dell-csi-extensions/replication v1.11.1-0.20250717054012-23ceaf9c9606/go.mod h1:tX3u8H+5TOkPjHc+te9U09LSLLIFTX/31qEFzKEYGmk=
-github.com/dell/gobrick v1.14.1-0.20250624004701-1c68c8c05f2f h1:u2zZw6k1GhapS1ex8PyfZtIBTRldF3kHTxxLVM5xxSU=
-github.com/dell/gobrick v1.14.1-0.20250624004701-1c68c8c05f2f/go.mod h1:ML2lu6+tPdLeE+4eF/+Fytl/C8Ekce2qT/AKijjXqFs=
+github.com/dell/gobrick v1.14.1-0.20250725130813-61399ef9776b h1:cigRedc3HhinO20RT39JZi/ZvCuerMgC0gToUtXYtHI=
+github.com/dell/gobrick v1.14.1-0.20250725130813-61399ef9776b/go.mod h1:qkqIh/AI/uf9XwUNdrF7mjEva5w61HIi09WTJo4EjNk=
 github.com/dell/goiscsi v1.12.0 h1:hxY9SaJLS/WQiDKQ9Vplguvg6jcF8wqTFGk5VzgFVj8=
 github.com/dell/goiscsi v1.12.0/go.mod h1:nMLnEG6QBpouHxFRMxpmJA6X+Nrr3KeN9mr5n2gV+5M=
 github.com/dell/gonvme v1.11.1-0.20250701150147-3adc18df98ba h1:d3wCUEhCof2Uz/nIR0034Kuv53TCzUPvCFpdIvRPqGA=
@@ -383,8 +383,8 @@ golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9/go.mod h1:RxMgew5VJxzue5/jJ
 golang.org/x/sync v0.0.0-20210220032951-036812b2e83c/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sync v0.1.0/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
-golang.org/x/sync v0.15.0 h1:KWH3jNZsfyT6xfAfKiz6MRNmd46ByHDYaZ7KSkCtdW8=
-golang.org/x/sync v0.15.0/go.mod h1:1dzgHSNfp02xaA81J2MS99Qcpr2w7fw1gpm99rleRqA=
+golang.org/x/sync v0.16.0 h1:ycBJEhp9p4vXvUZNszeOq0kGTPghopOL8q0fq3vstxw=
+golang.org/x/sync v0.16.0/go.mod h1:1dzgHSNfp02xaA81J2MS99Qcpr2w7fw1gpm99rleRqA=
 golang.org/x/sys v0.0.0-20180830151530-49385e6e1522/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
 golang.org/x/sys v0.0.0-20180909124046-d0be0721c37e/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
 golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
