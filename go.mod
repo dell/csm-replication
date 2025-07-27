@@ -9,7 +9,7 @@ require (
 	github.com/dell/dell-csi-extensions/common v1.8.1-0.20250717054012-23ceaf9c9606
 	github.com/dell/dell-csi-extensions/migration v1.8.1-0.20250717054012-23ceaf9c9606
 	github.com/dell/dell-csi-extensions/replication v1.11.1-0.20250717054012-23ceaf9c9606
-	github.com/dell/gobrick v1.14.1-0.20250624004701-1c68c8c05f2f
+	github.com/dell/gobrick v1.14.1-0.20250725130813-61399ef9776b
 	github.com/fatih/color v1.18.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-chi/chi v4.1.2+incompatible
@@ -21,7 +21,7 @@ require (
 	github.com/spf13/viper v1.20.0
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/net v0.41.0
-	golang.org/x/sync v0.15.0
+	golang.org/x/sync v0.16.0
 	google.golang.org/grpc v1.74.0
 	google.golang.org/protobuf v1.36.6
 	k8s.io/api v0.33.0
