@@ -13,7 +13,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.20.0
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.0
 	github.com/vektra/mockery/v2 v2.8.0
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	go.uber.org/mock v0.5.1
