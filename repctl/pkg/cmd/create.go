@@ -48,13 +48,15 @@ type Mirrored struct {
 
 // GlobalParameters is a struct that contains different replication configuration parameters for all supported drivers
 type GlobalParameters struct {
-	// PowerStore
-	ArrayID           Mirrored
-	RemoteSystem      Mirrored
+	// Common to all drivers
 	Rpo               string
-	IgnoreNamespaces  bool
 	VolumeGroupPrefix string
-	Mode              string
+	IgnoreNamespaces  bool
+
+	// PowerStore
+	ArrayID      Mirrored
+	RemoteSystem Mirrored
+	Mode         string
 
 	// PowerMax
 	Srp          Mirrored
@@ -67,6 +69,7 @@ type GlobalParameters struct {
 	ClusterName       Mirrored
 	AccessZone        Mirrored
 	AzServiceIP       Mirrored
+	AzNetwork         Mirrored
 	IsiPath           string
 	RootClientEnabled Mirrored
 
