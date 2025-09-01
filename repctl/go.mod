@@ -1,8 +1,6 @@
 module github.com/dell/repctl
 
-go 1.24.0
-
-toolchain go1.24.5
+go 1.25
 
 replace github.com/dell/csm-replication => ../
 
