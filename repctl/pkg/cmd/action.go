@@ -38,7 +38,8 @@ For single or multi-cluster config:
 ./repctl --rg <rg-id> exec -a <ACTION>
 repctl --rg <rg-id> exec -a suspend
 repctl --rg <rg-id> exec -a resume
-repctl --rg <rg-id> exec -a sync`,
+repctl --rg <rg-id> exec -a sync
+repctl --rg <rg-id> exec -a establish`,
 		Long: `
 This command will perform a maintenance on current source site. repctl will patch the CR with specified <ACTION>`,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -106,6 +107,8 @@ func getSupportedMaintenanceAction(action string) (string, error) {
 		return config.ActionSuspend, nil
 	case "sync":
 		return config.ActionSync, nil
+	case "establish":
+		return config.ActionEstablish, nil
 	}
 	return "", fmt.Errorf("not a supported action")
 }

@@ -30,6 +30,7 @@ const (
 	ActionSuspend                = "SUSPEND"
 	ActionResume                 = "RESUME"
 	ActionSync                   = "SYNC"
+	ActionEstablish              = "ESTABLISH"
 	ActionCreateSnapshot         = "CREATE_SNAPSHOT"
 	Verbose                      = "verbose"
 )
