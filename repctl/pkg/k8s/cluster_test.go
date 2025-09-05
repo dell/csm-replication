@@ -640,6 +640,11 @@ func (m *MockClient) Get(ctx context.Context, key client.ObjectKey, obj client.O
 	panic("unimplemented")
 }
 
+// Apply implements ClientInterface.
+func (f *MockClient) Apply(_ context.Context, _ runtime.ApplyConfiguration, _ ...client.ApplyOption) error {
+	panic("unimplemented")
+}
+
 // GroupVersionKindFor implements ClientInterface.
 func (m *MockClient) GroupVersionKindFor(obj runtime.Object) (schema.GroupVersionKind, error) {
 	panic("unimplemented")
