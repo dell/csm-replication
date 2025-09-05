@@ -34,7 +34,7 @@ func TestSetupRepctlCommand(t *testing.T) {
 	assert.Equal(t, "repctl", repctl.Use)
 	assert.Equal(t, "repctl is CLI tool for managing replication in Kubernetes", repctl.Short)
 	assert.Equal(t, "repctl is CLI tool for managing replication in Kubernetes", repctl.Long)
-	assert.Equal(t, "v1.12.0", repctl.Version)
+	assert.Equal(t, "v1.13.0", repctl.Version)
 
 	// Assert the persistent flags
 	clustersFlag := repctl.PersistentFlags().Lookup("clusters")
