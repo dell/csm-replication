@@ -34,8 +34,8 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o dell-csi
 FROM $BASEIMAGE AS container-base
 LABEL vendor="Dell Technologies" \
       maintainer="Dell Technologies" \
-      release="1.14.0" \
-      version="1.12.0" \
+      release="1.15.0" \
+      version="1.13.0" \
       license="Apache-2.0"
 
 # Controller
