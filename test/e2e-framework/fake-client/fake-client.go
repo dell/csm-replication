@@ -158,6 +158,10 @@ func (f Client) Get(_ context.Context, key client.ObjectKey, obj client.Object, 
 	return err
 }
 
+func (f *Client) Apply(_ context.Context, _ runtime.ApplyConfiguration, _ ...client.ApplyOption) error {
+	return fmt.Errorf("apply not supported in fake client")
+}
+
 // List list all requested items in fake cluster
 func (f Client) List(_ context.Context, list client.ObjectList, opts ...client.ListOption) error {
 	if f.errorInjector != nil {
