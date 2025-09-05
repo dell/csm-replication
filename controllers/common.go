@@ -17,6 +17,7 @@ package controllers
 import (
 	"context"
 	"os"
+	"sync"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"google.golang.org/grpc/codes"
@@ -244,43 +245,48 @@ var (
 	MigrationGroup string
 	// MigrationFinalizer — finalizer used by the migration sidecar for pre delete hook
 	MigrationFinalizer string
+
+	// responsible for ensuring the above global vars are set only once to avoid data races.
+	initVars *sync.Once = &sync.Once{}
 )
 
 // InitLabelsAndAnnotations initializes package visible constants by using customizable domain variable
 func InitLabelsAndAnnotations(domain string) {
-	StorageClassReplicationParam = domain + storageClassReplicationParam
-	StorageClassRemoteStorageClassParam = domain + storageClassRemoteStorageClassParam
-	StorageClassRemoteClusterParam = domain + storageClassRemoteClusterParam
-	ReplicationFinalizer = domain + replicationFinalizer
-	RGFinalizer = domain + rgFinalizer
-	RemoteVolumeAnnotation = domain + remoteVolumeAnnotation
-	RemoteStorageClassAnnotation = domain + remoteStorageClassAnnotation
-	PVCProtectionComplete = domain + pVCProtectionComplete
-	PVProtectionComplete = domain + pVProtectionComplete
-	PVCSyncComplete = domain + pVCSyncComplete
-	PVSyncComplete = domain + pVSyncComplete
-	ContextPrefix = domain + contextPrefix
-	ProtectionGroupRemovedAnnotation = domain + protectionGroupRemovedAnnotation
-	DriverName = domain + driverName
-	RemoteClusterID = domain + remoteClusterID
-	RemoteReplicationGroup = domain + remoteReplicationGroup
-	RGSyncComplete = domain + rGSyncComplete
-	RemotePV = domain + remotePV
-	RemotePVC = domain + remotePVC
-	RemotePVCNamespace = domain + remotePVCNamespace
-	ReplicationGroup = domain + replicationGroup
-	CreatedBy = domain + createdBy
-	ResourceRequest = domain + resourceRequest
-	DeletionRequested = domain + deletionRequested
-	SynchronizedDeletionStatus = domain + synchronizedDeletionStatus
-	RemotePVRetentionPolicy = domain + remotePVRetentionPolicy
-	RemoteRGRetentionPolicy = domain + remoteRGRetentionPolicy
-	MigrationRequested = domain + migrateTo
-	MigrationNamespace = domain + migrateNS
-	CreatedByMigrator = domain + createdByMigrator
-	SnapshotClass = domain + snapshotClass
-	SnapshotNamespace = domain + snapshotNamespace
-	ActionProcessedTime = domain + actionProcessedTime
-	MigrationGroup = domain + migrationGroup
-	MigrationFinalizer = domain + migrationFinalizer
+	initVars.Do(func() {
+		StorageClassReplicationParam = domain + storageClassReplicationParam
+		StorageClassRemoteStorageClassParam = domain + storageClassRemoteStorageClassParam
+		StorageClassRemoteClusterParam = domain + storageClassRemoteClusterParam
+		ReplicationFinalizer = domain + replicationFinalizer
+		RGFinalizer = domain + rgFinalizer
+		RemoteVolumeAnnotation = domain + remoteVolumeAnnotation
+		RemoteStorageClassAnnotation = domain + remoteStorageClassAnnotation
+		PVCProtectionComplete = domain + pVCProtectionComplete
+		PVProtectionComplete = domain + pVProtectionComplete
+		PVCSyncComplete = domain + pVCSyncComplete
+		PVSyncComplete = domain + pVSyncComplete
+		ContextPrefix = domain + contextPrefix
+		ProtectionGroupRemovedAnnotation = domain + protectionGroupRemovedAnnotation
+		DriverName = domain + driverName
+		RemoteClusterID = domain + remoteClusterID
+		RemoteReplicationGroup = domain + remoteReplicationGroup
+		RGSyncComplete = domain + rGSyncComplete
+		RemotePV = domain + remotePV
+		RemotePVC = domain + remotePVC
+		RemotePVCNamespace = domain + remotePVCNamespace
+		ReplicationGroup = domain + replicationGroup
+		CreatedBy = domain + createdBy
+		ResourceRequest = domain + resourceRequest
+		DeletionRequested = domain + deletionRequested
+		SynchronizedDeletionStatus = domain + synchronizedDeletionStatus
+		RemotePVRetentionPolicy = domain + remotePVRetentionPolicy
+		RemoteRGRetentionPolicy = domain + remoteRGRetentionPolicy
+		MigrationRequested = domain + migrateTo
+		MigrationNamespace = domain + migrateNS
+		CreatedByMigrator = domain + createdByMigrator
+		SnapshotClass = domain + snapshotClass
+		SnapshotNamespace = domain + snapshotNamespace
+		ActionProcessedTime = domain + actionProcessedTime
+		MigrationGroup = domain + migrationGroup
+		MigrationFinalizer = domain + migrationFinalizer
+	})
 }
