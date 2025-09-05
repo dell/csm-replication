@@ -6,6 +6,7 @@ replace github.com/dell/csm-replication => ../
 
 require (
 	github.com/dell/csm-replication v1.11.1-0.20250416153617-b2a7d6526a1c
+	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.6.0
 	github.com/rifflock/lfshook v0.0.0-20180920164130-b9218ef580f5
 	github.com/sirupsen/logrus v1.9.3
