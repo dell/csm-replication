@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"reflect"
 	"testing"
 	"time"
 
@@ -262,60 +261,52 @@ func TestCreateReplicatorManager(t *testing.T) {
 }
 
 func Test_getClusterUID(t *testing.T) {
-	type args struct {
-		ctx context.Context
-	}
 	tests := []struct {
 		name    string
-		args    args
-		want    *v1.Namespace
+		prepare func() client.Client
 		wantErr bool
 	}{
 		{
 			name: "Success",
-			args: args{
-				ctx: context.TODO(),
-			},
-			want: &v1.Namespace{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "Namespace",
-					APIVersion: "v1",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "kube-system",
-				},
+			prepare: func() client.Client {
+				return fake.NewClientBuilder().WithObjects(&v1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "kube-system",
+						UID:  "999", // fake UID
+					},
+				}).Build()
 			},
 			wantErr: false,
 		},
 		{
 			name: "Error",
-			args: args{
-				ctx: context.TODO(),
+			prepare: func() client.Client {
+				// no objects in fake client
+				return fake.NewClientBuilder().Build()
 			},
-			want:    nil,
 			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.name == "Success" {
-				getControllerClient = func(_ *rest.Config, _ *runtime.Scheme) (client.Client, error) {
-					return fake.NewClientBuilder().WithObjects(tt.want).Build(), nil
-				}
-			} else if tt.name == "Error" {
-				getControllerClient = func(_ *rest.Config, _ *runtime.Scheme) (client.Client, error) {
-					return fake.NewClientBuilder().Build(), nil
-				}
+			getControllerClient = func(_ *rest.Config, _ *runtime.Scheme) (client.Client, error) {
+				return tt.prepare(), nil
 			}
 
-			got, err := getClusterUID(tt.args.ctx)
+			got, err := getClusterUID(context.TODO())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getClusterUID() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("getClusterUID() = %v, want %v", got, tt.want)
+
+			if !tt.wantErr {
+				if got.Name != "kube-system" {
+					t.Errorf("expected namespace kube-system, got %s", got.Name)
+				}
+				if string(got.UID) == "" {
+					t.Errorf("expected non-empty UID")
+				}
 			}
 		})
 	}

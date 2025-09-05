@@ -32,6 +32,10 @@ type ClusterInterface struct {
 func (_m *ClusterInterface) CreateNamespace(_a0 context.Context, _a1 *v1.Namespace) error {
 	ret := _m.Called(_a0, _a1)
 
+	if len(ret) == 0 {
+		panic("no return value specified for CreateNamespace")
+	}
+
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, *v1.Namespace) error); ok {
 		r0 = rf(_a0, _a1)
@@ -46,7 +50,15 @@ func (_m *ClusterInterface) CreateNamespace(_a0 context.Context, _a1 *v1.Namespa
 func (_m *ClusterInterface) CreateObject(_a0 context.Context, _a1 []byte) (runtime.Object, error) {
 	ret := _m.Called(_a0, _a1)
 
+	if len(ret) == 0 {
+		panic("no return value specified for CreateObject")
+	}
+
 	var r0 runtime.Object
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []byte) (runtime.Object, error)); ok {
+		return rf(_a0, _a1)
+	}
 	if rf, ok := ret.Get(0).(func(context.Context, []byte) runtime.Object); ok {
 		r0 = rf(_a0, _a1)
 	} else {
@@ -55,7 +67,6 @@ func (_m *ClusterInterface) CreateObject(_a0 context.Context, _a1 []byte) (runti
 		}
 	}
 
-	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, []byte) error); ok {
 		r1 = rf(_a0, _a1)
 	} else {
@@ -68,6 +79,10 @@ func (_m *ClusterInterface) CreateObject(_a0 context.Context, _a1 []byte) (runti
 // CreatePersistentVolumeClaimsFromPVs provides a mock function with given fields: _a0, _a1, _a2, _a3, _a4
 func (_m *ClusterInterface) CreatePersistentVolumeClaimsFromPVs(_a0 context.Context, _a1 string, _a2 []types.PersistentVolume, _a3 string, _a4 bool) error {
 	ret := _m.Called(_a0, _a1, _a2, _a3, _a4)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreatePersistentVolumeClaimsFromPVs")
+	}
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, string, []types.PersistentVolume, string, bool) error); ok {
@@ -82,6 +97,10 @@ func (_m *ClusterInterface) CreatePersistentVolumeClaimsFromPVs(_a0 context.Cont
 // CreateStatefulSet provides a mock function with given fields: ctx, sts
 func (_m *ClusterInterface) CreateStatefulSet(ctx context.Context, sts *appsv1.StatefulSet) error {
 	ret := _m.Called(ctx, sts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateStatefulSet")
+	}
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, *appsv1.StatefulSet) error); ok {
@@ -104,6 +123,10 @@ func (_m *ClusterInterface) DeletePersistentVolumeClaim(ctx context.Context, pvc
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
+	if len(ret) == 0 {
+		panic("no return value specified for DeletePersistentVolumeClaim")
+	}
+
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, *v1.PersistentVolumeClaim, ...client.DeleteOption) error); ok {
 		r0 = rf(ctx, pvc, opts...)
@@ -125,6 +148,10 @@ func (_m *ClusterInterface) DeletePod(ctx context.Context, pod *v1.Pod, opts ...
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
+	if len(ret) == 0 {
+		panic("no return value specified for DeletePod")
+	}
+
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, *v1.Pod, ...client.DeleteOption) error); ok {
 		r0 = rf(ctx, pod, opts...)
@@ -138,6 +165,10 @@ func (_m *ClusterInterface) DeletePod(ctx context.Context, pod *v1.Pod, opts ...
 // DeleteStsOrphan provides a mock function with given fields: ctx, sts
 func (_m *ClusterInterface) DeleteStsOrphan(ctx context.Context, sts *appsv1.StatefulSet) error {
 	ret := _m.Called(ctx, sts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteStsOrphan")
+	}
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, *appsv1.StatefulSet) error); ok {
@@ -153,7 +184,15 @@ func (_m *ClusterInterface) DeleteStsOrphan(ctx context.Context, sts *appsv1.Sta
 func (_m *ClusterInterface) FilterPersistentVolumeClaims(_a0 context.Context, _a1 string, _a2 string, _a3 string, _a4 string) (*types.PersistentVolumeClaimList, error) {
 	ret := _m.Called(_a0, _a1, _a2, _a3, _a4)
 
+	if len(ret) == 0 {
+		panic("no return value specified for FilterPersistentVolumeClaims")
+	}
+
 	var r0 *types.PersistentVolumeClaimList
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string) (*types.PersistentVolumeClaimList, error)); ok {
+		return rf(_a0, _a1, _a2, _a3, _a4)
+	}
 	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string) *types.PersistentVolumeClaimList); ok {
 		r0 = rf(_a0, _a1, _a2, _a3, _a4)
 	} else {
@@ -162,7 +201,6 @@ func (_m *ClusterInterface) FilterPersistentVolumeClaims(_a0 context.Context, _a
 		}
 	}
 
-	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, string) error); ok {
 		r1 = rf(_a0, _a1, _a2, _a3, _a4)
 	} else {
@@ -176,7 +214,15 @@ func (_m *ClusterInterface) FilterPersistentVolumeClaims(_a0 context.Context, _a
 func (_m *ClusterInterface) FilterPersistentVolumes(_a0 context.Context, _a1 string, _a2 string, _a3 string, _a4 string) ([]types.PersistentVolume, error) {
 	ret := _m.Called(_a0, _a1, _a2, _a3, _a4)
 
+	if len(ret) == 0 {
+		panic("no return value specified for FilterPersistentVolumes")
+	}
+
 	var r0 []types.PersistentVolume
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string) ([]types.PersistentVolume, error)); ok {
+		return rf(_a0, _a1, _a2, _a3, _a4)
+	}
 	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string) []types.PersistentVolume); ok {
 		r0 = rf(_a0, _a1, _a2, _a3, _a4)
 	} else {
@@ -185,7 +231,6 @@ func (_m *ClusterInterface) FilterPersistentVolumes(_a0 context.Context, _a1 str
 		}
 	}
 
-	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, string) error); ok {
 		r1 = rf(_a0, _a1, _a2, _a3, _a4)
 	} else {
@@ -199,7 +244,15 @@ func (_m *ClusterInterface) FilterPersistentVolumes(_a0 context.Context, _a1 str
 func (_m *ClusterInterface) FilterPods(ctx context.Context, namespace string, stsName string) (*v1.PodList, error) {
 	ret := _m.Called(ctx, namespace, stsName)
 
+	if len(ret) == 0 {
+		panic("no return value specified for FilterPods")
+	}
+
 	var r0 *v1.PodList
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*v1.PodList, error)); ok {
+		return rf(ctx, namespace, stsName)
+	}
 	if rf, ok := ret.Get(0).(func(context.Context, string, string) *v1.PodList); ok {
 		r0 = rf(ctx, namespace, stsName)
 	} else {
@@ -208,7 +261,6 @@ func (_m *ClusterInterface) FilterPods(ctx context.Context, namespace string, st
 		}
 	}
 
-	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
 		r1 = rf(ctx, namespace, stsName)
 	} else {
@@ -222,7 +274,15 @@ func (_m *ClusterInterface) FilterPods(ctx context.Context, namespace string, st
 func (_m *ClusterInterface) FilterReplicationGroups(_a0 context.Context, _a1 string, _a2 string) (*types.RGList, error) {
 	ret := _m.Called(_a0, _a1, _a2)
 
+	if len(ret) == 0 {
+		panic("no return value specified for FilterReplicationGroups")
+	}
+
 	var r0 *types.RGList
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*types.RGList, error)); ok {
+		return rf(_a0, _a1, _a2)
+	}
 	if rf, ok := ret.Get(0).(func(context.Context, string, string) *types.RGList); ok {
 		r0 = rf(_a0, _a1, _a2)
 	} else {
@@ -231,7 +291,6 @@ func (_m *ClusterInterface) FilterReplicationGroups(_a0 context.Context, _a1 str
 		}
 	}
 
-	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
 		r1 = rf(_a0, _a1, _a2)
 	} else {
@@ -245,7 +304,15 @@ func (_m *ClusterInterface) FilterReplicationGroups(_a0 context.Context, _a1 str
 func (_m *ClusterInterface) FilterStorageClass(_a0 context.Context, _a1 string, _a2 bool) (*types.SCList, error) {
 	ret := _m.Called(_a0, _a1, _a2)
 
+	if len(ret) == 0 {
+		panic("no return value specified for FilterStorageClass")
+	}
+
 	var r0 *types.SCList
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, bool) (*types.SCList, error)); ok {
+		return rf(_a0, _a1, _a2)
+	}
 	if rf, ok := ret.Get(0).(func(context.Context, string, bool) *types.SCList); ok {
 		r0 = rf(_a0, _a1, _a2)
 	} else {
@@ -254,7 +321,6 @@ func (_m *ClusterInterface) FilterStorageClass(_a0 context.Context, _a1 string, 
 		}
 	}
 
-	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, string, bool) error); ok {
 		r1 = rf(_a0, _a1, _a2)
 	} else {
@@ -264,9 +330,13 @@ func (_m *ClusterInterface) FilterStorageClass(_a0 context.Context, _a1 string, 
 	return r0, r1
 }
 
-// GetClient provides a mock function with given fields:
+// GetClient provides a mock function with no fields
 func (_m *ClusterInterface) GetClient() k8s.ClientInterface {
 	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetClient")
+	}
 
 	var r0 k8s.ClientInterface
 	if rf, ok := ret.Get(0).(func() k8s.ClientInterface); ok {
@@ -280,10 +350,14 @@ func (_m *ClusterInterface) GetClient() k8s.ClientInterface {
 	return r0
 }
 
-// GetHost provides a mock function with given fields:
+// GetHost provides a mock function with no fields
 func (_m *ClusterInterface) GetHost() string {
 	ret := _m.Called()
 
+	if len(ret) == 0 {
+		panic("no return value specified for GetHost")
+	}
+
 	var r0 string
 	if rf, ok := ret.Get(0).(func() string); ok {
 		r0 = rf()
@@ -294,10 +368,14 @@ func (_m *ClusterInterface) GetHost() string {
 	return r0
 }
 
-// GetID provides a mock function with given fields:
+// GetID provides a mock function with no fields
 func (_m *ClusterInterface) GetID() string {
 	ret := _m.Called()
 
+	if len(ret) == 0 {
+		panic("no return value specified for GetID")
+	}
+
 	var r0 string
 	if rf, ok := ret.Get(0).(func() string); ok {
 		r0 = rf()
@@ -308,10 +386,14 @@ func (_m *ClusterInterface) GetID() string {
 	return r0
 }
 
-// GetKubeConfigFile provides a mock function with given fields:
+// GetKubeConfigFile provides a mock function with no fields
 func (_m *ClusterInterface) GetKubeConfigFile() string {
 	ret := _m.Called()
 
+	if len(ret) == 0 {
+		panic("no return value specified for GetKubeConfigFile")
+	}
+
 	var r0 string
 	if rf, ok := ret.Get(0).(func() string); ok {
 		r0 = rf()
@@ -322,9 +404,13 @@ func (_m *ClusterInterface) GetKubeConfigFile() string {
 	return r0
 }
 
-// GetKubeVersion provides a mock function with given fields:
+// GetKubeVersion provides a mock function with no fields
 func (_m *ClusterInterface) GetKubeVersion() string {
 	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetKubeVersion")
+	}
 
 	var r0 string
 	if rf, ok := ret.Get(0).(func() string); ok {
@@ -340,7 +426,15 @@ func (_m *ClusterInterface) GetKubeVersion() string {
 func (_m *ClusterInterface) GetMigrationGroup(_a0 context.Context, _a1 string) (*apiv1.DellCSIMigrationGroup, error) {
 	ret := _m.Called(_a0, _a1)
 
+	if len(ret) == 0 {
+		panic("no return value specified for GetMigrationGroup")
+	}
+
 	var r0 *apiv1.DellCSIMigrationGroup
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*apiv1.DellCSIMigrationGroup, error)); ok {
+		return rf(_a0, _a1)
+	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) *apiv1.DellCSIMigrationGroup); ok {
 		r0 = rf(_a0, _a1)
 	} else {
@@ -349,7 +443,6 @@ func (_m *ClusterInterface) GetMigrationGroup(_a0 context.Context, _a1 string) (
 		}
 	}
 
-	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = rf(_a0, _a1)
 	} else {
@@ -363,7 +456,15 @@ func (_m *ClusterInterface) GetMigrationGroup(_a0 context.Context, _a1 string) (
 func (_m *ClusterInterface) GetNamespace(_a0 context.Context, _a1 string) (*v1.Namespace, error) {
 	ret := _m.Called(_a0, _a1)
 
+	if len(ret) == 0 {
+		panic("no return value specified for GetNamespace")
+	}
+
 	var r0 *v1.Namespace
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*v1.Namespace, error)); ok {
+		return rf(_a0, _a1)
+	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) *v1.Namespace); ok {
 		r0 = rf(_a0, _a1)
 	} else {
@@ -372,7 +473,6 @@ func (_m *ClusterInterface) GetNamespace(_a0 context.Context, _a1 string) (*v1.N
 		}
 	}
 
-	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = rf(_a0, _a1)
 	} else {
@@ -386,7 +486,15 @@ func (_m *ClusterInterface) GetNamespace(_a0 context.Context, _a1 string) (*v1.N
 func (_m *ClusterInterface) GetPersistentVolume(_a0 context.Context, _a1 string) (*v1.PersistentVolume, error) {
 	ret := _m.Called(_a0, _a1)
 
+	if len(ret) == 0 {
+		panic("no return value specified for GetPersistentVolume")
+	}
+
 	var r0 *v1.PersistentVolume
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*v1.PersistentVolume, error)); ok {
+		return rf(_a0, _a1)
+	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) *v1.PersistentVolume); ok {
 		r0 = rf(_a0, _a1)
 	} else {
@@ -395,7 +503,6 @@ func (_m *ClusterInterface) GetPersistentVolume(_a0 context.Context, _a1 string)
 		}
 	}
 
-	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = rf(_a0, _a1)
 	} else {
@@ -409,7 +516,15 @@ func (_m *ClusterInterface) GetPersistentVolume(_a0 context.Context, _a1 string)
 func (_m *ClusterInterface) GetPersistentVolumeClaim(_a0 context.Context, _a1 string, _a2 string) (*v1.PersistentVolumeClaim, error) {
 	ret := _m.Called(_a0, _a1, _a2)
 
+	if len(ret) == 0 {
+		panic("no return value specified for GetPersistentVolumeClaim")
+	}
+
 	var r0 *v1.PersistentVolumeClaim
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*v1.PersistentVolumeClaim, error)); ok {
+		return rf(_a0, _a1, _a2)
+	}
 	if rf, ok := ret.Get(0).(func(context.Context, string, string) *v1.PersistentVolumeClaim); ok {
 		r0 = rf(_a0, _a1, _a2)
 	} else {
@@ -418,7 +533,6 @@ func (_m *ClusterInterface) GetPersistentVolumeClaim(_a0 context.Context, _a1 st
 		}
 	}
 
-	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
 		r1 = rf(_a0, _a1, _a2)
 	} else {
@@ -432,7 +546,15 @@ func (_m *ClusterInterface) GetPersistentVolumeClaim(_a0 context.Context, _a1 st
 func (_m *ClusterInterface) GetPod(ctx context.Context, name string, namespace string) (*v1.Pod, error) {
 	ret := _m.Called(ctx, name, namespace)
 
+	if len(ret) == 0 {
+		panic("no return value specified for GetPod")
+	}
+
 	var r0 *v1.Pod
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*v1.Pod, error)); ok {
+		return rf(ctx, name, namespace)
+	}
 	if rf, ok := ret.Get(0).(func(context.Context, string, string) *v1.Pod); ok {
 		r0 = rf(ctx, name, namespace)
 	} else {
@@ -441,7 +563,6 @@ func (_m *ClusterInterface) GetPod(ctx context.Context, name string, namespace s
 		}
 	}
 
-	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
 		r1 = rf(ctx, name, namespace)
 	} else {
@@ -455,7 +576,15 @@ func (_m *ClusterInterface) GetPod(ctx context.Context, name string, namespace s
 func (_m *ClusterInterface) GetReplicationGroups(_a0 context.Context, _a1 string) (*apiv1.DellCSIReplicationGroup, error) {
 	ret := _m.Called(_a0, _a1)
 
+	if len(ret) == 0 {
+		panic("no return value specified for GetReplicationGroups")
+	}
+
 	var r0 *apiv1.DellCSIReplicationGroup
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*apiv1.DellCSIReplicationGroup, error)); ok {
+		return rf(_a0, _a1)
+	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) *apiv1.DellCSIReplicationGroup); ok {
 		r0 = rf(_a0, _a1)
 	} else {
@@ -464,7 +593,6 @@ func (_m *ClusterInterface) GetReplicationGroups(_a0 context.Context, _a1 string
 		}
 	}
 
-	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = rf(_a0, _a1)
 	} else {
@@ -478,7 +606,15 @@ func (_m *ClusterInterface) GetReplicationGroups(_a0 context.Context, _a1 string
 func (_m *ClusterInterface) GetSecret(_a0 context.Context, _a1 string, _a2 string) (*v1.Secret, error) {
 	ret := _m.Called(_a0, _a1, _a2)
 
+	if len(ret) == 0 {
+		panic("no return value specified for GetSecret")
+	}
+
 	var r0 *v1.Secret
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*v1.Secret, error)); ok {
+		return rf(_a0, _a1, _a2)
+	}
 	if rf, ok := ret.Get(0).(func(context.Context, string, string) *v1.Secret); ok {
 		r0 = rf(_a0, _a1, _a2)
 	} else {
@@ -487,7 +623,6 @@ func (_m *ClusterInterface) GetSecret(_a0 context.Context, _a1 string, _a2 strin
 		}
 	}
 
-	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
 		r1 = rf(_a0, _a1, _a2)
 	} else {
@@ -501,7 +636,15 @@ func (_m *ClusterInterface) GetSecret(_a0 context.Context, _a1 string, _a2 strin
 func (_m *ClusterInterface) GetStatefulSet(_a0 context.Context, _a1 string, _a2 string) (*appsv1.StatefulSet, error) {
 	ret := _m.Called(_a0, _a1, _a2)
 
+	if len(ret) == 0 {
+		panic("no return value specified for GetStatefulSet")
+	}
+
 	var r0 *appsv1.StatefulSet
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*appsv1.StatefulSet, error)); ok {
+		return rf(_a0, _a1, _a2)
+	}
 	if rf, ok := ret.Get(0).(func(context.Context, string, string) *appsv1.StatefulSet); ok {
 		r0 = rf(_a0, _a1, _a2)
 	} else {
@@ -510,7 +653,6 @@ func (_m *ClusterInterface) GetStatefulSet(_a0 context.Context, _a1 string, _a2 
 		}
 	}
 
-	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
 		r1 = rf(_a0, _a1, _a2)
 	} else {
@@ -531,7 +673,15 @@ func (_m *ClusterInterface) ListPersistentVolumeClaims(_a0 context.Context, _a1 
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
+	if len(ret) == 0 {
+		panic("no return value specified for ListPersistentVolumeClaims")
+	}
+
 	var r0 *v1.PersistentVolumeClaimList
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, ...client.ListOption) (*v1.PersistentVolumeClaimList, error)); ok {
+		return rf(_a0, _a1...)
+	}
 	if rf, ok := ret.Get(0).(func(context.Context, ...client.ListOption) *v1.PersistentVolumeClaimList); ok {
 		r0 = rf(_a0, _a1...)
 	} else {
@@ -540,7 +690,6 @@ func (_m *ClusterInterface) ListPersistentVolumeClaims(_a0 context.Context, _a1 
 		}
 	}
 
-	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, ...client.ListOption) error); ok {
 		r1 = rf(_a0, _a1...)
 	} else {
@@ -561,7 +710,15 @@ func (_m *ClusterInterface) ListPersistentVolumes(_a0 context.Context, _a1 ...cl
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
+	if len(ret) == 0 {
+		panic("no return value specified for ListPersistentVolumes")
+	}
+
 	var r0 *v1.PersistentVolumeList
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, ...client.ListOption) (*v1.PersistentVolumeList, error)); ok {
+		return rf(_a0, _a1...)
+	}
 	if rf, ok := ret.Get(0).(func(context.Context, ...client.ListOption) *v1.PersistentVolumeList); ok {
 		r0 = rf(_a0, _a1...)
 	} else {
@@ -570,7 +727,6 @@ func (_m *ClusterInterface) ListPersistentVolumes(_a0 context.Context, _a1 ...cl
 		}
 	}
 
-	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, ...client.ListOption) error); ok {
 		r1 = rf(_a0, _a1...)
 	} else {
@@ -591,7 +747,15 @@ func (_m *ClusterInterface) ListPods(ctx context.Context, opts ...client.ListOpt
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
+	if len(ret) == 0 {
+		panic("no return value specified for ListPods")
+	}
+
 	var r0 *v1.PodList
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, ...client.ListOption) (*v1.PodList, error)); ok {
+		return rf(ctx, opts...)
+	}
 	if rf, ok := ret.Get(0).(func(context.Context, ...client.ListOption) *v1.PodList); ok {
 		r0 = rf(ctx, opts...)
 	} else {
@@ -600,7 +764,6 @@ func (_m *ClusterInterface) ListPods(ctx context.Context, opts ...client.ListOpt
 		}
 	}
 
-	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, ...client.ListOption) error); ok {
 		r1 = rf(ctx, opts...)
 	} else {
@@ -621,7 +784,15 @@ func (_m *ClusterInterface) ListReplicationGroups(_a0 context.Context, _a1 ...cl
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
+	if len(ret) == 0 {
+		panic("no return value specified for ListReplicationGroups")
+	}
+
 	var r0 *apiv1.DellCSIReplicationGroupList
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, ...client.ListOption) (*apiv1.DellCSIReplicationGroupList, error)); ok {
+		return rf(_a0, _a1...)
+	}
 	if rf, ok := ret.Get(0).(func(context.Context, ...client.ListOption) *apiv1.DellCSIReplicationGroupList); ok {
 		r0 = rf(_a0, _a1...)
 	} else {
@@ -630,7 +801,6 @@ func (_m *ClusterInterface) ListReplicationGroups(_a0 context.Context, _a1 ...cl
 		}
 	}
 
-	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, ...client.ListOption) error); ok {
 		r1 = rf(_a0, _a1...)
 	} else {
@@ -651,7 +821,15 @@ func (_m *ClusterInterface) ListStorageClass(_a0 context.Context, _a1 ...client.
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
+	if len(ret) == 0 {
+		panic("no return value specified for ListStorageClass")
+	}
+
 	var r0 *storagev1.StorageClassList
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, ...client.ListOption) (*storagev1.StorageClassList, error)); ok {
+		return rf(_a0, _a1...)
+	}
 	if rf, ok := ret.Get(0).(func(context.Context, ...client.ListOption) *storagev1.StorageClassList); ok {
 		r0 = rf(_a0, _a1...)
 	} else {
@@ -660,7 +838,6 @@ func (_m *ClusterInterface) ListStorageClass(_a0 context.Context, _a1 ...client.
 		}
 	}
 
-	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, ...client.ListOption) error); ok {
 		r1 = rf(_a0, _a1...)
 	} else {
@@ -673,6 +850,10 @@ func (_m *ClusterInterface) ListStorageClass(_a0 context.Context, _a1 ...client.
 // PatchReplicationGroup provides a mock function with given fields: _a0, _a1, _a2
 func (_m *ClusterInterface) PatchReplicationGroup(_a0 context.Context, _a1 *apiv1.DellCSIReplicationGroup, _a2 client.Patch) error {
 	ret := _m.Called(_a0, _a1, _a2)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PatchReplicationGroup")
+	}
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, *apiv1.DellCSIReplicationGroup, client.Patch) error); ok {
@@ -693,6 +874,10 @@ func (_m *ClusterInterface) SetClient(_a0 k8s.ClientInterface) {
 func (_m *ClusterInterface) UpdateMigrationGroup(_a0 context.Context, _a1 *apiv1.DellCSIMigrationGroup) error {
 	ret := _m.Called(_a0, _a1)
 
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateMigrationGroup")
+	}
+
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, *apiv1.DellCSIMigrationGroup) error); ok {
 		r0 = rf(_a0, _a1)
@@ -706,6 +891,10 @@ func (_m *ClusterInterface) UpdateMigrationGroup(_a0 context.Context, _a1 *apiv1
 // UpdatePersistentVolume provides a mock function with given fields: ctx, pv
 func (_m *ClusterInterface) UpdatePersistentVolume(ctx context.Context, pv *v1.PersistentVolume) error {
 	ret := _m.Called(ctx, pv)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdatePersistentVolume")
+	}
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, *v1.PersistentVolume) error); ok {
@@ -721,6 +910,10 @@ func (_m *ClusterInterface) UpdatePersistentVolume(ctx context.Context, pv *v1.P
 func (_m *ClusterInterface) UpdateReplicationGroup(_a0 context.Context, _a1 *apiv1.DellCSIReplicationGroup) error {
 	ret := _m.Called(_a0, _a1)
 
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateReplicationGroup")
+	}
+
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, *apiv1.DellCSIReplicationGroup) error); ok {
 		r0 = rf(_a0, _a1)
@@ -735,6 +928,10 @@ func (_m *ClusterInterface) UpdateReplicationGroup(_a0 context.Context, _a1 *api
 func (_m *ClusterInterface) UpdateSecret(ctx context.Context, secret *v1.Secret) error {
 	ret := _m.Called(ctx, secret)
 
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateSecret")
+	}
+
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, *v1.Secret) error); ok {
 		r0 = rf(ctx, secret)
@@ -743,4 +940,18 @@ func (_m *ClusterInterface) UpdateSecret(ctx context.Context, secret *v1.Secret)
 	}
 
 	return r0
+}
+
+// NewClusterInterface creates a new instance of ClusterInterface. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+// The first argument is typically a *testing.T value.
+func NewClusterInterface(t interface {
+	mock.TestingT
+	Cleanup(func())
+}) *ClusterInterface {
+	mock := &ClusterInterface{}
+	mock.Mock.Test(t)
+
+	t.Cleanup(func() { mock.AssertExpectations(t) })
+
+	return mock
 }
