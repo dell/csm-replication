@@ -23,7 +23,7 @@ import (
 	"github.com/dell/repctl/mocks"
 	"github.com/dell/repctl/pkg/config"
 	"github.com/dell/repctl/pkg/k8s"
-	gomock "github.com/golang/mock/gomock"
+	"github.com/golang/mock/gomock"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
