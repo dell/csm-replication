@@ -27,3 +27,6 @@ vendor/
 
 # Local version files
 semver.mk
+
+# Logs
+repctl.log
