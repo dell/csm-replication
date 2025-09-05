@@ -21,15 +21,15 @@ parameters:
   accessZone:
     source: "System"
     target: "System"
-  # azServiceIP:
-  #   source: "192.168.1.1"
-  #   target: "192.168.1.2"
+  azServiceIP:
+    source: "192.168.1.1"
+    target: "192.168.1.2"
 
   # The CIDR notation of the subnet on which the volumes should be
   # accessible. The volumes will only be exported to addresses in
   # this subnet. If not specified, then the volume will be exported to
   # the default (primary) address of the node.
   #
-  # azNetwork:
-  #   source: 192.168.2.0/24
-  #   target: 192.168.3.0/24
+  azNetwork:
+    source: 192.168.2.0/24
+    target: 192.168.3.0/24

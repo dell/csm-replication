@@ -12,7 +12,10 @@ build-static:
 	CGO_ENABLED=1 CGO_LDFLAGS="-static" go build ./cmd/repctl
 
 test:
-	go clean -cache; cd ./pkg; go test -race -cover -coverprofile=coverage.out ./...
+	cd ./pkg; go test -race -cover -coverprofile=coverage.out ./...
+
+test-sc-generation:
+	cd ./test/storageclass; go test ./...
 
 # Install Go tools to build the code
 tools:

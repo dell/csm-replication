@@ -29,10 +29,16 @@ parameters:
   {{- if .Parameters.AzServiceIP.Source }}
   {{ .ReplicationPrefix }}/remoteAzServiceIP: {{ .Parameters.AzServiceIP.Source }}
   {{- end }}
+  {{- if .Parameters.AzNetwork.Source }}
+  {{ .ReplicationPrefix }}/remoteAzNetwork: {{ .Parameters.AzNetwork.Source }}
+  {{- end }}
   {{ .ReplicationPrefix }}/remoteRootClientEnabled: "{{ .Parameters.RootClientEnabled.Source }}"
   AccessZone: {{ .Parameters.AccessZone.Target }}
   {{- if .Parameters.AzServiceIP.Target }}
   AzServiceIP: {{ .Parameters.AzServiceIP.Target }}
+  {{- end }}
+  {{- if .Parameters.AzNetwork.Target }}
+  AzNetwork: {{ .Parameters.AzNetwork.Target }}
   {{- end }}
   IsiPath: {{ .Parameters.IsiPath}}
   RootClientEnabled: "{{ .Parameters.RootClientEnabled.Target }}"
