@@ -92,7 +92,14 @@ func TestMonitoringControllerTestSuite(t *testing.T) {
 }
 
 func (suite *MonitoringControllerTestSuite) runMonitor() {
-	err := suite.rgMonitor.Monitor(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	suite.T().Cleanup(func() {
+		// cancel the rg monitor loop when the tests are done
+		// to avoid data races caused by other tests resetting the
+		// label key domain values in InitLabelsAndAnnotations()
+		cancel()
+	})
+	err := suite.rgMonitor.Monitor(ctx)
 	suite.NoError(err)
 }
 
