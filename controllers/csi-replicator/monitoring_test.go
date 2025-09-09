@@ -92,7 +92,11 @@ func TestMonitoringControllerTestSuite(t *testing.T) {
 }
 
 func (suite *MonitoringControllerTestSuite) runMonitor() {
-	err := suite.rgMonitor.Monitor(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	suite.T().Cleanup(func() {
+		cancel()
+	})
+	err := suite.rgMonitor.Monitor(ctx)
 	suite.NoError(err)
 }
 
