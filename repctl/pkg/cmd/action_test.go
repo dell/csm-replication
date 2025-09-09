@@ -226,6 +226,7 @@ func TestGetSupportedMaintenanceAction(t *testing.T) {
 		{"resume", config.ActionResume, nil},
 		{"suspend", config.ActionSuspend, nil},
 		{"sync", config.ActionSync, nil},
+		{"establish", config.ActionEstablish, nil},
 		{"invalid", "", fmt.Errorf("not a supported action")},
 	}
 

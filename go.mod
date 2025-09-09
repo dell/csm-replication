@@ -4,10 +4,10 @@ go 1.25
 
 require (
 	github.com/bombsimon/logrusr/v4 v4.1.0
-	github.com/dell/dell-csi-extensions/common v1.8.1-0.20250825155821-05e7f81ae500
-	github.com/dell/dell-csi-extensions/migration v1.8.1-0.20250825155821-05e7f81ae500
-	github.com/dell/dell-csi-extensions/replication v1.11.1-0.20250825155821-05e7f81ae500
-	github.com/dell/gobrick v1.14.0
+	github.com/dell/dell-csi-extensions/common v1.8.1-0.20250905054742-ad01c425487b
+	github.com/dell/dell-csi-extensions/migration v1.8.1-0.20250905054742-ad01c425487b
+	github.com/dell/dell-csi-extensions/replication v1.11.1-0.20250905054742-ad01c425487b
+	github.com/dell/gobrick v1.14.1-0.20250905070950-cfc6233bb65d
 	github.com/fatih/color v1.18.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-chi/chi v4.1.2+incompatible
@@ -16,10 +16,10 @@ require (
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.2.0
 	github.com/lithammer/fuzzysearch v1.1.8
 	github.com/sirupsen/logrus v1.9.3
-	github.com/spf13/viper v1.20.0
-	github.com/stretchr/testify v1.11.0
+	github.com/spf13/viper v1.21.0
+	github.com/stretchr/testify v1.11.1
 	golang.org/x/net v0.43.0
-	golang.org/x/sync v0.16.0
+	golang.org/x/sync v0.17.0
 	google.golang.org/grpc v1.75.0
 	google.golang.org/protobuf v1.36.6
 	k8s.io/api v0.34.0
@@ -33,8 +33,8 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/dell/goiscsi v1.12.1-0.20250828071455-fd1c391bd920 // indirect
-	github.com/dell/gonvme v1.11.1-0.20250828071511-e8cac5e362ec // indirect
+	github.com/dell/goiscsi v1.12.1-0.20250905060008-55acbdc24de2 // indirect
+	github.com/dell/gonvme v1.11.1-0.20250905062246-29901c861fe6 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.2 // indirect
 	github.com/evanphx/json-patch v5.9.10+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
@@ -57,18 +57,18 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
+	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.22.0 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
-	github.com/sagikazarmark/locafero v0.7.0 // indirect
-	github.com/sourcegraph/conc v0.3.0 // indirect
-	github.com/spf13/afero v1.12.0 // indirect
-	github.com/spf13/cast v1.7.1 // indirect
-	github.com/spf13/pflag v1.0.6 // indirect
+	github.com/sagikazarmark/locafero v0.11.0 // indirect
+	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
+	github.com/spf13/afero v1.15.0 // indirect
+	github.com/spf13/cast v1.10.0 // indirect
+	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
