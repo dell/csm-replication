@@ -23,6 +23,7 @@ import (
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
+	"github.com/dell/csm-replication/pkg/common/constants"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -144,5 +145,5 @@ func TestUpdateConditions(t *testing.T) {
 }
 
 func TestInitLabelsAndAnnotations(_ *testing.T) {
-	controllers.InitLabelsAndAnnotations("test-domain")
+	controllers.InitLabelsAndAnnotations(constants.DefaultDomain)
 }
