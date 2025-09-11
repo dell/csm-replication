@@ -106,6 +106,13 @@ func TestGeneratePowerScaleStorageClass(t *testing.T) {
 			},
 			want: powerscaleStorageClass,
 		},
+		{
+			name: "generate a csi-powerstore replication storage class with all options populated",
+			args: args{
+				templateName: "powerstore",
+			},
+			want: powerstoreStorageClass,
+		},
 	}
 
 	for _, tt := range tests {

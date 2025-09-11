@@ -33,7 +33,7 @@ parameters:
   {{- else }}
   {{ .ReplicationPrefix }}/remoteClusterID: {{ .SourceClusterID }}
   {{- end }}
-  {{ .ReplicationPrefix }}/remoteSystem: {{ .Parameters.RemoteSystem.Target }}
+  {{ .ReplicationPrefix }}/remoteSystem: {{ .Parameters.RemoteSystem.Source }}
   {{ .ReplicationPrefix }}/rpo: {{ .Parameters.Rpo }}
   {{ .ReplicationPrefix }}/mode: {{ .Parameters.Mode }}
   {{ .ReplicationPrefix }}/ignoreNamespaces: "{{ .Parameters.IgnoreNamespaces }}"

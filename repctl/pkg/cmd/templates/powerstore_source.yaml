@@ -30,7 +30,7 @@ parameters:
   {{ .ReplicationPrefix }}/remoteStorageClassName: {{ .Name }}
   {{ .ReplicationPrefix }}/remoteClusterID: {{ .TargetClusterID }}
   {{- end }}
-  {{ .ReplicationPrefix }}/remoteSystem: {{ .Parameters.RemoteSystem.Source }}
+  {{ .ReplicationPrefix }}/remoteSystem: {{ .Parameters.RemoteSystem.Target }}
   {{ .ReplicationPrefix }}/rpo: {{ .Parameters.Rpo }}
   {{ .ReplicationPrefix }}/mode: {{ .Parameters.Mode }}
   {{ .ReplicationPrefix }}/ignoreNamespaces: "{{ .Parameters.IgnoreNamespaces }}"
