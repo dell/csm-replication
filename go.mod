@@ -4,7 +4,7 @@ go 1.25
 
 require (
 	github.com/bombsimon/logrusr/v4 v4.1.0
-	github.com/dell/dell-csi-extensions/common v1.9.0
+	github.com/dell/dell-csi-extensions/common v1.9.1-0.20250916113526-fe78a563d94f
 	github.com/dell/dell-csi-extensions/migration v1.9.0
 	github.com/dell/dell-csi-extensions/replication v1.12.0
 	github.com/dell/gobrick v1.15.0
