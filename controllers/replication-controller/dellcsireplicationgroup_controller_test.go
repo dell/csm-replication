@@ -1148,6 +1148,17 @@ func (suite *RGControllerTestSuite) getSingleClusterPVSetup() (*repv1.DellCSIRep
 	pvcObj.Spec.VolumeName = "local-pv"
 	pvcObj.Annotations = pvcAnnotations
 	pvcObj.Labels = pvcLabels
+	apiGroup := "cdi.kubevirt.io"
+	pvcObj.Spec.DataSourceRef = &v1.TypedObjectReference{
+		APIGroup: &apiGroup,
+		Kind:     "VolumeImportSource",
+		Name:     "fake-import",
+	}
+	pvcObj.Spec.DataSource = &v1.TypedLocalObjectReference{
+		APIGroup: &apiGroup,
+		Kind:     "VolumeImportSource",
+		Name:     "fake-import",
+	}
 
 	err = suite.client.Create(ctx, pvcObj)
 	suite.NoError(err)
@@ -1193,6 +1204,8 @@ func (suite *RGControllerTestSuite) TestPVCRemapPlanned() {
 	suite.Equal("sc-2", *swappedPVC.Spec.StorageClassName, "PVC should now use the remote storage class")
 	suite.Equal("local-pv", swappedPVC.Annotations[controllers.RemotePV], "Remote PV annotation should be updated")
 	suite.Equal(replicatedRGName, swappedPVC.Annotations[controllers.ReplicationGroup], "Replication group annotation should be updated")
+	suite.Empty(swappedPVC.Spec.DataSource)
+	suite.Empty(swappedPVC.Spec.DataSourceRef)
 
 	// Verify remote PV's claim reference
 	var updatedRemotePV corev1.PersistentVolume
