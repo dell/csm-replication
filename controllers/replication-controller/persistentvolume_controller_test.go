@@ -16,6 +16,7 @@ package replicationcontroller
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -117,6 +118,7 @@ func (suite *PVReconcileSuite) runRemoteReplicationManager(fakeConfig connection
 				APIVersion:      "v1",
 				ResourceVersion: "32776691",
 			},
+			MountOptions: []string{"nconnect=8", "vers=4.2"},
 		},
 	}
 	suite.mockUtils.FakeClient.Create(context.TODO(), localPV)
@@ -198,6 +200,7 @@ func (suite *PVReconcileSuite) runRemoteReplicationManager(fakeConfig connection
 			pv.Labels = labels
 			pv.Finalizers = finalizers
 			pv.Spec.ClaimRef.Namespace = "fake-ns"
+			pv.Spec.MountOptions = []string{"nconnect=8", "vers=4.2"}
 			break
 		}
 	}
@@ -207,7 +210,7 @@ func (suite *PVReconcileSuite) runRemoteReplicationManager(fakeConfig connection
 	assert.NoError(suite.T(), err, "No error on PV deletion reconcile")
 	assert.Equal(suite.T(), res.Requeue, false, "Requeue should be set to false")
 
-	annotations[controllers.RemotePV] = "doesnotexist"
+	annotations[controllers.RemotePV] = "remote-pv"
 	objMap = suite.mockUtils.FakeClient.Objects
 	for k, v := range objMap {
 		if k.Name == "fake-pv" {
@@ -222,7 +225,16 @@ func (suite *PVReconcileSuite) runRemoteReplicationManager(fakeConfig connection
 	}
 
 	// scenario: remote PV does not exist
-	res, err = PVReconciler.Reconcile(context.Background(), req)
+	rClient, err := PVReconciler.Config.GetConnection("remote-123")
+	rPVBefore, err := rClient.GetPersistentVolume(context.Background(), "fake-pv")
+	rClient.DeletePersistentVolume(context.Background(), rPVBefore)
+	res, err = PVReconciler.Reconcile(context.Background(), req) // this should create a PV on the remote client, because one should not currently exist.
+	// validate that the created PV matches expected parameters
+	rPV, err := rClient.GetPersistentVolume(context.Background(), "remote-pv")
+	rSC, err := rClient.GetStorageClass(context.Background(), "fake-sc")
+
+	mountOptCheck := reflect.DeepEqual(rPV.Spec.MountOptions, rSC.MountOptions)
+	assert.Equal(suite.T(), mountOptCheck, true, "PV mount options match SC mount options")
 	assert.NoError(suite.T(), err, "No error on PV deletion reconcile")
 	assert.Equal(suite.T(), res.Requeue, false, "Requeue should be set to false")
 
@@ -332,6 +344,7 @@ func (suite *PVReconcileSuite) TestReconcilePV() {
 				APIVersion:      "v1",
 				ResourceVersion: "32776691",
 			},
+			MountOptions: []string{"nconnect=9", "vers=4.2"},
 		},
 		Status: corev1.PersistentVolumeStatus{Phase: corev1.VolumeBound},
 	}

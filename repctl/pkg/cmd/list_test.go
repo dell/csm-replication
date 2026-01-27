@@ -88,7 +88,6 @@ func (suite *ListTestSuite) TestGetListCommand() {
 }
 
 func TestGetListClusterGlobalCommandExitClustersFolderPath(t *testing.T) {
-
 	if os.Getenv("INVOKE_ERROR_EXIT") == "1" {
 		originalGetClustersFolderPathFunction := getClustersFolderPathFunction
 		defer func() {
@@ -135,7 +134,6 @@ func TestGetListClusterGlobalCommandExitClustersFolderPath(t *testing.T) {
 }
 
 func TestGetListClusterGlobalCommandExitGetAllClusters(t *testing.T) {
-
 	if os.Getenv("INVOKE_ERROR_EXIT") == "1" {
 		originalGetClustersFolderPathFunction := getClustersFolderPathFunction
 		defer func() {

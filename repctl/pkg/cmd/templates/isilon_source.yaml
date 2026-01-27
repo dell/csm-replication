@@ -21,6 +21,10 @@ metadata:
 provisioner: csi-{{ .Driver }}.dellemc.com
 reclaimPolicy: {{ .ReclaimPolicy }}
 volumeBindingMode: Immediate
+{{- if .MountOptions }}
+mountOptions: {{ range $index, $value := .MountOptions }}
+  - {{ $value }} {{ end }}
+{{- end }}
 parameters:
   {{ .ReplicationPrefix }}/isReplicationEnabled: "true"
   {{- if eq .TargetClusterID .SourceClusterID }}

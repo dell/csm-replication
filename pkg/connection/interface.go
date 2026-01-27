@@ -33,6 +33,7 @@ type RemoteClusterClient interface {
 	ListCustomResourceDefinitions(ctx context.Context) (*apiExtensionsv1.CustomResourceDefinitionList, error)
 	GetCustomResourceDefinitions(ctx context.Context, crdName string) (*apiExtensionsv1.CustomResourceDefinition, error)
 	GetPersistentVolume(ctx context.Context, persistentVolumeName string) (*corev1.PersistentVolume, error)
+	DeletePersistentVolume(ctx context.Context, pv *corev1.PersistentVolume) error
 	CreatePersistentVolume(ctx context.Context, volume *corev1.PersistentVolume) error
 	UpdatePersistentVolume(ctx context.Context, volume *corev1.PersistentVolume) error
 	GetPersistentVolumeClaim(ctx context.Context, namespace, claimName string) (*corev1.PersistentVolumeClaim, error)

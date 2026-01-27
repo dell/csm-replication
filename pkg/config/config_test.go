@@ -23,9 +23,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bombsimon/logrusr/v4"
 	"github.com/dell/csm-replication/pkg/common/constants"
 	"github.com/dell/csm-replication/pkg/connection"
+	"github.com/bombsimon/logrusr/v4"
 	"github.com/go-logr/logr"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -959,7 +959,7 @@ func Test_getReplicationConfig(t *testing.T) {
 			ConfigDir:         "../../deploy",
 			ConfigFileName:    "config",
 			InCluster:         true,
-			Mode:              "",
+			Mode:              "controller",
 		}
 
 		// os.Setenv(constants.EnvInClusterConfig, "true")

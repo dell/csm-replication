@@ -93,6 +93,7 @@ type ScConfig struct {
 	TargetClusterID       string
 	SourceClusterID       string
 	ReplicationPrefix     string
+	MountOptions          []string
 	RemoteRetentionPolicy RemoteRetentionPolicy
 	Parameters            GlobalParameters
 }

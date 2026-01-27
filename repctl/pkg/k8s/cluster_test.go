@@ -407,7 +407,6 @@ func (suite *ClusterTestSuite) TestFilterPersistentVolumeClaims() {
 	})
 
 	suite.Suite.T().Run("success: match labels get PVC", func(t *testing.T) {
-
 		fake, err := fake_client.NewFakeClient([]runtime.Object{pvc1, pvc2, repPVC}, nil, nil)
 		suite.NoError(err)
 
@@ -909,14 +908,12 @@ func (suite *ClusterTestSuite) TestGetPersistentVolumeClaim() {
 }
 
 func (suite *ClusterTestSuite) TestGetReplicationGroups() {
-
 	tests := []struct {
 		name           string
 		client         ClientInterface
 		expectedRGName string
 		expectedErr    error
 	}{
-
 		{
 			name: "Successful",
 			client: func() ClientInterface {
@@ -955,7 +952,6 @@ func (suite *ClusterTestSuite) TestGetReplicationGroups() {
 }
 
 func (suite *ClusterTestSuite) TestGetStatefulSet() {
-
 	tests := []struct {
 		name                 string
 		client               ClientInterface
@@ -963,7 +959,6 @@ func (suite *ClusterTestSuite) TestGetStatefulSet() {
 		expectedSTSNamespace string
 		expectedErr          error
 	}{
-
 		{
 			name: "Successful",
 			client: func() ClientInterface {

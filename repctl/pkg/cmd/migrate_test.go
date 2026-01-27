@@ -66,7 +66,6 @@ func (suite *MigrateTestSuite) TestGetMigrateCommand() {
 	for _, subCmd := range subCommands {
 		suite.NotNil(subCmd)
 	}
-
 }
 
 func TestMigrateTestSuite(t *testing.T) {
@@ -540,7 +539,7 @@ func TestMigrateSTSCommand(t *testing.T) {
 					Name:      tt.podName,
 					Namespace: tt.ns,
 					OwnerReferences: []metav1.OwnerReference{
-						metav1.OwnerReference{
+						{
 							Name: tt.stsName,
 							Kind: "StatefulSet",
 						},
@@ -548,7 +547,7 @@ func TestMigrateSTSCommand(t *testing.T) {
 				},
 				Spec: v1.PodSpec{
 					Volumes: []v1.Volume{
-						v1.Volume{
+						{
 							Name: "test-pv",
 							VolumeSource: v1.VolumeSource{
 								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
@@ -561,7 +560,7 @@ func TestMigrateSTSCommand(t *testing.T) {
 				Status: v1.PodStatus{
 					Phase: v1.PodRunning,
 					Conditions: []v1.PodCondition{
-						v1.PodCondition{
+						{
 							Type: v1.PodReady,
 						},
 					},

@@ -68,7 +68,7 @@ func (suite *SnapshotTestSuite) TestGetSnapshotCommand() {
 		name                  string
 		getClustersFolderPath func(string) (string, error)
 		expectedError         bool
-		//expectedOutputContains          string
+		// expectedOutputContains          string
 		objects                   []runtime.Object
 		getListReplicationGroups  func(cluster k8s.ClusterInterface, ctx context.Context) (*repv1.DellCSIReplicationGroupList, error)
 		getRGAndClusterFromRGID   func(configFolder string, rgID string, filter string) (k8s.ClusterInterface, *repv1.DellCSIReplicationGroup, error)

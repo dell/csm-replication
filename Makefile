@@ -1,3 +1,11 @@
+# Copyright © 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
+#
+# Dell Technologies, Dell and other trademarks are trademarks of Dell Inc.
+# or its subsidiaries. Other trademarks may be trademarks of their respective 
+# owners.
+
+include images.mk
+
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -11,26 +19,26 @@ KUSTOMIZE ?= $(GOBIN)/kustomize
 
 IMG ?= "NOIMG"
 
-#Generate semver.mk for setting the semantic version
-gen-semver:
-	(cd core; rm -f core_generated.go; go generate)
-	go run core/semver/semver.go -f mk > semver.mk
+# This will be overridden during image build.
+IMAGE_VERSION ?= 0.0.0
+LDFLAGS = "-X main.ManifestSemver=$(IMAGE_VERSION)"
 
 # Run all _test.go files (including those in repctl/) in this repo and generate coverage report
 test: generate fmt vet static-crd gen-semver
 	go test ./... -coverprofile cover.out
 
-# Build manager binary for csi-replicator
-build-sidecar-manager: pre
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/dell-csi-replicator cmd/csi-replicator/main.go
-build-sidecar-migrator: pre
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/dell-csi-migrator cmd/csi-migrator/main.go
-# Build manager binary for csi-node re scanner
-build-sidecar-node-rescanner: pre
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/dell-csi-node-rescanner cmd/csi-node-rescanner/main.go
-# Build manager binary for replication-controller
-build-controller-manager: pre
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/dell-replication-controller cmd/replication-controller/main.go
+build-sidecar-manager: gen-semver
+	CGO_ENABLED=0 GOOS=linux go build -ldflags $(LDFLAGS) -mod=vendor -o bin/dell-csi-replicator cmd/csi-replicator/main.go
+
+build-sidecar-migrator: gen-semver
+	CGO_ENABLED=0 GOOS=linux go build -ldflags $(LDFLAGS) -mod=vendor -o bin/dell-csi-migrator cmd/csi-migrator/main.go
+
+build-sidecar-node-rescanner: gen-semver
+	CGO_ENABLED=0 GOOS=linux go build -ldflags $(LDFLAGS) -mod=vendor -o bin/dell-csi-node-rescanner cmd/csi-node-rescanner/main.go
+
+build-controller-manager: gen-semver
+	CGO_ENABLED=0 GOOS=linux go build -ldflags $(LDFLAGS) -mod=vendor -o bin/dell-replication-controller cmd/replication-controller/main.go
+
 # Build all binaries for replication
 build: build-sidecar-manager build-sidecar-migrator build-sidecar-node-rescanner build-controller-manager
 
@@ -49,7 +57,6 @@ run-node-rescanner: pre static-crd
 
 static-crd: manifests
 	$(KUSTOMIZE) build config/crd > deploy/replicationcrds.all.yaml
-
 
 update-image:
 ifeq ($(IMG),"NOIMG")
@@ -109,52 +116,6 @@ generate: tools
 
 # Pre-requisite for the build/run targets
 pre: gen-semver fmt vet tools generate
-
-# Build the container image
-image-sidecar: gen-semver
-	make -f image.mk sidecar
-
-image-migrator: gen-semver
-	make -f image.mk sidecar-migrator
-
-image-migrator-push: gen-semver
-	make -f image.mk sidecar-migrator-push
-
-image-node-rescanner: gen-semver
-	make -f image.mk sidecar-node-rescanner
-
-image-node-rescanner-push: gen-semver
-	make -f image.mk sidecar-node-rescanner-push
-
-image-controller: gen-semver
-	make -f image.mk controller
-
-image-sidecar-push: gen-semver
-	make -f image.mk sidecar-push
-
-image-controller-push: gen-semver
-	make -f image.mk controller-push
-
-build-base-image: gen-semver
-	make -f image.mk build-base-image
-
-images: gen-semver
-	make -f image.mk images
-
-images-push: gen-semver
-	make -f image.mk images-push
-
-image-sidecar-dev: build-sidecar-manager
-	make -f image.mk sidecar-dev
-
-image-controller-dev: build-controller-manager
-	make -f image.mk controller-dev
-
-image-migrator-dev: build-sidecar-migrator
-	make -f image.mk sidecar-migrator-dev
-
-image-node-rescanner-dev: build-sidecar-node-rescanner
-	make -f image.mk sidecar-node-rescanner-dev
 
 #To start mock-grpc server
 start-server-win:
@@ -236,20 +197,3 @@ KUSTOMIZE=$(GOBIN)/kustomize
 else
 KUSTOMIZE=$(shell which kustomize)
 endif
-
-.PHONY: actions action-help
-actions: ## Run all GitHub Action checks that run on a pull request creation
-	@echo "Running all GitHub Action checks for pull request events..."
-	@act -l | grep -v ^Stage | grep pull_request | grep -v image_security_scan | awk '{print $$2}' | while read WF; do \
-		echo "Running workflow: $${WF}"; \
-		act pull_request --no-cache-server --platform ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest --job "$${WF}"; \
-	done
-
-action-help: ## Echo instructions to run one specific workflow locally
-	@echo "GitHub Workflows can be run locally with the following command:"
-	@echo "act pull_request --no-cache-server --platform ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest --job <jobid>"
-	@echo ""
-	@echo "Where '<jobid>' is a Job ID returned by the command:"
-	@echo "act -l"
-	@echo ""
-	@echo "NOTE: if act is not installed, it can be downloaded from https://github.com/nektos/act"

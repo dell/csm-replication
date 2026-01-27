@@ -63,6 +63,7 @@ func New(source string, targets ...string) connection.MultiClusterClient {
 			Provisioner:   "csi-fake",
 			Parameters:    parameters,
 			ReclaimPolicy: &policy,
+			MountOptions:  []string{"nconnect=8", "vers=4.2"},
 		}
 		obj = append(obj, &scObj)
 		client, _ := fake_client.NewFakeClient(obj, nil, nil)

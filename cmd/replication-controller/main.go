@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/bombsimon/logrusr/v4"
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
 	repController "github.com/dell/csm-replication/controllers/replication-controller"
@@ -31,6 +30,7 @@ import (
 	"github.com/dell/csm-replication/pkg/common/logger"
 	"github.com/dell/csm-replication/pkg/config"
 	"github.com/dell/csm-replication/pkg/connection"
+	"github.com/bombsimon/logrusr/v4"
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-logr/logr"
 	"github.com/sirupsen/logrus"
@@ -134,7 +134,7 @@ var (
 
 		loggerInstance := logrusr.New(logrusLog)
 		ctrl.SetLogger(loggerInstance)
-		setupLog.V(logger.InfoLevel).Info(constants.DellReplicationController, "Version", core.SemVer, "Commit ID", core.CommitSha32, "Commit SHA", core.CommitTime.Format(time.RFC1123))
+		setupLog.V(logger.InfoLevel).Info(constants.DellReplicationController, "Version", ManifestSemver, "Creation Time", core.CommitTime.Format(time.RFC1123))
 
 		setupLog.V(logger.InfoLevel).Info("Prefix", "Domain", domain)
 		controllers.InitLabelsAndAnnotations(domain)
@@ -180,6 +180,8 @@ var (
 
 		return controllerMgr
 	}
+
+	ManifestSemver string
 )
 
 func init() {

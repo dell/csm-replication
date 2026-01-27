@@ -194,6 +194,11 @@ func (c *RemoteK8sControllerClient) CreatePersistentVolume(ctx context.Context, 
 	return c.Client.Create(ctx, volume)
 }
 
+// DeletePersistentVolume deletes the persistent volume object in current cluster
+func (c *RemoteK8sControllerClient) DeletePersistentVolume(ctx context.Context, pv *corev1.PersistentVolume) error {
+	return c.Client.Delete(ctx, pv)
+}
+
 // UpdatePersistentVolume updates persistent volume object in current cluster
 func (c *RemoteK8sControllerClient) UpdatePersistentVolume(ctx context.Context, volume *corev1.PersistentVolume) error {
 	return c.Client.Update(ctx, volume)

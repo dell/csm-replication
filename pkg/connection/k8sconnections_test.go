@@ -20,8 +20,6 @@ package connection
 
 import (
 	"context"
-	"errors"
-	"os"
 	"testing"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
@@ -555,16 +553,8 @@ func TestRemoteK8sConnHandler_GetControllerClient(t *testing.T) {
 	// Test case: Nil restConfig
 	client, err = GetControllerClient(nil, scheme)
 
-	// Through CI, assume file does not exist
-	dirname, dirErr := os.UserHomeDir()
-	assert.NoError(t, dirErr)
-	if _, err2 := os.Stat(dirname + "/.kube/config"); errors.Is(err2, os.ErrNotExist) {
-		assert.Error(t, err)
-		assert.Nil(t, client)
-	} else {
-		assert.NoError(t, err)
-		assert.NotNil(t, client)
-	}
+	assert.NoError(t, err)
+	assert.NotNil(t, client)
 }
 
 // Since a scheme does not contain the necessary objects and no objects have been created, retrieval fails.

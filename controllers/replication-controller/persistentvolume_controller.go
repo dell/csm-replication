@@ -280,6 +280,7 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				VolumeMode:                    volume.Spec.VolumeMode,
 				StorageClassName:              remoteSCName,
 				PersistentVolumeReclaimPolicy: *remoteSC.ReclaimPolicy,
+				MountOptions:                  remoteSC.MountOptions,
 			},
 		}
 
