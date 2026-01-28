@@ -1,5 +1,5 @@
 /*
-Copyright © 2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+Copyright © 2025-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -639,6 +639,9 @@ func TestProbeAndCreateMetricsServer(t *testing.T) {
 }
 
 func TestSetupFlags(t *testing.T) {
+	// Set Manifest version similar to how the image would be built.
+	ManifestSemver = "1.0.0"
+
 	// Call the setupFlags function
 	flags, setupLog, ctx := setupFlags()
 

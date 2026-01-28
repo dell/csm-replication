@@ -25,8 +25,9 @@ vendor/
 *.swo
 *~
 
-# Local version files
+# Support make files
 semver.mk
+csm-common.mk
 
 # Logs
 repctl.log

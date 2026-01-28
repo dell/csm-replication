@@ -402,6 +402,18 @@ func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context
 		}
 	}
 
+	if strings.Contains(group.Status.LastAction.Condition, "FAILBACK_LOCAL") {
+		if err := r.processFailBackEvent(ctx, remoteGroup, remoteClient, log); err != nil {
+			return err
+		}
+	}
+
+	if strings.Contains(group.Status.LastAction.Condition, "ACTION_FAILBACK_DISCARD_CHANGES_LOCAL") {
+		if err := r.processFailBackEvent(ctx, remoteGroup, remoteClient, log); err != nil {
+			return err
+		}
+	}
+
 	// Informing the RG that the last action has been processed.
 	controller.AddAnnotation(group, controller.ActionProcessedTime, group.Status.LastAction.Time.GoString())
 
@@ -409,6 +421,24 @@ func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context
 }
 
 func (r *ReplicationGroupReconciler) processFailoverEvent(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
+	if r.DisablePVCRemap {
+		return nil
+	}
+	remoteClusterID := group.Annotations[controller.RemoteClusterID]
+	if remoteClusterID == "self" {
+		rgName := group.Name
+		rgTarget := group.Annotations[controller.RemoteReplicationGroup]
+
+		err := r.swapAllPVC(ctx, remoteClient, rgName, rgTarget, log)
+		if err != nil {
+			log.Error(err, "Error swapping all PVCs")
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *ReplicationGroupReconciler) processFailBackEvent(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
 	if r.DisablePVCRemap {
 		return nil
 	}

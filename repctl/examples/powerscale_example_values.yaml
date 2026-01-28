@@ -23,6 +23,9 @@ replicationPrefix: "replication.storage.dell.com"
 remoteRetentionPolicy:
   RG: "Retain"
   PV: "Retain"
+# mountOptions:
+  # - "timeo=600"
+  # - "retrans=1"
 parameters:
   rpo: "Five_Minutes"
   ignoreNamespaces: "false"

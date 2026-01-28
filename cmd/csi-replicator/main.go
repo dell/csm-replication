@@ -1,5 +1,5 @@
 /*
- Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -23,8 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bombsimon/logrusr/v4"
 	"github.com/dell/csm-replication/pkg/config"
+	"github.com/bombsimon/logrusr/v4"
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-logr/logr"
 	"github.com/sirupsen/logrus"
@@ -68,6 +68,7 @@ var (
 		replication.ReplicationCapability_RPC_CREATE_PROTECTION_GROUP,
 	}
 	monitoringCapability = replication.ReplicationCapability_RPC_MONITOR_PROTECTION_GROUP
+	ManifestSemver       string
 )
 
 func init() {
@@ -234,7 +235,7 @@ func main() {
 	ctrl.SetLogger(logger)
 
 	setupLog.V(1).Info("Prefix", "Domain", flags.domain)
-	setupLog.V(1).Info(constants.DellCSIReplicator, "Version", core.SemVer, "Commit ID", core.CommitSha32, "Commit SHA", core.CommitTime.Format(time.RFC1123))
+	setupLog.V(1).Info(constants.DellCSIReplicator, "Version", ManifestSemver, "Creation Time", core.CommitTime.Format(time.RFC1123))
 
 	ctx := context.Background()
 

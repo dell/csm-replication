@@ -1,0 +1,7 @@
+site_name: 'csm-replication'
+site_description: 'csm-replication Documentation.'
+docs_dir: docs
+plugins:
+  - techdocs-core
+theme:
+  name: material

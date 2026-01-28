@@ -1,5 +1,5 @@
 /*
- Copyright © 2022-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2022-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -28,8 +28,8 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
-	"github.com/bombsimon/logrusr/v4"
 	"github.com/dell/csm-replication/pkg/config"
+	"github.com/bombsimon/logrusr/v4"
 	"github.com/fsnotify/fsnotify"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -65,6 +65,7 @@ var (
 		migration.MigrateTypes_REPL_TO_NON_REPL: true,
 		migration.MigrateTypes_VERSION_UPGRADE:  true,
 	}
+	ManifestSemver string
 )
 
 func init() {
@@ -228,7 +229,7 @@ func main() {
 	ctrl.SetLogger(logger)
 
 	setupLog.V(1).Info("Prefix", "Domain", flags.domain)
-	setupLog.V(1).Info(constants.DellCSIMigrator, "Version", core.SemVer, "Commit ID", core.CommitSha32, "Commit SHA", core.CommitTime.Format(time.RFC1123))
+	setupLog.V(1).Info(constants.DellCSIMigrator, "Version", ManifestSemver, "Creation Time", core.CommitTime.Format(time.RFC1123))
 
 	ctx := context.Background()
 

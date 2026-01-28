@@ -311,6 +311,7 @@ func (suite *EditTestSuite) SetupSuite() {
 func TestEditTestSuite(t *testing.T) {
 	suite.Run(t, new(EditTestSuite))
 }
+
 func (suite *EditTestSuite) TestGetEditCommand() {
 	cmd := GetEditCommand()
 
