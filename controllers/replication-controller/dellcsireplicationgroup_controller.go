@@ -706,6 +706,8 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	pvc.Labels[controller.ReplicationGroup] = rgTarget
 	pvc.Spec.StorageClassName = &remoteStorageClassName
 	pvc.ObjectMeta.ResourceVersion = ""
+	pvc.Spec.DataSource = nil
+	pvc.Spec.DataSourceRef = nil
 
 	// Re-create the PVC, now pointing to the target.
 	err = createPersistentVolumeClaim(ctx, client, pvc)
