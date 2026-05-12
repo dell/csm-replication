@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 
@@ -52,6 +53,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/conversion"
 )
 
 func TestGetCSIConn(t *testing.T) {
@@ -912,6 +914,16 @@ func (m *MockManager) GetScheme() *runtime.Scheme {
 
 func (m *MockManager) GetWebhookServer() webhook.Server {
 	// Implement the GetWebhookServer method logic
+	return nil
+}
+
+func (m *MockManager) GetConverterRegistry() conversion.Registry {
+	// Implement the GetConverterRegistry method logic
+	return nil
+}
+
+func (m *MockManager) GetEventRecorder(_ string) events.EventRecorder {
+	// Implement the GetEventRecorder method logic
 	return nil
 }
 

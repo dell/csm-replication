@@ -1089,7 +1089,7 @@ CSI_LOG_LEVEL: "INFO"`)
 
 		// 3. Defer the restore operation
 		defer func() {
-			err := os.WriteFile(configFilePath, originalContent, 0o600)
+			err := os.WriteFile(configFilePath, originalContent, 0o600) // #nosec G703 -- test-only: writing to temp test config file
 			if err != nil {
 				t.Errorf("Failed to restore original config content: %v", err)
 			}

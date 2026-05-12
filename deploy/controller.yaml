@@ -150,6 +150,9 @@ rules:
   - apiGroups: ["snapshot.storage.k8s.io"]
     resources: ["volumesnapshots"]
     verbs: ["get", "list", "watch", "update", "create", "delete"]
+  - apiGroups: ["cdi.kubevirt.io"]
+    resources: ["datavolumes"]
+    verbs: ["get", "update", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -295,6 +298,7 @@ spec:
       containers:
         - args:
             - --disable-pvc-remap=false
+            - --enable-kubevirt-pvc-remap=false
             - --allow-pvc-creation-on-target=false
             - --enable-leader-election
             - --prefix=replication.storage.dell.com
@@ -319,7 +323,7 @@ spec:
               value: /app/certs
             - name: X_CSI_REPLICATION_CONFIG_FILE_NAME
               value: config
-          image: quay.io/dell/container-storage-modules/dell-replication-controller:v1.13.0
+          image: quay.io/dell/container-storage-modules/dell-replication-controller:v1.15.0
           imagePullPolicy: IfNotPresent
           name: manager
           resources:

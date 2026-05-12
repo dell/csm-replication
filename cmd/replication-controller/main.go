@@ -104,11 +104,12 @@ var (
 
 	setupFlags = func() (map[string]string, logr.Logger, *logrus.Logger, context.Context) {
 		var (
-			retryIntervalStart time.Duration
-			retryIntervalMax   time.Duration
-			workerThreads      int
-			domain             string
-			disablePVCRemap    bool
+			retryIntervalStart     time.Duration
+			retryIntervalMax       time.Duration
+			workerThreads          int
+			domain                 string
+			disablePVCRemap        bool
+			enableKubevirtPVCRemap bool
 		)
 
 		var metricsAddr string
@@ -124,6 +125,7 @@ var (
 		flag.DurationVar(&retryIntervalMax, "retry-interval-max", 5*time.Minute, "Maximum retry interval of failed reconcile request")
 		flag.IntVar(&workerThreads, "worker-threads", 2, "Number of concurrent reconcilers for each of the controllers")
 		flag.BoolVar(&disablePVCRemap, "disable-pvc-remap", false, "disables PVC remapping functionality")
+		flag.BoolVar(&enableKubevirtPVCRemap, "enable-kubevirt-pvc-remap", false, "enables KubeVirt PVC remapping functionality")
 		flag.BoolVar(&allowPVCCreationOnTarget, "allow-pvc-creation-on-target", false, "allow PVC creation on target cluster")
 		flag.Parse()
 
@@ -147,6 +149,7 @@ var (
 		flagMap["retry-interval-max"] = retryIntervalMax.String()
 		flagMap["worker-threads"] = strconv.Itoa(workerThreads)
 		flagMap["disable-pvc-remap"] = strconv.FormatBool(disablePVCRemap)
+		flagMap["enable-kubevirt-pvc-remap"] = strconv.FormatBool(enableKubevirtPVCRemap)
 		flagMap["allow-pvc-creation-on-target"] = strconv.FormatBool(allowPVCCreationOnTarget)
 
 		return flagMap, setupLog, logrusLog, context.Background()
@@ -305,7 +308,7 @@ func main() {
 			createPersistentVolumeClaimReconciler(mgr, controllerMgr, flagMap["prefix"], stringToInt(flagMap["worker-threads"]), expRateLimiter, stringToBoolean(flagMap["allow-pvc-creation-on-target"]), setupLog)
 
 			// Create ReplicationGroupReconciler
-			createReplicationGroupReconciler(mgr, controllerMgr, flagMap["prefix"], stringToInt(flagMap["worker-threads"]), expRateLimiter, stringToBoolean(flagMap["disable-pvc-remap"]), setupLog)
+			createReplicationGroupReconciler(mgr, controllerMgr, flagMap["prefix"], stringToInt(flagMap["worker-threads"]), expRateLimiter, stringToBoolean(flagMap["disable-pvc-remap"]), stringToBoolean(flagMap["enable-kubevirt-pvc-remap"]), setupLog)
 
 			// Create PersistentVolumeReconciler
 			createPersistentVolumeReconciler(mgr, controllerMgr, flagMap["prefix"], stringToInt(flagMap["worker-threads"]), expRateLimiter, setupLog)
@@ -345,15 +348,16 @@ func createPersistentVolumeReconciler(mgr manager.Manager, controllerMgr *Contro
 	}
 }
 
-func createReplicationGroupReconciler(mgr manager.Manager, controllerMgr *ControllerManager, domain string, workerThreads int, expRateLimiter workqueue.TypedRateLimiter[reconcile.Request], disablePVCRemap bool, setupLog logr.Logger) {
+func createReplicationGroupReconciler(mgr manager.Manager, controllerMgr *ControllerManager, domain string, workerThreads int, expRateLimiter workqueue.TypedRateLimiter[reconcile.Request], disablePVCRemap bool, enableKubevirtPVCRemap bool, setupLog logr.Logger) {
 	if err := getReplicationGroupReconciler(&repController.ReplicationGroupReconciler{
-		Client:          mgr.GetClient(),
-		Log:             ctrl.Log.WithName("controllers").WithName("DellCSIReplicationGroup"),
-		Scheme:          mgr.GetScheme(),
-		EventRecorder:   mgr.GetEventRecorderFor(constants.DellReplicationController),
-		Config:          controllerMgr.config,
-		Domain:          domain,
-		DisablePVCRemap: disablePVCRemap,
+		Client:                 mgr.GetClient(),
+		Log:                    ctrl.Log.WithName("controllers").WithName("DellCSIReplicationGroup"),
+		Scheme:                 mgr.GetScheme(),
+		EventRecorder:          mgr.GetEventRecorderFor(constants.DellReplicationController),
+		Config:                 controllerMgr.config,
+		Domain:                 domain,
+		DisablePVCRemap:        disablePVCRemap,
+		EnableKubevirtPVCRemap: enableKubevirtPVCRemap,
 	}, mgr, expRateLimiter, workerThreads); err != nil {
 		setupLog.Error(err, "unable to create controller", constants.DellReplicationController, "DellCSIReplicationGroup")
 		osExit(1)

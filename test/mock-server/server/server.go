@@ -18,7 +18,7 @@ package server
 
 import (
 	"bytes"
-	context2 "context"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -28,14 +28,13 @@ import (
 
 	commonext "github.com/dell/dell-csi-extensions/common"
 	"github.com/dell/dell-csi-extensions/replication"
-	"golang.org/x/net/context"
 )
 
 // Replication mock controller that implements replication related calls
 type Replication struct{}
 
 // VolumeMigrate - mocks Migrate function
-func (s *Replication) VolumeMigrate(_ context2.Context, _ *migration.VolumeMigrateRequest) (*migration.VolumeMigrateResponse, error) {
+func (s *Replication) VolumeMigrate(_ context.Context, _ *migration.VolumeMigrateRequest) (*migration.VolumeMigrateResponse, error) {
 	rep := &migration.VolumeMigrateResponse{
 		MigratedVolume: &migration.Volume{
 			CapacityBytes: 3221225472,
@@ -56,7 +55,7 @@ func (s *Replication) VolumeMigrate(_ context2.Context, _ *migration.VolumeMigra
 }
 
 // GetMigrationCapabilities - mocks GetMigrationCapabilities func
-func (s *Replication) GetMigrationCapabilities(_ context2.Context, _ *migration.GetMigrationCapabilityRequest) (*migration.GetMigrationCapabilityResponse, error) {
+func (s *Replication) GetMigrationCapabilities(_ context.Context, _ *migration.GetMigrationCapabilityRequest) (*migration.GetMigrationCapabilityResponse, error) {
 	return &migration.GetMigrationCapabilityResponse{
 		Capabilities: []*migration.MigrationCapability{
 			{

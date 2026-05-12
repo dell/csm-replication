@@ -411,6 +411,11 @@ func (f SubResourceClient) Patch(_ context.Context, _ client.Object, _ client.Pa
 	panic("implement me")
 }
 
+// Apply applies the given configuration to the subresource.
+func (f SubResourceClient) Apply(_ context.Context, _ runtime.ApplyConfiguration, _ ...client.SubResourceApplyOption) error {
+	panic("implement me")
+}
+
 // Get retrieves a subResource for the given obj object from the Kubernetes Cluster.
 // TODO: Implement
 func (f SubResourceClient) Get(_ context.Context, _ client.Object, _ client.Object, _ ...client.SubResourceGetOption) error {

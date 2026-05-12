@@ -37,7 +37,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/go-logr/logr"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -91,18 +93,28 @@ var (
 	sleep = func(d time.Duration) {
 		time.Sleep(d)
 	}
+	getObject = func(ctx context.Context, c connection.RemoteClusterClient, key client.ObjectKey, obj client.Object) error {
+		return c.GetObject(ctx, key, obj)
+	}
+	updateObject = func(ctx context.Context, c connection.RemoteClusterClient, obj client.Object) error {
+		return c.UpdateObject(ctx, obj)
+	}
+	deleteObject = func(ctx context.Context, c connection.RemoteClusterClient, obj client.Object) error {
+		return c.DeleteObject(ctx, obj)
+	}
 )
 
 // ReplicationGroupReconciler reconciles a ReplicationGroup object
 type ReplicationGroupReconciler struct {
 	client.Client
-	Log                logr.Logger
-	Scheme             *runtime.Scheme
-	EventRecorder      record.EventRecorder
-	PVCRequeueInterval time.Duration
-	Config             connection.MultiClusterClient
-	Domain             string
-	DisablePVCRemap    bool
+	Log                    logr.Logger
+	Scheme                 *runtime.Scheme
+	EventRecorder          record.EventRecorder
+	PVCRequeueInterval     time.Duration
+	Config                 connection.MultiClusterClient
+	Domain                 string
+	DisablePVCRemap        bool
+	EnableKubevirtPVCRemap bool
 }
 
 // +kubebuilder:rbac:groups=replication.storage.dell.com,resources=dellcsireplicationgroups,verbs=get;list;watch;update;patch;delete;create
@@ -586,18 +598,78 @@ func (r *ReplicationGroupReconciler) SetupWithManager(mgr ctrl.Manager, limiter 
 		Complete(r)
 }
 
+// pvcSwapBackup stores PVC details and original PV reclaim policies for crash recovery during PVC swap.
+// It is serialized as JSON and stored as an annotation on the local PV before any destructive action.
+type pvcSwapBackup struct {
+	PVC            *v1.PersistentVolumeClaim        `json:"pvc"`
+	LocalPVPolicy  v1.PersistentVolumeReclaimPolicy `json:"localPVPolicy"`
+	RemotePVPolicy v1.PersistentVolumeReclaimPolicy `json:"remotePVPolicy"`
+}
+
+// savePVCBackupToPV persists the PVC swap backup as a JSON annotation on the local PV.
+// It also sets the PV reclaim policy to Retain in the same update to minimize API calls.
+func savePVCBackupToPV(ctx context.Context, c connection.RemoteClusterClient, localPV *v1.PersistentVolume, backup *pvcSwapBackup, log logr.Logger) error {
+	data, err := json.Marshal(backup)
+	if err != nil {
+		return fmt.Errorf("error marshaling PVC backup: %w", err)
+	}
+	if localPV.Annotations == nil {
+		localPV.Annotations = make(map[string]string)
+	}
+	localPV.Annotations[controller.PendingPVCSwap] = string(data)
+	localPV.Spec.PersistentVolumeReclaimPolicy = v1.PersistentVolumeReclaimRetain
+	if err := updatePersistentVolume(ctx, c, localPV); err != nil {
+		return fmt.Errorf("error saving PVC backup to PV %s: %w", localPV.Name, err)
+	}
+	log.V(logger.InfoLevel).Info(fmt.Sprintf("Saved PVC swap backup to PV %s and set Retain policy", localPV.Name))
+	return nil
+}
+
+// recoverPVCBackup attempts to recover a PVC swap backup from the local PV.
+// It uses the target PV's RemotePV annotation to find the local PV name.
+func recoverPVCBackup(ctx context.Context, c connection.RemoteClusterClient, targetPV string, log logr.Logger) (*pvcSwapBackup, error) {
+	remotePV, err := getPersistentVolume(ctx, c, targetPV)
+	if err != nil {
+		return nil, fmt.Errorf("error getting target PV %s for recovery: %w", targetPV, err)
+	}
+	localPVName := remotePV.Annotations[controller.RemotePV]
+	if localPVName == "" {
+		return nil, fmt.Errorf("target PV %s has no RemotePV annotation", targetPV)
+	}
+	localPV, err := getPersistentVolume(ctx, c, localPVName)
+	if err != nil {
+		return nil, fmt.Errorf("error getting local PV %s for recovery: %w", localPVName, err)
+	}
+	backupJSON, ok := localPV.Annotations[controller.PendingPVCSwap]
+	if !ok {
+		return nil, fmt.Errorf("local PV %s has no pending PVC swap annotation", localPVName)
+	}
+	var backup pvcSwapBackup
+	if err := json.Unmarshal([]byte(backupJSON), &backup); err != nil {
+		return nil, fmt.Errorf("error unmarshaling PVC backup from PV %s: %w", localPVName, err)
+	}
+	log.V(logger.InfoLevel).Info(fmt.Sprintf("Recovered PVC swap backup from PV %s", localPVName))
+	return &backup, nil
+}
+
 // Give a replication group name and target, swapAllPVC reassigns the PVC from local volume to remote volume.
 // It also retains the original reclaimPolicy and operates within a single cluster.
+// After processing listed PVCs, it checks for orphaned PVs with pending swap annotations
+// to recover PVCs that were mid-swap when the controller crashed.
 func (r *ReplicationGroupReconciler) swapAllPVC(ctx context.Context, c connection.RemoteClusterClient, rgName string, rgTarget string, log logr.Logger) error {
 	pvcs, err := c.ListPersistentVolumeClaim(ctx, client.MatchingLabels{controller.ReplicationGroup: rgName})
 	if err != nil {
 		return fmt.Errorf("failed to list PVCs: %w", err)
 	}
 
+	// Build set of PVC names being swapped (to detect orphans later)
+	swappedPVCNames := make(map[string]bool)
+
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(pvcs.Items))
 
 	for _, pvc := range pvcs.Items {
+		swappedPVCNames[pvc.Namespace+"/"+pvc.Name] = true
 		wg.Add(1)
 		go func(pvc v1.PersistentVolumeClaim) {
 			defer wg.Done()
@@ -618,6 +690,35 @@ func (r *ReplicationGroupReconciler) swapAllPVC(ctx context.Context, c connectio
 		errs = append(errs, err)
 	}
 
+	// Recovery: check for PVs with pending swap annotations whose PVCs were not in the list.
+	// This handles the case where the controller crashed after PVC deletion but before recreation.
+	var pvList v1.PersistentVolumeList
+	if listErr := r.Client.List(ctx, &pvList, client.MatchingLabels{controller.ReplicationGroup: rgName}); listErr == nil {
+		for i := range pvList.Items {
+			pv := &pvList.Items[i]
+			backupJSON, ok := pv.Annotations[controller.PendingPVCSwap]
+			if !ok {
+				continue
+			}
+			var backup pvcSwapBackup
+			if err := json.Unmarshal([]byte(backupJSON), &backup); err != nil {
+				log.V(logger.WarnLevel).Info(fmt.Sprintf("Failed to unmarshal PVC backup from PV %s: %v", pv.Name, err))
+				continue
+			}
+			key := backup.PVC.Namespace + "/" + backup.PVC.Name
+			if swappedPVCNames[key] {
+				continue // already handled in the main loop
+			}
+			targetPV := backup.PVC.Annotations[controller.RemotePV]
+			log.V(logger.InfoLevel).Info(fmt.Sprintf("Recovering orphaned PVC swap for %s from PV %s", key, pv.Name))
+			if err := r.swapPVC(ctx, c, backup.PVC.Name, backup.PVC.Namespace, targetPV, rgTarget, log); err != nil {
+				errs = append(errs, fmt.Errorf("error recovering PVC swap %s: %s", key, err))
+			}
+		}
+	} else {
+		log.V(logger.WarnLevel).Info(fmt.Sprintf("Failed to list PVs for swap recovery: %v", listErr))
+	}
+
 	if len(errs) > 0 {
 		return fmt.Errorf("errors occurred while swapping PVCs: %s", errs)
 	}
@@ -626,76 +727,141 @@ func (r *ReplicationGroupReconciler) swapAllPVC(ctx context.Context, c connectio
 }
 
 func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connection.RemoteClusterClient, pvcName, namespace, targetPV, rgTarget string, log logr.Logger) error {
+	var pvc *v1.PersistentVolumeClaim
+	var localPVPolicy, remotePVPolicy v1.PersistentVolumeReclaimPolicy
+	recovered := false
+
 	// Read the PVC
-	pvc, err := getPersistentVolumeClaim(ctx, client, namespace, pvcName)
+	pvcFetched, err := getPersistentVolumeClaim(ctx, client, namespace, pvcName)
 	if err != nil {
-		return fmt.Errorf("error getting pvc %s: %s", pvcName, err)
-	}
+		if !errors.IsNotFound(err) {
+			return fmt.Errorf("error getting pvc %s: %s", pvcName, err)
+		}
+		// PVC not found — attempt recovery from local PV backup annotation
+		backup, recoveryErr := recoverPVCBackup(ctx, client, targetPV, log)
+		if recoveryErr != nil {
+			return fmt.Errorf("PVC %s/%s not found and recovery failed: %w", namespace, pvcName, recoveryErr)
+		}
+		pvc = backup.PVC
+		localPVPolicy = backup.LocalPVPolicy
+		remotePVPolicy = backup.RemotePVPolicy
+		recovered = true
+		log.V(logger.InfoLevel).Info(fmt.Sprintf("Recovered PVC %s/%s from PV backup, skipping to recreation", namespace, pvcName))
+	} else {
+		pvc = pvcFetched
 
-	// Save the Reclaim Policy for both PVs - return reclaim policy to makepvcreclaimpolicyretain
-	pv, err := getPersistentVolume(ctx, client, pvc.Spec.VolumeName)
-	if err != nil {
-		return fmt.Errorf("error retrieving local PV %s", pvc.Spec.VolumeName)
-	}
-	localPVPolicy := pv.Spec.PersistentVolumeReclaimPolicy
-
-	pv, err = getPersistentVolume(ctx, client, pvc.Annotations[controller.RemotePV])
-	if err != nil {
-		return fmt.Errorf("error retrieving remote PV %s", pvc.Annotations[controller.RemotePV])
-	}
-
-	// The target PV should be unclaimed.
-	if pv.Spec.ClaimRef != nil {
-		// Check if the target PV claimRef if set to "reserved/reserved" This is done as part of claimRef feature
-		if pv.Spec.ClaimRef.Name == controller.ReservedPVCName && pv.Spec.ClaimRef.Namespace == controller.ReservedPVCNamespace {
-			// Update the claimRef to nil so that PVC can be created
-			err = removeReservedClaimRefForTargetPV(ctx, client, pv.Name, log)
-			if err != nil {
-				return fmt.Errorf("error removing PV claim ref from %s: %s", pv, err.Error())
-			}
-		} else {
-			return fmt.Errorf("target PV %s is claimed", pv.Name)
+		// If KubeVirt PVC remap is disabled but the PVC is owned by a DataVolume,
+		// skip the swap entirely — we cannot safely delete a DV-owned PVC without
+		// first handling the DataVolume dependency.
+		if !r.EnableKubevirtPVCRemap && findDataVolumeOwnerRef(pvc.OwnerReferences) != nil {
+			log.V(logger.WarnLevel).Info(fmt.Sprintf("PVC %s/%s is owned by a DataVolume but KubeVirt PVC remap is disabled; skipping PVC swap",
+				pvc.Namespace, pvc.Name))
+			return nil
 		}
 	}
 
-	remotePVPolicy := pv.Spec.PersistentVolumeReclaimPolicy
+	if !recovered {
+		// Normal flow: read PVs, save backup, set Retain, handle DV, delete/wait
 
-	// Make the local PV reclaim policy Retain
-	if err = setPVReclaimPolicy(ctx, client, pvc.Spec.VolumeName, "Retain"); err != nil {
-		return fmt.Errorf("error making source PV %s reclaim policy Retain: %s", pvc.Spec.VolumeName, err)
-	}
-
-	// Make the remote PV reclaim policy Retain
-	if err = setPVReclaimPolicy(ctx, client, pvc.Annotations[controller.RemotePV], "Retain"); err != nil {
-		return fmt.Errorf("error making target PV %s reclaim policy Retain: %s", pvc.Annotations[controller.RemotePV], err)
-	}
-
-	// Delete the existing PVC
-	err = deletePersistentVolumeClaim(ctx, client, pvc)
-	if err != nil {
-		return fmt.Errorf("error deleting PVC %s with errror %s", pvcName, err)
-	}
-
-	// Wait until PVC is deleted
-	done := false
-	for iteration := 0; !done; iteration++ {
-		sleep(2 * time.Second)
-		_, err := getPersistentVolumeClaim(ctx, client, namespace, pvcName)
+		// Save the Reclaim Policy for both PVs
+		localPV, err := getPersistentVolume(ctx, client, pvc.Spec.VolumeName)
 		if err != nil {
-			if errors.IsNotFound(err) {
-				done = true
-				break
-			}
+			return fmt.Errorf("error retrieving local PV %s", pvc.Spec.VolumeName)
+		}
+		localPVPolicy = localPV.Spec.PersistentVolumeReclaimPolicy
 
-			return fmt.Errorf("error when waiting for PVC %s/%s to be deleted", namespace, pvcName)
+		remotePV, err := getPersistentVolume(ctx, client, pvc.Annotations[controller.RemotePV])
+		if err != nil {
+			return fmt.Errorf("error retrieving remote PV %s", pvc.Annotations[controller.RemotePV])
 		}
 
-		if iteration > 30 {
-			return fmt.Errorf("timed out waiting on PVC %s/%s to be deleted", namespace, pvcName)
+		// The target PV should be unclaimed.
+		if remotePV.Spec.ClaimRef != nil {
+			if remotePV.Spec.ClaimRef.Name == controller.ReservedPVCName && remotePV.Spec.ClaimRef.Namespace == controller.ReservedPVCNamespace {
+				err = removeReservedClaimRefForTargetPV(ctx, client, remotePV.Name, log)
+				if err != nil {
+					return fmt.Errorf("error removing PV claim ref from %s: %s", remotePV, err.Error())
+				}
+			} else {
+				// During recovery, the PVC might be deleted but the PV still has the ClaimRef.
+				// Check if the PVC still exists before failing.
+				_, pvcErr := getPersistentVolumeClaim(ctx, client, remotePV.Spec.ClaimRef.Namespace, remotePV.Spec.ClaimRef.Name)
+				if pvcErr != nil && errors.IsNotFound(pvcErr) {
+					// PVC doesn't exist, safe to remove the ClaimRef
+					log.V(logger.InfoLevel).Info(fmt.Sprintf("PVC %s/%s not found, removing stale ClaimRef from target PV %s",
+						remotePV.Spec.ClaimRef.Namespace, remotePV.Spec.ClaimRef.Name, remotePV.Name))
+					remotePV.Spec.ClaimRef = nil
+					if err := updatePersistentVolume(ctx, client, remotePV); err != nil {
+						return fmt.Errorf("error removing stale ClaimRef from target PV %s: %s", remotePV.Name, err)
+					}
+				} else {
+					return fmt.Errorf("target PV %s is claimed by PVC %s/%s", remotePV.Name,
+						remotePV.Spec.ClaimRef.Namespace, remotePV.Spec.ClaimRef.Name)
+				}
+			}
+		}
+
+		remotePVPolicy = remotePV.Spec.PersistentVolumeReclaimPolicy
+
+		// Save PVC backup to local PV and set Retain in a single update.
+		// This persists the PVC details so they survive a pod crash.
+		backup := &pvcSwapBackup{
+			PVC:            pvc,
+			LocalPVPolicy:  localPVPolicy,
+			RemotePVPolicy: remotePVPolicy,
+		}
+		if err := savePVCBackupToPV(ctx, client, localPV, backup, log); err != nil {
+			return err
+		}
+
+		// Make the remote PV reclaim policy Retain
+		if err = setPVReclaimPolicy(ctx, client, pvc.Annotations[controller.RemotePV], "Retain"); err != nil {
+			return fmt.Errorf("error making target PV %s reclaim policy Retain: %s", pvc.Annotations[controller.RemotePV], err)
+		}
+
+		// Handle DataVolume dependencies before PVC deletion.
+		// If the DV was deleted, Kubernetes GC will cascade-delete the PVC.
+		// If no DV was involved, we delete the PVC explicitly below.
+		dvDeleted := false
+		if r.EnableKubevirtPVCRemap {
+			var dvErr error
+			dvDeleted, dvErr = r.handleDataVolumeDependencies(ctx, client, pvc, log)
+			if dvErr != nil {
+				return dvErr
+			}
+		}
+
+		if !dvDeleted {
+			// No DV involvement — delete the PVC explicitly
+			err = deletePersistentVolumeClaim(ctx, client, pvc)
+			if err != nil {
+				return fmt.Errorf("error deleting PVC %s with errror %s", pvcName, err)
+			}
+		}
+
+		// Wait until PVC is deleted (either by GC cascade or explicit delete above)
+		done := false
+		for iteration := 0; !done; iteration++ {
+			sleep(2 * time.Second)
+			_, err := getPersistentVolumeClaim(ctx, client, namespace, pvcName)
+			if err != nil {
+				if errors.IsNotFound(err) {
+					done = true
+					break
+				}
+
+				return fmt.Errorf("error when waiting for PVC %s/%s to be deleted", namespace, pvcName)
+			}
+
+			if iteration > 30 {
+				return fmt.Errorf("timed out waiting on PVC %s/%s to be deleted", namespace, pvcName)
+			}
 		}
 	}
 
-	// Swap some fields in the PVC.
+	// --- Common recreation path (normal + recovery) ---
+
+	// Swap some fields in the PVC (using the in-memory or recovered copy).
 	localPV := pvc.Spec.VolumeName
 	pvc.Annotations[controller.RemotePV] = pvc.Spec.VolumeName
 	pvc.Spec.VolumeName = targetPV
@@ -706,6 +872,18 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	pvc.Labels[controller.ReplicationGroup] = rgTarget
 	pvc.Spec.StorageClassName = &remoteStorageClassName
 	pvc.ObjectMeta.ResourceVersion = ""
+
+	// Strip DataVolume/CDI artifacts from the PVC before recreation so the new PVC
+	// is not tied to the deleted DataVolume or CDI import sources.
+	if r.EnableKubevirtPVCRemap {
+		pvc.OwnerReferences = removeDataVolumeOwnerRef(pvc.OwnerReferences)
+		removeCDIAnnotations(pvc)
+	}
+	pvc.Spec.DataSource = nil
+	pvc.Spec.DataSourceRef = nil
+
+	// Remove the pending swap annotation before recreation
+	delete(pvc.Annotations, controller.PendingPVCSwap)
 
 	// Re-create the PVC, now pointing to the target.
 	err = createPersistentVolumeClaim(ctx, client, pvc)
@@ -734,8 +912,8 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 		return fmt.Errorf("error removing PV claim ref from %s: %s", localPV, err.Error())
 	}
 
-	// Updating the claimRef of localPV to reservd/reserved
-	pv, err = getPersistentVolume(ctx, client, localPV)
+	// Updating the claimRef of localPV to reserved/reserved and clear backup annotation
+	pv, err := getPersistentVolume(ctx, client, localPV)
 	if err != nil {
 		return fmt.Errorf("error retrieving PV %s: %s", localPV, err.Error())
 	}
@@ -747,6 +925,7 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 		Namespace:  controller.ReservedPVCNamespace,
 	}
 	pv.Spec.ClaimRef = claimRef
+	delete(pv.Annotations, controller.PendingPVCSwap)
 
 	err = updatePersistentVolume(ctx, client, pv)
 	if err != nil {
@@ -913,4 +1092,123 @@ func updatePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 	}
 
 	return fmt.Errorf("timed out updating the claim ref")
+}
+
+// handleDataVolumeDependencies detects and handles DataVolume ownership on the PVC
+// before PVC deletion during remap. Returns dvDeleted=true if a DataVolume was deleted,
+// meaning the PVC will be garbage-collected by Kubernetes and should not be deleted explicitly.
+//
+//  1. If the PVC has no DataVolume ownerRef: return (false, nil).
+//  2. If the PVC has a DataVolume ownerRef, fetch the DV.
+//     a. If the DV is not found: return (false, nil) — DV already gone, PVC may still exist.
+//     b. If the DV is owned by a VirtualMachine: return (false, error) — skip cleanup.
+//     c. If the DV is NOT owned by a VM: remove finalizers, delete DV, return (true, nil).
+//
+// When dvDeleted=true, the caller should NOT explicitly delete the PVC. Kubernetes garbage
+// collection will cascade-delete the PVC via the DV ownerReference. The caller should wait
+// for PVC deletion before recreating it.
+func (r *ReplicationGroupReconciler) handleDataVolumeDependencies(ctx context.Context, c connection.RemoteClusterClient, pvc *v1.PersistentVolumeClaim, log logr.Logger) (bool, error) {
+	dvOwnerRef := findDataVolumeOwnerRef(pvc.OwnerReferences)
+	if dvOwnerRef == nil {
+		return false, nil
+	}
+
+	log.V(logger.InfoLevel).Info(fmt.Sprintf("PVC %s/%s has DataVolume ownerRef %s, fetching DV to check ownership",
+		pvc.Namespace, pvc.Name, dvOwnerRef.Name))
+
+	// Fetch the DataVolume to inspect its ownerReferences
+	dv := &unstructured.Unstructured{}
+	dv.SetGroupVersionKind(schema.FromAPIVersionAndKind(dvOwnerRef.APIVersion, dvOwnerRef.Kind))
+	err := getObject(ctx, c, client.ObjectKey{Name: dvOwnerRef.Name, Namespace: pvc.Namespace}, dv)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// DV already deleted — PVC may still exist, caller should delete it explicitly
+			log.V(logger.InfoLevel).Info(fmt.Sprintf("DataVolume %s/%s not found, PVC deletion will be handled by caller",
+				pvc.Namespace, dvOwnerRef.Name))
+			return false, nil
+		}
+		return false, fmt.Errorf("error fetching DataVolume %s/%s: %w", pvc.Namespace, dvOwnerRef.Name, err)
+	}
+
+	// Check if the DV is owned by a VirtualMachine
+	vmOwnerRef := findVMOwnerRef(dv.GetOwnerReferences())
+	if vmOwnerRef != nil {
+		msg := fmt.Sprintf("PVC %s/%s is backed by DataVolume %s owned by VirtualMachine %s; skipping cleanup — "+
+			"stop the VM and remove the dataVolumeTemplate before retrying PVC remap",
+			pvc.Namespace, pvc.Name, dvOwnerRef.Name, vmOwnerRef.Name)
+		log.V(logger.WarnLevel).Info(msg)
+		r.EventRecorder.Event(pvc, eventTypeWarning, "VirtualMachineOwnedDataVolume", msg)
+		return false, fmt.Errorf("%s", msg)
+	}
+
+	// DV is NOT owned by a VM — remove finalizers and delete DV.
+	// Kubernetes GC will cascade-delete the PVC via the ownerReference.
+	log.V(logger.InfoLevel).Info(fmt.Sprintf("DataVolume %s/%s is standalone (not VM-owned), removing finalizers and deleting",
+		pvc.Namespace, dvOwnerRef.Name))
+
+	// Remove finalizers from DV so deletion is immediate
+	if len(dv.GetFinalizers()) > 0 {
+		log.V(logger.InfoLevel).Info(fmt.Sprintf("Removing finalizers %v from DataVolume %s/%s",
+			dv.GetFinalizers(), pvc.Namespace, dvOwnerRef.Name))
+		dv.SetFinalizers(nil)
+		if err := updateObject(ctx, c, dv); err != nil {
+			return false, fmt.Errorf("error removing finalizers from DataVolume %s/%s: %w",
+				pvc.Namespace, dvOwnerRef.Name, err)
+		}
+	}
+
+	if err := deleteObject(ctx, c, dv); err != nil {
+		if !errors.IsNotFound(err) {
+			return false, fmt.Errorf("error deleting DataVolume %s/%s: %w", pvc.Namespace, dvOwnerRef.Name, err)
+		}
+	}
+
+	log.V(logger.InfoLevel).Info(fmt.Sprintf("Deleted DataVolume %s/%s; PVC will be garbage-collected",
+		pvc.Namespace, dvOwnerRef.Name))
+	return true, nil
+}
+
+// findDataVolumeOwnerRef returns the first OwnerReference that points to a DataVolume (cdi.kubevirt.io).
+func findDataVolumeOwnerRef(refs []metav1.OwnerReference) *metav1.OwnerReference {
+	for i, ref := range refs {
+		if strings.Contains(ref.APIVersion, "cdi.kubevirt.io") && ref.Kind == "DataVolume" {
+			return &refs[i]
+		}
+	}
+	return nil
+}
+
+// findVMOwnerRef returns the first OwnerReference that points to a VirtualMachine (kubevirt.io).
+func findVMOwnerRef(refs []metav1.OwnerReference) *metav1.OwnerReference {
+	for i, ref := range refs {
+		if strings.Contains(ref.APIVersion, "kubevirt.io") && ref.Kind == "VirtualMachine" {
+			return &refs[i]
+		}
+	}
+	return nil
+}
+
+// removeDataVolumeOwnerRef returns the ownerReferences list with all DataVolume (cdi.kubevirt.io) entries removed.
+func removeDataVolumeOwnerRef(refs []metav1.OwnerReference) []metav1.OwnerReference {
+	filtered := make([]metav1.OwnerReference, 0, len(refs))
+	for _, ref := range refs {
+		if strings.Contains(ref.APIVersion, "cdi.kubevirt.io") && ref.Kind == "DataVolume" {
+			continue
+		}
+		filtered = append(filtered, ref)
+	}
+	return filtered
+}
+
+// removeCDIAnnotations removes all CDI-related annotations from the PVC.
+// CDI annotations use the "cdi.kubevirt.io" prefix.
+func removeCDIAnnotations(pvc *v1.PersistentVolumeClaim) {
+	if pvc.Annotations == nil {
+		return
+	}
+	for key := range pvc.Annotations {
+		if strings.Contains(key, "cdi.kubevirt.io") {
+			delete(pvc.Annotations, key)
+		}
+	}
 }

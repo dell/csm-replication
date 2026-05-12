@@ -36,7 +36,7 @@ FROM $BASEIMAGE AS container-base
 ARG VERSION
 LABEL vendor="Dell Technologies" \
       maintainer="Dell Technologies" \
-      release="1.16.0" \
+      release="1.17.0" \
       license="Apache-2.0"
 
 FROM container-base AS controller

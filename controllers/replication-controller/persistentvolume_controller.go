@@ -129,7 +129,16 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		// Process deletion of remote PV
 		if _, ok := volume.Annotations[controller.DeletionRequested]; !ok {
 			log.V(logger.InfoLevel).Info("Deletion requested annotation not found")
-			remoteVolume, err := rClient.GetPersistentVolume(ctx, volume.Annotations[controller.RemotePV])
+			remotePVName := volume.Annotations[controller.RemotePV]
+			if remotePVName == "" {
+				log.V(logger.InfoLevel).Info("RemotePV annotation is empty, skipping remote volume lookup")
+			}
+			remoteVolume, err := func() (*v1.PersistentVolume, error) {
+				if remotePVName == "" {
+					return nil, &errors.StatusError{ErrStatus: metav1.Status{Reason: metav1.StatusReasonNotFound}}
+				}
+				return rClient.GetPersistentVolume(ctx, remotePVName)
+			}()
 			if err != nil {
 				// If remote PV doesn't exist, proceed to removing finalizer
 				if !errors.IsNotFound(err) {
@@ -300,7 +309,8 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 		var resourceRequests []byte
 
-		if volume.Spec.ClaimRef != nil {
+		if volume.Spec.ClaimRef != nil &&
+			!(volume.Spec.ClaimRef.Name == controller.ReservedPVCName && volume.Spec.ClaimRef.Namespace == controller.ReservedPVCNamespace) {
 			pvc := new(v1.PersistentVolumeClaim)
 			if err := r.Get(ctx, client.ObjectKey{
 				Namespace: volume.Spec.ClaimRef.Namespace,
@@ -617,7 +627,7 @@ func UpdateRemotePVDetails(ctx context.Context, client connection.RemoteClusterC
 	// Update the remote PV claimref if it differs from the local PV
 	if volume.Spec.ClaimRef != nil && remoteClusterID != controller.Self {
 		if remotePV.Spec.ClaimRef != nil && volume.Spec.ClaimRef.Name != remotePV.Spec.ClaimRef.Name {
-			log.V(logger.InfoLevel).Info(fmt.Sprintf("Remote PV claimref differs from the local PV claimref. Hence updating remote PV"))
+			log.V(logger.InfoLevel).Info("Remote PV claimref differs from the local PV claimref. Hence updating remote PV")
 			remotePV.Spec.ClaimRef.Namespace = volume.Spec.ClaimRef.Namespace
 			remotePV.Spec.ClaimRef.Name = volume.Spec.ClaimRef.Name
 			remotePV.Spec.ClaimRef.ResourceVersion = volume.Spec.ClaimRef.ResourceVersion
