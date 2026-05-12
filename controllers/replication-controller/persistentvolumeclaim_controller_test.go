@@ -553,10 +553,9 @@ func (suite *PVControllerTestSuite) TestAllowPVCCreationOnTarget_CreatesRemotePV
 	if pvObj.Annotations == nil {
 		pvObj.Annotations = make(map[string]string)
 	}
-	// Add required annotations so updatePVCAnnotations can fill PVC metadata
+	// Add required annotations so updatePVCAnnotations can fill PVC metadata.
 	pvObj.Annotations[controllers.ContextPrefix] = suite.driver.DriverName
 	pvObj.Annotations[controllers.PVCProtectionComplete] = "yes"
-	pvObj.Annotations[controllers.RemoteVolumeAnnotation] = pvObj.Name
 	pvObj.Annotations[controllers.RemotePVCNamespace] = suite.driver.Namespace
 	pvObj.Annotations[controllers.RemotePVC] = "allow-create-pvc-remote"
 	// Add required labels for updatePVCLabels
@@ -565,6 +564,9 @@ func (suite *PVControllerTestSuite) TestAllowPVCCreationOnTarget_CreatesRemotePV
 	}
 	pvObj.Labels[controllers.DriverName] = suite.driver.DriverName
 	pvObj.Labels[controllers.ReplicationGroup] = "rg0"
+	// Set VolumeMode to Block to verify it is propagated to the remote PVC
+	blockMode := corev1.PersistentVolumeBlock
+	pvObj.Spec.VolumeMode = &blockMode
 	// Create the remote PV in the fake remote cluster
 	err = remoteClient.CreatePersistentVolume(ctx, &pvObj)
 	assert.Nil(suite.T(), err, "expected no error creating remote PV on target cluster")
@@ -631,6 +633,11 @@ func (suite *PVControllerTestSuite) TestAllowPVCCreationOnTarget_CreatesRemotePV
 	assert.Equal(suite.T(), suite.driver.DriverName, remotePVC.Labels[controllers.DriverName], "DriverName label")
 	assert.Equal(suite.T(), "remote-123", remotePVC.Labels[controllers.RemoteClusterID], "RemoteClusterID label")
 	assert.Equal(suite.T(), "rg0", remotePVC.Labels[controllers.ReplicationGroup], "ReplicationGroup label")
+
+	// Verify VolumeMode is propagated from remote PV to remote PVC
+	if assert.NotNil(suite.T(), remotePVC.Spec.VolumeMode, "VolumeMode should be set on remote PVC") {
+		assert.Equal(suite.T(), corev1.PersistentVolumeBlock, *remotePVC.Spec.VolumeMode, "VolumeMode should be Block")
+	}
 }
 
 func TestUpdatePVCLabels(t *testing.T) {
@@ -701,8 +708,8 @@ func TestUpdatePVCAnnotations(t *testing.T) {
 	assert.Equal(t, "ctxPrefixVal", pvc.Annotations[controllers.ContextPrefix], "ContextPrefix annotation")
 	assert.Equal(t, "complete", pvc.Annotations[controllers.PVCProtectionComplete], "PVCProtectionComplete annotation")
 	assert.Equal(t, constants.DellReplicationController, pvc.Annotations[controllers.CreatedBy], "CreatedBy annotation")
-	assert.Equal(t, "remote-vol-id", pvc.Spec.VolumeName, "PVC Spec.VolumeName should be set to remote volume ID")
-	assert.Equal(t, "remote-vol-id", pvc.Annotations[controllers.RemotePV], "RemotePV annotation")
+	assert.Equal(t, "pv1", pvc.Spec.VolumeName, "PVC Spec.VolumeName should be set to PV name for pre-binding")
+	assert.Equal(t, "pv1", pvc.Annotations[controllers.RemotePV], "RemotePV annotation should be PV name")
 	assert.Equal(t, "remote-123", pvc.Annotations[controllers.RemoteClusterID], "RemoteClusterID annotation")
 	assert.Equal(t, "rg-1", pvc.Annotations[controllers.ReplicationGroup], "ReplicationGroup annotation")
 	// StorageClassName is a pointer; compare the string value
@@ -723,6 +730,76 @@ func TestUpdatePVCAnnotations(t *testing.T) {
 	if !strings.HasPrefix(actualRVAnn, expectedPrefix) {
 		t.Errorf("RemoteVolumeAnnotation should start with \"%s\", got \"%s\"", expectedPrefix, actualRVAnn)
 	}
+}
+
+func (suite *PVControllerTestSuite) TestAllowPVCCreationOnTarget_SkipsDeletingPVC() {
+	ctx := context.Background()
+	remoteClient, err := suite.fakeConfig.GetConnection("remote-123")
+	assert.Nil(suite.T(), err)
+	controllers.InitLabelsAndAnnotations(constants.DefaultDomain)
+
+	// Set up a remote PV in the target cluster with Phase=Available and a ClaimRef
+	pvObj := suite.getPV("pv-skip-deleting")
+	pvObj.Status.Phase = corev1.VolumeAvailable
+	pvObj.Spec.ClaimRef = &corev1.ObjectReference{
+		Kind:       "PersistentVolumeClaim",
+		Namespace:  suite.driver.Namespace,
+		Name:       "deleting-pvc",
+		APIVersion: "v1",
+	}
+	if pvObj.Annotations == nil {
+		pvObj.Annotations = make(map[string]string)
+	}
+	pvObj.Annotations[controllers.ContextPrefix] = suite.driver.DriverName
+	pvObj.Annotations[controllers.PVCProtectionComplete] = "yes"
+	pvObj.Annotations[controllers.RemotePVCNamespace] = suite.driver.Namespace
+	pvObj.Annotations[controllers.RemotePVC] = "deleting-pvc-remote"
+	if pvObj.Labels == nil {
+		pvObj.Labels = make(map[string]string)
+	}
+	pvObj.Labels[controllers.DriverName] = suite.driver.DriverName
+	pvObj.Labels[controllers.ReplicationGroup] = "rg0"
+	err = remoteClient.CreatePersistentVolume(ctx, &pvObj)
+	assert.Nil(suite.T(), err)
+
+	// Set up a local PVC that is being deleted (DeletionTimestamp set)
+	pvcObj := utils.GetPVCObj("deleting-pvc", suite.driver.Namespace, suite.driver.StorageClass)
+	pvcAnnotations := make(map[string]string)
+	pvcAnnotations[controllers.RemoteClusterID] = "remote-123"
+	pvcObj.Status.Phase = corev1.ClaimBound
+	pvcObj.Spec.VolumeName = pvObj.Name
+	pvcObj.Annotations = pvcAnnotations
+	pvcObj.Finalizers = []string{"test-finalizer"}
+	err = suite.client.Create(ctx, pvcObj)
+	assert.Nil(suite.T(), err)
+
+	// Mark the PVC for deletion
+	err = suite.client.Delete(ctx, pvcObj)
+	assert.Nil(suite.T(), err)
+
+	// Perform reconciliation with AllowPVCCreationOnTarget = true
+	pvcReq := reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Namespace: suite.driver.Namespace,
+			Name:      "deleting-pvc",
+		},
+	}
+	fakeRecorder := record.NewFakeRecorder(100)
+	externalReconcile := PersistentVolumeClaimReconciler{
+		Client:                   suite.client,
+		Log:                      ctrl.Log.WithName("controllers").WithName("DellCSIReplicationGroup"),
+		Scheme:                   utils.Scheme,
+		EventRecorder:            fakeRecorder,
+		Config:                   suite.fakeConfig,
+		AllowPVCCreationOnTarget: true,
+	}
+	res, err := externalReconcile.Reconcile(ctx, pvcReq)
+	assert.Nil(suite.T(), err, "expected no error on PVC reconcile for deleting PVC")
+	assert.False(suite.T(), res.Requeue, "expected no requeue")
+
+	// Verify that NO remote PVC was created on the target cluster
+	_, err = remoteClient.GetPersistentVolumeClaim(ctx, suite.driver.Namespace, "deleting-pvc-remote")
+	assert.NotNil(suite.T(), err, "expected remote PVC to NOT be created for a deleting PVC")
 }
 
 func TestVerifyNamespaceExistence_NamespaceAlreadyExists(t *testing.T) {

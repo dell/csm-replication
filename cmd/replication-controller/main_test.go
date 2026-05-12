@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -47,6 +48,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/conversion"
 )
 
 type mockManager struct {
@@ -174,6 +176,16 @@ func (m *mockManager) GetRESTMapper() meta.RESTMapper {
 }
 
 func (m *mockManager) GetScheme() *runtime.Scheme {
+	// Implement the method as needed for your mock
+	return nil
+}
+
+func (m *mockManager) GetConverterRegistry() conversion.Registry {
+	// Implement the method as needed for your mock
+	return nil
+}
+
+func (m *mockManager) GetEventRecorder(_ string) events.EventRecorder {
 	// Implement the method as needed for your mock
 	return nil
 }
@@ -943,7 +955,7 @@ func TestCreateReplicationGroupReconciler(t *testing.T) {
 					}
 				}()
 			}
-			createReplicationGroupReconciler(tt.manager, tt.controllerMgr, tt.domain, tt.workerThreads, tt.expRateLimiter, false, tt.setupLog)
+			createReplicationGroupReconciler(tt.manager, tt.controllerMgr, tt.domain, tt.workerThreads, tt.expRateLimiter, false, false, tt.setupLog)
 			if tt.name == "Manager is not nil" {
 				if exitCode != 0 {
 					t.Errorf("Expected exit code 0, but got %d", exitCode)

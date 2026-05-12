@@ -244,6 +244,8 @@ var (
 	MigrationGroup string
 	// MigrationFinalizer — finalizer used by the migration sidecar for pre delete hook
 	MigrationFinalizer string
+	// PendingPVCSwap annotation on the local PV storing serialized PVC backup for crash recovery during PVC swap
+	PendingPVCSwap string
 )
 
 // InitLabelsAndAnnotations initializes package visible constants by using customizable domain variable
@@ -283,4 +285,5 @@ func InitLabelsAndAnnotations(domain string) {
 	ActionProcessedTime = domain + actionProcessedTime
 	MigrationGroup = domain + migrationGroup
 	MigrationFinalizer = domain + migrationFinalizer
+	PendingPVCSwap = domain + pendingPVCSwap
 }

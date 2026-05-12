@@ -77,7 +77,7 @@ func (s *Secret) ToDecodedSecret() *DecodedSecret {
 		m[k] = string(v)
 	}
 
-	meta := metav1.TypeMeta{"Secret", "v1"}
+	meta := metav1.TypeMeta{Kind: "Secret", APIVersion: "v1"}
 	objectMeta := metav1.ObjectMeta{
 		Name:        s.ObjectMeta.Name,
 		Namespace:   s.ObjectMeta.Namespace,
@@ -180,7 +180,7 @@ func editSecretCommand() *cobra.Command {
 			if !existence {
 				editor = "vi"
 			}
-			command := exec.Command(editor, tmpFile.Name()) // #nosec G204 --neither editor nor tmpFile.Name() can be hardcoded
+			command := exec.Command(editor, tmpFile.Name()) // #nosec G702 --neither editor nor tmpFile.Name() can be hardcoded
 			command.Stdout = os.Stdout
 			command.Stderr = os.Stderr
 			command.Stdin = os.Stdin

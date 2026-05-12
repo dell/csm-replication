@@ -329,6 +329,21 @@ func (c *RemoteK8sControllerClient) GetNamespace(ctx context.Context, namespace 
 	return found, nil
 }
 
+// GetObject fetches a generic Kubernetes object (including unstructured CRDs) from the cluster.
+func (c *RemoteK8sControllerClient) GetObject(ctx context.Context, key ctrlClient.ObjectKey, obj ctrlClient.Object) error {
+	return c.Client.Get(ctx, key, obj)
+}
+
+// UpdateObject updates a generic Kubernetes object (including unstructured CRDs) on the cluster.
+func (c *RemoteK8sControllerClient) UpdateObject(ctx context.Context, obj ctrlClient.Object) error {
+	return c.Client.Update(ctx, obj)
+}
+
+// DeleteObject deletes a generic Kubernetes object (including unstructured CRDs) from the cluster.
+func (c *RemoteK8sControllerClient) DeleteObject(ctx context.Context, obj ctrlClient.Object) error {
+	return c.Client.Delete(ctx, obj)
+}
+
 // GetControllerClient - Returns a controller client which reads and writes directly to API server
 func GetControllerClient(restConfig *rest.Config, scheme *runtime.Scheme) (ctrlClient.Client, error) {
 	// Create a temp client and use it

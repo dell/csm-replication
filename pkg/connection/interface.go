@@ -50,6 +50,9 @@ type RemoteClusterClient interface {
 	GetSnapshotClass(ctx context.Context, snapClassName string) (*s1.VolumeSnapshotClass, error)
 	CreateNamespace(ctx context.Context, content *corev1.Namespace) error
 	GetNamespace(ctx context.Context, namespace string) (*corev1.Namespace, error)
+	GetObject(ctx context.Context, key ctrlClient.ObjectKey, obj ctrlClient.Object) error
+	UpdateObject(ctx context.Context, obj ctrlClient.Object) error
+	DeleteObject(ctx context.Context, obj ctrlClient.Object) error
 }
 
 // ConnHandler - Interface

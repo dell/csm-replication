@@ -15,6 +15,7 @@
 package csireplicator
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -25,7 +26,6 @@ import (
 	csireplication "github.com/dell/csm-replication/pkg/csi-clients/replication"
 	"github.com/dell/dell-csi-extensions/replication"
 	"github.com/go-logr/logr"
-	"golang.org/x/net/context"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"

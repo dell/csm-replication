@@ -147,4 +147,3 @@ If you wish to install CSM Replication Controller with repctl on your openSUSE s
 
 Click [here](/TESTING.md) for details on how to test.
 
-

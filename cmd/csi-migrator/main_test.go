@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -45,6 +46,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/conversion"
 )
 
 type mockManager struct {
@@ -172,6 +174,16 @@ func (m *mockManager) GetRESTMapper() meta.RESTMapper {
 }
 
 func (m *mockManager) GetScheme() *runtime.Scheme {
+	// Implement the method as needed for your mock
+	return nil
+}
+
+func (m *mockManager) GetConverterRegistry() conversion.Registry {
+	// Implement the method as needed for your mock
+	return nil
+}
+
+func (m *mockManager) GetEventRecorder(_ string) events.EventRecorder {
 	// Implement the method as needed for your mock
 	return nil
 }

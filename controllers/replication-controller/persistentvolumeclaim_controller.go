@@ -149,9 +149,15 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 	remotePVCName := ""
 	remotePVCNamespace := ""
 	if remoteClusterID != controller.Self && r.AllowPVCCreationOnTarget {
+		// Skip remote PVC creation if local PVC is being deleted (e.g. temporary scratch PVCs)
+		if claim.DeletionTimestamp != nil {
+			log.V(logger.InfoLevel).Info("Local PVC is being deleted, skipping remote PVC creation")
+			return ctrl.Result{}, nil
+		}
 		// if its not single cluster then check the pv status and create pvc on target cluster
 		if remotePV.Status.Phase == v1.VolumeAvailable && remotePV.Spec.ClaimRef != nil {
 			remoteClaim.Spec.AccessModes = remotePV.Spec.AccessModes
+			remoteClaim.Spec.VolumeMode = remotePV.Spec.VolumeMode
 			remoteClaim.Spec.Resources.Requests = v1.ResourceList{
 				v1.ResourceStorage: remotePV.Spec.Capacity[v1.ResourceStorage],
 			}
@@ -167,8 +173,12 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 			// creating PVC on target
 			err = rClient.CreatePersistentVolumeClaim(ctx, remoteClaim)
 			if err != nil {
-				log.Error(err, "Failed to create remote PVC on target cluster")
-				return ctrl.Result{}, err
+				if errors.IsAlreadyExists(err) {
+					log.V(logger.InfoLevel).Info("Remote PVC already exists on target cluster")
+				} else {
+					log.Error(err, "Failed to create remote PVC on target cluster")
+					return ctrl.Result{}, err
+				}
 			}
 		}
 	}
@@ -305,10 +315,9 @@ func updatePVCAnnotationsAndSpec(pvc *v1.PersistentVolumeClaim, remoteClusterID 
 	controller.AddAnnotation(pvc, controller.PVCProtectionComplete, pvcProtectionComplete)
 	// Created By
 	controller.AddAnnotation(pvc, controller.CreatedBy, constants.DellReplicationController)
-	// Remote PV Name
-	remoteVolume, _ := getValueFromAnnotations(controller.RemoteVolumeAnnotation, pv.Annotations)
-	pvc.Spec.VolumeName = remoteVolume
-	controller.AddAnnotation(pvc, controller.RemotePV, remoteVolume)
+	// Remote PV Name - use PV name directly for pre-binding to the target PV
+	pvc.Spec.VolumeName = pv.Name
+	controller.AddAnnotation(pvc, controller.RemotePV, pv.Name)
 	// Remote ClusterID
 	controller.AddAnnotation(pvc, controller.RemoteClusterID, remoteClusterID)
 	// Replication group
@@ -316,9 +325,6 @@ func updatePVCAnnotationsAndSpec(pvc *v1.PersistentVolumeClaim, remoteClusterID 
 	// Remote Storage Class
 	pvc.Spec.StorageClassName = &pv.Spec.StorageClassName
 	controller.AddAnnotation(pvc, controller.RemoteStorageClassAnnotation, pv.Spec.StorageClassName)
-	// Remote Volume
-	remoteVolume, _ = getValueFromAnnotations(controller.RemoteVolumeAnnotation, pv.Annotations)
-	controller.AddAnnotation(pvc, controller.RemoteVolumeAnnotation, remoteVolume)
 	// remote PVC namespace
 	remotePVCNamespace, _ := getValueFromAnnotations(controller.RemotePVCNamespace, pv.Annotations)
 	pvc.Namespace = remotePVCNamespace

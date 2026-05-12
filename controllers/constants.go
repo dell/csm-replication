@@ -133,6 +133,8 @@ const (
 	ClusterUID = "clusterUID"
 	// NodeReScanned will flag the current rescan status
 	NodeReScanned = "node-rescanned"
+	// pendingPVCSwap annotation on the local PV storing serialized PVC backup for crash recovery during PVC swap
+	pendingPVCSwap = "/pendingPVCSwap"
 
 	XCSIReplicationPodName      = "X_CSI_REPLICATION_POD_NAME"
 	XCSIReplicationPodNamespace = "X_CSI_REPLICATION_POD_NAMESPACE"
