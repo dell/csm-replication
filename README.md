@@ -41,8 +41,6 @@ to reconcile state. These controllers are responsible for the syncing of objects
 This project has been created using [kubebuilder](https://github.com/kubernetes-sigs/kubebuilder), and the various kubernetes controllers
 have been implemented using [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime). Additionally, this project uses [kustomize](https://github.com/kubernetes-sigs/kustomize) for generating various `yaml` manifests for Kubernetes objects.
 
-For documentation, please visit [Container Storage Modules documentation](https://dell.github.io/csm-docs/).
-
 ## Table of Contents
 
 * [Code of Conduct](https://github.com/dell/csm/blob/main/docs/CODE_OF_CONDUCT.md)
@@ -138,10 +136,6 @@ You can install the CSM Replication Controller by running the command `make depl
 
 You can also run the `dell-replication-controller` process directly in your Kubernetes cluster by running the command `make run-controller`.
 Make sure that the kubernetes user has the desired RBAC permissions.
-
-#### Platform Notes
-
-If you wish to install CSM Replication Controller with repctl on your openSUSE server, when referring to this [section](https://dell.github.io/csm-docs/docs/deployment/helm/modules/installation/replication/install-repctl/), you need to install `glibc-devel-static` devel package before running `make build`.
 
 ## Testing
 
