@@ -18,9 +18,9 @@ import (
 	"context"
 
 	v1 "github.com/dell/csm-replication/api/v1"
-	"github.com/dell/repctl/pkg/config"
-	"github.com/dell/repctl/pkg/k8s"
-	log "github.com/sirupsen/logrus"
+	csmlog "github.com/dell/csmlog"
+	"github.com/dell/csm-replication/repctl/pkg/config"
+	"github.com/dell/csm-replication/repctl/pkg/k8s"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -35,7 +35,7 @@ var getVerifyInputForSnapshotActionFunction = func(mc GetClustersInterface, inpu
 	return verifyInputForSnapshotAction(mc, input, rg)
 }
 
-var getListReplicationGroupsFunction = func(cluster k8s.ClusterInterface, ctx context.Context) (*v1.DellCSIReplicationGroupList, error) {
+var getListReplicationGroupsFunction = func(cluster k8s.ClusterInterface, _ context.Context) (*v1.DellCSIReplicationGroupList, error) {
 	return cluster.ListReplicationGroups(context.Background())
 }
 
@@ -50,7 +50,7 @@ For single cluster config:
 ./repctl --rg <rg-id> --sn-namespace <namespace> --sn-class <snapshot class> snapshot`,
 		Long: `
 This command will create a snapshot for the specified RG on the target cluster.\n`,
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			rgName := viper.GetString(config.ReplicationGroup)
 			inputCluster := viper.GetString("target")
 			prefix := viper.GetString(config.ReplicationPrefix)
@@ -62,13 +62,13 @@ This command will create a snapshot for the specified RG on the target cluster.\
 
 			configFolder, err := getClustersFolderPathFunction(clusterPath)
 			if err != nil {
-				log.Fatalf("snapshot: error getting clusters folder path: %s\n", err.Error())
+				csmlog.Fatalf("snapshot: error getting clusters folder path: %s\n", err.Error())
 			}
 
 			if input == "rg" {
 				createSnapshot(configFolder, res, prefix, snNamespace, snClass, verbose, wait)
 			} else {
-				log.Error("unexpected input")
+				csmlog.Error("unexpected input")
 				return
 			}
 		},
@@ -91,24 +91,24 @@ func verifyInputForSnapshotAction(mc GetClustersInterface, input string, rg stri
 		if rg != "" {
 			input = rg
 		} else {
-			log.Fatalf("snapshot: wrong input, no input provided. Replication Group ID is needed.\n")
+			csmlog.Fatalf("snapshot: wrong input, no input provided. Replication Group ID is needed.\n")
 		}
 	}
 
 	configFolder, err := getClustersFolderPathFunction(clusterPath)
 	if err != nil {
-		log.Fatalf("snapshot: error getting clusters folder path: %s", err.Error())
+		csmlog.Fatalf("snapshot: error getting clusters folder path: %s", err.Error())
 	}
 
 	clusters, err := mc.GetAllClusters([]string{}, configFolder)
 	if err != nil {
-		log.Fatalf("error in initializing cluster info: %s", err.Error())
+		csmlog.Fatalf("error in initializing cluster info: %s", err.Error())
 	}
 
 	for _, cluster := range clusters.Clusters {
 		rgList, err := getListReplicationGroupsFunction(cluster, context.Background())
 		if err != nil {
-			log.Printf("Encountered error during filtering replication groups. Error: %s",
+			csmlog.Infof("Encountered error during filtering replication groups. Error: %s",
 				err.Error())
 			continue
 		}
@@ -121,11 +121,11 @@ func verifyInputForSnapshotAction(mc GetClustersInterface, input string, rg stri
 	return "", ""
 }
 
-var getRGAndClusterFromRGIDFunction = func(configFolder string, rgID string, filter string) (k8s.ClusterInterface, *v1.DellCSIReplicationGroup, error) {
+var getRGAndClusterFromRGIDFunction = func(configFolder string, rgID string, _ string) (k8s.ClusterInterface, *v1.DellCSIReplicationGroup, error) {
 	return GetRGAndClusterFromRGID(configFolder, rgID, "src")
 }
 
-var getUpdateReplicationGroupFunction = func(cluster k8s.ClusterInterface, ctx context.Context, rg *v1.DellCSIReplicationGroup) error {
+var getUpdateReplicationGroupFunction = func(cluster k8s.ClusterInterface, _ context.Context, rg *v1.DellCSIReplicationGroup) error {
 	return cluster.UpdateReplicationGroup(context.Background(), rg)
 }
 
@@ -135,27 +135,27 @@ var getWaitForStateToUpdateFunction = func(rgName string, cluster k8s.ClusterInt
 
 func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass string, verbose bool, wait bool) {
 	if verbose {
-		log.Printf("fetching RG and cluster info...\n")
+		csmlog.Infof("fetching RG and cluster info...\n")
 	}
 
 	cluster, rg, err := getRGAndClusterFromRGIDFunction(configFolder, rgName, "src")
 	if err != nil {
-		log.Errorf("snapshot to RG: error fetching RG info: (%s)\n", err.Error())
+		csmlog.Errorf("snapshot to RG: error fetching RG info: (%s)\n", err.Error())
 		return
 	}
 
 	if verbose {
-		log.Printf("found specified RG (%s) on cluster (%s)...\n", rg.Name, cluster.GetID())
+		csmlog.Infof("found specified RG (%s) on cluster (%s)...\n", rg.Name, cluster.GetID())
 	}
 
 	rLinkState := rg.Status.ReplicationLinkState
 	if rLinkState.LastSuccessfulUpdate == nil {
-		log.Errorf("Aborted. One of your RGs is in an error state. Please verify RGs logs/events and try again.")
+		csmlog.Errorf("Aborted. One of your RGs is in an error state. Please verify RGs logs/events and try again.")
 		return
 	}
 
 	if snClass == "" {
-		log.Errorf("Aborted. Snapshot class not provided.")
+		csmlog.Errorf("Aborted. Snapshot class not provided.")
 		return
 	}
 
@@ -166,7 +166,7 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass string, v
 		namespace = snNamespace
 	}
 
-	log.Printf("Executing CreateSnapshot on Namespace: %s, Snapshot Class: %s", namespace, snClass)
+	csmlog.Infof("Executing CreateSnapshot on Namespace: %s, Snapshot Class: %s", namespace, snClass)
 
 	if rg.Annotations == nil {
 		rg.Annotations = make(map[string]string)
@@ -176,20 +176,20 @@ func createSnapshot(configFolder, rgName, prefix, snNamespace, snClass string, v
 	rg.Annotations[prefix+"/snapshotClass"] = snClass
 
 	if err := getUpdateReplicationGroupFunction(cluster, context.Background(), rg); err != nil {
-		log.Errorf("snapshot: error executing UpdateAction %s\n", err.Error())
+		csmlog.Errorf("snapshot: error executing UpdateAction %s\n", err.Error())
 		return
 	}
 
 	if wait {
 		success := getWaitForStateToUpdateFunction(rgName, cluster, rLinkState)
 		if success {
-			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
+			csmlog.Infof("Successfully executed action on RG (%s)\n", rg.Name)
 			return
 		}
 
-		log.Printf("RG (%s), timed out with action: snapshot\n", rg.Name)
+		csmlog.Infof("RG (%s), timed out with action: snapshot\n", rg.Name)
 		return
 	}
 
-	log.Printf("RG (%s), successfully updated with action: snapshot\n", rg.Name)
+	csmlog.Infof("RG (%s), successfully updated with action: snapshot\n", rg.Name)
 }

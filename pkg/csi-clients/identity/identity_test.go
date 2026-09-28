@@ -24,14 +24,12 @@ import (
 	commonext "github.com/dell/dell-csi-extensions/common"
 	"github.com/dell/dell-csi-extensions/migration"
 	"github.com/dell/dell-csi-extensions/replication"
-	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/wrapperspb"
-	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 func createFakeConnection() *grpc.ClientConn {
@@ -43,15 +41,12 @@ func TestNew(t *testing.T) {
 	// Create a fake gRPC connection
 	conn := &grpc.ClientConn{}
 
-	// Create a fake logger
-	log := logr.Discard()
-
 	// Create a fake timeout and frequency
 	timeout := time.Second
 	frequency := time.Minute
 
 	// Call the New function
-	result := New(conn, log, timeout, frequency)
+	result := New(conn, timeout, frequency)
 
 	// Assert that the result is not nil
 	if result == nil {
@@ -67,11 +62,6 @@ func TestNew(t *testing.T) {
 	// Assert that the result has the correct connection
 	if result.(*identity).conn != conn {
 		t.Errorf("Expected the result to have connection %v, but got %v", conn, result.(*identity).conn)
-	}
-
-	// Assert that the result has the correct logger
-	if result.(*identity).log != log {
-		t.Errorf("Expected the result to have logger %v, but got %v", log, result.(*identity).log)
 	}
 
 	// Assert that the result has the correct timeout
@@ -94,7 +84,6 @@ func Test_identity_ProbeController(t *testing.T) {
 
 	type fields struct {
 		conn      *grpc.ClientConn
-		log       logr.Logger
 		timeout   time.Duration
 		frequency time.Duration
 	}
@@ -112,7 +101,7 @@ func Test_identity_ProbeController(t *testing.T) {
 	}{
 		{
 			name:   "ProbeController Failed",
-			fields: fields{createFakeConnection(), ctrl.Log.WithName("identity.v1.Identity/ProbeController"), time.Second, time.Second},
+			fields: fields{createFakeConnection(), time.Second, time.Second},
 			args:   args{context.Background()},
 			setup: func() {
 				getClientProbeController = func(_ replication.ReplicationClient, _ context.Context, _ *commonext.ProbeControllerRequest, _ ...grpc.CallOption) (*commonext.ProbeControllerResponse, error) {
@@ -125,7 +114,7 @@ func Test_identity_ProbeController(t *testing.T) {
 		},
 		{
 			name:   "ProbeController Success",
-			fields: fields{createFakeConnection(), ctrl.Log.WithName("identity.v1.Identity/ProbeController"), time.Second, time.Second},
+			fields: fields{createFakeConnection(), time.Second, time.Second},
 			args:   args{context.Background()},
 			setup: func() {
 				getClientProbeController = func(_ replication.ReplicationClient, _ context.Context, _ *commonext.ProbeControllerRequest, _ ...grpc.CallOption) (*commonext.ProbeControllerResponse, error) {
@@ -143,7 +132,7 @@ func Test_identity_ProbeController(t *testing.T) {
 		},
 		{
 			name:   "ProbeController Success (ready = nil)",
-			fields: fields{createFakeConnection(), ctrl.Log.WithName("identity.v1.Identity/ProbeController"), time.Second, time.Second},
+			fields: fields{createFakeConnection(), time.Second, time.Second},
 			args:   args{context.Background()},
 			setup: func() {
 				getClientProbeController = func(_ replication.ReplicationClient, _ context.Context, _ *commonext.ProbeControllerRequest, _ ...grpc.CallOption) (*commonext.ProbeControllerResponse, error) {
@@ -166,7 +155,6 @@ func Test_identity_ProbeController(t *testing.T) {
 			}
 			r := &identity{
 				conn:      tt.fields.conn,
-				log:       tt.fields.log,
 				timeout:   tt.fields.timeout,
 				frequency: tt.fields.frequency,
 			}
@@ -194,7 +182,6 @@ func Test_identity_GetReplicationCapabilities(t *testing.T) {
 
 	type fields struct {
 		conn      *grpc.ClientConn
-		log       logr.Logger
 		timeout   time.Duration
 		frequency time.Duration
 	}
@@ -212,7 +199,7 @@ func Test_identity_GetReplicationCapabilities(t *testing.T) {
 	}{
 		{
 			name:   "GetReplicationCapabilities Failed",
-			fields: fields{createFakeConnection(), ctrl.Log.WithName("identity.v1.Identity/GetReplicationCapabilities"), time.Second, time.Second},
+			fields: fields{createFakeConnection(), time.Second, time.Second},
 			args:   args{context.Background()},
 			setup: func() {
 				getClientGetReplicationCapabilities = func(_ replication.ReplicationClient, _ context.Context, _ *replication.GetReplicationCapabilityRequest, _ ...grpc.CallOption) (*replication.GetReplicationCapabilityResponse, error) {
@@ -225,7 +212,7 @@ func Test_identity_GetReplicationCapabilities(t *testing.T) {
 		},
 		{
 			name:   "GetReplicationCapabilities Passed",
-			fields: fields{createFakeConnection(), ctrl.Log.WithName("identity.v1.Identity/GetReplicationCapabilities"), time.Second, time.Second},
+			fields: fields{createFakeConnection(), time.Second, time.Second},
 			args:   args{context.Background()},
 			setup: func() {
 				getClientGetReplicationCapabilities = func(_ replication.ReplicationClient, _ context.Context, _ *replication.GetReplicationCapabilityRequest, _ ...grpc.CallOption) (*replication.GetReplicationCapabilityResponse, error) {
@@ -277,7 +264,6 @@ func Test_identity_GetReplicationCapabilities(t *testing.T) {
 
 			r := &identity{
 				conn:      tt.fields.conn,
-				log:       tt.fields.log,
 				timeout:   tt.fields.timeout,
 				frequency: tt.fields.frequency,
 			}
@@ -303,7 +289,6 @@ func Test_identity_GetMigrationCapabilities(t *testing.T) {
 	}
 	type fields struct {
 		conn      *grpc.ClientConn
-		log       logr.Logger
 		timeout   time.Duration
 		frequency time.Duration
 	}
@@ -320,7 +305,7 @@ func Test_identity_GetMigrationCapabilities(t *testing.T) {
 	}{
 		{
 			name:   "GetMigrationCapabilities Failed",
-			fields: fields{createFakeConnection(), ctrl.Log.WithName("identity.v1.Identity/GetMigrationCapabilities"), time.Second, time.Second},
+			fields: fields{createFakeConnection(), time.Second, time.Second},
 			args:   args{context.Background()},
 			setup: func() {
 				getClientGetMigrationCapabilities = func(_ migration.MigrationClient, _ context.Context, _ *migration.GetMigrationCapabilityRequest, _ ...grpc.CallOption) (*migration.GetMigrationCapabilityResponse, error) {
@@ -332,7 +317,7 @@ func Test_identity_GetMigrationCapabilities(t *testing.T) {
 		},
 		{
 			name:   "GetMigrationCapabilities Failed",
-			fields: fields{createFakeConnection(), ctrl.Log.WithName("identity.v1.Identity/GetMigrationCapabilities"), time.Second, time.Second},
+			fields: fields{createFakeConnection(), time.Second, time.Second},
 			args:   args{context.Background()},
 			setup: func() {
 				getClientGetMigrationCapabilities = func(_ migration.MigrationClient, _ context.Context, _ *migration.GetMigrationCapabilityRequest, _ ...grpc.CallOption) (*migration.GetMigrationCapabilityResponse, error) {
@@ -369,7 +354,6 @@ func Test_identity_GetMigrationCapabilities(t *testing.T) {
 			}
 			r := &identity{
 				conn:      tt.fields.conn,
-				log:       tt.fields.log,
 				timeout:   tt.fields.timeout,
 				frequency: tt.fields.frequency,
 			}
@@ -397,7 +381,6 @@ func TestProbeForever(t *testing.T) {
 	// Create a new identity instance
 	r := &identity{
 		conn:      mockConn,
-		log:       ctrl.Log.WithName("identity.v1.Identity/ProbeForever"),
 		timeout:   time.Second,
 		frequency: time.Second,
 	}
@@ -425,7 +408,6 @@ func TestProbeForever_Failure(t *testing.T) {
 	// Create a new identity instance
 	r := &identity{
 		conn:      mockConn,
-		log:       ctrl.Log.WithName("identity.v1.Identity/ProbeForever"),
 		timeout:   time.Second,
 		frequency: time.Second,
 	}
@@ -453,7 +435,6 @@ func TestProbeForever_FailureStatus(t *testing.T) {
 	// Create a new identity instance
 	r := &identity{
 		conn:      mockConn,
-		log:       ctrl.Log.WithName("identity.v1.Identity/ProbeForever"),
 		timeout:   time.Second,
 		frequency: time.Second,
 	}

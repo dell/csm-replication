@@ -10,7 +10,7 @@ import (
 
 	context "context"
 
-	k8s "github.com/dell/repctl/pkg/k8s"
+	k8s "github.com/dell/csm-replication/repctl/pkg/k8s"
 
 	mock "github.com/stretchr/testify/mock"
 
@@ -18,7 +18,7 @@ import (
 
 	storagev1 "k8s.io/api/storage/v1"
 
-	types "github.com/dell/repctl/pkg/types"
+	types "github.com/dell/csm-replication/repctl/pkg/types"
 
 	v1 "k8s.io/api/core/v1"
 )

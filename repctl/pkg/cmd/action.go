@@ -12,6 +12,7 @@
  limitations under the License.
 */
 
+// Package cmd contains the repctl subcommands.
 package cmd
 
 import (
@@ -19,11 +20,11 @@ import (
 	"fmt"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
+	csmlog "github.com/dell/csmlog"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
-	"github.com/dell/repctl/pkg/config"
-	"github.com/dell/repctl/pkg/k8s"
+	"github.com/dell/csm-replication/repctl/pkg/config"
+	"github.com/dell/csm-replication/repctl/pkg/k8s"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -42,30 +43,30 @@ repctl --rg <rg-id> exec -a sync
 repctl --rg <rg-id> exec -a establish`,
 		Long: `
 This command will perform a maintenance on current source site. repctl will patch the CR with specified <ACTION>`,
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			rgName := viper.GetString(config.ReplicationGroup)
 			inputAction := viper.GetString("action")
 			verbose := viper.GetBool(config.Verbose)
 			action, err := getSupportedMaintenanceAction(inputAction)
 			if err != nil {
-				log.Error(fmt.Sprintf("exec: error in supported action: %s", err.Error()))
+				csmlog.Error(fmt.Sprintf("exec: error in supported action: %s", err.Error()))
 				return
 			}
 
 			if verbose {
-				log.Printf("Proceeding for action (%s)...", action)
+				csmlog.Infof("Proceeding for action (%s)...", action)
 			}
 			configFolder, err := getClustersFolderPathFunction(clusterPath)
 			if err != nil {
-				log.Fatalf("exec: error getting clusters folder path: %s", err.Error())
+				csmlog.Fatalf("exec: error getting clusters folder path: %s", err.Error())
 			}
 			if verbose {
-				log.Printf("reading cluster configs...")
+				csmlog.Infof("reading cluster configs...")
 			}
 			mc := &k8s.MultiClusterConfigurator{}
 			clusters, err := mc.GetAllClusters([]string{}, configFolder)
 			if err != nil {
-				log.Fatalf("exec: error in initializing cluster info: %s", err.Error())
+				csmlog.Fatalf("exec: error in initializing cluster info: %s", err.Error())
 			}
 			found := false
 			for _, cluster := range clusters.Clusters {
@@ -77,18 +78,18 @@ This command will perform a maintenance on current source site. repctl will patc
 				if rg.Status.ReplicationLinkState.IsSource {
 					found = true
 					if verbose {
-						log.Printf("found RG (%s) on cluster (%s), updating spec...", rg.Name, cluster.GetID())
+						csmlog.Infof("found RG (%s) on cluster (%s), updating spec...", rg.Name, cluster.GetID())
 					}
 					rg.Spec.Action = action
 					if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
-						log.Fatalf("exec: error executing action %s", err.Error())
+						csmlog.Fatalf("exec: error executing action %s", err.Error())
 					}
-					log.Printf("RG (%s) on cluster (%s), successfully updated with action: (%s)", rg.Name, cluster.GetID(), action)
+					csmlog.Infof("RG (%s) on cluster (%s), successfully updated with action: (%s)", rg.Name, cluster.GetID(), action)
 					break
 				}
 			}
 			if !found {
-				log.Error(fmt.Sprintf("exec: no matching cluster found with RG as source (%s)", rgName))
+				csmlog.Error(fmt.Sprintf("exec: no matching cluster found with RG as source (%s)", rgName))
 				return
 			}
 		},
@@ -119,7 +120,7 @@ func GetRGAndClusterFromRGID(configFolder, rgID, filter string) (k8s.ClusterInte
 	mc := &k8s.MultiClusterConfigurator{}
 	clusters, err := mc.GetAllClusters([]string{}, configFolder)
 	if err != nil {
-		log.Fatalf("exec: error in initializing cluster info: %s", err.Error())
+		csmlog.Fatalf("exec: error in initializing cluster info: %s", err.Error())
 	}
 	for _, cluster := range clusters.Clusters {
 		rg, err := cluster.GetReplicationGroups(context.Background(), rgID)

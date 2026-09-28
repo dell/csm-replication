@@ -20,9 +20,9 @@ import (
 	"time"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
-	"github.com/dell/repctl/pkg/config"
-	"github.com/dell/repctl/pkg/k8s"
-	log "github.com/sirupsen/logrus"
+	csmlog "github.com/dell/csmlog"
+	"github.com/dell/csm-replication/repctl/pkg/config"
+	"github.com/dell/csm-replication/repctl/pkg/k8s"
 	"github.com/spf13/viper"
 
 	"github.com/spf13/cobra"
@@ -51,7 +51,7 @@ This command will perform a planned failover to a cluster or to an RG.
 To perform failover to a cluster, use --target <clusterID> with --rg <rg-id1> and to do failover to RG, use --target <rg-id2> with --rg <rg-id1>. repctl will patch the CR at source site with action FAILOVER_REMOTE.
 With --unplanned, this command will perform an unplanned failover to given cluster or an rg. repctl will patch CR at cluster2 with action UNPLANNED_FAILOVER_LOCAL`,
 
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			rgName := viper.GetString(config.ReplicationGroup)
 			inputTargetCluster := viper.GetString("tgt")
 			unplanned := viper.GetBool("unplanned")
@@ -61,7 +61,7 @@ With --unplanned, this command will perform an unplanned failover to given clust
 
 			configFolder, err := getClustersFolderPathFunction(clusterPath)
 			if err != nil {
-				log.Errorf("failover: error getting clusters folder path: %s\n", err.Error())
+				csmlog.Errorf("failover: error getting clusters folder path: %s\n", err.Error())
 				return
 			}
 
@@ -70,7 +70,7 @@ With --unplanned, this command will perform an unplanned failover to given clust
 			} else if target == "rg" {
 				failoverToRG(configFolder, inputTargetCluster, unplanned, verbose, wait)
 			} else {
-				log.Error("unexpected input")
+				csmlog.Error("unexpected input")
 				return
 			}
 		},
@@ -91,18 +91,18 @@ With --unplanned, this command will perform an unplanned failover to given clust
 func verifyInputForFailoverAction(input string) string {
 	// Check if cluster or rg is given by the user
 	if input == "" {
-		log.Fatalf("failover: wrong input, no input provided. Either clusterID or RGID is needed.\n")
+		csmlog.Fatalf("failover: wrong input, no input provided. Either clusterID or RGID is needed.\n")
 	}
 
 	configFolder, err := getClustersFolderPathFunction(clusterPath)
 	if err != nil {
-		log.Fatalf("list pvc: error getting clusters folder path: %s", err.Error())
+		csmlog.Fatalf("list pvc: error getting clusters folder path: %s", err.Error())
 	}
 
 	mc := &k8s.MultiClusterConfigurator{}
 	clusters, err := mc.GetAllClusters([]string{}, configFolder)
 	if err != nil {
-		log.Fatalf("error in initializing cluster info: %s", err.Error())
+		csmlog.Fatalf("error in initializing cluster info: %s", err.Error())
 	}
 
 	for _, cluster := range clusters.Clusters {
@@ -111,7 +111,7 @@ func verifyInputForFailoverAction(input string) string {
 		}
 		rgList, err := cluster.ListReplicationGroups(context.Background())
 		if err != nil {
-			log.Printf("Encountered error during filtering persistent volume claims. Error: %s",
+			csmlog.Infof("Encountered error during filtering persistent volume claims. Error: %s",
 				err.Error())
 			continue
 		}
@@ -126,166 +126,166 @@ func verifyInputForFailoverAction(input string) string {
 
 func failoverToRG(configFolder, rgName string, unplanned bool, verbose bool, wait bool) {
 	if verbose {
-		log.Printf("fetching RG and cluster info...\n")
+		csmlog.Infof("fetching RG and cluster info...\n")
 	}
 	// fetch the target RG and the cluster info
 	cluster, rg, err := GetRGAndClusterFromRGID(configFolder, rgName, "tgt")
 	if err != nil {
-		log.Fatalf("failover to RG: error fetching target RG info: (%s)\n", err.Error())
+		csmlog.Fatalf("failover to RG: error fetching target RG info: (%s)\n", err.Error())
 	}
 	if verbose {
-		log.Printf("found target RG (%s) on cluster (%s)...\n", rg.Name, cluster.GetID())
+		csmlog.Infof("found target RG (%s) on cluster (%s)...\n", rg.Name, cluster.GetID())
 	}
 	// check if the action is unplanned failover
 	if unplanned {
 		rLinkState := rg.Status.ReplicationLinkState
 		if rLinkState.LastSuccessfulUpdate == nil {
-			log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
+			csmlog.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
 		}
 		// unplanned failover, update target RG
 		rg.Spec.Action = config.ActionFailoverLocalUnplanned
 		if verbose {
-			log.Print("found flag for unplanned failover, updating remote RG...")
+			csmlog.Info("found flag for unplanned failover, updating remote RG...")
 		}
 		if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
-			log.Fatalf("failover: error executing UpdateAction %s\n", err.Error())
+			csmlog.Fatalf("failover: error executing UpdateAction %s\n", err.Error())
 		}
 		if wait {
 			success := waitForStateToUpdate(rgName, cluster, rLinkState)
 			if success {
-				log.Printf("RG (%s), successfully updated with action: failover\n", rg.Name)
+				csmlog.Infof("RG (%s), successfully updated with action: failover\n", rg.Name)
 				return
 			}
-			log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
+			csmlog.Infof("RG (%s), timed out with action: failover\n", rg.Name)
 			return
 
 		}
-		log.Printf("RG (%s), successfully updated with action: unplanned failover\n", rg.Name)
+		csmlog.Infof("RG (%s), successfully updated with action: unplanned failover\n", rg.Name)
 	} else {
 		// proceed for planned failover
 		sourceRGID := rg.GetAnnotations()[path.Join(viper.GetString(config.ReplicationPrefix), "remoteReplicationGroupName")]
 		if sourceRGID == "" {
-			log.Fatalf("failover: error in fecthing source RG name: %s\n", err.Error())
+			csmlog.Fatalf("failover: error in fecthing source RG name: %s\n", err.Error())
 		}
 		if verbose {
-			log.Printf("source RG (%s) ...\n", sourceRGID)
+			csmlog.Infof("source RG (%s) ...\n", sourceRGID)
 		}
 		sourceRG, err := cluster.GetReplicationGroups(context.Background(), sourceRGID)
 		if err != nil {
-			log.Fatalf("failover: error in fecthing RG info: %s\n", err.Error())
+			csmlog.Fatalf("failover: error in fecthing RG info: %s\n", err.Error())
 		}
 		if verbose {
-			log.Printf("found RG (%s) on source cluster, updating spec...\n", rg.Name)
+			csmlog.Infof("found RG (%s) on source cluster, updating spec...\n", rg.Name)
 		}
 		rLinkState := rg.Status.ReplicationLinkState
 		if rLinkState.LastSuccessfulUpdate == nil {
-			log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
+			csmlog.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
 		}
 		sourceRG.Spec.Action = config.ActionFailoverRemote
 		if err := cluster.UpdateReplicationGroup(context.Background(), sourceRG); err != nil {
-			log.Fatalf("failover: error executing UpdateAction %s\n", err.Error())
+			csmlog.Fatalf("failover: error executing UpdateAction %s\n", err.Error())
 		}
 		if wait {
 			success := waitForStateToUpdate(rgName, cluster, rLinkState)
 			if success {
-				log.Printf("RG (%s), successfully updated with action: failover\n", rg.Name)
+				csmlog.Infof("RG (%s), successfully updated with action: failover\n", rg.Name)
 				return
 			}
-			log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
+			csmlog.Infof("RG (%s), timed out with action: failover\n", rg.Name)
 			return
 
 		}
-		log.Printf("RG (%s), successfully updated with action: failover\n", sourceRG.Name)
+		csmlog.Infof("RG (%s), successfully updated with action: failover\n", sourceRG.Name)
 	}
 }
 
 func failoverToCluster(configFolder, inputTargetCluster, rgName string, unplanned bool, verbose bool, wait bool) {
 	if verbose {
-		log.Print("reading cluster configs...")
+		csmlog.Info("reading cluster configs...")
 	}
 	mc := &k8s.MultiClusterConfigurator{}
 	clusters, err := mc.GetAllClusters([]string{inputTargetCluster}, configFolder)
 	if err != nil {
-		log.Fatalf("failover: error in initializing cluster info: %s\n", err.Error())
+		csmlog.Fatalf("failover: error in initializing cluster info: %s\n", err.Error())
 	}
 	targetCluster := clusters.Clusters[0]
 	if verbose {
-		log.Printf("found target cluster (%s)\n", targetCluster.GetID())
+		csmlog.Infof("found target cluster (%s)\n", targetCluster.GetID())
 	}
 	rg, err := targetCluster.GetReplicationGroups(context.Background(), rgName)
 	if err != nil {
-		log.Fatalf("failover: error in fecthing RG info: %s\n", err.Error())
+		csmlog.Fatalf("failover: error in fecthing RG info: %s\n", err.Error())
 	}
 	if verbose {
-		log.Printf("found RG (%s) on target cluster...\n", rg.Name)
+		csmlog.Infof("found RG (%s) on target cluster...\n", rg.Name)
 	}
 	if rg.Status.ReplicationLinkState.IsSource {
-		log.Fatalf("failover: error executing failover to source site.")
+		csmlog.Fatalf("failover: error executing failover to source site.")
 	}
 	// check if this is an unplanned failover
 	if unplanned {
 		rLinkState := rg.Status.ReplicationLinkState
 		if rLinkState.LastSuccessfulUpdate == nil {
-			log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
+			csmlog.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
 		}
 		rg.Spec.Action = config.ActionFailoverLocalUnplanned
 		if verbose {
-			log.Print("found flag for unplanned failover, updating remote RG...")
+			csmlog.Info("found flag for unplanned failover, updating remote RG...")
 		}
 		if err := targetCluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
-			log.Fatalf("failover: error executing UpdateAction %s\n", err.Error())
+			csmlog.Fatalf("failover: error executing UpdateAction %s\n", err.Error())
 		}
 		if wait {
 			success := waitForStateToUpdate(rgName, targetCluster, rLinkState)
 			if success {
-				log.Printf("RG (%s), successfully updated with action: failover\n", rg.Name)
+				csmlog.Infof("RG (%s), successfully updated with action: failover\n", rg.Name)
 				return
 			}
-			log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
+			csmlog.Infof("RG (%s), timed out with action: failover\n", rg.Name)
 			return
 
 		}
-		log.Printf("RG (%s), successfully updated with action: unplanned failover\n", rg.Name)
+		csmlog.Infof("RG (%s), successfully updated with action: unplanned failover\n", rg.Name)
 	} else {
 		// proceed for planned failover
 		if verbose {
-			log.Print("fetching source cluster...")
+			csmlog.Info("fetching source cluster...")
 		}
 		// fetch CR on source cluster (remote to this target  cluster)
 		clusters, err = mc.GetAllClusters([]string{rg.Spec.RemoteClusterID}, configFolder)
 		if err != nil {
-			log.Fatalf("failover: error in fetching source cluster info: %s\n", err.Error())
+			csmlog.Fatalf("failover: error in fetching source cluster info: %s\n", err.Error())
 		}
 		sourceCluster := clusters.Clusters[0]
 		if verbose {
-			log.Printf("found source cluster (%s)\n", sourceCluster.GetID())
+			csmlog.Infof("found source cluster (%s)\n", sourceCluster.GetID())
 		}
 		rg, err = sourceCluster.GetReplicationGroups(context.Background(), rgName)
 		if err != nil {
-			log.Fatalf("failover: error in fecthing RG info: %s\n", err.Error())
+			csmlog.Fatalf("failover: error in fecthing RG info: %s\n", err.Error())
 		}
 		if verbose {
-			log.Printf("found RG (%s) on source cluster, updating spec...\n", rg.Name)
+			csmlog.Infof("found RG (%s) on source cluster, updating spec...\n", rg.Name)
 		}
 		rLinkState := rg.Status.ReplicationLinkState
 		if rLinkState.LastSuccessfulUpdate == nil {
-			log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
+			csmlog.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
 		}
 		rg.Spec.Action = config.ActionFailoverRemote
 		if err := sourceCluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
-			log.Fatalf("failover: error executing UpdateAction %s\n", err.Error())
+			csmlog.Fatalf("failover: error executing UpdateAction %s\n", err.Error())
 		}
 		if wait {
 			success := waitForStateToUpdate(rgName, sourceCluster, rLinkState)
 			if success {
-				log.Printf("RG (%s), successfully updated with action: failover\n", rg.Name)
+				csmlog.Infof("RG (%s), successfully updated with action: failover\n", rg.Name)
 				return
 			}
-			log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
+			csmlog.Infof("RG (%s), timed out with action: failover\n", rg.Name)
 			return
 
 		}
-		log.Printf("RG (%s), successfully updated with action: failover\n", rg.Name)
+		csmlog.Infof("RG (%s), successfully updated with action: failover\n", rg.Name)
 	}
 }
 
@@ -296,7 +296,7 @@ func waitForStateToUpdate(rgName string, cluster k8s.ClusterInterface, repllinks
 	defer ticker.Stop()
 
 	go func() {
-		log.Print("Waiting for action to complete ...")
+		csmlog.Info("Waiting for action to complete ...")
 		for {
 			select {
 			case <-timeout:
@@ -305,7 +305,7 @@ func waitForStateToUpdate(rgName string, cluster k8s.ClusterInterface, repllinks
 			case <-ticker.C:
 				rg, err := cluster.GetReplicationGroups(context.Background(), rgName)
 				if err != nil {
-					log.Fatalf("failover: error in fecthing RG info: %s\n", err.Error())
+					csmlog.Fatalf("failover: error in fecthing RG info: %s\n", err.Error())
 				}
 				if rg.Status.ReplicationLinkState.LastSuccessfulUpdate.Time != repllinkstate.LastSuccessfulUpdate.Time {
 					ret <- true

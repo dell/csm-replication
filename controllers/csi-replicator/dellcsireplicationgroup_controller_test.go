@@ -25,16 +25,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dell/csmlog"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
+	"github.com/dell/csm-replication/internal/metrics"
 	"github.com/dell/csm-replication/pkg/common/constants"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
 	csiidentity "github.com/dell/csm-replication/test/mocks"
 	csireplication "github.com/dell/csm-replication/test/mocks"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -80,12 +84,11 @@ func (suite *RGControllerTestSuite) Init() {
 }
 
 func (suite *RGControllerTestSuite) initReconciler() {
-	logger := ctrl.Log.WithName("controllers").WithName("DellCSIReplicationGroup")
 	// Get capabilities
 	identity := csiidentity.NewFakeIdentityClient(suite.driver.DriverName)
 	_, actions, err := identity.GetReplicationCapabilities(context.Background())
 	if err != nil {
-		logger.Error(err, "failed to get CSI driver capabilities")
+		csmlog.Errorf("failed to get CSI driver capabilities: %v", err)
 		os.Exit(1)
 	}
 	fakeRecorder := record.NewFakeRecorder(100)
@@ -94,7 +97,6 @@ func (suite *RGControllerTestSuite) initReconciler() {
 
 	rgReconcile := &ReplicationGroupReconciler{
 		Client:                     suite.client,
-		Log:                        logger,
 		Scheme:                     utils.Scheme,
 		DriverName:                 suite.driver.DriverName,
 		EventRecorder:              fakeRecorder,
@@ -559,10 +561,8 @@ func (suite *RGControllerTestSuite) TestActionInReadyState() {
 	suite.rgReconcile.Client = suite.client
 	req := suite.getTypicalReconcileRequest(replicationGroup.Name)
 
-	// Reconcile twice
+	// Reconcile once to move the action into the in-progress state
 	_, err := suite.rgReconcile.Reconcile(context.Background(), req)
-	suite.NoError(err, "No error on RG reconcile")
-	_, err = suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err, "No error on RG reconcile")
 
 	// Get the updated RG
@@ -616,6 +616,49 @@ func (suite *RGControllerTestSuite) TestActionInProgressState() {
 	// Check if condition was updated
 	msg := fmt.Sprintf("Replication Link State:IsSource changed")
 	suite.Equal(true, conditionPresent(rg.Status.Conditions, msg))
+}
+
+func TestExecuteActionRecordsOnlyTerminalResults(t *testing.T) {
+	actionType := ActionType(csiext.ActionTypes_FAILOVER_LOCAL.String())
+	action := &csiext.ExecuteActionRequest_Action{Action: &csiext.Action{ActionTypes: csiext.ActionTypes_FAILOVER_LOCAL}}
+	rg := utils.GetRGObj("rg-action-metrics", "driver", "remote-cluster", utils.LocalPGID, utils.RemotePGID, nil, nil)
+
+	tests := []struct {
+		name       string
+		injected   error
+		metricName string
+		metricHelp string
+		wantMetric bool
+	}{
+		{name: "success", metricName: metrics.MetricReplicationSuccessTotal, metricHelp: "Total successful replication operations.", wantMetric: true},
+		{name: "terminal failure", injected: status.Error(codes.FailedPrecondition, "failed"), metricName: metrics.MetricReplicationFailureTotal, metricHelp: "Total failed replication operations.", wantMetric: true},
+		{name: "transient failure", injected: status.Error(codes.Unavailable, "retry"), metricName: metrics.MetricReplicationFailureTotal, metricHelp: "Total failed replication operations.", wantMetric: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			registry := prometheus.NewPedanticRegistry()
+			previous := metrics.GetGlobalReplicationMetrics()
+			metrics.SetGlobalReplicationMetrics(metrics.NewReplicationMetrics(registry))
+			defer metrics.SetGlobalReplicationMetrics(previous)
+
+			repClient := csireplication.NewFakeReplicationClient(utils.ContextPrefix)
+			if tt.injected != nil {
+				repClient.InjectErrorAutoClear(tt.injected)
+			}
+			r := &ReplicationGroupReconciler{DriverName: "driver", ReplicationClient: &repClient}
+			r.executeAction(context.Background(), rg, actionType, action)
+
+			expected := ""
+			if tt.wantMetric {
+				expected = fmt.Sprintf(`# HELP %s %s
+# TYPE %s counter
+%s{action=%q,driver="driver"} 1
+`, tt.metricName, tt.metricHelp, tt.metricName, tt.metricName, actionType.String())
+			}
+			assert.NoError(t, testutil.GatherAndCompare(registry, strings.NewReader(expected), tt.metricName))
+		})
+	}
 }
 
 func (suite *RGControllerTestSuite) TestActionInProgressStateWithSingleError() {
@@ -1115,16 +1158,16 @@ func (suite *RGControllerTestSuite) TestActionInErrorStateWithContextDeadlineErr
 	err = suite.client.Update(context.Background(), rg)
 	suite.NoError(err)
 
-	// Reconcile a few times
-	_, err = suite.rgReconcile.Reconcile(context.Background(), req)
+	// Reconcile once to move to the new in-progress action
 	_, err = suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.NoError(err)
 
 	deadlineExceededError := status.Error(codes.DeadlineExceeded, "context deadline exceeded")
 	suite.repClient.InjectErrorAutoClear(deadlineExceededError)
+
+	// Reconcile again to execute the action and hit the temporary error
 	_, err = suite.rgReconcile.Reconcile(context.Background(), req)
 
-	//_, err = suite.rgReconcile.Reconcile(context.Background(), req)
 	suite.EqualError(err, deadlineExceededError.Error())
 	// Get the updated RG
 	err = suite.client.Get(context.Background(), req.NamespacedName, rg)
@@ -1224,6 +1267,152 @@ func TestSetupWithManagerRg(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestReplicationGroupReconciler_updateState(t *testing.T) {
+	rg := utils.GetRGObj("rg-update-state", "driver", "remote-cluster", utils.LocalPGID, utils.RemotePGID, nil, nil)
+	r := &ReplicationGroupReconciler{Client: utils.GetFakeClientWithObjects(rg)}
+
+	err := r.updateState(context.Background(), rg.DeepCopy(), ReadyState)
+	assert.NoError(t, err)
+
+	updatedRG := &repv1.DellCSIReplicationGroup{}
+	err = r.Client.Get(context.Background(), types.NamespacedName{Name: rg.Name}, updatedRG)
+	assert.NoError(t, err)
+	assert.Equal(t, ReadyState, updatedRG.Status.State)
+}
+
+func TestReplicationGroupReconciler_processRGInActionInProgressStateWithInvalidSpecAction(t *testing.T) {
+	rg := utils.GetRGObj("rg-invalid-spec-action", "driver", "remote-cluster", utils.LocalPGID, utils.RemotePGID, nil, nil)
+	rg.Status.State = ActionType("Resume").getInProgressState()
+	rg.Spec.Action = "invalid-action"
+	r := &ReplicationGroupReconciler{
+		Client:           utils.GetFakeClientWithObjects(rg),
+		EventRecorder:    record.NewFakeRecorder(10),
+		SupportedActions: []*csiext.SupportedActions{},
+	}
+
+	result, err := r.processRGInActionInProgressState(context.Background(), rg.DeepCopy())
+	assert.NoError(t, err)
+	assert.Equal(t, ctrl.Result{}, result)
+
+	updatedRG := &repv1.DellCSIReplicationGroup{}
+	err = r.Client.Get(context.Background(), types.NamespacedName{Name: rg.Name}, updatedRG)
+	assert.NoError(t, err)
+	assert.Empty(t, updatedRG.Spec.Action)
+}
+
+func TestReplicationGroupReconciler_processRGInActionInProgressStateWithoutActionOrAnnotation(t *testing.T) {
+	rg := utils.GetRGObj("rg-missing-action-and-annotation", "driver", "remote-cluster", utils.LocalPGID, utils.RemotePGID, nil, nil)
+	rg.Status.State = ActionType("Resume").getInProgressState()
+	r := &ReplicationGroupReconciler{
+		Client:        utils.GetFakeClientWithObjects(rg),
+		EventRecorder: record.NewFakeRecorder(10),
+	}
+
+	result, err := r.processRGInActionInProgressState(context.Background(), rg.DeepCopy())
+	assert.NoError(t, err)
+	assert.Equal(t, ctrl.Result{}, result)
+
+	updatedRG := &repv1.DellCSIReplicationGroup{}
+	err = r.Client.Get(context.Background(), types.NamespacedName{Name: rg.Name}, updatedRG)
+	assert.NoError(t, err)
+	assert.Equal(t, ReadyState, updatedRG.Status.State)
+}
+
+func TestReplicationGroupReconciler_processRGInActionInProgressStateWithValidSpecActionButMissingAnnotation(t *testing.T) {
+	rg := utils.GetRGObj("rg-valid-action-missing-annotation", "driver", "remote-cluster", utils.LocalPGID, utils.RemotePGID, nil, nil)
+	rg.Status.State = ActionType("Resume").getInProgressState()
+	rg.Spec.Action = "Resume"
+	repClient := csireplication.NewFakeReplicationClient(utils.ContextPrefix)
+	r := &ReplicationGroupReconciler{
+		Client:            utils.GetFakeClientWithObjects(rg),
+		EventRecorder:     record.NewFakeRecorder(10),
+		ReplicationClient: &repClient,
+		SupportedActions: []*csiext.SupportedActions{
+			{
+				Actions: &csiext.SupportedActions_Type{
+					Type: csiext.ActionTypes_RESUME,
+				},
+			},
+		},
+	}
+
+	result, err := r.processRGInActionInProgressState(context.Background(), rg.DeepCopy())
+	assert.NoError(t, err)
+	assert.Equal(t, ctrl.Result{}, result)
+
+	updatedRG := &repv1.DellCSIReplicationGroup{}
+	err = r.Client.Get(context.Background(), types.NamespacedName{Name: rg.Name}, updatedRG)
+	assert.NoError(t, err)
+	assert.Equal(t, ReadyState, updatedRG.Status.State)
+	assert.Empty(t, updatedRG.Spec.Action)
+
+	var actionAnnotation ActionAnnotation
+	err = json.Unmarshal([]byte(updatedRG.Annotations[Action]), &actionAnnotation)
+	assert.NoError(t, err)
+	assert.Equal(t, ActionType("Resume").String(), actionAnnotation.ActionName)
+	assert.True(t, actionAnnotation.Completed)
+}
+
+func TestReplicationGroupReconciler_removeFinalizerNoop(t *testing.T) {
+	rg := utils.GetRGObj("rg-no-finalizer", "driver", "remote-cluster", utils.LocalPGID, utils.RemotePGID, nil, nil)
+	r := &ReplicationGroupReconciler{Client: utils.GetFakeClientWithObjects(rg)}
+
+	err := r.removeFinalizer(context.Background(), rg.DeepCopy())
+	assert.NoError(t, err)
+
+	updatedRG := &repv1.DellCSIReplicationGroup{}
+	err = r.Client.Get(context.Background(), types.NamespacedName{Name: rg.Name}, updatedRG)
+	assert.NoError(t, err)
+	assert.Empty(t, updatedRG.Finalizers)
+	assert.Empty(t, updatedRG.Annotations[controllers.ProtectionGroupRemovedAnnotation])
+}
+
+func TestReplicationGroupReconciler_removeFinalizer(t *testing.T) {
+	rg := utils.GetRGObj("rg-remove-finalizer", "driver", "remote-cluster", utils.LocalPGID, utils.RemotePGID, nil, nil)
+	rg.Finalizers = []string{controllers.ReplicationFinalizer}
+	r := &ReplicationGroupReconciler{Client: utils.GetFakeClientWithObjects(rg)}
+
+	err := r.removeFinalizer(context.Background(), rg.DeepCopy())
+	assert.NoError(t, err)
+
+	updatedRG := &repv1.DellCSIReplicationGroup{}
+	err = r.Client.Get(context.Background(), types.NamespacedName{Name: rg.Name}, updatedRG)
+	assert.NoError(t, err)
+	assert.Empty(t, updatedRG.Finalizers)
+	assert.Equal(t, "yes", updatedRG.Annotations[controllers.ProtectionGroupRemovedAnnotation])
+}
+
+func TestReplicationGroupReconciler_processRGInNoState(t *testing.T) {
+	rg := utils.GetRGObj("rg-no-state", "driver", "remote-cluster", utils.LocalPGID, utils.RemotePGID, nil, nil)
+	rg.Status.State = ""
+	r := &ReplicationGroupReconciler{Client: utils.GetFakeClientWithObjects(rg)}
+
+	result, err := r.processRGInNoState(context.Background(), rg.DeepCopy())
+	assert.NoError(t, err)
+	assert.True(t, result.Requeue)
+
+	updatedRG := &repv1.DellCSIReplicationGroup{}
+	err = r.Client.Get(context.Background(), types.NamespacedName{Name: rg.Name}, updatedRG)
+	assert.NoError(t, err)
+	assert.Contains(t, updatedRG.Finalizers, controllers.ReplicationFinalizer)
+}
+
+func TestReplicationGroupReconciler_processRGInNoStateWithExistingFinalizer(t *testing.T) {
+	rg := utils.GetRGObj("rg-ready-from-empty", "driver", "remote-cluster", utils.LocalPGID, utils.RemotePGID, nil, nil)
+	rg.Status.State = ""
+	rg.Finalizers = []string{controllers.ReplicationFinalizer}
+	r := &ReplicationGroupReconciler{Client: utils.GetFakeClientWithObjects(rg)}
+
+	result, err := r.processRGInNoState(context.Background(), rg.DeepCopy())
+	assert.NoError(t, err)
+	assert.Equal(t, ctrl.Result{}, result)
+
+	updatedRG := &repv1.DellCSIReplicationGroup{}
+	err = r.Client.Get(context.Background(), types.NamespacedName{Name: rg.Name}, updatedRG)
+	assert.NoError(t, err)
+	assert.Equal(t, ReadyState, updatedRG.Status.State)
 }
 
 func TestReplicationGroupReconciler_getAction(t *testing.T) {

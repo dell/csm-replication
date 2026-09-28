@@ -15,12 +15,10 @@
 package connection
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
-	"github.com/go-logr/logr"
-
+	"github.com/dell/csmlog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -36,7 +34,6 @@ type PendingState struct {
 	npending     int
 	pendingMutex sync.Mutex
 	pendingMap   map[RgIDType]time.Time
-	Log          logr.Logger
 }
 
 // CheckAndUpdatePendingState sets state of current RG as pending if allowed by current capacity
@@ -48,7 +45,7 @@ func (rgID RgIDType) CheckAndUpdatePendingState(ps *PendingState) error {
 	}
 	startTime := ps.pendingMap[rgID]
 	if startTime.IsZero() == false {
-		ps.Log.Info(fmt.Sprintf("rgID %s pending %s", rgID, time.Now().Sub(startTime)))
+		csmlog.Infof("rgID %s pending %s", rgID, time.Now().Sub(startTime))
 		return status.Errorf(codes.Unavailable, "pending")
 	}
 	if ps.MaxPending > 0 && ps.npending >= ps.MaxPending {

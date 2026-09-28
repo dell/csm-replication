@@ -39,6 +39,18 @@ build-sidecar-node-rescanner: gen-semver
 build-controller-manager: gen-semver
 	CGO_ENABLED=0 GOOS=linux go build -ldflags $(LDFLAGS) -mod=vendor -o bin/dell-replication-controller cmd/replication-controller/main.go
 
+build-binary-sidecar-manager:
+	CGO_ENABLED=0 GOOS=linux go build -ldflags $(LDFLAGS) -mod=vendor -o bin/dell-csi-replicator cmd/csi-replicator/main.go
+
+build-binary-sidecar-migrator:
+	CGO_ENABLED=0 GOOS=linux go build -ldflags $(LDFLAGS) -mod=vendor -o bin/dell-csi-migrator cmd/csi-migrator/main.go
+
+build-binary-sidecar-node-rescanner:
+	CGO_ENABLED=0 GOOS=linux go build -ldflags $(LDFLAGS) -mod=vendor -o bin/dell-csi-node-rescanner cmd/csi-node-rescanner/main.go
+
+build-binary-controller-manager:
+	CGO_ENABLED=0 GOOS=linux go build -ldflags $(LDFLAGS) -mod=vendor -o bin/dell-replication-controller cmd/replication-controller/main.go
+
 # Build all binaries for replication
 build: build-sidecar-manager build-sidecar-migrator build-sidecar-node-rescanner build-controller-manager
 

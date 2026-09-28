@@ -19,8 +19,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 var debugUnitTest = false
@@ -60,7 +58,6 @@ func TestPending(t *testing.T) {
 	for _, test := range tests {
 		pendState := &PendingState{
 			MaxPending: test.maxpending,
-			Log:        zap.New(),
 		}
 		for i := 0; i < test.npending; i++ {
 			id := strconv.Itoa(i)

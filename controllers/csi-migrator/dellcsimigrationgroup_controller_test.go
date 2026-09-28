@@ -66,14 +66,12 @@ func (suite *MGControllerTestSuite) Init() {
 }
 
 func (suite *MGControllerTestSuite) initReconciler() {
-	logger := ctrl.Log.WithName("controllers").WithName("DellCSIMigrationGroup")
 	fakeRecorder := record.NewFakeRecorder(100)
 	// Initialize the annotations & labels
 	controllers.InitLabelsAndAnnotations(constants.DefaultDomain)
 
 	suite.mgReconcile = &MigrationGroupReconciler{
 		Client:                     suite.client,
-		Log:                        logger,
 		Scheme:                     utils.Scheme,
 		DriverName:                 suite.driver.DriverName,
 		EventRecorder:              fakeRecorder,
@@ -646,4 +644,120 @@ func (suite *MGControllerTestSuite) TestRemoveFinalizerFailure() {
 	err = suite.mgReconcile.removeFinalizer(ctx, mg1.DeepCopy())
 	suite.Error(err, "Should fail to remove the finalizers")
 	suite.Contains(err.Error(), "not found")
+}
+
+func (suite *MGControllerTestSuite) TestProcessMGForDeletionUpdatesState() {
+	mg1 := getTypicalMigrationGroup()
+	mg1.Status.State = ReadyState
+
+	suite.client = utils.GetFakeClientWithObjects(mg1)
+	suite.mgReconcile.Client = suite.client
+
+	result, err := suite.mgReconcile.processMGForDeletion(context.Background(), mg1.DeepCopy())
+	suite.NoError(err)
+	suite.Equal(ctrl.Result{}, result)
+
+	updatedMG := &storagev1.DellCSIMigrationGroup{}
+	err = suite.mgReconcile.Client.Get(context.Background(), types.NamespacedName{Name: mg1.Name}, updatedMG)
+	suite.NoError(err)
+	suite.Equal(DeletingState, updatedMG.Status.State)
+}
+
+func (suite *MGControllerTestSuite) TestProcessMGForDeletionRemovesFinalizerWhenAlreadyDeleting() {
+	mg1 := getTypicalMigrationGroup()
+	mg1.Status.State = DeletingState
+	mg1.Finalizers = []string{controllers.MigrationFinalizer}
+
+	suite.client = utils.GetFakeClientWithObjects(mg1)
+	suite.mgReconcile.Client = suite.client
+
+	result, err := suite.mgReconcile.processMGForDeletion(context.Background(), mg1.DeepCopy())
+	suite.NoError(err)
+	suite.Equal(ctrl.Result{}, result)
+
+	updatedMG := &storagev1.DellCSIMigrationGroup{}
+	err = suite.mgReconcile.Client.Get(context.Background(), types.NamespacedName{Name: mg1.Name}, updatedMG)
+	suite.NoError(err)
+	suite.Empty(updatedMG.Finalizers)
+}
+
+func (suite *MGControllerTestSuite) TestProcessMGInNoStateFailsWhenObjectMissing() {
+	mg1 := getTypicalMigrationGroup()
+	mg1.Status.State = NoState
+
+	suite.client = utils.GetFakeClient()
+	suite.mgReconcile.Client = suite.client
+
+	result, err := suite.mgReconcile.processMGInNoState(context.Background(), mg1.DeepCopy())
+	suite.Error(err)
+	suite.Equal(ctrl.Result{}, result)
+	suite.Contains(err.Error(), "not found")
+}
+
+func (suite *MGControllerTestSuite) TestProcessMGForDeletionAlreadyDeletingWithoutFinalizer() {
+	mg1 := getTypicalMigrationGroup()
+	mg1.Status.State = DeletingState
+
+	suite.client = utils.GetFakeClientWithObjects(mg1)
+	suite.mgReconcile.Client = suite.client
+
+	result, err := suite.mgReconcile.processMGForDeletion(context.Background(), mg1.DeepCopy())
+	suite.NoError(err)
+	suite.Equal(ctrl.Result{}, result)
+
+	updatedMG := &storagev1.DellCSIMigrationGroup{}
+	err = suite.mgReconcile.Client.Get(context.Background(), types.NamespacedName{Name: mg1.Name}, updatedMG)
+	suite.NoError(err)
+	suite.Empty(updatedMG.Finalizers)
+	suite.Equal(DeletingState, updatedMG.Status.State)
+}
+
+func (suite *MGControllerTestSuite) TestMGReconcileDeletionTimestampWithoutDeletingState() {
+	mg1 := getTypicalMigrationGroup()
+	mg1.Status.State = ReadyState
+	now := metav1.Now()
+	mg1.DeletionTimestamp = &now
+	mg1.Finalizers = []string{controllers.MigrationFinalizer}
+
+	suite.client = utils.GetFakeClientWithObjects(mg1)
+	suite.mgReconcile.Client = suite.client
+
+	res, err := suite.mgReconcile.Reconcile(context.Background(), suite.getTypicalReconcileRequest(mg1.Name))
+	suite.Error(err)
+	suite.Equal(ctrl.Result{}, res)
+	suite.Contains(err.Error(), "not ready for deletion")
+}
+
+func (suite *MGControllerTestSuite) TestMGReconcileWithUnknownState() {
+	mg1 := getTypicalMigrationGroup()
+	mg1.Status.State = "mystery-state"
+
+	suite.client = utils.GetFakeClientWithObjects(mg1)
+	suite.mgReconcile.Client = suite.client
+
+	res, err := suite.mgReconcile.Reconcile(context.Background(), suite.getTypicalReconcileRequest(mg1.Name))
+	suite.Error(err)
+	suite.Equal(ctrl.Result{}, res)
+	suite.Contains(err.Error(), "Unknown state")
+}
+
+func (suite *MGControllerTestSuite) TestMGReconcileDeletionTimestampWithDeletingState() {
+	mg1 := getTypicalMigrationGroup()
+	mg1.Status.State = DeletingState
+	now := metav1.Now()
+	mg1.DeletionTimestamp = &now
+	mg1.Finalizers = []string{controllers.MigrationFinalizer}
+
+	suite.client = utils.GetFakeClientWithObjects(mg1)
+	suite.mgReconcile.Client = suite.client
+
+	res, err := suite.mgReconcile.Reconcile(context.Background(), suite.getTypicalReconcileRequest(mg1.Name))
+	suite.NoError(err)
+	suite.Equal(ctrl.Result{}, res)
+
+	updatedMG := &storagev1.DellCSIMigrationGroup{}
+	err = suite.mgReconcile.Client.Get(context.Background(), types.NamespacedName{Name: mg1.Name}, updatedMG)
+	if err == nil {
+		suite.Empty(updatedMG.Finalizers)
+	}
 }

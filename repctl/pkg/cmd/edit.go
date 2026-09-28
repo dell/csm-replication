@@ -21,9 +21,9 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/dell/repctl/pkg/config"
-	"github.com/dell/repctl/pkg/k8s"
-	log "github.com/sirupsen/logrus"
+	csmlog "github.com/dell/csmlog"
+	"github.com/dell/csm-replication/repctl/pkg/config"
+	"github.com/dell/csm-replication/repctl/pkg/k8s"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	v1 "k8s.io/api/core/v1"
@@ -135,10 +135,10 @@ func editSecretCommand() *cobra.Command {
 		Example: `
 ./repctl edit secret <secret name> --namespace <namespace>
 ./repctl edit secret <secret name> --namespace <namespace> --clusters <cluster name>`,
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, args []string) {
 			configFolder, err := getClustersFolderPathFunction(clusterPath)
 			if err != nil {
-				log.Fatalf("edit secret: error getting clusters folder path: %s", err.Error())
+				csmlog.Fatalf("edit secret: error getting clusters folder path: %s", err.Error())
 			}
 
 			clusterIDs := viper.GetStringSlice(config.Clusters)
@@ -146,7 +146,7 @@ func editSecretCommand() *cobra.Command {
 			mc := &k8s.MultiClusterConfigurator{}
 			clusters, err := getMultiConfigClusters(mc, clusterIDs, configFolder)
 			if err != nil {
-				log.Fatalf("edit secret: error in initializing cluster info: %s", err.Error())
+				csmlog.Fatalf("edit secret: error in initializing cluster info: %s", err.Error())
 			}
 
 			// Get the first cluster object
@@ -156,7 +156,7 @@ func editSecretCommand() *cobra.Command {
 			secretNamespace := viper.GetString("namespace")
 			s, err := getSecretFunction(cluster, context.Background(), secretNamespace, secretName)
 			if err != nil {
-				log.Fatalf("edit secret: error in getting secret: %s", err.Error())
+				csmlog.Fatalf("edit secret: error in getting secret: %s", err.Error())
 			}
 
 			secret := &Secret{s}
@@ -164,44 +164,44 @@ func editSecretCommand() *cobra.Command {
 
 			tmpFile, err := os.CreateTemp("", "temp")
 			if err != nil {
-				log.Fatalf("edit secret: error in creating temp file with secret data: %s", err.Error())
+				csmlog.Fatalf("edit secret: error in creating temp file with secret data: %s", err.Error())
 			}
 
 			defer os.Remove(tmpFile.Name())
 
 			if _, err := tmpFile.Write([]byte(data)); err != nil {
-				log.Fatalf("edit secret: error in writing temp file with secret data: %s", err.Error())
+				csmlog.Fatalf("edit secret: error in writing temp file with secret data: %s", err.Error())
 			}
 			if err := tmpFile.Close(); err != nil {
-				log.Fatalf("edit secret: error in closing temp file with secret data: %s", err.Error())
+				csmlog.Fatalf("edit secret: error in closing temp file with secret data: %s", err.Error())
 			}
 
 			editor, existence := os.LookupEnv("EDITOR")
 			if !existence {
 				editor = "vi"
 			}
-			command := exec.Command(editor, tmpFile.Name()) // #nosec G702 --neither editor nor tmpFile.Name() can be hardcoded
+			command := exec.Command(editor, tmpFile.Name()) // #nosec G204 -- editor and temp file are controlled by the user and test harness
 			command.Stdout = os.Stdout
 			command.Stderr = os.Stderr
 			command.Stdin = os.Stdin
 			err = command.Run()
 			if err != nil {
-				log.Fatalf("edit secret: error in running text editor: %s", err.Error())
+				csmlog.Fatalf("edit secret: error in running text editor: %s", err.Error())
 			}
 
 			// extract data from temp file and converting back to secret
 			newSecret, err := parseSecret(tmpFile.Name())
 			if err != nil {
-				log.Fatalf("edit secret: error in parsing data to yaml: %s", err.Error())
+				csmlog.Fatalf("edit secret: error in parsing data to yaml: %s", err.Error())
 			}
 
 			for _, cluster := range clusters.Clusters {
 				copiedSecret := newSecret.DeepCopy()
 				err = getUpdateSecretFunction(cluster, context.Background(), copiedSecret)
 				if err != nil {
-					log.Fatalf("edit secret: error in updating secret in clusters: %s", err.Error())
+					csmlog.Fatalf("edit secret: error in updating secret in clusters: %s", err.Error())
 				}
-				log.Println("updated secret in cluster ", cluster.GetID())
+				csmlog.Infof("updated secret in cluster %s", cluster.GetID())
 			}
 		},
 	}

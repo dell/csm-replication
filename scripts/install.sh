@@ -21,7 +21,7 @@ MODE="install"
 NS="dell-replication-controller"
 RELEASE="replication"
 MODULE="csm-replication"
-DEFAULT_VERSION="v1.15.0"
+DEFAULT_VERSION="v1.16.0"
 
 # Derive HELMCHARTVERSION from DEFAULT_VERSION (single source of truth)
 HELMCHARTVERSION="${MODULE}-${DEFAULT_VERSION#v}"
@@ -47,7 +47,9 @@ function usage() {
 
   decho "  Optional"
   decho "  --upgrade                                Perform an upgrade, default is false"
-  decho "  --helm-charts-version                    Pass the helm chart version"
+  decho "  --helm-charts-version                    Helm chart version (format: full git tag for local e.g. csm-replication-1.16.0; version number for OCI Registry e.g. 1.16.0)"
+  decho "  --oci-chart[=]<oci-uri>                  OCI registry URI for Helm chart (e.g., oci://registry.example.com/charts/csm-replication)"
+  decho "  --registry-auth-secret[=]<secret-name>   Kubernetes secret containing registry credentials (username/password keys)"
   decho "  -h                                       Help"
   decho
 
@@ -113,6 +115,26 @@ function validate_params() {
     usage
     exit 1
   fi
+
+  # OCI chart validation
+  if [ -n "${OCI_CHART}" ]; then
+    if [[ ! "${OCI_CHART}" =~ ^oci:// ]]; then
+      decho "OCI chart URI must start with oci://"
+      usage
+      exit 1
+    fi
+    if [ -z "${REGISTRY_AUTH_SECRET}" ]; then
+      decho "Warning: --registry-auth-secret not specified. Registry login will be skipped."
+      decho "This is only acceptable if the OCI registry does not require authentication."
+    fi
+  fi
+
+  # Registry auth secret requires OCI chart
+  if [ -n "${REGISTRY_AUTH_SECRET}" ] && [ -z "${OCI_CHART}" ]; then
+    decho "--registry-auth-secret can only be used with --oci-chart"
+    usage
+    exit 1
+  fi
 }
 
 # install_module uses helm to install the module with a given name
@@ -123,17 +145,65 @@ function install_module() {
     log step "Installing ${MODULE} module"
   fi
 
+  # Handle OCI registry authentication if needed
+  if [ -n "${OCI_CHART}" ] && [ -n "${REGISTRY_AUTH_SECRET}" ]; then
+    log section "Authenticating to OCI Registry"
+    extract_registry_credentials_from_secret "${REGISTRY_AUTH_SECRET}" "${NS}"
+
+    local registry_domain
+    registry_domain=$(echo "${OCI_CHART}" | sed -E 's|^oci://([^/]+).*|\1|')
+
+    local use_plain_http="false"
+    if [[ "${registry_domain}" == localhost* ]] || [[ "${registry_domain}" == 127.0.0.1* ]]; then
+      use_plain_http="true"
+    fi
+
+    helm_registry_login "${registry_domain}" "${REGISTRY_USERNAME}" "${REGISTRY_PASSWORD}" "${use_plain_http}"
+    if [ $? -ne 0 ]; then
+      log error "Failed to authenticate to OCI registry ${registry_domain}"
+    fi
+    log step_success
+  fi
+
+  # Determine chart source: OCI URI or local filesystem
+  local CHART_SOURCE
+  local HELM_EXTRA_FLAGS=""
+  if [ -n "${OCI_CHART}" ]; then
+    CHART_SOURCE="${OCI_CHART}"
+    log step "Using OCI chart: ${CHART_SOURCE}"
+
+    # Add --version flag if HELMCHARTVERSION is specified
+    if [ -n "${HELMCHARTVERSION}" ]; then
+      HELM_EXTRA_FLAGS="${HELM_EXTRA_FLAGS} --version ${HELMCHARTVERSION}"
+    fi
+
+    # Add --plain-http flag for localhost registries
+    local registry_domain
+    registry_domain=$(echo "${OCI_CHART}" | sed -E 's|^oci://([^/]+).*|\1|')
+    if [[ "${registry_domain}" == localhost* ]] || [[ "${registry_domain}" == 127.0.0.1* ]]; then
+      HELM_EXTRA_FLAGS="${HELM_EXTRA_FLAGS} --plain-http"
+    fi
+  else
+    CHART_SOURCE="${MODULEDIR}/${MODULE}"
+    log step "Using local chart: ${CHART_SOURCE}"
+  fi
+
   HELMOUTPUT="/tmp/csm-install.$$.out"
+  record_helm_telemetry "${1}" "${MODULE}" "pending"
   run_command helm ${1} \
     --set openshift=${OPENSHIFT} \
     --values "${VALUES}" \
     --namespace ${NS} "${RELEASE}" \
-    "${MODULEDIR}/${MODULE}" >"${HELMOUTPUT}" 2>&1
+    "${CHART_SOURCE}" ${HELM_EXTRA_FLAGS} >"${HELMOUTPUT}" 2>&1
+  HELM_RC=$?
 
-  if [ $? -ne 0 ]; then
+  if [ $HELM_RC -ne 0 ]; then
     cat "${HELMOUTPUT}"
+    detect_ssa_conflict_in_output "${HELMOUTPUT}"
+    record_helm_telemetry "${1}" "${MODULE}" "failure"
     log error "Helm operation failed, output can be found in ${HELMOUTPUT}. The failure should be examined, before proceeding."
   fi
+  record_helm_telemetry "${1}" "${MODULE}" "success"
   log step_success
   # wait for the deployment to finish, use the default timeout
   waitOnRunning "${NS}" "Deployment dell-replication-controller-manager"
@@ -225,6 +295,40 @@ function waitOnRunning() {
   return 0
 }
 
+# extract_registry_credentials_from_secret
+function extract_registry_credentials_from_secret() {
+  local secret_name="${1}"
+  local namespace="${2}"
+
+  if [ -z "${secret_name}" ] || [ -z "${namespace}" ]; then
+    log error "Secret name and namespace are required for credential extraction"
+  fi
+
+  log step "Extracting registry credentials from secret ${secret_name}"
+
+  local username_b64
+  local password_b64
+
+  username_b64=$(kubectl get secret "${secret_name}" -n "${namespace}" -o jsonpath='{.data.username}' 2>/dev/null)
+  if [ -z "${username_b64}" ]; then
+    log error "Failed to extract username from secret ${secret_name} in namespace ${namespace}"
+  fi
+
+  password_b64=$(kubectl get secret "${secret_name}" -n "${namespace}" -o jsonpath='{.data.password}' 2>/dev/null)
+  if [ -z "${password_b64}" ]; then
+    log error "Failed to extract password from secret ${secret_name} in namespace ${namespace}"
+  fi
+
+  REGISTRY_USERNAME=$(echo "${username_b64}" | base64 -d)
+  REGISTRY_PASSWORD=$(echo "${password_b64}" | base64 -d)
+
+  if [ -z "${REGISTRY_USERNAME}" ] || [ -z "${REGISTRY_PASSWORD}" ]; then
+    log error "Decoded credentials are empty from secret ${secret_name}"
+  fi
+
+  log step_success
+}
+
 # verify_kubernetes
 # will run a module specific function to verify environmental requirements
 function verify_kubernetes() {
@@ -256,6 +360,20 @@ while getopts ":h-:" optchar; do
     values=*)
       VALUES=${OPTARG#*=}
       ;;
+    oci-chart)
+      OCI_CHART="${!OPTIND}"
+      OPTIND=$((OPTIND + 1))
+      ;;
+    oci-chart=*)
+      OCI_CHART=${OPTARG#*=}
+      ;;
+    registry-auth-secret)
+      REGISTRY_AUTH_SECRET="${!OPTIND}"
+      OPTIND=$((OPTIND + 1))
+      ;;
+    registry-auth-secret=*)
+      REGISTRY_AUTH_SECRET=${OPTARG#*=}
+      ;;
     *)
       decho "Unknown option --${OPTARG}"
       decho "For help, run $PROG -h"
@@ -274,17 +392,20 @@ while getopts ":h-:" optchar; do
   esac
 done
 
-if [ ! -d "$MODULEDIR/helm-charts" ]; then
-  if  [ ! -d "$SCRIPTDIR/helm-charts" ]; then
-    git clone --quiet -c advice.detachedHead=false -b $HELMCHARTVERSION https://github.com/dell/helm-charts
+# Skip git clone when using OCI charts (charts pulled from registry, not local files)
+if [ -z "${OCI_CHART}" ]; then
+  if [ ! -d "$MODULEDIR/helm-charts" ]; then
+    if  [ ! -d "$SCRIPTDIR/helm-charts" ]; then
+      git clone --quiet -c advice.detachedHead=false -b $HELMCHARTVERSION https://github.com/dell/helm-charts
+    fi
+    mv helm-charts $MODULEDIR
+  else
+    if [  -d "$SCRIPTDIR/helm-charts" ]; then
+      rm -rf $SCRIPTDIR/helm-charts
+    fi
   fi
-  mv helm-charts $MODULEDIR
-else
-  if [  -d "$SCRIPTDIR/helm-charts" ]; then
-    rm -rf $SCRIPTDIR/helm-charts
-  fi
+  MODULEDIR="${SCRIPTDIR}/../helm-charts/charts"
 fi
-MODULEDIR="${SCRIPTDIR}/../helm-charts/charts"
 
 # make sure kubectl is available
 kubectl --help >&/dev/null || {
@@ -296,6 +417,8 @@ helm --help >&/dev/null || {
   decho "helm required for installation... exiting"
   exit 2
 }
+detect_helm_version
+validate_helm_version "${HELM_MAJOR_VERSION}"
 
 OPENSHIFT=$(isOpenShift)
 

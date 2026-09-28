@@ -21,9 +21,9 @@ import (
 	"time"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
-	"github.com/dell/repctl/mocks"
-	"github.com/dell/repctl/pkg/config"
-	"github.com/dell/repctl/pkg/k8s"
+	"github.com/dell/csm-replication/repctl/mocks"
+	"github.com/dell/csm-replication/repctl/pkg/config"
+	"github.com/dell/csm-replication/repctl/pkg/k8s"
 	"github.com/golang/mock/gomock"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
@@ -76,7 +76,7 @@ func TestGetFailbackCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -175,7 +175,7 @@ func TestFailbackToRG(t *testing.T) {
 				getUpdateReplicationGroupFunction = func(_ k8s.ClusterInterface, _ context.Context, _ *repv1.DellCSIReplicationGroup) error {
 					return nil
 				}
-				getWaitForStateToUpdateFunction = func(rgName string, cluster k8s.ClusterInterface, rLinkState repv1.ReplicationLinkState) bool {
+				getWaitForStateToUpdateFunction = func(_ string, _ k8s.ClusterInterface, _ repv1.ReplicationLinkState) bool {
 					return false
 				}
 			},
@@ -214,7 +214,7 @@ func TestFailbackToRG(t *testing.T) {
 				getUpdateReplicationGroupFunction = func(_ k8s.ClusterInterface, _ context.Context, _ *repv1.DellCSIReplicationGroup) error {
 					return errors.New("failback: error executing UpdateAction")
 				}
-				getWaitForStateToUpdateFunction = func(rgName string, cluster k8s.ClusterInterface, rLinkState repv1.ReplicationLinkState) bool {
+				getWaitForStateToUpdateFunction = func(_ string, _ k8s.ClusterInterface, _ repv1.ReplicationLinkState) bool {
 					return true
 				}
 			},
@@ -292,7 +292,7 @@ func Test_failbackToCluster(t *testing.T) {
 				)
 				mockClusterA.On("UpdateReplicationGroup", mock.Anything, mock.Anything).Return(nil)
 
-				getMultiClusterAllClusters = func(mc *k8s.MultiClusterConfigurator, clusterIDs []string, configDir string) (*k8s.Clusters, error) {
+				getMultiClusterAllClusters = func(_ *k8s.MultiClusterConfigurator, _ []string, _ string) (*k8s.Clusters, error) {
 					return &k8s.Clusters{
 						Clusters: []k8s.ClusterInterface{
 							mockClusterA,
@@ -336,7 +336,7 @@ func Test_failbackToCluster(t *testing.T) {
 					errors.New("failback: error executing UpdateAction"),
 				)
 
-				getMultiClusterAllClusters = func(mc *k8s.MultiClusterConfigurator, clusterIDs []string, configDir string) (*k8s.Clusters, error) {
+				getMultiClusterAllClusters = func(_ *k8s.MultiClusterConfigurator, _ []string, _ string) (*k8s.Clusters, error) {
 					return &k8s.Clusters{
 						Clusters: []k8s.ClusterInterface{
 							mockClusterA,
@@ -385,7 +385,7 @@ func Test_failbackToCluster(t *testing.T) {
 					errors.New("failback: error executing UpdateAction"),
 				)
 
-				getMultiClusterAllClusters = func(mc *k8s.MultiClusterConfigurator, clusterIDs []string, configDir string) (*k8s.Clusters, error) {
+				getMultiClusterAllClusters = func(_ *k8s.MultiClusterConfigurator, _ []string, _ string) (*k8s.Clusters, error) {
 					return &k8s.Clusters{
 						Clusters: []k8s.ClusterInterface{
 							mockClusterA,

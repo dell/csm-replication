@@ -23,9 +23,9 @@ import (
 	"testing"
 
 	fake_client "github.com/dell/csm-replication/test/e2e-framework/fake-client"
-	"github.com/dell/repctl/pkg/cmd/mocks"
-	"github.com/dell/repctl/pkg/k8s"
-	"github.com/dell/repctl/pkg/metadata"
+	"github.com/dell/csm-replication/repctl/pkg/cmd/mocks"
+	"github.com/dell/csm-replication/repctl/pkg/k8s"
+	"github.com/dell/csm-replication/repctl/pkg/metadata"
 	"github.com/golang/mock/gomock"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
@@ -93,7 +93,7 @@ func TestGetListClusterGlobalCommandExitClustersFolderPath(t *testing.T) {
 		defer func() {
 			getClustersFolderPathFunction = originalGetClustersFolderPathFunction
 		}()
-		getClustersFolderPathFunction = func(path string) (string, error) {
+		getClustersFolderPathFunction = func(_ string) (string, error) {
 			return "", errors.New("error getting clusters folder path")
 		}
 		cmd := getListClusterGlobalCommand(nil)
@@ -102,7 +102,7 @@ func TestGetListClusterGlobalCommandExitClustersFolderPath(t *testing.T) {
 	}
 
 	// call the test again with INVOKE_ERROR_EXIT=1 so the function is invoked and we can check the return code
-	cmd := exec.Command(os.Args[0], "-test.run=TestGetListClusterGlobalCommandExitClustersFolderPath") // #nosec G204
+	cmd := exec.Command(os.Args[0], "-test.run=TestGetListClusterGlobalCommandExitClustersFolderPath") // #nosec G204,G702 -- test-only helper; inputs are hardcoded test data
 	cmd.Env = append(os.Environ(), "INVOKE_ERROR_EXIT=1")
 
 	stdout, err := cmd.StderrPipe()
@@ -139,7 +139,7 @@ func TestGetListClusterGlobalCommandExitGetAllClusters(t *testing.T) {
 		defer func() {
 			getClustersFolderPathFunction = originalGetClustersFolderPathFunction
 		}()
-		getClustersFolderPathFunction = func(path string) (string, error) {
+		getClustersFolderPathFunction = func(_ string) (string, error) {
 			return "folder", nil
 		}
 		getClustersMock := mocks.NewMockGetClustersInterface(gomock.NewController(t))
@@ -150,7 +150,7 @@ func TestGetListClusterGlobalCommandExitGetAllClusters(t *testing.T) {
 	}
 
 	// call the test again with INVOKE_ERROR_EXIT=1 so the function is invoked and we can check the return code
-	cmd := exec.Command(os.Args[0], "-test.run=TestGetListClusterGlobalCommandExitGetAllClusters") // #nosec G204
+	cmd := exec.Command(os.Args[0], "-test.run=TestGetListClusterGlobalCommandExitGetAllClusters") // #nosec G204,G702 -- test-only helper; inputs are hardcoded test data
 	cmd.Env = append(os.Environ(), "INVOKE_ERROR_EXIT=1")
 
 	stdout, err := cmd.StderrPipe()
@@ -197,7 +197,7 @@ func (suite *ListTestSuite) TestGetListPersistentVolumesCommand() {
 	}{
 		{
 			name: "Successful with no filter",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				return clusterPath, nil
 			},
 			objects: []runtime.Object{
@@ -212,7 +212,7 @@ func (suite *ListTestSuite) TestGetListPersistentVolumesCommand() {
 		},
 		{
 			name: "Successful with filter",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				return clusterPath, nil
 			},
 			objects: []runtime.Object{
@@ -283,7 +283,7 @@ func (suite *ListTestSuite) TestGetListPersistentVolumesCommand() {
 
 			cmd.Run(nil, nil)
 
-			w.Close()
+			_ = w.Close()
 			out, _ := io.ReadAll(r)
 			os.Stdout = rescueStdout
 
@@ -306,7 +306,7 @@ func (suite *ListTestSuite) TestGetListStorageClassesCommand() {
 	}{
 		{
 			name: "Successful",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				return clusterPath, nil
 			},
 			expectedOutputContains: "test-sc",
@@ -359,7 +359,7 @@ func (suite *ListTestSuite) TestGetListStorageClassesCommand() {
 
 			listPVCmd.Run(nil, nil)
 
-			w.Close()
+			_ = w.Close()
 			out, _ := io.ReadAll(r)
 			os.Stdout = rescueStdout
 
@@ -382,7 +382,7 @@ func (suite *ListTestSuite) TestGetListPersistentVolumeClaimsCommand() {
 	}{
 		{
 			name: "Successful with filter",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				return clusterPath, nil
 			},
 			objects: []runtime.Object{
@@ -412,7 +412,7 @@ func (suite *ListTestSuite) TestGetListPersistentVolumeClaimsCommand() {
 		},
 		{
 			name: "Successful with no filter",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				return clusterPath, nil
 			},
 			objects: []runtime.Object{
@@ -481,7 +481,7 @@ func (suite *ListTestSuite) TestGetListPersistentVolumeClaimsCommand() {
 
 			cmd.Run(nil, nil)
 
-			w.Close()
+			_ = w.Close()
 			out, _ := io.ReadAll(r)
 			os.Stdout = rescueStdout
 
@@ -504,7 +504,7 @@ func (suite *ListTestSuite) TestGetListClusterGlobalCommand() {
 	}{
 		{
 			name: "Successful",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				return clusterPath, nil
 			},
 			expectedOutputContains: "cluster-id",
@@ -542,7 +542,7 @@ func (suite *ListTestSuite) TestGetListClusterGlobalCommand() {
 
 			cmd.Run(nil, nil)
 
-			w.Close()
+			_ = w.Close()
 			out, _ := io.ReadAll(r)
 			os.Stdout = rescueStdout
 
@@ -559,7 +559,7 @@ func (suite *ListTestSuite) TestGetListReplicationGroupsCommand() {
 	}{
 		{
 			name: "Successful",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				return clusterPath, nil
 			},
 			expectedOutputContains: "test-rg",
@@ -607,7 +607,7 @@ func (suite *ListTestSuite) TestGetListReplicationGroupsCommand() {
 
 			cmd.Run(nil, nil)
 
-			w.Close()
+			_ = w.Close()
 			out, _ := io.ReadAll(r)
 			os.Stdout = rescueStdout
 

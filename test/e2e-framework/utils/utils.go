@@ -34,9 +34,9 @@ import (
 	fakeclient "github.com/dell/csm-replication/test/e2e-framework/fake-client"
 	"github.com/dell/csm-replication/test/mock-server/server"
 	"github.com/dell/csm-replication/test/mock-server/stub"
+	"github.com/dell/csmlog"
 	"github.com/dell/dell-csi-extensions/replication"
 	"github.com/fatih/color"
-	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	v1 "k8s.io/api/core/v1"
@@ -52,7 +52,6 @@ import (
 	"k8s.io/client-go/util/homedir"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 const (
@@ -115,8 +114,6 @@ type Common struct {
 	Namespace string
 }
 
-var log logr.Logger
-
 // MockServer mock grpc server
 var MockServer *grpc.Server
 
@@ -141,7 +138,7 @@ func InitializeSchemes() {
 
 // RunServer launches mock grpc server
 func RunServer(stubsPath string) {
-	log.Info("RUNNING MOCK SERVER")
+	csmlog.Info("RUNNING MOCK SERVER")
 	const (
 		csiAddress       = "localhost:4772"
 		defaultStubsPath = "../mock-server/stubs"
@@ -164,7 +161,7 @@ func RunServer(stubsPath string) {
 	}
 	lis, err := net.Listen(protocol, csiAddress)
 	if err != nil {
-		log.Error(err, "failed to listen on address", "address", csiAddress)
+		csmlog.Errorf("failed to listen on address: %v", err)
 		os.Exit(1)
 	}
 
@@ -428,7 +425,7 @@ func WaitForAllToBeBound(ctx context.Context, k8sClient client.Client, t *testin
 func StopMockServer() {
 	// terminate gracefully
 	MockServer.GracefulStop()
-	log.Info("Server stopped gracefully")
+	csmlog.Info("Server stopped gracefully")
 }
 
 // MockUtils contains utils for mocking calls
@@ -438,11 +435,5 @@ type MockUtils struct {
 	FakeControllerClient client.Client
 }
 
-// GetLogger returns currently used logger
-func GetLogger() logr.Logger {
-	return log
-}
-
 func init() {
-	log = zap.New(zap.UseDevMode(false))
 }

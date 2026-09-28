@@ -18,22 +18,23 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
+	metricscommon "github.com/dell/csm-metrics-common/pkg/server"
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
 	repController "github.com/dell/csm-replication/controllers/replication-controller"
+	"github.com/dell/csm-replication/internal/metrics"
 	"github.com/dell/csm-replication/pkg/common/constants"
-	"github.com/dell/csm-replication/pkg/common/logger"
 	"github.com/dell/csm-replication/pkg/config"
 	"github.com/dell/csm-replication/pkg/connection"
-	"github.com/bombsimon/logrusr/v4"
+	"github.com/dell/csmlog"
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-logr/logr"
-	"github.com/sirupsen/logrus"
+	"github.com/prometheus/client_golang/prometheus"
 	corev1 "k8s.io/api/core/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/record"
@@ -60,28 +61,24 @@ import (
 )
 
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	scheme = runtime.NewScheme()
 
 	osExit = os.Exit
 
-	getSecretControllerLogger = func(mgr *ControllerManager, request reconcile.Request) logr.Logger {
-		return mgr.SecretController.GetLogger().WithName(request.Name)
-	}
-	getUpdateConfigOnSecretEvent = func(mgr *ControllerManager, ctx context.Context, request reconcile.Request, er record.EventRecorder, secretLog logr.Logger) error {
-		return mgr.config.UpdateConfigOnSecretEvent(ctx, mgr.Manager.GetClient(), mgr.Opts, request.Name, er, secretLog)
+	getUpdateConfigOnSecretEvent = func(mgr *ControllerManager, ctx context.Context, request reconcile.Request, er record.EventRecorder) error {
+		return mgr.config.UpdateConfigOnSecretEvent(ctx, mgr.Manager.GetClient(), mgr.Opts, request.Name, er)
 	}
 	getUpdateConfigMap = func(mgr *ControllerManager, ctx context.Context, er record.EventRecorder) error {
-		return mgr.config.UpdateConfigMap(ctx, mgr.Manager.GetClient(), mgr.Opts, er, mgr.Manager.GetLogger())
+		return mgr.config.UpdateConfigMap(ctx, mgr.Manager.GetClient(), mgr.Opts, er)
 	}
 	getConnectionControllerClient = func(scheme *runtime.Scheme) (client.Client, error) {
 		return connection.GetControllerClient(nil, scheme)
 	}
-	getConfig = func(ctx context.Context, client client.Client, opts config.ControllerManagerOpts, er record.EventRecorder, mgrLogger logr.Logger) (*config.Config, error) {
-		return config.GetConfig(ctx, client, opts, er, mgrLogger)
+	getConfig = func(ctx context.Context, client client.Client, opts config.ControllerManagerOpts, er record.EventRecorder) (*config.Config, error) {
+		return config.GetConfig(ctx, client, opts, er)
 	}
-	getConfigPrintConfig = func(config *config.Config, logger logr.Logger) {
-		config.PrintConfig(logger)
+	getConfigPrintConfig = func(config *config.Config) {
+		config.PrintConfig()
 	}
 	getManagerStart = func(mgr manager.Manager) error {
 		return mgr.Start(ctrl.SetupSignalHandler())
@@ -102,7 +99,15 @@ var (
 		return ctrl.NewManager(ctrl.GetConfigOrDie(), options)
 	}
 
-	setupFlags = func() (map[string]string, logr.Logger, *logrus.Logger, context.Context) {
+	watchConfigFunc    = viper.WatchConfig
+	onConfigChangeFunc = viper.OnConfigChange
+
+	newMetricsServerFunc   = metricscommon.NewMetricsServer
+	startMetricsServerFunc = func(s *metricscommon.MetricsServer) error {
+		return s.Start()
+	}
+
+	setupFlags = func() (map[string]string, context.Context) {
 		var (
 			retryIntervalStart     time.Duration
 			retryIntervalMax       time.Duration
@@ -129,16 +134,9 @@ var (
 		flag.BoolVar(&allowPVCCreationOnTarget, "allow-pvc-creation-on-target", false, "allow PVC creation on target cluster")
 		flag.Parse()
 
-		logrusLog := logrus.New()
-		logrusLog.SetFormatter(&logrus.JSONFormatter{
-			TimestampFormat: time.RFC3339Nano,
-		})
+		csmlog.Infof("%s Version: %s, Creation Time: %s", constants.DellReplicationController, ManifestSemver, core.CommitTime.Format(time.RFC1123))
 
-		loggerInstance := logrusr.New(logrusLog)
-		ctrl.SetLogger(loggerInstance)
-		setupLog.V(logger.InfoLevel).Info(constants.DellReplicationController, "Version", ManifestSemver, "Creation Time", core.CommitTime.Format(time.RFC1123))
-
-		setupLog.V(logger.InfoLevel).Info("Prefix", "Domain", domain)
+		csmlog.Infof("Prefix Domain: %s", domain)
 		controllers.InitLabelsAndAnnotations(domain)
 
 		flagMap := make(map[string]string)
@@ -152,7 +150,7 @@ var (
 		flagMap["enable-kubevirt-pvc-remap"] = strconv.FormatBool(enableKubevirtPVCRemap)
 		flagMap["allow-pvc-creation-on-target"] = strconv.FormatBool(allowPVCCreationOnTarget)
 
-		return flagMap, setupLog, logrusLog, context.Background()
+		return flagMap, context.Background()
 	}
 
 	createManagerInstance = func(flagMap map[string]string) manager.Manager {
@@ -167,17 +165,17 @@ var (
 			LeaderElectionID:           fmt.Sprintf("%s-manager", constants.DellReplicationController),
 		})
 		if err != nil {
-			setupLog.Error(err, "unable to start manager")
+			csmlog.Errorf("unable to start manager: %v", err)
 			osExit(1)
 		}
 
 		return mgr
 	}
 
-	setupControllerManager = func(ctx context.Context, mgr manager.Manager, setupLog logr.Logger) *ControllerManager {
+	setupControllerManager = func(ctx context.Context, mgr manager.Manager) *ControllerManager {
 		controllerMgr, err := createControllerManager(ctx, mgr)
 		if err != nil {
-			setupLog.Error(err, "failed to configure the controller manager")
+			csmlog.Errorf("failed to configure the controller manager: %v", err)
 			osExit(1)
 		}
 
@@ -203,12 +201,10 @@ type ControllerManager struct {
 }
 
 func (mgr *ControllerManager) reconcileSecretUpdates(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
-	secretLog := getSecretControllerLogger(mgr, request)
-
 	er := mgr.Manager.GetEventRecorderFor(constants.DellReplicationController)
-	err := getUpdateConfigOnSecretEvent(mgr, ctx, request, er, secretLog)
+	err := getUpdateConfigOnSecretEvent(mgr, ctx, request, er)
 	if err != nil {
-		secretLog.Error(err, "failed to update the configuration")
+		csmlog.Errorf("failed to update the configuration: %v", err)
 	}
 	return reconcile.Result{}, nil
 }
@@ -229,29 +225,25 @@ func (mgr *ControllerManager) startSecretController() error {
 	return err
 }
 
-func (mgr *ControllerManager) processConfigMapChanges(loggerConfig *logrus.Logger) {
-	loggerConfig.Info("Received a config change event")
+func (mgr *ControllerManager) processConfigMapChanges() {
+	csmlog.Info("Received a config change event")
 	er := mgr.Manager.GetEventRecorderFor(constants.DellReplicationController)
 	err := getUpdateConfigMap(mgr, context.Background(), er)
 	if err != nil {
-		log.Printf("Error parsing the config: %v\n", err)
+		csmlog.Errorf("Error parsing the config: %v", err)
 		return
 	}
 	mgr.config.Lock.Lock()
 	defer mgr.config.Lock.Unlock()
-	level, err := logger.ParseLevel(mgr.config.LogLevel)
-	if err != nil {
-		loggerConfig.Error("Unable to parse ", err)
-	}
-	loggerConfig.Info("set level to", level)
-	loggerConfig.SetLevel(level)
+	setLogLevel(mgr.config.LogLevel)
+	setLogFormat(mgr.config.LogFormat)
 }
 
-func (mgr *ControllerManager) setupConfigMapWatcher(loggerConfig *logrus.Logger) {
-	loggerConfig.Info("Started ConfigMap Watcher")
-	viper.WatchConfig()
-	viper.OnConfigChange(func(_ fsnotify.Event) {
-		mgr.processConfigMapChanges(loggerConfig)
+func (mgr *ControllerManager) setupConfigMapWatcher() {
+	csmlog.Info("Started ConfigMap Watcher")
+	watchConfigFunc()
+	onConfigChangeFunc(func(_ fsnotify.Event) {
+		mgr.processConfigMapChanges()
 	})
 }
 
@@ -263,14 +255,12 @@ func createControllerManager(ctx context.Context, mgr ctrl.Manager) (*Controller
 	if err != nil {
 		return nil, err
 	}
-	mgrLogger := mgr.GetLogger()
-
 	er := mgr.GetEventRecorderFor(constants.DellReplicationController)
-	repConfig, err := getConfig(ctx, client, opts, er, mgrLogger)
+	repConfig, err := getConfig(ctx, client, opts, er)
 	if err != nil {
 		return nil, err
 	}
-	getConfigPrintConfig(repConfig, mgrLogger)
+	getConfigPrintConfig(repConfig)
 	controllerManager := ControllerManager{
 		Opts:    opts,
 		Manager: mgr,
@@ -286,72 +276,92 @@ func createControllerManager(ctx context.Context, mgr ctrl.Manager) (*Controller
 // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
 
 func main() {
-	flagMap, setupLog, logrusLog, ctx := setupFlags()
+	flagMap, ctx := setupFlags()
+
+	// Set controller-runtime logger to discard to prevent goroutine error
+	// controller-runtime requires a global logger to be set; we discard its internal logs
+	// and use csmlog for all application-specific logging instead
+	ctrl.SetLogger(logr.Discard())
 
 	// Create the manager instance
 	mgr := createManagerInstance(flagMap)
 
 	if mgr != nil {
-		controllerMgr := setupControllerManager(ctx, mgr, setupLog)
+		controllerMgr := setupControllerManager(ctx, mgr)
 		if controllerMgr != nil {
 			// Start the watch on configmap
-			controllerMgr.setupConfigMapWatcher(logrusLog)
+			controllerMgr.setupConfigMapWatcher()
 
-			// Process the config. Get initial log level
-			processLogLevel(controllerMgr.config.LogLevel, logrusLog)
+			// Process the config. Get initial log level and format
+			setLogLevel(controllerMgr.config.LogLevel)
+			setLogFormat(controllerMgr.config.LogFormat)
+
+			initReplicationMetrics()
+
+			// Log controller-runtime startup (mimics controller-runtime logging)
+			csmlog.Info("Starting manager")
+			csmlog.Info("Starting controller-runtime")
 
 			// Start the secret controller
-			startSecretController(controllerMgr, setupLog)
+			// Log controller startup (mimics controller-runtime logging)
+			csmlog.Info("Starting Secret controller")
+			startSecretController(controllerMgr)
 
 			// Create PersistentVolumeClaimReconciler
+			// Log controller startup (mimics controller-runtime logging)
+			csmlog.Info("Starting PersistentVolumeClaim controller")
 			expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](stringToTimeDuration(flagMap["retry-interval-start"]), stringToTimeDuration(flagMap["retry-interval-max"]))
-			createPersistentVolumeClaimReconciler(mgr, controllerMgr, flagMap["prefix"], stringToInt(flagMap["worker-threads"]), expRateLimiter, stringToBoolean(flagMap["allow-pvc-creation-on-target"]), setupLog)
+			createPersistentVolumeClaimReconciler(mgr, controllerMgr, flagMap["prefix"], stringToInt(flagMap["worker-threads"]), expRateLimiter, stringToBoolean(flagMap["allow-pvc-creation-on-target"]))
 
 			// Create ReplicationGroupReconciler
-			createReplicationGroupReconciler(mgr, controllerMgr, flagMap["prefix"], stringToInt(flagMap["worker-threads"]), expRateLimiter, stringToBoolean(flagMap["disable-pvc-remap"]), stringToBoolean(flagMap["enable-kubevirt-pvc-remap"]), setupLog)
+			// Log controller startup (mimics controller-runtime logging)
+			csmlog.Info("Starting ReplicationGroup controller")
+			createReplicationGroupReconciler(mgr, controllerMgr, flagMap["prefix"], stringToInt(flagMap["worker-threads"]), expRateLimiter, stringToBoolean(flagMap["disable-pvc-remap"]), stringToBoolean(flagMap["enable-kubevirt-pvc-remap"]))
 
 			// Create PersistentVolumeReconciler
-			createPersistentVolumeReconciler(mgr, controllerMgr, flagMap["prefix"], stringToInt(flagMap["worker-threads"]), expRateLimiter, setupLog)
+			// Log controller startup (mimics controller-runtime logging)
+			csmlog.Info("Starting PersistentVolume controller")
+			createPersistentVolumeReconciler(mgr, controllerMgr, flagMap["prefix"], stringToInt(flagMap["worker-threads"]), expRateLimiter)
 
+			// Log worker thread configuration (mimics controller-runtime logging)
+			csmlog.Infof("Starting workers with %d threads", stringToInt(flagMap["worker-threads"]))
 		}
 
 		// +kubebuilder:scaffold:builder
 
 		// start manager
-		startManager(mgr, setupLog)
+		startManager(mgr)
 	}
 }
 
-func startManager(mgr manager.Manager, setupLog logr.Logger) {
-	setupLog.Info("starting manager")
+func startManager(mgr manager.Manager) {
+	// Log manager start (mimics controller-runtime logging)
+	csmlog.Info("starting manager")
 
 	if err := getManagerStart(mgr); err != nil {
-		log.Println("problem running manager")
-		setupLog.Error(err, "problem running manager")
+		csmlog.Errorf("problem running manager: %v", err)
 		osExit(1)
 	}
 }
 
-func createPersistentVolumeReconciler(mgr manager.Manager, controllerMgr *ControllerManager, domain string, workerThreads int, expRateLimiter workqueue.TypedRateLimiter[reconcile.Request], setupLog logr.Logger) {
+func createPersistentVolumeReconciler(mgr manager.Manager, controllerMgr *ControllerManager, domain string, workerThreads int, expRateLimiter workqueue.TypedRateLimiter[reconcile.Request]) {
 	// PV Controller
 	if err := getPersistentVolumeReconciler(&repController.PersistentVolumeReconciler{
 		Client:        mgr.GetClient(),
-		Log:           ctrl.Log.WithName("controllers").WithName("PersistentVolume"),
 		Scheme:        mgr.GetScheme(),
 		EventRecorder: mgr.GetEventRecorderFor(constants.DellReplicationController),
 		Config:        controllerMgr.config,
 		Domain:        domain,
 	}, mgr, expRateLimiter, workerThreads); err != nil {
-		log.Println("unable to create controller", constants.DellReplicationController, "PersistentVolume")
-		setupLog.Error(err, "unable to create controller", constants.DellReplicationController, "PersistentVolume")
+		csmlog.Errorf("unable to create controller %s PersistentVolume", constants.DellReplicationController)
+		csmlog.Errorf("unable to create controller: %v", err)
 		osExit(1)
 	}
 }
 
-func createReplicationGroupReconciler(mgr manager.Manager, controllerMgr *ControllerManager, domain string, workerThreads int, expRateLimiter workqueue.TypedRateLimiter[reconcile.Request], disablePVCRemap bool, enableKubevirtPVCRemap bool, setupLog logr.Logger) {
+func createReplicationGroupReconciler(mgr manager.Manager, controllerMgr *ControllerManager, domain string, workerThreads int, expRateLimiter workqueue.TypedRateLimiter[reconcile.Request], disablePVCRemap bool, enableKubevirtPVCRemap bool) {
 	if err := getReplicationGroupReconciler(&repController.ReplicationGroupReconciler{
 		Client:                 mgr.GetClient(),
-		Log:                    ctrl.Log.WithName("controllers").WithName("DellCSIReplicationGroup"),
 		Scheme:                 mgr.GetScheme(),
 		EventRecorder:          mgr.GetEventRecorderFor(constants.DellReplicationController),
 		Config:                 controllerMgr.config,
@@ -359,40 +369,57 @@ func createReplicationGroupReconciler(mgr manager.Manager, controllerMgr *Contro
 		DisablePVCRemap:        disablePVCRemap,
 		EnableKubevirtPVCRemap: enableKubevirtPVCRemap,
 	}, mgr, expRateLimiter, workerThreads); err != nil {
-		setupLog.Error(err, "unable to create controller", constants.DellReplicationController, "DellCSIReplicationGroup")
+		csmlog.Errorf("unable to create controller: %v", err)
 		osExit(1)
 	}
 }
 
-func createPersistentVolumeClaimReconciler(mgr manager.Manager, controllerMgr *ControllerManager, domain string, workerThreads int, expRateLimiter workqueue.TypedRateLimiter[reconcile.Request], allowPVCCreationOnTarget bool, setupLog logr.Logger) {
+func createPersistentVolumeClaimReconciler(mgr manager.Manager, controllerMgr *ControllerManager, domain string, workerThreads int, expRateLimiter workqueue.TypedRateLimiter[reconcile.Request], allowPVCCreationOnTarget bool) {
 	if err := getPersistentVolumeClaimReconciler(&repController.PersistentVolumeClaimReconciler{
 		Client:                   mgr.GetClient(),
-		Log:                      ctrl.Log.WithName("controllers").WithName("PersistentVolumeClaim"),
 		Scheme:                   mgr.GetScheme(),
 		EventRecorder:            mgr.GetEventRecorderFor(constants.DellReplicationController),
 		Config:                   controllerMgr.config,
 		Domain:                   domain,
 		AllowPVCCreationOnTarget: allowPVCCreationOnTarget,
 	}, mgr, expRateLimiter, workerThreads); err != nil {
-		setupLog.Error(err, "unable to create controller", constants.DellReplicationController, "PersistentVolumeClaim")
+		csmlog.Errorf("unable to create controller: %v", err)
 		osExit(1)
 	}
 }
 
-func startSecretController(controllerMgr *ControllerManager, setupLog logr.Logger) {
+func startSecretController(controllerMgr *ControllerManager) {
 	err := getSecretController(controllerMgr)
 	if err != nil {
-		setupLog.Error(err, "failed to setup secret controller. Continuing")
+		csmlog.Errorf("failed to setup secret controller. Continuing: %v", err)
 	}
 }
 
-func processLogLevel(logLevel string, logrusLog *logrus.Logger) {
-	level, err := logger.ParseLevel(logLevel)
-	if err != nil {
-		logrusLog.Error("Unable to parse ", err)
+func setLogLevel(logLevel string) {
+	normalizedLogLevel := strings.ToLower(strings.TrimSpace(logLevel))
+	if normalizedLogLevel == "" {
+		return
 	}
-	logrusLog.Info("set level to", level)
-	logrusLog.SetLevel(level)
+	level, err := csmlog.ParseLevel(normalizedLogLevel)
+	if err != nil {
+		csmlog.Errorf("Unable to parse log level: %v", err)
+		return
+	}
+	csmlog.Infof("set level to %v", level)
+	csmlog.SetLevel(level)
+}
+
+func setLogFormat(logFormat string) {
+	if logFormat != "" {
+		switch strings.ToLower(logFormat) {
+		case "json", "text":
+			csmlog.Infof("set format to %v", strings.ToLower(logFormat))
+			csmlog.SetFormat(strings.ToLower(logFormat))
+		default:
+			csmlog.Errorf("invalid log format %q, falling back to json", logFormat)
+			csmlog.SetFormat("json")
+		}
+	}
 }
 
 func stringToTimeDuration(timeString string) time.Duration {
@@ -417,4 +444,51 @@ func stringToInt(intString string) int {
 		return 0
 	}
 	return integer
+}
+
+func initReplicationMetrics() {
+	if os.Getenv(constants.EnvReplicationMetricsEnabled) != "true" {
+		csmlog.Info("Replication metrics are disabled")
+		return
+	}
+
+	driverName := constants.DellReplicationController
+
+	registry := prometheus.NewRegistry()
+	replMetrics := metrics.NewReplicationMetrics(registry)
+	metrics.SetGlobalReplicationMetrics(replMetrics)
+	replMetrics.SetControllerHealth(driverName, true)
+
+	metricsPort := os.Getenv(constants.EnvReplicationMetricsPort)
+	if metricsPort == "" {
+		metricsPort = constants.DefaultMetricsPort
+	}
+
+	tlsCert := os.Getenv(constants.EnvReplicationMetricsTLSCertFile)
+	tlsKey := os.Getenv(constants.EnvReplicationMetricsTLSKeyFile)
+
+	newMetricsServer := newMetricsServerFunc
+	startMetricsServer := startMetricsServerFunc
+	go func() {
+		// StaleMetricName is intentionally omitted: dell_csm_repl_metrics_stale is
+		// owned by ReplicationMetrics and set via SetMetricsStale in the monitoring
+		// loop to avoid a double-registration panic.
+		cfg := metricscommon.Config{
+			Port:     ":" + metricsPort,
+			CertFile: tlsCert,
+			KeyFile:  tlsKey,
+			Registry: registry,
+		}
+		metricsSrv := newMetricsServer(cfg)
+
+		if tlsCert != "" && tlsKey != "" {
+			csmlog.Infof("Starting replication metrics server with TLS on port %s for driver %s", metricsPort, driverName)
+		} else {
+			csmlog.Infof("Starting replication metrics server on port %s for driver %s", metricsPort, driverName)
+		}
+
+		if err := startMetricsServer(metricsSrv); err != nil {
+			csmlog.Errorf("Replication metrics server failed: %v", err)
+		}
+	}()
 }

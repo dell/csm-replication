@@ -20,15 +20,15 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/dell/csmlog"
 	"github.com/dell/gobrick/pkg/scsi"
-	log "github.com/sirupsen/logrus"
 )
 
 var OsReader = os.ReadDir
 
 // RescanNode is called to rescan the nodes
 func RescanNode(ctx context.Context) error {
-	log.Info("Calling NodeRescan")
+	csmlog.Info("Calling NodeRescan")
 	return rescanSCSIHostAll(ctx)
 }
 
@@ -36,10 +36,10 @@ func rescanSCSIHostAll(ctx context.Context) error {
 	hostsDir := "/sys/class/scsi_host"
 	hostFiles, err := OsReader(fmt.Sprintf("%s/", hostsDir))
 	if err != nil {
-		log.Errorf("rescanSCSIHOSTALL failed to read scsi_host dir, err: %s", err.Error())
+		csmlog.Errorf("rescanSCSIHOSTALL failed to read scsi_host dir, err: %s", err.Error())
 		return err
 	}
-	log.Infof("found (%d) files in hostsDir (%s)", len(hostFiles), hostsDir)
+	csmlog.Infof("found (%d) files in hostsDir (%s)", len(hostFiles), hostsDir)
 	scsiHost := scsi.NewSCSI("")
 	for host := 0; host < len(hostFiles); host++ {
 		// at least one target port not found, do full scsi rescan
@@ -51,7 +51,7 @@ func rescanSCSIHostAll(ctx context.Context) error {
 		}
 		err := scsiHost.RescanSCSIHostByHCTL(ctx, hctl)
 		if err != nil {
-			log.Error(ctx, err.Error())
+			csmlog.Errorf("rescanSCSIHostByHCTL error: %s", err.Error())
 			continue
 		}
 	}

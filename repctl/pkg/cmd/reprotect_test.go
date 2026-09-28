@@ -20,9 +20,9 @@ import (
 	"time"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
-	"github.com/dell/repctl/mocks"
-	"github.com/dell/repctl/pkg/config"
-	"github.com/dell/repctl/pkg/k8s"
+	"github.com/dell/csm-replication/repctl/mocks"
+	"github.com/dell/csm-replication/repctl/pkg/config"
+	"github.com/dell/csm-replication/repctl/pkg/k8s"
 	"github.com/golang/mock/gomock"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
@@ -73,7 +73,7 @@ func TestGetReprotectCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -115,7 +115,7 @@ func TestGetReprotectCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -187,7 +187,7 @@ func TestGetReprotectCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -259,7 +259,7 @@ func TestGetReprotectCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -343,7 +343,7 @@ func TestGetReprotectCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -418,7 +418,7 @@ func TestGetReprotectCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -490,7 +490,7 @@ func TestGetReprotectCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -562,7 +562,7 @@ func TestGetReprotectCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -646,7 +646,7 @@ func TestGetReprotectCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 

@@ -19,10 +19,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/dell/csmlog"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	controller "github.com/dell/csm-replication/controllers"
-	"github.com/dell/csm-replication/pkg/common/logger"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -32,7 +33,6 @@ import (
 
 	"github.com/dell/csm-replication/pkg/common/constants"
 	"github.com/dell/csm-replication/pkg/connection"
-	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -43,7 +43,6 @@ import (
 // PersistentVolumeClaimReconciler reconciles a PersistentVolumeClaim object
 type PersistentVolumeClaimReconciler struct {
 	client.Client
-	Log                      logr.Logger
 	Scheme                   *runtime.Scheme
 	EventRecorder            record.EventRecorder
 	PVCRequeueInterval       time.Duration
@@ -74,8 +73,6 @@ var (
 // Reconcile contains reconciliation logic that updates PersistentVolumeClaim depending on it's current state
 func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// If we have received the reconcile request, it means that the sidecar has completed its protection
-	log := r.Log.WithValues("persistentvolumeclaim", req.NamespacedName)
-	ctx = context.WithValue(ctx, logger.LoggerContextKey, log)
 
 	claim := new(v1.PersistentVolumeClaim)
 	err := r.Get(ctx, req.NamespacedName, claim)
@@ -90,7 +87,7 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 	// Lets start with the assumption that remote PV name is same as local PV
 	remotePVName := localPVName
 
-	log.V(logger.InfoLevel).Info("Reconciling PVC event!!!")
+	csmlog.Info("Reconciling PVC event!!!")
 
 	// Parse the local annotations
 	localAnnotations := claim.Annotations
@@ -98,7 +95,7 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 	// RemoteClusterID annotation
 	remoteClusterID, err := getValueFromAnnotations(controller.RemoteClusterID, localAnnotations)
 	if err != nil {
-		log.Error(err, "remoteClusterID not set")
+		csmlog.Errorf("remoteClusterID not set: %v", err)
 		r.EventRecorder.Eventf(claim, eventTypeWarning, eventReasonUpdated,
 			"failed to fetch remote cluster id from annotations. error: %s", err.Error())
 		return ctrl.Result{}, err
@@ -111,6 +108,14 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 	if remoteClusterID == controller.Self {
 		remotePVName = replicated + "-" + localPVName
 	}
+	csmlog.WithFields(csmlog.Fields{
+		"controller":      "persistentvolumeclaim",
+		"pvcName":         req.Name,
+		"namespace":       req.Namespace,
+		"localPVName":     localPVName,
+		"remotePVName":    remotePVName,
+		"remoteClusterID": remoteClusterID,
+	}).Info("Reconciling PVC event")
 
 	// Get the remote client
 	rClient, err := r.Config.GetConnection(remoteClusterID)
@@ -126,21 +131,35 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 		remotePVAnnotationSet = true
 		// Update the remote PV name to point to the one in annotation
 		remotePVName = localAnnotations[controller.RemotePV]
-		log.V(logger.DebugLevel).Info("Remote PV annotation already set. Verifying details")
+		csmlog.WithFields(csmlog.Fields{
+			"controller":      "persistentvolumeclaim",
+			"pvcName":         req.Name,
+			"namespace":       req.Namespace,
+			"localPVName":     localPVName,
+			"remotePVName":    remotePVName,
+			"remoteClusterID": remoteClusterID,
+		}).Info("Remote PV annotation already set. Verifying details")
 	}
 
-	log.V(logger.DebugLevel).Info("Checking if the PV already exists " + remotePVName)
+	csmlog.WithFields(csmlog.Fields{
+		"controller":      "persistentvolumeclaim",
+		"pvcName":         req.Name,
+		"namespace":       req.Namespace,
+		"localPVName":     localPVName,
+		"remotePVName":    remotePVName,
+		"remoteClusterID": remoteClusterID,
+	}).Info("Checking if the PV already exists")
 	remotePV, err := rClient.GetPersistentVolume(ctx, remotePVName)
 	if err != nil && errors.IsNotFound(err) {
 		if remotePVAnnotationSet {
 			// This is unexpected as the RemotePV annotation indicates that the remote PV should be created
-			log.Error(err, "Something went wrong. Remote PV annotation already set")
+			csmlog.Errorf("Something went wrong. Remote PV annotation already set: %v", err)
 			return ctrl.Result{}, err
 		}
-		log.V(logger.InfoLevel).Info("Will wait for remote PV to be created...")
+		csmlog.Info("Will wait for remote PV to be created...")
 		return ctrl.Result{RequeueAfter: controller.DefaultRetryInterval}, nil
 	} else if err != nil {
-		log.Error(err, "failed to check if remote PV exists")
+		csmlog.Errorf("failed to check if remote PV exists: %v", err)
 		return ctrl.Result{}, err
 	}
 
@@ -151,7 +170,7 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 	if remoteClusterID != controller.Self && r.AllowPVCCreationOnTarget {
 		// Skip remote PVC creation if local PVC is being deleted (e.g. temporary scratch PVCs)
 		if claim.DeletionTimestamp != nil {
-			log.V(logger.InfoLevel).Info("Local PVC is being deleted, skipping remote PVC creation")
+			csmlog.Info("Local PVC is being deleted, skipping remote PVC creation")
 			return ctrl.Result{}, nil
 		}
 		// if its not single cluster then check the pv status and create pvc on target cluster
@@ -174,9 +193,9 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 			err = rClient.CreatePersistentVolumeClaim(ctx, remoteClaim)
 			if err != nil {
 				if errors.IsAlreadyExists(err) {
-					log.V(logger.InfoLevel).Info("Remote PVC already exists on target cluster")
+					csmlog.Info("Remote PVC already exists on target cluster")
 				} else {
-					log.Error(err, "Failed to create remote PVC on target cluster")
+					csmlog.Errorf("Failed to create remote PVC on target cluster: %v", err)
 					return ctrl.Result{}, err
 				}
 			}
@@ -201,7 +220,7 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 			return ctrl.Result{}, err
 		}
 	} else {
-		log.V(logger.InfoLevel).Info("Remote PVC has not been created yet. Information can't be synced")
+		csmlog.Info("Remote PVC has not been created yet. Information can't be synced")
 	}
 
 	err = r.processLocalPVC(ctx, claim, remotePVName, remotePVCName, remotePVCNamespace, remoteClusterID, isRemotePVCUpdated)
@@ -209,7 +228,7 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 		return ctrl.Result{}, err
 	}
 
-	log.V(logger.InfoLevel).Info("PVC Reconcile complete!!!!")
+	csmlog.Info("PVC Reconcile complete!!!!")
 	return ctrl.Result{}, nil
 }
 
@@ -219,7 +238,6 @@ func (r *PersistentVolumeClaimReconciler) processRemotePVC(ctx context.Context,
 	claim *v1.PersistentVolumeClaim,
 	remotePVCName, remotePVCNamespace, remotePVName string,
 ) (bool, error) {
-	log := logger.FromContext(ctx)
 	isUpdated := false
 	// Just apply the missing annotation
 	if claim.Annotations[controller.RemotePVC] == "" {
@@ -239,11 +257,18 @@ func (r *PersistentVolumeClaimReconciler) processRemotePVC(ctx context.Context,
 		if err != nil {
 			return false, err
 		}
-		log.V(logger.InfoLevel).Info("Successfully updated remote PVC with annotation")
+		csmlog.WithFields(csmlog.Fields{
+			"controller":      "persistentvolumeclaim",
+			"pvcName":         claim.Name,
+			"namespace":       claim.Namespace,
+			"remotePVCName":   remotePVCName,
+			"remotePVName":    remotePVName,
+			"remoteClusterID": claim.Annotations[controller.RemoteClusterID],
+		}).Info("Successfully updated remote PVC with annotation")
 		return true, nil
 	}
 
-	log.V(logger.InfoLevel).Info("Remote PVC already has the annotations set")
+	csmlog.Info("Remote PVC already has the annotations set")
 	return true, nil
 }
 
@@ -251,9 +276,8 @@ func (r *PersistentVolumeClaimReconciler) processLocalPVC(ctx context.Context,
 	claim *v1.PersistentVolumeClaim, remotePVName, remotePVCName, remotePVCNamespace,
 	remoteClusterID string, isRemotePVCUpdated bool,
 ) error {
-	log := logger.FromContext(ctx)
 	if claim.Annotations[controller.PVCSyncComplete] == "yes" {
-		log.V(logger.InfoLevel).Info("PVC Sync already completed")
+		csmlog.Info("PVC Sync already completed")
 		return nil
 	}
 	// Apply the remote PV annotation if required
@@ -356,9 +380,8 @@ func updatePVCLabels(pvc, volume *v1.PersistentVolumeClaim, remoteClusterID stri
 
 func VerifyAndCreateNamespace(ctx context.Context, rClient connection.RemoteClusterClient, namespace string) error {
 	// Verify if the namespace exists
-	log := logger.FromContext(ctx)
 	if _, err := rClient.GetNamespace(ctx, namespace); err != nil {
-		log.V(logger.InfoLevel).Info("Namespace - " + namespace + " not found, creating it.")
+		csmlog.Info("Namespace - " + namespace + " not found, creating it.")
 		NewNamespace := &v1.Namespace{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: "Namespace",
@@ -371,7 +394,7 @@ func VerifyAndCreateNamespace(ctx context.Context, rClient connection.RemoteClus
 		err = rClient.CreateNamespace(ctx, NewNamespace)
 		if err != nil {
 			msg := "unable to create the desired namespace" + namespace
-			log.V(logger.ErrorLevel).Error(err, msg)
+			csmlog.Errorf("%s: %v", msg, err)
 			return err
 		}
 	}

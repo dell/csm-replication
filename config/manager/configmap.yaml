@@ -17,6 +17,7 @@ data:
     clusterId: ""
     targets: []
     CSI_LOG_LEVEL: "info"
+    CSI_LOG_FORMAT: "json"
 kind: ConfigMap
 metadata:
   name: controller-config

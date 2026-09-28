@@ -71,7 +71,7 @@ func TestGetRG(t *testing.T) {
 	}
 }
 
-func TestRGList_Print(t *testing.T) {
+func TestRGList_Print(_ *testing.T) {
 	rgl := &RGList{
 		RGList: []RG{
 			{

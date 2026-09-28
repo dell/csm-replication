@@ -1,6 +1,6 @@
 # Repctl
 
-`repctl` is a command-line client for configuring replication 
+`repctl` is a command-line client for configuring replication
 and managing replicated resources between multiple Kubernetes clusters.
 
 
@@ -14,6 +14,13 @@ clusters, you can do that using `cluster add` command
 ```shell
 ./repctl cluster add -f <config-file> -n <name>
 ```
+
+**IPv6 Configuration Note:** When using IPv6 Kubernetes API server addresses in the config file, use bracket notation for the address field:
+```yaml
+address: "[<IPv6_ADDRESS>]:<PORT>"
+# e.g. address: "[2607:f2b1:f1d0:770::34]:6443"
+```
+This is required for proper URL parsing. No code changes are needed — Go's `url.Parse` already handles bracket notation correctly. This is a configuration documentation gap.
 
 You can view clusters that are currently being managed by `repctl`
 by running `cluster get` command
@@ -30,7 +37,7 @@ Or, alternatively, using `get cluster` command
 Also, you can inject information about all of your current clusters as
 config maps into the same clusters, so it can be used by `dell-csi-replicator`
 
-```shell 
+```shell
 ./repctl cluster inject
 ```
 
@@ -43,7 +50,7 @@ You can also generate kubeconfigs from existing replication service accounts and
 ### Querying Resources
 
 After adding clusters you want to manage with `repctl` you can query
-resources from multiple clusters at once using `get` command. 
+resources from multiple clusters at once using `get` command.
 
 For example, this command will list all storage classes in all clusters
 that currently are being managed by `repctl`
@@ -65,7 +72,7 @@ included into the tool help flag `-h`.
 ### Creating Resources
 
 #### Generic
-Generic `create` command allows you to apply provided config file into 
+Generic `create` command allows you to apply provided config file into
 multiple clusters at once
 
 ```shell
@@ -73,7 +80,7 @@ multiple clusters at once
 ```
 
 #### PersistentVolumeClaims
-You can use `repctl` to create PVCs from Replication Group's PVs 
+You can use `repctl` to create PVCs from Replication Group's PVs
 on the target cluster
 
 ```shell
@@ -93,22 +100,22 @@ provided config, you can find example configs in `examples` folder
 ```
 
 ### Single Cluster Replication
-`repctl` supports working with replication within a single Kubernetes cluster. 
+`repctl` supports working with replication within a single Kubernetes cluster.
 
-Just add cluster you want to use with `cluster add` command, and you can list, filter, and create resources. 
+Just add cluster you want to use with `cluster add` command, and you can list, filter, and create resources.
 
-Volumes and ReplicationGroups created as "target" resources would be prefixed with `replicated-` 
-so you can easily differentiate them. 
+Volumes and ReplicationGroups created as "target" resources would be prefixed with `replicated-`
+so you can easily differentiate them.
 
-You can also differentiate between single cluster replication configured StorageClasses and ReplicationGroups and multi-cluster ones 
+You can also differentiate between single cluster replication configured StorageClasses and ReplicationGroups and multi-cluster ones
 by checking `remoteClusterID` field, for a single cluster the field would be set to `self`.
 
 To create replication enabled storage classes for single cluster replication using `create sc` command
 be sure to set both `sourceClusterID` and `targetClusterID` to the same `clusterID` and continue as usual with executing the command.
-Name of StorageClass resource that created as "target" will be appended with `-tgt`. 
+Name of StorageClass resource that created as "target" will be appended with `-tgt`.
 
 ### Executing Actions
-`repctl` can be used to execute various replication actions on ReplicationGroups. 
+`repctl` can be used to execute various replication actions on ReplicationGroups.
 
 #### Failover
 
@@ -143,7 +150,7 @@ When working with multiple clusters, you can perform reprotect by specifying the
 When working with replication within a single cluster, you can perform reprotect by specifying the _replication group ID_. To do that use `--rg <rg-id>` parameter.
 
 ```shell
-./repctl --rg <rg-id> reprotect 
+./repctl --rg <rg-id> reprotect
 ```
 
 In both scenarios `repctl` will patch the CR at the source site with action **REPROTECT_LOCAL**.
@@ -187,11 +194,11 @@ When working with replication within a single cluster, you can perform swap by s
 repctl will patch CR at the source cluster with action `SWAP_LOCAL`.
 
 
-#### Wait For Completion 
+#### Wait For Completion
 
 When executing actions you can provide `--wait` argument to make `repctl` wait for completion of specified action.
 
-For example when executing `failover`: 
+For example when executing `failover`:
 ```shell
 ./repctl --rg <rg-id> failover --target <tgt-cluster-id> --wait
 ```
@@ -208,5 +215,5 @@ For single or multi-cluster config:
 Where `<ACTION>` can be one of the following:
 * `suspend` will suspend replication, changes will no longer be synced between replication sites
 * `resume` will resume replication, canceling the effect of `suspend` action
-* `sync` will force synchronization of change between replication sites 
+* `sync` will force synchronization of change between replication sites
 

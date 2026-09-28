@@ -22,8 +22,8 @@ import (
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	fake_client "github.com/dell/csm-replication/test/e2e-framework/fake-client"
-	"github.com/dell/repctl/pkg/cmd/mocks"
-	"github.com/dell/repctl/pkg/k8s"
+	"github.com/dell/csm-replication/repctl/pkg/cmd/mocks"
+	"github.com/dell/csm-replication/repctl/pkg/k8s"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -87,7 +87,7 @@ func TestMigratePVCommand(t *testing.T) {
 	}{
 		{
 			name: "successful PV migration",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				return clusterPath, nil
 			},
 			pvName:                 "test-pv",
@@ -98,7 +98,7 @@ func TestMigratePVCommand(t *testing.T) {
 		},
 		{
 			name: "successful PV migration - targetNS set",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				return clusterPath, nil
 			},
 			pvName:                 "test-pv",
@@ -110,7 +110,7 @@ func TestMigratePVCommand(t *testing.T) {
 		},
 		{
 			name: "successful PV migration - no wait",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				return clusterPath, nil
 			},
 			pvName:                 "test-pv",
@@ -172,18 +172,18 @@ func TestMigratePVCommand(t *testing.T) {
 				os.Stdout = rescueStdout
 			}()
 
-			migratePVCmd.Flag("to-sc").Value.Set(tt.toSC)
+			_ = migratePVCmd.Flag("to-sc").Value.Set(tt.toSC)
 			if tt.targetNS != "" {
-				migratePVCmd.Flag("target-ns").Value.Set(tt.targetNS)
+				_ = migratePVCmd.Flag("target-ns").Value.Set(tt.targetNS)
 			}
 			if tt.wait != "" {
-				migratePVCmd.Flag("wait").Value.Set(tt.wait)
+				_ = migratePVCmd.Flag("wait").Value.Set(tt.wait)
 			}
 
 			args := []string{"test-pv"}
 			migratePVCmd.Run(nil, args)
 
-			w.Close()
+			_ = w.Close()
 			out, _ := io.ReadAll(r)
 			os.Stdout = rescueStdout
 
@@ -208,7 +208,7 @@ func TestMigratePVCCommand(t *testing.T) {
 	}{
 		{
 			name: "successful PVC migration",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				return clusterPath, nil
 			},
 			pvcName:                "test-pvc",
@@ -220,7 +220,7 @@ func TestMigratePVCCommand(t *testing.T) {
 		},
 		{
 			name: "successful PVC migration - target namespace set",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				return clusterPath, nil
 			},
 			pvcName:                "test-pvc",
@@ -233,7 +233,7 @@ func TestMigratePVCCommand(t *testing.T) {
 		},
 		{
 			name: "successful PVC migration - nowait",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				return clusterPath, nil
 			},
 			pvcName:                "test-pvc",
@@ -300,14 +300,14 @@ func TestMigratePVCCommand(t *testing.T) {
 			getClustersMock.EXPECT().GetAllClusters(gomock.Any(), gomock.Any()).Times(1).Return(mockClusters, nil)
 
 			migratePVCCmd := migratePVCCommand(getClustersMock)
-			migratePVCCmd.Flag("namespace").Value.Set(tt.pvcNamespace)
+			_ = migratePVCCmd.Flag("namespace").Value.Set(tt.pvcNamespace)
 			if tt.wait != "" {
-				migratePVCCmd.Flag("wait").Value.Set(tt.wait)
+				_ = migratePVCCmd.Flag("wait").Value.Set(tt.wait)
 			}
 			if tt.targetNs != "" {
-				migratePVCCmd.Flag("target-ns").Value.Set(tt.targetNs)
+				_ = migratePVCCmd.Flag("target-ns").Value.Set(tt.targetNs)
 			}
-			migratePVCCmd.Flag("to-sc").Value.Set("target-sc")
+			_ = migratePVCCmd.Flag("to-sc").Value.Set("target-sc")
 
 			rescueStdout := os.Stdout
 			r, w, _ := os.Pipe()
@@ -319,7 +319,7 @@ func TestMigratePVCCommand(t *testing.T) {
 			args := []string{"test-pvc"}
 			migratePVCCmd.Run(nil, args)
 
-			w.Close()
+			_ = w.Close()
 			out, _ := io.ReadAll(r)
 			os.Stdout = rescueStdout
 
@@ -336,7 +336,7 @@ func TestMigrateSTSCommand(t *testing.T) {
 		name                   string
 		getClustersFolderPath  func(string) (string, error)
 		stsName                string
-		numReplicas            int
+		numReplicas            int32
 		podName                string
 		ns                     string
 		pvcName                string
@@ -352,7 +352,7 @@ func TestMigrateSTSCommand(t *testing.T) {
 	}{
 		{
 			name: "successful STS migration",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				return clusterPath, nil
 			},
 			stsName:                "test-sts",
@@ -367,7 +367,7 @@ func TestMigrateSTSCommand(t *testing.T) {
 		},
 		{
 			name: "successful STS migration -- target namespace set",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				return clusterPath, nil
 			},
 			stsName:                "test-sts",
@@ -383,7 +383,7 @@ func TestMigrateSTSCommand(t *testing.T) {
 		},
 		{
 			name: "successful STS migration -- no wait",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				return clusterPath, nil
 			},
 			stsName:                "test-sts",
@@ -399,7 +399,7 @@ func TestMigrateSTSCommand(t *testing.T) {
 		},
 		{
 			name: "successful STS migration -- no ndu",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				return clusterPath, nil
 			},
 			stsName:                "test-sts",
@@ -416,7 +416,7 @@ func TestMigrateSTSCommand(t *testing.T) {
 
 		{
 			name: "successful STS migration -- yes ndu --numreplicas 1",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				return clusterPath, nil
 			},
 			stsName:                "test-sts",
@@ -434,7 +434,7 @@ func TestMigrateSTSCommand(t *testing.T) {
 
 		{
 			name: "successful STS migration -- yes ndu --numReplicas 2",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				return clusterPath, nil
 			},
 			stsName:                "test-sts",
@@ -450,7 +450,7 @@ func TestMigrateSTSCommand(t *testing.T) {
 		},
 		{
 			name: " STS migration -- multiple PVCs",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				return clusterPath, nil
 			},
 			stsName:                "test-sts",
@@ -467,7 +467,7 @@ func TestMigrateSTSCommand(t *testing.T) {
 		},
 		{
 			name: "successful STS migration -- multiple PVCs ",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				return clusterPath, nil
 			},
 			stsName:                "test-sts",
@@ -521,7 +521,7 @@ func TestMigrateSTSCommand(t *testing.T) {
 				pvcs = append(pvcs, *persistentVolumeClaim2)
 			}
 
-			numReplicas := int32(tt.numReplicas)
+			numReplicas := tt.numReplicas
 
 			sts := &appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
@@ -607,20 +607,20 @@ func TestMigrateSTSCommand(t *testing.T) {
 			getClustersMock.EXPECT().GetAllClusters(gomock.Any(), gomock.Any()).Times(1).Return(mockClusters, nil)
 
 			migrateSTSCmd := migrateSTSCommand(getClustersMock)
-			migrateSTSCmd.Flag("namespace").Value.Set(tt.ns)
+			_ = migrateSTSCmd.Flag("namespace").Value.Set(tt.ns)
 			if tt.wait != "" {
-				migrateSTSCmd.Flag("wait").Value.Set(tt.wait)
+				_ = migrateSTSCmd.Flag("wait").Value.Set(tt.wait)
 			}
 			if tt.ndu != "" {
-				migrateSTSCmd.Flag("ndu").Value.Set(tt.ndu)
+				_ = migrateSTSCmd.Flag("ndu").Value.Set(tt.ndu)
 			}
 			if tt.yesToPrompts != "" {
-				migrateSTSCmd.Flag("yes").Value.Set(tt.yesToPrompts)
+				_ = migrateSTSCmd.Flag("yes").Value.Set(tt.yesToPrompts)
 			}
 			if tt.targetNamespace != "" {
-				migrateSTSCmd.Flag("target-ns").Value.Set(tt.targetNamespace)
+				_ = migrateSTSCmd.Flag("target-ns").Value.Set(tt.targetNamespace)
 			}
-			migrateSTSCmd.Flag("to-sc").Value.Set("target-sc")
+			_ = migrateSTSCmd.Flag("to-sc").Value.Set("target-sc")
 
 			rescueStdout := os.Stdout
 			r, w, _ := os.Pipe()
@@ -629,12 +629,12 @@ func TestMigrateSTSCommand(t *testing.T) {
 				os.Stdout = rescueStdout
 			}()
 
-			migrateSTSCmd.Flag("to-sc").Value.Set("target-sc")
-			migrateSTSCmd.Flag("namespace").Value.Set("test-ns")
+			_ = migrateSTSCmd.Flag("to-sc").Value.Set("target-sc")
+			_ = migrateSTSCmd.Flag("namespace").Value.Set("test-ns")
 			args := []string{"test-sts"}
 			migrateSTSCmd.Run(nil, args)
 
-			w.Close()
+			_ = w.Close()
 			out, _ := io.ReadAll(r)
 			os.Stdout = rescueStdout
 
@@ -655,7 +655,7 @@ func TestMigrateMGCommand(t *testing.T) {
 	}{
 		{
 			name: "successful array migration",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				return clusterPath, nil
 			},
 			mgName:                 "test-mg",
@@ -665,7 +665,7 @@ func TestMigrateMGCommand(t *testing.T) {
 		},
 		{
 			name: "successful array migration - no wait",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				return clusterPath, nil
 			},
 			mgName:                 "test-mg",
@@ -675,7 +675,7 @@ func TestMigrateMGCommand(t *testing.T) {
 		},
 		{
 			name: "successful array migration - wait",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				return clusterPath, nil
 			},
 			mgName:                 "test-mg",
@@ -723,7 +723,7 @@ func TestMigrateMGCommand(t *testing.T) {
 
 			migrateMGCmd := migrateMGCommand(getClustersMock)
 			if tt.wait != "" {
-				migrateMGCmd.Flag("wait").Value.Set(tt.wait)
+				_ = migrateMGCmd.Flag("wait").Value.Set(tt.wait)
 			}
 
 			rescueStdout := os.Stdout
@@ -736,7 +736,7 @@ func TestMigrateMGCommand(t *testing.T) {
 			args := []string{tt.mgName}
 			migrateMGCmd.Run(nil, args)
 
-			w.Close()
+			_ = w.Close()
 			out, _ := io.ReadAll(r)
 			os.Stdout = rescueStdout
 

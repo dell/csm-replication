@@ -18,22 +18,22 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 	"time"
 
+	metricscommon "github.com/dell/csm-metrics-common/pkg/server"
+	"github.com/dell/csm-replication/internal/metrics"
 	"github.com/dell/csm-replication/pkg/config"
-	"github.com/bombsimon/logrusr/v4"
+	"github.com/dell/csmlog"
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-logr/logr"
-	"github.com/sirupsen/logrus"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 
 	"github.com/dell/csm-replication/controllers"
 	"github.com/dell/csm-replication/pkg/common/constants"
-	"github.com/dell/csm-replication/pkg/common/logger"
 
 	"golang.org/x/sync/singleflight"
 
@@ -62,7 +62,6 @@ import (
 
 var (
 	scheme                       = runtime.NewScheme()
-	setupLog                     = ctrl.Log.WithName("setup")
 	currentSupportedCapabilities = []replication.ReplicationCapability_RPC_Type{
 		replication.ReplicationCapability_RPC_CREATE_REMOTE_VOLUME,
 		replication.ReplicationCapability_RPC_CREATE_PROTECTION_GROUP,
@@ -108,11 +107,11 @@ var (
 	kubeSystemNamespace      = controllers.KubeSystemNamespace
 
 	getUpdateConfigMapFunc = func(mgr *ReplicatorManager, ctx context.Context) error {
-		return mgr.config.UpdateConfigMap(ctx, nil, mgr.Opts, nil, mgr.Manager.GetLogger())
+		return mgr.config.UpdateConfigMap(ctx, nil, mgr.Opts, nil)
 	}
 
-	getConnectToCsiFunc = func(csiAddress string, setupLog logr.Logger) (*grpc.ClientConn, error) {
-		return connection.Connect(csiAddress, setupLog)
+	getConnectToCsiFunc = func(csiAddress string) (*grpc.ClientConn, error) {
+		return connection.Connect(csiAddress)
 	}
 
 	getProbeForeverFunc = func(ctx context.Context, identityClient csiidentity.Identity) (string, error) {
@@ -131,12 +130,17 @@ var (
 		return createReplicatorManager(ctx, mgr)
 	}
 
-	getParseLevelFunc = func(level string) (logrus.Level, error) {
-		return logger.ParseLevel(level)
-	}
-
 	getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 		return workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](retryIntervalStart, retryIntervalMax)
+	}
+	getReplicationMetricsCollectionInterval = func(defaultInterval time.Duration) time.Duration {
+		if intervalStr := strings.TrimSpace(os.Getenv(constants.EnvReplicationMetricsCollectionInterval)); intervalStr != "" {
+			if interval, err := time.ParseDuration(intervalStr); err == nil && interval > 0 {
+				return interval
+			}
+			csmlog.WithFields(csmlog.Fields{"env": constants.EnvReplicationMetricsCollectionInterval}).Warnf("Invalid %s value: %q, using default %s", constants.EnvReplicationMetricsCollectionInterval, intervalStr, defaultInterval)
+		}
+		return defaultInterval
 	}
 
 	getPersistentVolumeClaimReconcilerSetupWithManager = func(r *controller.PersistentVolumeClaimReconciler, mgr ctrl.Manager, limiter workqueue.TypedRateLimiter[reconcile.Request], maxReconcilers int) error {
@@ -155,6 +159,11 @@ var (
 		return mgr.Start(ctrl.SetupSignalHandler())
 	}
 	osExit = os.Exit
+
+	newMetricsServerFunc   = metricscommon.NewMetricsServer
+	startMetricsServerFunc = func(s *metricscommon.MetricsServer) error {
+		return s.Start()
+	}
 
 	setupFlags = func() flags {
 		flags := flags{}
@@ -179,36 +188,50 @@ var (
 	}
 )
 
-func (mgr *ReplicatorManager) processConfigMapChanges(loggerConfig *logrus.Logger) {
-	loggerConfig.Info("Received a config change event")
+func (mgr *ReplicatorManager) processConfigMapChanges() {
+	csmlog.Info("Received a config change event")
 	err := getUpdateConfigMapFunc(mgr, context.Background())
 	if err != nil {
-		log.Printf("Error parsing the config: %v\n", err)
+		csmlog.Errorf("Error parsing the config: %v", err)
 		return
 	}
 	mgr.config.Lock.Lock()
 	defer mgr.config.Lock.Unlock()
-	level, err := logger.ParseLevel(mgr.config.LogLevel)
-	if err != nil {
-		loggerConfig.Error("Unable to parse ", err)
+	normalizedLogLevel := strings.ToLower(strings.TrimSpace(mgr.config.LogLevel))
+	if normalizedLogLevel != "" {
+		level, err := csmlog.ParseLevel(normalizedLogLevel)
+		if err != nil {
+			csmlog.Errorf("Unable to parse log level: %v", err)
+		} else {
+			csmlog.Infof("set level to %v", level)
+			csmlog.SetLevel(level)
+		}
 	}
-	loggerConfig.Info("set level to", level)
-	loggerConfig.SetLevel(level)
+	format := mgr.config.LogFormat
+	if format != "" {
+		switch strings.ToLower(format) {
+		case "json", "text":
+			csmlog.Infof("set format to %v", strings.ToLower(format))
+			csmlog.SetFormat(strings.ToLower(format))
+		default:
+			csmlog.Errorf("invalid log format %q, falling back to json", format)
+			csmlog.SetFormat("json")
+		}
+	}
 }
 
-func (mgr *ReplicatorManager) setupConfigMapWatcher(loggerConfig *logrus.Logger) {
-	loggerConfig.Info("Started ConfigMap Watcher")
+func (mgr *ReplicatorManager) setupConfigMapWatcher() {
+	csmlog.Info("Started ConfigMap Watcher")
 	watchConfig()
 	onConfigChange(func(_ fsnotify.Event) {
-		mgr.processConfigMapChanges(loggerConfig)
+		mgr.processConfigMapChanges()
 	})
 }
 
 func createReplicatorManager(ctx context.Context, mgr ctrl.Manager) (*ReplicatorManager, error) {
 	opts := getControllerManagerOpts()
 	opts.Mode = "sidecar"
-	mgrLogger := mgr.GetLogger()
-	repConfig, err := getConfig(ctx, nil, opts, nil, mgrLogger)
+	repConfig, err := getConfig(ctx, nil, opts, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -226,47 +249,45 @@ func createReplicatorManager(ctx context.Context, mgr ctrl.Manager) (*Replicator
 
 func main() {
 	flags := setupFlags()
-	logrusLog := logrus.New()
-	logrusLog.SetFormatter(&logrus.JSONFormatter{
-		TimestampFormat: time.RFC3339Nano,
-	})
 
-	logger := logrusr.New(logrusLog)
-	ctrl.SetLogger(logger)
+	// Set controller-runtime logger to discard to prevent goroutine error
+	// controller-runtime requires a global logger to be set; we discard its internal logs
+	// and use csmlog for all application-specific logging instead
+	ctrl.SetLogger(logr.Discard())
 
-	setupLog.V(1).Info("Prefix", "Domain", flags.domain)
-	setupLog.V(1).Info(constants.DellCSIReplicator, "Version", ManifestSemver, "Creation Time", core.CommitTime.Format(time.RFC1123))
+	csmlog.Infof("Prefix Domain: %s", flags.domain)
+	csmlog.Infof("%s Version: %s, Creation Time: %s", constants.DellCSIReplicator, ManifestSemver, core.CommitTime.Format(time.RFC1123))
 
 	ctx := context.Background()
 
 	// Connect to csi
-	csiConn, err := getConnectToCsiFunc(flags.csiAddress, setupLog)
+	csiConn, err := getConnectToCsiFunc(flags.csiAddress)
 	if err != nil {
-		setupLog.Error(err, "failed to connect to CSI driver")
+		csmlog.Errorf("failed to connect to CSI driver: %v", err)
 		osExit(1)
 	}
 
-	identityClient := csiidentity.New(csiConn, ctrl.Log.WithName("identity-client"), flags.operationTimeout, flags.probeFrequency)
+	identityClient := csiidentity.New(csiConn, flags.operationTimeout, flags.probeFrequency)
 
 	driverName, err := getProbeForeverFunc(ctx, identityClient)
 	if err != nil {
-		setupLog.Error(err, "error waiting for the CSI driver to be ready")
+		csmlog.Errorf("error waiting for the CSI driver to be ready: %v", err)
 		osExit(1)
 	}
-	setupLog.V(1).Info("CSI driver name", "driverName", driverName)
+	csmlog.WithFields(csmlog.Fields{"driverName": driverName}).Info("CSI driver name")
 
 	capabilitySet, supportedActions, err := getReplicationCapabilitiesFunc(ctx, identityClient)
 	if err != nil {
-		setupLog.Error(err, "error fetching replication capabilities")
+		csmlog.Errorf("error fetching replication capabilities: %v", err)
 		osExit(1)
 	}
 	if len(capabilitySet) == 0 {
-		setupLog.Error(fmt.Errorf("driver doesn't support replication"), "replication not supported")
+		csmlog.Errorf("replication not supported: %v", fmt.Errorf("driver doesn't support replication"))
 		osExit(1)
 	}
 	for _, capability := range currentSupportedCapabilities {
 		if _, ok := capabilitySet[capability]; !ok {
-			setupLog.Error(fmt.Errorf("driver doesn't support %s capability, which is required", capability),
+			csmlog.Error(
 				"one of the capabilities not supported")
 			osExit(1)
 		}
@@ -284,91 +305,111 @@ func main() {
 		LeaderElectionID:           leaderElectionID,
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
+		csmlog.Errorf("unable to start manager: %v", err)
 		osExit(1)
 	}
 
 	controllerMgr, err := getcreateReplicatorManagerFunc(ctx, mgr)
 	if err != nil {
-		setupLog.Error(err, "failed to configure the controller manager")
+		csmlog.Errorf("failed to configure the controller manager: %v", err)
 		osExit(1)
 	}
 	// Start the watch on configmap
-	controllerMgr.setupConfigMapWatcher(logrusLog)
+	controllerMgr.setupConfigMapWatcher()
 
-	// Process the config. Get initial log level
-	level, err := getParseLevelFunc(controllerMgr.config.LogLevel)
-	if err != nil {
-		logrusLog.Error("Unable to parse ", err)
+	// Process the config. Get initial log level and format
+	normalizedLogLevel := strings.ToLower(strings.TrimSpace(controllerMgr.config.LogLevel))
+	if normalizedLogLevel != "" {
+		level, err := csmlog.ParseLevel(normalizedLogLevel)
+		if err != nil {
+			csmlog.Errorf("Unable to parse log level: %v", err)
+		} else {
+			csmlog.Infof("set level to %v", level)
+			csmlog.SetLevel(level)
+		}
 	}
-	logrusLog.Info("set level to", level)
-	logrusLog.SetLevel(level)
+	if controllerMgr.config.LogFormat != "" {
+		switch strings.ToLower(controllerMgr.config.LogFormat) {
+		case "json", "text":
+			csmlog.Infof("set format to %v", strings.ToLower(controllerMgr.config.LogFormat))
+			csmlog.SetFormat(strings.ToLower(controllerMgr.config.LogFormat))
+		default:
+			csmlog.Errorf("invalid log format %q, falling back to json", controllerMgr.config.LogFormat)
+			csmlog.SetFormat("json")
+		}
+	}
+
+	csmlog.Info("Starting manager")
+	csmlog.Info("Starting controller-runtime")
 
 	// Get the kube-system content
 	var clusterUID string
 	ns, err := getClusterUID(ctx)
 	if err != nil {
-		logrusLog.Error("getClusterUuid error: ", err.Error())
+		csmlog.Errorf("getClusterUuid error: %v", err)
 	} else {
-		logrusLog.Error("getClusterUuid got uuid: ", ns.GetUID())
+		csmlog.Infof("getClusterUuid got uuid: %s", ns.GetUID())
 		clusterUID = string(ns.GetUID())
 	}
 
+	initReplicationMetrics(driverName)
+
 	expRateLimiter := getWorkqueueReconcileRequest(flags.retryIntervalStart, flags.retryIntervalMax)
+	csmlog.Info("Starting PersistentVolumeClaim controller")
 	if err = getPersistentVolumeClaimReconcilerSetupWithManager(&controller.PersistentVolumeClaimReconciler{
 		Client:            mgr.GetClient(),
-		Log:               ctrl.Log.WithName("controllers").WithName("PersistentVolumeClaim"),
 		Scheme:            mgr.GetScheme(),
 		EventRecorder:     mgr.GetEventRecorderFor(constants.DellCSIReplicator),
 		DriverName:        driverName,
-		ReplicationClient: csireplication.New(csiConn, ctrl.Log.WithName("replication-client"), flags.operationTimeout),
+		ReplicationClient: csireplication.New(csiConn, flags.operationTimeout),
 		ContextPrefix:     flags.pgContextKeyPrefix,
 		SingleFlightGroup: singleflight.Group{},
 		Domain:            flags.domain,
 	}, mgr, expRateLimiter, flags.workerThreads); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "PersistentVolumeClaim")
+		csmlog.Errorf("unable to create controller: %v", err)
 		osExit(1)
 	}
 
+	csmlog.Info("Starting PersistentVolume controller")
 	if err = getPersistentVolumeReconcilerSetupWithManager(&controller.PersistentVolumeReconciler{
 		Client:            mgr.GetClient(),
-		Log:               ctrl.Log.WithName("controllers").WithName("PersistentVolume"),
 		Scheme:            mgr.GetScheme(),
 		EventRecorder:     mgr.GetEventRecorderFor(constants.DellCSIReplicator),
 		DriverName:        driverName,
-		ReplicationClient: csireplication.New(csiConn, ctrl.Log.WithName("replication-client"), flags.operationTimeout),
+		ReplicationClient: csireplication.New(csiConn, flags.operationTimeout),
 		ContextPrefix:     flags.pgContextKeyPrefix,
 		SingleFlightGroup: singleflight.Group{},
 		Domain:            flags.domain,
 		ClusterUID:        clusterUID,
 	}, ctx, mgr, expRateLimiter, flags.workerThreads); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "PersistentVolume")
+		csmlog.Errorf("unable to create controller: %v", err)
 		osExit(1)
 	}
 
+	csmlog.Info("Starting ReplicationGroup controller")
 	if err = getReplicationGroupReconcilerSetupWithManager(&controller.ReplicationGroupReconciler{
 		Client:                     mgr.GetClient(),
-		Log:                        ctrl.Log.WithName("controllers").WithName("DellCSIReplicationGroup"),
 		Scheme:                     mgr.GetScheme(),
 		EventRecorder:              mgr.GetEventRecorderFor(constants.DellCSIReplicator),
 		DriverName:                 driverName,
-		ReplicationClient:          csireplication.New(csiConn, ctrl.Log.WithName("replication-client"), flags.operationTimeout),
+		ReplicationClient:          csireplication.New(csiConn, flags.operationTimeout),
 		SupportedActions:           supportedActions,
 		MaxRetryDurationForActions: flags.maxRetryDurationForActions,
 	}, mgr, expRateLimiter, flags.workerThreads); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "DellCSIReplicationGroup")
+		csmlog.Errorf("unable to create controller: %v", err)
 		osExit(1)
 	}
 
+	monitoringInterval := getReplicationMetricsCollectionInterval(flags.monitoringInterval)
+
 	if _, ok := capabilitySet[monitoringCapability]; ok {
-		setupLog.Info("driver supports monitoring capability. we will monitor the RGs")
+		csmlog.Info("driver supports monitoring capability. we will monitor the RGs")
 		rgMonitor := controller.ReplicationGroupMonitoring{
 			Client:             mgr.GetClient(),
-			Log:                ctrl.Log.WithName("controllers").WithName(constants.Monitoring),
 			EventRecorder:      mgr.GetEventRecorderFor(constants.Monitoring),
 			DriverName:         driverName,
-			ReplicationClient:  csireplication.New(csiConn, ctrl.Log.WithName("replication-client"), flags.operationTimeout),
-			MonitoringInterval: flags.monitoringInterval,
+			ReplicationClient:  csireplication.New(csiConn, flags.operationTimeout),
+			MonitoringInterval: monitoringInterval,
 		}
 
 		err = rgMonitor.Monitor(ctx)
@@ -376,12 +417,14 @@ func main() {
 			osExit(1)
 		}
 	} else {
-		setupLog.Info("driver does not support monitoring capability")
+		csmlog.Info("driver does not support monitoring capability")
 	}
 
-	setupLog.Info("starting manager")
+	csmlog.Infof("Starting workers with %d threads", flags.workerThreads)
+
+	csmlog.Info("starting manager")
 	if err := getManagerStart(mgr); err != nil {
-		setupLog.Error(err, "problem running manager")
+		csmlog.Errorf("problem running manager: %v", err)
 		osExit(1)
 	}
 }
@@ -399,4 +442,52 @@ func getClusterUID(ctx context.Context) (*v1.Namespace, error) {
 	}
 
 	return ns, nil
+}
+
+func initReplicationMetrics(driverName string) {
+	if os.Getenv(constants.EnvReplicationMetricsEnabled) != "true" {
+		csmlog.Info("Replication metrics are disabled")
+		return
+	}
+
+	registry := prometheus.NewRegistry()
+	replMetrics := metrics.NewReplicationMetrics(registry)
+	metrics.SetGlobalReplicationMetrics(replMetrics)
+	replMetrics.SetControllerHealth(driverName, true)
+
+	srdfMetrics := metrics.NewSRDFMetrics(registry)
+	metrics.SetGlobalSRDFMetrics(srdfMetrics)
+
+	metricsPort := os.Getenv(constants.EnvReplicationMetricsPort)
+	if metricsPort == "" {
+		metricsPort = constants.DefaultMetricsPort
+	}
+
+	tlsCert := os.Getenv(constants.EnvReplicationMetricsTLSCertFile)
+	tlsKey := os.Getenv(constants.EnvReplicationMetricsTLSKeyFile)
+
+	newMetricsServer := newMetricsServerFunc
+	startMetricsServer := startMetricsServerFunc
+	go func() {
+		// StaleMetricName is intentionally omitted: dell_csm_repl_metrics_stale is
+		// owned by ReplicationMetrics and set via SetMetricsStale in the monitoring
+		// loop to avoid a double-registration panic.
+		cfg := metricscommon.Config{
+			Port:     ":" + metricsPort,
+			CertFile: tlsCert,
+			KeyFile:  tlsKey,
+			Registry: registry,
+		}
+		metricsSrv := newMetricsServer(cfg)
+
+		if tlsCert != "" && tlsKey != "" {
+			csmlog.Infof("Starting replication metrics server with TLS on port %s for driver %s", metricsPort, driverName)
+		} else {
+			csmlog.Infof("Starting replication metrics server on port %s for driver %s", metricsPort, driverName)
+		}
+
+		if err := startMetricsServer(metricsSrv); err != nil {
+			csmlog.Errorf("Replication metrics server failed: %v", err)
+		}
+	}()
 }

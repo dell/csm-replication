@@ -22,12 +22,12 @@ import (
 	"testing"
 	"time"
 
+	metricscommon "github.com/dell/csm-metrics-common/pkg/server"
 	repController "github.com/dell/csm-replication/controllers/replication-controller"
 	"github.com/dell/csm-replication/pkg/common/constants"
 	"github.com/dell/csm-replication/pkg/config"
-	"github.com/go-logr/logr"
-	"github.com/go-logr/logr/funcr"
-	"github.com/sirupsen/logrus"
+	"github.com/dell/csmlog"
+	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -36,23 +36,24 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlcnf "sigs.k8s.io/controller-runtime/pkg/config"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/recorder"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/conversion"
 )
 
 type mockManager struct {
-	logger              logr.Logger
+	manager.Manager
 	client              client.Client
 	scheme              *runtime.Scheme
 	eventRec            record.EventRecorder
@@ -63,8 +64,116 @@ type mockManager struct {
 	// reconciler          *controller.PersistentVolumeReconciler
 }
 
-func (m *mockManager) GetLogger() logr.Logger {
-	return m.logger
+func TestMainFlow(_ *testing.T) {
+	originalSetupFlags := setupFlags
+	originalCreateManagerInstance := createManagerInstance
+	originalSetupControllerManager := setupControllerManager
+	originalGetSecretController := getSecretController
+	originalPersistentVolumeRecon := getPersistentVolumeReconciler
+	originalReplicationGroupRecon := getReplicationGroupReconciler
+	originalPersistentVolumeClaimRecon := getPersistentVolumeClaimReconciler
+	originalGetManagerStart := getManagerStart
+	originalOsExit := osExit
+	defer func() {
+		setupFlags = originalSetupFlags
+		createManagerInstance = originalCreateManagerInstance
+		setupControllerManager = originalSetupControllerManager
+		getSecretController = originalGetSecretController
+		getPersistentVolumeReconciler = originalPersistentVolumeRecon
+		getReplicationGroupReconciler = originalReplicationGroupRecon
+		getPersistentVolumeClaimReconciler = originalPersistentVolumeClaimRecon
+		getManagerStart = originalGetManagerStart
+		osExit = originalOsExit
+	}()
+
+	setupFlags = func() (map[string]string, context.Context) {
+		return map[string]string{
+			"metrics-addr":                 ":8081",
+			"leader-election":              "false",
+			"prefix":                       "replication.storage.dell.com",
+			"worker-threads":               "2",
+			"retry-interval-start":         "1s",
+			"retry-interval-max":           "5m0s",
+			"disable-pvc-remap":            "false",
+			"enable-kubevirt-pvc-remap":    "false",
+			"allow-pvc-creation-on-target": "false",
+		}, context.Background()
+	}
+
+	createManagerInstance = func(_ map[string]string) manager.Manager {
+		return &mockManager{}
+	}
+
+	setupControllerManager = func(_ context.Context, mgr manager.Manager) *ControllerManager {
+		return &ControllerManager{
+			Manager: mgr,
+			config: &config.Config{
+				LogLevel:  "info",
+				LogFormat: "json",
+			},
+		}
+	}
+
+	getSecretController = func(*ControllerManager) error {
+		return nil
+	}
+	getPersistentVolumeReconciler = func(_ *repController.PersistentVolumeReconciler, _ manager.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+		return nil
+	}
+	getReplicationGroupReconciler = func(_ *repController.ReplicationGroupReconciler, _ manager.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+		return nil
+	}
+	getPersistentVolumeClaimReconciler = func(_ *repController.PersistentVolumeClaimReconciler, _ manager.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+		return nil
+	}
+	getManagerStart = func(_ manager.Manager) error {
+		return nil
+	}
+	osExit = func(int) {}
+
+	main()
+}
+
+func TestCreateControllerManager(t *testing.T) {
+	originalGetConnectionControllerClient := getConnectionControllerClient
+	originalGetConfig := getConfig
+	originalGetConfigPrintConfig := getConfigPrintConfig
+	originalGetCtrlNewManager := getCtrlNewManager
+	defer func() {
+		getConnectionControllerClient = originalGetConnectionControllerClient
+		getConfig = originalGetConfig
+		getConfigPrintConfig = originalGetConfigPrintConfig
+		getCtrlNewManager = originalGetCtrlNewManager
+	}()
+
+	t.Run("error fetching client", func(t *testing.T) {
+		getConnectionControllerClient = func(_ *runtime.Scheme) (client.Client, error) {
+			return nil, errors.New("client fail")
+		}
+		_, err := createControllerManager(context.Background(), &mockManager{})
+		assert.Error(t, err)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		getConnectionControllerClient = func(_ *runtime.Scheme) (client.Client, error) {
+			return nil, nil
+		}
+		getConfig = func(_ context.Context, _ client.Client, _ config.ControllerManagerOpts, _ record.EventRecorder) (*config.Config, error) {
+			return &config.Config{}, nil
+		}
+		printed := false
+		getConfigPrintConfig = func(_ *config.Config) {
+			printed = true
+		}
+		getCtrlNewManager = func(_ ctrl.Options) (manager.Manager, error) {
+			return &mockManager{}, nil
+		}
+
+		mgr, err := createControllerManager(context.Background(), &mockManager{})
+		assert.NoError(t, err)
+		assert.NotNil(t, mgr)
+		assert.True(t, printed)
+	})
 }
 
 func (m *mockManager) Add(_ manager.Runnable) error {
@@ -185,18 +294,14 @@ func (m *mockManager) GetConverterRegistry() conversion.Registry {
 	return nil
 }
 
-func (m *mockManager) GetEventRecorder(_ string) events.EventRecorder {
+func (m *mockManager) GetEventRecorder(_ string) recorder.EventRecorder {
 	// Implement the method as needed for your mock
 	return nil
 }
 
 type mockSecretController struct {
+	controller.Controller
 	mock.Mock
-	logger logr.Logger
-}
-
-func (m *mockSecretController) GetLogger() logr.Logger {
-	return m.logger
 }
 
 func (m *mockSecretController) Start(_ context.Context) error {
@@ -214,11 +319,9 @@ func (m *mockSecretController) Reconcile(ctx context.Context, request reconcile.
 
 func TestControllerManager_reconcileSecretUpdates(t *testing.T) {
 	// Saving original function
-	defaultGetSecretControllerLogger := getSecretControllerLogger
 	defaultGetUpdateConfigOnSecretEvent := getUpdateConfigOnSecretEvent
 
 	after := func() {
-		getSecretControllerLogger = defaultGetSecretControllerLogger
 		getUpdateConfigOnSecretEvent = defaultGetUpdateConfigOnSecretEvent
 	}
 
@@ -231,10 +334,7 @@ func TestControllerManager_reconcileSecretUpdates(t *testing.T) {
 		{
 			name: "Config update is successful",
 			setup: func() {
-				getSecretControllerLogger = func(_ *ControllerManager, _ reconcile.Request) logr.Logger {
-					return logr.Logger{}
-				}
-				getUpdateConfigOnSecretEvent = func(_ *ControllerManager, _ context.Context, _ reconcile.Request, _ record.EventRecorder, _ logr.Logger) error {
+				getUpdateConfigOnSecretEvent = func(_ *ControllerManager, _ context.Context, _ reconcile.Request, _ record.EventRecorder) error {
 					return nil
 				}
 			},
@@ -244,10 +344,7 @@ func TestControllerManager_reconcileSecretUpdates(t *testing.T) {
 		{
 			name: "Config update fails",
 			setup: func() {
-				getSecretControllerLogger = func(_ *ControllerManager, _ reconcile.Request) logr.Logger {
-					return logr.Logger{}
-				}
-				getUpdateConfigOnSecretEvent = func(_ *ControllerManager, _ context.Context, _ reconcile.Request, _ record.EventRecorder, _ logr.Logger) error {
+				getUpdateConfigOnSecretEvent = func(_ *ControllerManager, _ context.Context, _ reconcile.Request, _ record.EventRecorder) error {
 					return errors.New("failed to update config")
 				}
 			},
@@ -258,13 +355,9 @@ func TestControllerManager_reconcileSecretUpdates(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockMgr := &mockManager{
-				logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
-			}
+			mockMgr := &mockManager{}
 
-			mockSecretController := &mockSecretController{
-				logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
-			}
+			mockSecretController := &mockSecretController{}
 
 			tt.setup()
 			defer after()
@@ -289,6 +382,30 @@ func TestControllerManager_reconcileSecretUpdates(t *testing.T) {
 	}
 }
 
+func TestStartSecretControllerHelper(t *testing.T) {
+	original := getSecretController
+	defer func() {
+		getSecretController = original
+	}()
+
+	ctrlMgr := &ControllerManager{
+		config: &config.Config{},
+	}
+
+	called := false
+	getSecretController = func(*ControllerManager) error {
+		called = true
+		return nil
+	}
+	startSecretController(ctrlMgr)
+	assert.True(t, called)
+
+	getSecretController = func(*ControllerManager) error {
+		return errors.New("boom")
+	}
+	startSecretController(ctrlMgr)
+}
+
 func TestControllerManager_startSecretController(t *testing.T) {
 	after := func() {}
 
@@ -307,13 +424,9 @@ func TestControllerManager_startSecretController(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockMgr := &mockManager{
-				logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
-			}
+			mockMgr := &mockManager{}
 
-			mockSecretController := &mockSecretController{
-				logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
-			}
+			mockSecretController := &mockSecretController{}
 
 			tt.setup()
 			defer after()
@@ -341,15 +454,13 @@ func TestControllerManager_processConfigMapChanges(t *testing.T) {
 	tests := []struct {
 		name          string
 		setup         func()
-		loggerConfig  *logrus.Logger
-		expectedLevel logrus.Level
+		expectedLevel csmlog.Level
 		expectedError error
 	}{
 		{
 			name:          "Error parsing the config",
 			setup:         func() {},
-			loggerConfig:  logrus.New(),
-			expectedLevel: logrus.InfoLevel,
+			expectedLevel: csmlog.InfoLevel,
 		},
 		{
 			name: "Success",
@@ -358,33 +469,53 @@ func TestControllerManager_processConfigMapChanges(t *testing.T) {
 					return nil
 				}
 			},
-			loggerConfig:  logrus.New(),
-			expectedLevel: logrus.InfoLevel,
+			expectedLevel: csmlog.InfoLevel,
+		},
+		{
+			name: "Success with valid log format",
+			setup: func() {
+				getUpdateConfigMap = func(_ *ControllerManager, _ context.Context, _ record.EventRecorder) error {
+					return nil
+				}
+			},
+			expectedLevel: csmlog.InfoLevel,
+		},
+		{
+			name: "Success with invalid log format",
+			setup: func() {
+				getUpdateConfigMap = func(_ *ControllerManager, _ context.Context, _ record.EventRecorder) error {
+					return nil
+				}
+			},
+			expectedLevel: csmlog.InfoLevel,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockMgr := &mockManager{
-				logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
-			}
+			mockMgr := &mockManager{}
 
-			mockSecretController := &mockSecretController{
-				logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
-			}
+			mockSecretController := &mockSecretController{}
 
 			tt.setup()
 			defer after()
 
+			cfg := &config.Config{}
+			if tt.name == "Success with valid log format" {
+				cfg.LogFormat = "TEXT"
+			} else if tt.name == "Success with invalid log format" {
+				cfg.LogFormat = "invalid"
+			}
+
 			mgr := &ControllerManager{
 				Manager:          mockMgr,
-				config:           &config.Config{},
+				config:           cfg,
 				SecretController: mockSecretController,
 			}
 
-			mgr.processConfigMapChanges(tt.loggerConfig)
+			mgr.processConfigMapChanges()
 
-			assert.Equal(t, tt.expectedLevel, tt.loggerConfig.GetLevel())
+			assert.Equal(t, tt.expectedLevel, csmlog.GetLevel())
 		})
 	}
 }
@@ -413,12 +544,9 @@ func TestControllerManager_setupConfigMapWatcher(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockMgr := &mockManager{
-				logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
-			}
+		t.Run(tt.name, func(_ *testing.T) {
+			mockMgr := &mockManager{}
 
-			loggerConfig := logrus.New()
 			mgr := &ControllerManager{
 				Opts:    config.ControllerManagerOpts{},
 				Manager: mockMgr,
@@ -427,7 +555,7 @@ func TestControllerManager_setupConfigMapWatcher(t *testing.T) {
 
 			tt.setup()
 
-			mgr.setupConfigMapWatcher(loggerConfig)
+			mgr.setupConfigMapWatcher()
 		})
 	}
 }
@@ -465,7 +593,7 @@ func TestControllerManager_createControllerManager(t *testing.T) {
 				getConnectionControllerClient = func(_ *runtime.Scheme) (client.Client, error) {
 					return nil, nil
 				}
-				getConfig = func(_ context.Context, _ client.Client, _ config.ControllerManagerOpts, _ record.EventRecorder, _ logr.Logger) (*config.Config, error) {
+				getConfig = func(_ context.Context, _ client.Client, _ config.ControllerManagerOpts, _ record.EventRecorder) (*config.Config, error) {
 					return &config.Config{}, errors.New("error getting config")
 				}
 			},
@@ -478,10 +606,10 @@ func TestControllerManager_createControllerManager(t *testing.T) {
 				getConnectionControllerClient = func(_ *runtime.Scheme) (client.Client, error) {
 					return nil, nil
 				}
-				getConfig = func(_ context.Context, _ client.Client, _ config.ControllerManagerOpts, _ record.EventRecorder, _ logr.Logger) (*config.Config, error) {
+				getConfig = func(_ context.Context, _ client.Client, _ config.ControllerManagerOpts, _ record.EventRecorder) (*config.Config, error) {
 					return &config.Config{}, nil
 				}
-				getConfigPrintConfig = func(_ *config.Config, _ logr.Logger) {}
+				getConfigPrintConfig = func(_ *config.Config) {}
 			},
 			expectedControllerManager: &ControllerManager{
 				Opts: config.ControllerManagerOpts{
@@ -500,9 +628,7 @@ func TestControllerManager_createControllerManager(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockMgr := &mockManager{
-				logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
-			}
+			mockMgr := &mockManager{}
 
 			tt.setup()
 			defer after()
@@ -521,7 +647,7 @@ func TestControllerManager_createControllerManager(t *testing.T) {
 
 func TestSetupFlags(t *testing.T) {
 	// Call the setupFlags function
-	flags, setupLog, logrusLog, ctx := setupFlags()
+	flags, ctx := setupFlags()
 
 	// Assert the expected values
 	expected := map[string]string{
@@ -539,39 +665,67 @@ func TestSetupFlags(t *testing.T) {
 		}
 	}
 
-	assert.NotNil(t, setupLog)
-	assert.NotNil(t, logrusLog)
+	assert.NotNil(t, flags)
 	assert.NotNil(t, ctx)
+}
+
+func TestProcessLogFormat(t *testing.T) {
+	tests := []struct {
+		name      string
+		logFormat string
+	}{
+		{
+			name:      "Valid log format TEXT",
+			logFormat: "TEXT",
+		},
+		{
+			name:      "Valid log format JSON",
+			logFormat: "JSON",
+		},
+		{
+			name:      "Invalid log format",
+			logFormat: "invalid",
+		},
+		{
+			name:      "Empty log format",
+			logFormat: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(_ *testing.T) {
+			setLogFormat(tt.logFormat)
+		})
+	}
 }
 
 func TestProcessLogLevel(t *testing.T) {
 	tests := []struct {
 		name     string
 		logLevel string
-		expected logrus.Level
+		expected csmlog.Level
 	}{
 		{
 			name:     "Valid log level",
 			logLevel: "info",
-			expected: logrus.InfoLevel,
+			expected: csmlog.InfoLevel,
 		},
 		{
 			name:     "Invalid log level",
 			logLevel: "invalid",
-			expected: logrus.InfoLevel,
+			expected: csmlog.InfoLevel,
 		},
 		{
 			name:     "Empty log level",
 			logLevel: "",
-			expected: logrus.InfoLevel,
+			expected: csmlog.InfoLevel,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logrusLog := logrus.New()
-			processLogLevel(tt.logLevel, logrusLog)
-			actual := logrusLog.GetLevel()
+			setLogLevel(tt.logLevel)
+			actual := csmlog.GetLevel()
 			if actual != tt.expected {
 				t.Errorf("Expected log level: %v, but got: %v", tt.expected, actual)
 			}
@@ -693,17 +847,15 @@ func TestStartManager(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
-		manager  manager.Manager
-		setupLog logr.Logger
-		setup    func()
-		wantErr  bool
+		name    string
+		manager manager.Manager
+		setup   func()
+		wantErr bool
 	}{
 		{
-			name:     "Manager is nil",
-			manager:  nil,
-			setupLog: ctrl.Log.WithName("test-logger"),
-			wantErr:  true,
+			name:    "Manager is nil",
+			manager: nil,
+			wantErr: true,
 		},
 		{
 			name:    "Manager is not nil",
@@ -713,8 +865,7 @@ func TestStartManager(t *testing.T) {
 					return errors.New("problem running manager")
 				}
 			},
-			setupLog: ctrl.Log.WithName("test-logger"),
-			wantErr:  false,
+			wantErr: false,
 		},
 	}
 
@@ -738,7 +889,7 @@ func TestStartManager(t *testing.T) {
 					}
 				}()
 			}
-			startManager(tt.manager, tt.setupLog)
+			startManager(tt.manager)
 			if tt.name == "Manager is not nil" {
 				if exitCode != 1 {
 					t.Errorf("Expected exit code 1, but got %d", exitCode)
@@ -749,13 +900,9 @@ func TestStartManager(t *testing.T) {
 }
 
 func TestCreatePersistentVolumeReconciler(t *testing.T) {
-	mockMgr := &mockManager{
-		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
-	}
+	mockMgr := &mockManager{}
 
-	mockSecretController := &mockSecretController{
-		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
-	}
+	mockSecretController := &mockSecretController{}
 	originalGetPersistentVolumeReconciler := getPersistentVolumeReconciler
 	originalOsExit := osExit
 
@@ -770,7 +917,6 @@ func TestCreatePersistentVolumeReconciler(t *testing.T) {
 		domain         string
 		workerThreads  int
 		expRateLimiter workqueue.TypedRateLimiter[reconcile.Request]
-		setupLog       logr.Logger
 		setup          func()
 		wantErr        bool
 	}{
@@ -781,7 +927,6 @@ func TestCreatePersistentVolumeReconciler(t *testing.T) {
 			domain:         "abc",
 			workerThreads:  2,
 			expRateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second),
-			setupLog:       ctrl.Log.WithName("test-logger"),
 			wantErr:        false,
 		},
 		{
@@ -795,7 +940,6 @@ func TestCreatePersistentVolumeReconciler(t *testing.T) {
 			domain:         "abc",
 			workerThreads:  2,
 			expRateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second),
-			setupLog:       ctrl.Log.WithName("test-logger"),
 			setup: func() {
 				getPersistentVolumeReconciler = func(_ *repController.PersistentVolumeReconciler, _ manager.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
 					return nil
@@ -814,7 +958,6 @@ func TestCreatePersistentVolumeReconciler(t *testing.T) {
 			domain:         "abc",
 			workerThreads:  3,
 			expRateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second),
-			setupLog:       ctrl.Log.WithName("test-logger"),
 			setup: func() {
 				getPersistentVolumeReconciler = func(_ *repController.PersistentVolumeReconciler, _ manager.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
 					return errors.New("problem running manager")
@@ -844,7 +987,7 @@ func TestCreatePersistentVolumeReconciler(t *testing.T) {
 					}
 				}()
 			}
-			createPersistentVolumeReconciler(tt.manager, tt.controllerMgr, tt.domain, tt.workerThreads, tt.expRateLimiter, tt.setupLog)
+			createPersistentVolumeReconciler(tt.manager, tt.controllerMgr, tt.domain, tt.workerThreads, tt.expRateLimiter)
 			if tt.name == "Manager is not nil" {
 				if exitCode != 0 {
 					t.Errorf("Expected exit code 0, but got %d", exitCode)
@@ -860,13 +1003,9 @@ func TestCreatePersistentVolumeReconciler(t *testing.T) {
 }
 
 func TestCreateReplicationGroupReconciler(t *testing.T) {
-	mockMgr := &mockManager{
-		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
-	}
+	mockMgr := &mockManager{}
 
-	mockSecretController := &mockSecretController{
-		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
-	}
+	mockSecretController := &mockSecretController{}
 	originalGetReplicationGroupReconciler := getReplicationGroupReconciler
 	originalOsExit := osExit
 
@@ -881,7 +1020,6 @@ func TestCreateReplicationGroupReconciler(t *testing.T) {
 		domain         string
 		workerThreads  int
 		expRateLimiter workqueue.TypedRateLimiter[reconcile.Request]
-		setupLog       logr.Logger
 		setup          func()
 		wantErr        bool
 	}{
@@ -892,7 +1030,6 @@ func TestCreateReplicationGroupReconciler(t *testing.T) {
 			domain:         "abc",
 			workerThreads:  2,
 			expRateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second),
-			setupLog:       ctrl.Log.WithName("test-logger"),
 			wantErr:        false,
 		},
 		{
@@ -906,7 +1043,6 @@ func TestCreateReplicationGroupReconciler(t *testing.T) {
 			domain:         "abc",
 			workerThreads:  2,
 			expRateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second),
-			setupLog:       ctrl.Log.WithName("test-logger"),
 			setup: func() {
 				getReplicationGroupReconciler = func(_ *repController.ReplicationGroupReconciler, _ manager.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
 					return nil
@@ -925,7 +1061,6 @@ func TestCreateReplicationGroupReconciler(t *testing.T) {
 			domain:         "abc",
 			workerThreads:  3,
 			expRateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second),
-			setupLog:       ctrl.Log.WithName("test-logger"),
 			setup: func() {
 				getReplicationGroupReconciler = func(_ *repController.ReplicationGroupReconciler, _ manager.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
 					return errors.New("problem running manager")
@@ -955,7 +1090,7 @@ func TestCreateReplicationGroupReconciler(t *testing.T) {
 					}
 				}()
 			}
-			createReplicationGroupReconciler(tt.manager, tt.controllerMgr, tt.domain, tt.workerThreads, tt.expRateLimiter, false, false, tt.setupLog)
+			createReplicationGroupReconciler(tt.manager, tt.controllerMgr, tt.domain, tt.workerThreads, tt.expRateLimiter, false, false)
 			if tt.name == "Manager is not nil" {
 				if exitCode != 0 {
 					t.Errorf("Expected exit code 0, but got %d", exitCode)
@@ -971,13 +1106,9 @@ func TestCreateReplicationGroupReconciler(t *testing.T) {
 }
 
 func TestCreatePersistentVolumeClaimReconciler(t *testing.T) {
-	mockMgr := &mockManager{
-		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
-	}
+	mockMgr := &mockManager{}
 
-	mockSecretController := &mockSecretController{
-		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
-	}
+	mockSecretController := &mockSecretController{}
 	originalGetPersistentVolumeClaimReconciler := getPersistentVolumeClaimReconciler
 	originalOsExit := osExit
 
@@ -992,7 +1123,6 @@ func TestCreatePersistentVolumeClaimReconciler(t *testing.T) {
 		domain                   string
 		workerThreads            int
 		expRateLimiter           workqueue.TypedRateLimiter[reconcile.Request]
-		setupLog                 logr.Logger
 		setup                    func()
 		wantErr                  bool
 		allowPVCCreationOnTarget bool
@@ -1004,7 +1134,6 @@ func TestCreatePersistentVolumeClaimReconciler(t *testing.T) {
 			domain:                   "abc",
 			workerThreads:            2,
 			expRateLimiter:           workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second),
-			setupLog:                 ctrl.Log.WithName("test-logger"),
 			wantErr:                  false,
 			allowPVCCreationOnTarget: false,
 		},
@@ -1019,7 +1148,6 @@ func TestCreatePersistentVolumeClaimReconciler(t *testing.T) {
 			domain:         "abc",
 			workerThreads:  2,
 			expRateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second),
-			setupLog:       ctrl.Log.WithName("test-logger"),
 			setup: func() {
 				getPersistentVolumeClaimReconciler = func(_ *repController.PersistentVolumeClaimReconciler, _ manager.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
 					return nil
@@ -1039,7 +1167,6 @@ func TestCreatePersistentVolumeClaimReconciler(t *testing.T) {
 			domain:         "abc",
 			workerThreads:  3,
 			expRateLimiter: workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](1*time.Second, 10*time.Second),
-			setupLog:       ctrl.Log.WithName("test-logger"),
 			setup: func() {
 				getPersistentVolumeClaimReconciler = func(_ *repController.PersistentVolumeClaimReconciler, _ manager.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
 					return errors.New("problem running manager")
@@ -1070,7 +1197,7 @@ func TestCreatePersistentVolumeClaimReconciler(t *testing.T) {
 					}
 				}()
 			}
-			createPersistentVolumeClaimReconciler(tt.manager, tt.controllerMgr, tt.domain, tt.workerThreads, tt.expRateLimiter, tt.allowPVCCreationOnTarget, tt.setupLog)
+			createPersistentVolumeClaimReconciler(tt.manager, tt.controllerMgr, tt.domain, tt.workerThreads, tt.expRateLimiter, tt.allowPVCCreationOnTarget)
 			if tt.name == "Manager is not nil" {
 				if exitCode != 0 {
 					t.Errorf("Expected exit code 0, but got %d", exitCode)
@@ -1086,13 +1213,9 @@ func TestCreatePersistentVolumeClaimReconciler(t *testing.T) {
 }
 
 func TestStartSecretController(t *testing.T) {
-	mockMgr := &mockManager{
-		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
-	}
+	mockMgr := &mockManager{}
 
-	mockSecretController := &mockSecretController{
-		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
-	}
+	mockSecretController := &mockSecretController{}
 
 	originalgetSecretController := getSecretController
 	originalOsExit := osExit
@@ -1105,7 +1228,6 @@ func TestStartSecretController(t *testing.T) {
 	tests := []struct {
 		name          string
 		controllerMgr *ControllerManager
-		setupLog      logr.Logger
 		setup         func()
 		expectedErr   bool
 	}{
@@ -1116,7 +1238,6 @@ func TestStartSecretController(t *testing.T) {
 				config:           &config.Config{},
 				SecretController: mockSecretController,
 			},
-			setupLog: ctrl.Log.WithName("test-logger"),
 			setup: func() {
 				getSecretController = func(_ *ControllerManager) error {
 					return nil
@@ -1131,7 +1252,6 @@ func TestStartSecretController(t *testing.T) {
 				config:           &config.Config{},
 				SecretController: mockSecretController,
 			},
-			setupLog: ctrl.Log.WithName("test-logger"),
 			setup: func() {
 				getSecretController = func(_ *ControllerManager) error {
 					return errors.New("failed to setup secret controller. Continuing")
@@ -1148,15 +1268,13 @@ func TestStartSecretController(t *testing.T) {
 			}
 			defer after()
 
-			startSecretController(tt.controllerMgr, tt.setupLog)
+			startSecretController(tt.controllerMgr)
 		})
 	}
 }
 
 func TestSetupControllerManager(t *testing.T) {
-	mockMgr := &mockManager{
-		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
-	}
+	mockMgr := &mockManager{}
 
 	ctx := context.Background()
 	originalOsExit := osExit
@@ -1168,21 +1286,18 @@ func TestSetupControllerManager(t *testing.T) {
 	tests := []struct {
 		name        string
 		mgr         manager.Manager
-		setupLog    logr.Logger
 		setup       func()
 		expectedErr bool
 	}{
 		{
 			name:        "Success",
 			mgr:         mockMgr,
-			setupLog:    ctrl.Log.WithName("test-logger"),
 			setup:       func() {},
 			expectedErr: false,
 		},
 		{
 			name:        "Failure",
 			mgr:         mockMgr,
-			setupLog:    ctrl.Log.WithName("test-logger"),
 			setup:       func() {},
 			expectedErr: false,
 		},
@@ -1200,7 +1315,7 @@ func TestSetupControllerManager(t *testing.T) {
 				exitCode = code
 			}
 
-			setupControllerManager(ctx, tt.mgr, tt.setupLog)
+			setupControllerManager(ctx, tt.mgr)
 
 			if tt.name == "Failure" {
 				if exitCode != 1 {
@@ -1292,9 +1407,9 @@ func TestMain(t *testing.T) {
 		{
 			name: "Manager instance is nil",
 			setup: func() {
-				setupFlags = func() (map[string]string, logr.Logger, *logrus.Logger, context.Context) {
+				setupFlags = func() (map[string]string, context.Context) {
 					flagMap := make(map[string]string)
-					return flagMap, logr.Logger{}, logrus.New(), context.Background()
+					return flagMap, context.Background()
 				}
 
 				createManagerInstance = func(_ map[string]string) manager.Manager {
@@ -1310,19 +1425,17 @@ func TestMain(t *testing.T) {
 		{
 			name: "Manager is nil",
 			setup: func() {
-				setupFlags = func() (map[string]string, logr.Logger, *logrus.Logger, context.Context) {
-					return map[string]string{"metrics-addr": ":8080", "leader-election": "true"}, logr.Logger{}, logrus.New(), context.Background()
+				setupFlags = func() (map[string]string, context.Context) {
+					return map[string]string{"metrics-addr": ":8080", "leader-election": "true"}, context.Background()
 				}
 
-				mockMgr := &mockManager{
-					logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
-				}
+				mockMgr := &mockManager{}
 
 				createManagerInstance = func(_ map[string]string) manager.Manager {
 					return mockMgr
 				}
 
-				setupControllerManager = func(_ context.Context, _ manager.Manager, _ logr.Logger) *ControllerManager {
+				setupControllerManager = func(_ context.Context, _ manager.Manager) *ControllerManager {
 					return nil
 				}
 
@@ -1352,4 +1465,95 @@ func TestMain(t *testing.T) {
 		}
 		osExitCode = 0
 	}
+}
+
+func TestInitReplicationMetrics(t *testing.T) {
+	originalNew := newMetricsServerFunc
+	originalStart := startMetricsServerFunc
+	defer func() {
+		newMetricsServerFunc = originalNew
+		startMetricsServerFunc = originalStart
+	}()
+
+	tests := []struct {
+		name        string
+		envEnabled  string
+		envPort     string
+		envCertFile string
+		envKeyFile  string
+		startErr    error
+	}{
+		{
+			name:       "metrics disabled",
+			envEnabled: "false",
+		},
+		{
+			name:       "metrics enabled without TLS",
+			envEnabled: "true",
+			envPort:    "0",
+		},
+		{
+			name:        "metrics enabled with TLS",
+			envEnabled:  "true",
+			envPort:     "8445",
+			envCertFile: "/tmp/tls.crt",
+			envKeyFile:  "/tmp/tls.key",
+		},
+		{
+			name:       "metrics server start fails",
+			envEnabled: "true",
+			envPort:    "0",
+			startErr:   errors.New("start failed"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(constants.EnvReplicationMetricsEnabled, tt.envEnabled)
+			t.Setenv(constants.EnvReplicationMetricsPort, tt.envPort)
+			t.Setenv(constants.EnvReplicationMetricsTLSCertFile, tt.envCertFile)
+			t.Setenv(constants.EnvReplicationMetricsTLSKeyFile, tt.envKeyFile)
+
+			started := make(chan struct{}, 1)
+			newMetricsServerFunc = func(_ ...interface{}) *metricscommon.MetricsServer {
+				return &metricscommon.MetricsServer{}
+			}
+			startMetricsServerFunc = func(_ *metricscommon.MetricsServer) error {
+				started <- struct{}{}
+				return tt.startErr
+			}
+
+			initReplicationMetrics()
+
+			if tt.envEnabled == "true" {
+				select {
+				case <-started:
+				case <-time.After(time.Second):
+					t.Fatal("metrics server was not started")
+				}
+			}
+		})
+	}
+}
+
+func TestSetupConfigMapWatcher(_ *testing.T) {
+	originalWatch := watchConfigFunc
+	originalOnChange := onConfigChangeFunc
+	originalUpdateConfigMap := getUpdateConfigMap
+	defer func() {
+		watchConfigFunc = originalWatch
+		onConfigChangeFunc = originalOnChange
+		getUpdateConfigMap = originalUpdateConfigMap
+	}()
+
+	watchConfigFunc = func() {}
+	onConfigChangeFunc = func(runner func(fsnotify.Event)) {
+		runner(fsnotify.Event{})
+	}
+	getUpdateConfigMap = func(_ *ControllerManager, _ context.Context, _ record.EventRecorder) error {
+		return errors.New("config update error")
+	}
+
+	mgr := &ControllerManager{Manager: &mockManager{}}
+	mgr.setupConfigMapWatcher()
 }

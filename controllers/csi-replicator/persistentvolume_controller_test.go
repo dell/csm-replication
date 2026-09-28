@@ -112,7 +112,6 @@ func (suite *PersistentVolumeControllerTestSuite) initReconciler() {
 
 	suite.reconciler = &PersistentVolumeReconciler{
 		Client:            suite.client,
-		Log:               ctrl.Log.WithName("controllers").WithName("PersistentVolumeClaim"),
 		Scheme:            utils.Scheme,
 		EventRecorder:     fakeRecorder,
 		DriverName:        suite.driver.DriverName,
@@ -510,6 +509,19 @@ func (suite *PersistentVolumeControllerTestSuite) TestCreateProtectionGroupAndRG
 
 	_, err = suite.reconciler.createProtectionGroupAndRG(ctx, "", map[string]string{})
 	suite.NoError(err)
+}
+
+func (suite *PersistentVolumeControllerTestSuite) TestCreateProtectionGroupAndRG_ExistingRG() {
+	ctx := context.Background()
+	existingRG := utils.GetRGObj("existing-rg", suite.driver.DriverName, suite.driver.RemoteClusterID, "localPGID", "remotePGID", nil, nil)
+	err := suite.client.Create(ctx, existingRG)
+	suite.NoError(err)
+
+	rgName, err := suite.reconciler.createProtectionGroupAndRG(ctx, "volume-handle", map[string]string{
+		controllers.StorageClassRemoteClusterParam: suite.driver.RemoteClusterID,
+	})
+	suite.NoError(err)
+	suite.Equal(existingRG.Name, rgName)
 }
 
 func TestGetProtectionGroupID(t *testing.T) {

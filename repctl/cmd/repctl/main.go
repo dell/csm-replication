@@ -12,49 +12,24 @@
  limitations under the License.
 */
 
+// Package main implements the repctl entrypoint.
 package main
 
 import (
 	"os"
 
-	"github.com/rifflock/lfshook"
-	log "github.com/sirupsen/logrus"
-	prefixed "github.com/x-cray/logrus-prefixed-formatter"
+	csmlog "github.com/dell/csmlog"
 
-	"github.com/dell/repctl/pkg/cmd"
-	"github.com/dell/repctl/pkg/config"
-	"github.com/dell/repctl/pkg/k8s"
-	"github.com/dell/repctl/pkg/metadata"
+	"github.com/dell/csm-replication/repctl/pkg/cmd"
+	"github.com/dell/csm-replication/repctl/pkg/config"
+	"github.com/dell/csm-replication/repctl/pkg/k8s"
+	"github.com/dell/csm-replication/repctl/pkg/metadata"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 func init() {
-	terminal := &prefixed.TextFormatter{
-		DisableColors:   false,
-		TimestampFormat: "2006-01-02 15:04:05",
-		FullTimestamp:   true,
-		ForceFormatting: true,
-	}
-
-	file := &prefixed.TextFormatter{
-		DisableColors:   true,
-		TimestampFormat: "2006-01-02 15:04:05",
-		FullTimestamp:   true,
-		ForceFormatting: true,
-	}
-
-	log.SetFormatter(terminal)
-	log.SetOutput(os.Stdout)
-
-	pathMap := lfshook.PathMap{
-		log.DebugLevel: "./repctl.log",
-		log.InfoLevel:  "./repctl.log",
-		log.WarnLevel:  "./repctl.log",
-		log.ErrorLevel: "./repctl.log",
-		log.FatalLevel: "./repctl.log",
-	}
-	log.AddHook(lfshook.NewHook(pathMap, file))
+	csmlog.SetFormat("text")
 }
 
 func setupRepctlCommand() *cobra.Command {
@@ -62,8 +37,8 @@ func setupRepctlCommand() *cobra.Command {
 		Use:     "repctl",
 		Short:   "repctl is CLI tool for managing replication in Kubernetes",
 		Long:    "repctl is CLI tool for managing replication in Kubernetes",
-		Version: "v1.15.0",
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		Version: "v1.16.0",
+		PersistentPreRun: func(_ *cobra.Command, _ []string) {
 			metadata.Init(viper.GetString(config.ReplicationPrefix))
 		},
 	}
@@ -110,7 +85,7 @@ func main() {
 
 	err := getRepctlCommandExecFunction(repctl)
 	if err != nil {
-		log.Fatalf("repctl: error: %s\n", err.Error())
+		csmlog.Fatalf("repctl: error: %s\n", err.Error())
 	}
 	osExit(0)
 }

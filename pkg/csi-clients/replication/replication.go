@@ -21,7 +21,6 @@ import (
 	"github.com/dell/csm-replication/pkg/connection"
 
 	csiext "github.com/dell/dell-csi-extensions/replication"
-	"github.com/go-logr/logr"
 	"google.golang.org/grpc"
 )
 
@@ -36,18 +35,16 @@ type Replication interface {
 }
 
 // New returns new implementation of Replication interface
-func New(conn *grpc.ClientConn, log logr.Logger, timeout time.Duration) Replication {
+func New(conn *grpc.ClientConn, timeout time.Duration) Replication {
 	return &replication{
 		conn:           conn,
-		log:            log,
 		timeout:        timeout,
-		rgPendingState: &connection.PendingState{MaxPending: 50, Log: log},
+		rgPendingState: &connection.PendingState{MaxPending: 50},
 	}
 }
 
 type replication struct {
 	conn           *grpc.ClientConn
-	log            logr.Logger
 	timeout        time.Duration
 	rgPendingState *connection.PendingState
 }

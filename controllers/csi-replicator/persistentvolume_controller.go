@@ -22,10 +22,9 @@ import (
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	controller "github.com/dell/csm-replication/controllers"
-	"github.com/dell/csm-replication/pkg/common/logger"
 	csireplication "github.com/dell/csm-replication/pkg/csi-clients/replication"
+	"github.com/dell/csmlog"
 	"github.com/dell/dell-csi-extensions/replication"
-	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 	"golang.org/x/sync/singleflight"
 	v1 "k8s.io/api/core/v1"
@@ -44,7 +43,6 @@ import (
 // PersistentVolumeReconciler reconciles PersistentVolume resources
 type PersistentVolumeReconciler struct {
 	client.Client
-	Log               logr.Logger
 	Scheme            *runtime.Scheme
 	EventRecorder     record.EventRecorder
 	DriverName        string
@@ -63,15 +61,15 @@ var getManagerIndexField = func(mgr ctrl.Manager, ctx context.Context) error {
 
 // Reconcile contains reconciliation logic that updates PersistentVolume depending on it's current state
 func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("persistentvolume", req.NamespacedName)
-	ctx = context.WithValue(ctx, logger.LoggerContextKey, log)
-
-	log.V(logger.InfoLevel).Info("Begin reconcile - PV Controller")
-
 	pv := new(v1.PersistentVolume)
 	if err := r.Get(ctx, req.NamespacedName, pv); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+	csmlog.WithFields(csmlog.Fields{
+		"controller": "persistentvolume",
+		"pvName":     pv.Name,
+		"driverName": r.DriverName,
+	}).Info("Begin reconcile - PV controller")
 
 	storageClass := new(storageV1.StorageClass)
 	err := r.Get(ctx, client.ObjectKey{
@@ -79,10 +77,10 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}, storageClass)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			log.Error(err, "The storage class specified in the PV doesn't exist", "StorageClassName", pv.Spec.StorageClassName)
+			csmlog.Errorf("The storage class specified in the PV doesn't exist: %v", err)
 			return ctrl.Result{}, nil
 		}
-		log.Error(err, "Failed to fetch storage class of the PV", "StorageClassName", pv.Spec.StorageClassName)
+		csmlog.Errorf("Failed to fetch storage class of the PV: %v", err)
 		return ctrl.Result{}, err
 	}
 
@@ -96,18 +94,23 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		if _, ok = pv.Annotations[controller.RemoteVolumeAnnotation]; !ok {
 			res, err := r.ReplicationClient.CreateRemoteVolume(ctx, pv.Spec.CSI.VolumeHandle, storageClass.Parameters)
 			if err != nil {
-				log.Error(err, "Failed to create the remote volume", "VolumeHandle", pv.Spec.CSI.VolumeHandle)
+				csmlog.WithFields(csmlog.Fields{
+					"controller":   "persistentvolume",
+					"pvName":       pv.Name,
+					"driverName":   r.DriverName,
+					"volumeHandle": pv.Spec.CSI.VolumeHandle,
+				}).Errorf("Failed to create the remote volume: %v", err)
 				return ctrl.Result{}, err
 			}
 			buffer, err = json.Marshal(res.RemoteVolume)
 			if err != nil {
-				log.Error(err, "Failed to marshal", "RemoteVolume", res.RemoteVolume)
+				csmlog.Errorf("Failed to marshal: %v", err)
 				return ctrl.Result{}, err
 			}
 			pvObj := pv.DeepCopy()
 			controller.AddAnnotation(pvObj, controller.RemoteVolumeAnnotation, string(buffer))
 			if err := r.Update(ctx, pvObj); err != nil {
-				log.Error(err, "Failed to add label and annotation to the PV", string(buffer))
+				csmlog.Errorf("Failed to add label and annotation to the PV: %v", err)
 				return ctrl.Result{}, err
 			}
 			isPVUpdated = true
@@ -117,11 +120,15 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	var replicationGroupName string
 
-	log.V(logger.InfoLevel).Info("Adding replication-group, remote storage class annotation and label to the PersistentVolume")
+	csmlog.WithFields(csmlog.Fields{
+		"controller": "persistentvolume",
+		"pvName":     pv.Name,
+		"driverName": r.DriverName,
+	}).Info("Adding replication-group, remote storage class annotation and label to the persistent volume")
 
 	if _, ok := pv.Annotations[controller.ReplicationGroup]; !ok {
 		if _, ok = pv.Annotations[controller.CreatedBy]; ok {
-			log.V(logger.DebugLevel).Info("This PV was created by sync controller. It is expected to have RG annotation. Re-queuing..")
+			csmlog.Info("This PV was created by sync controller. It is expected to have RG annotation. Re-queuing..")
 			return ctrl.Result{Requeue: true, RequeueAfter: controller.DefaultRetryInterval}, nil
 		}
 		if replicationGroupName, err = r.createProtectionGroupAndRG(ctx, pv.Spec.CSI.VolumeHandle, storageClass.Parameters); err != nil {
@@ -129,12 +136,12 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 
 		if replicationGroupName == "" {
-			log.V(logger.DebugLevel).Info("In corner cases we have seen RGName being empty, in that case retry..")
+			csmlog.Info("In corner cases we have seen RGName being empty, in that case retry..")
 			return ctrl.Result{Requeue: true, RequeueAfter: controller.DefaultRetryInterval}, nil
 		}
 		if isPVUpdated {
 			if err := r.Get(ctx, req.NamespacedName, pv); err != nil {
-				log.Error(err, "Failed to get PV", "pv", pv, "NamespacedName", req.NamespacedName)
+				csmlog.Errorf("Failed to get PV: %v", err)
 				return ctrl.Result{}, err
 			}
 		}
@@ -144,31 +151,31 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 	}
 
-	log.V(logger.DebugLevel).Info("Checking if PV protection complete annotation is applied")
+	csmlog.Info("Checking if PV protection complete annotation is applied")
 	if _, ok := pv.Annotations[controller.PVProtectionComplete]; !ok {
 		controller.AddAnnotation(pv, controller.PVProtectionComplete, "yes")
 		if err := r.Update(ctx, pv); err != nil {
-			log.Error(err, "Failed to add PV protection complete annotation to the PV")
+			csmlog.Errorf("Failed to add PV protection complete annotation to the PV: %v", err)
 		}
 	}
 
-	log.V(logger.DebugLevel).Info("Checking if synchronized deletion annotation is applied")
+	csmlog.Info("Checking if synchronized deletion annotation is applied")
 	syncDeleteStatus, ok := pv.Annotations[controller.SynchronizedDeletionStatus]
 	if ok && syncDeleteStatus == "requested" {
-		log.V(logger.InfoLevel).Info("Synchronized Deletion requested by annotation, deleting local backend volume")
+		csmlog.Info("Synchronized Deletion requested by annotation, deleting local backend volume")
 		volumeHandle := pv.Spec.PersistentVolumeSource.CSI.VolumeHandle
 		if volumeHandle == "" {
-			log.Error(err, "Failed to retrieve the PV's volume handle for deletion")
+			csmlog.Errorf("Failed to retrieve the PV's volume handle for deletion: %v", err)
 			return ctrl.Result{}, err
 		}
 		_, err := r.ReplicationClient.DeleteLocalVolume(ctx, volumeHandle, storageClass.Parameters)
 		if err != nil {
-			log.Error(err, "Failed to delete the local volume", "VolumeHandle", pv.Spec.PersistentVolumeSource.CSI.VolumeHandle)
+			csmlog.Errorf("Failed to delete the local volume: %v", err)
 			return ctrl.Result{}, err
 		}
 		controller.AddAnnotation(pv, controller.SynchronizedDeletionStatus, "complete")
 		if err := r.Update(ctx, pv); err != nil {
-			log.Error(err, "Failed to add SynchronizedDeletionStatus complete annotation to the PV")
+			csmlog.Errorf("Failed to add SynchronizedDeletionStatus complete annotation to the PV: %v", err)
 			return ctrl.Result{}, err
 		}
 	}
@@ -180,10 +187,14 @@ func (r *PersistentVolumeReconciler) processVolumeForReplicationGroup(ctx contex
 	replicationGroupName string,
 	scParams map[string]string,
 ) error {
-	log := logger.FromContext(ctx)
-	log.V(logger.InfoLevel).Info("Begin process volume for replication-group")
+	csmlog.WithFields(csmlog.Fields{
+		"controller":           "persistentvolume",
+		"pvName":               volume.Name,
+		"driverName":           r.DriverName,
+		"replicationGroupName": replicationGroupName,
+	}).Info("Begin process volume for replication-group")
 
-	log.V(logger.DebugLevel).Info("Adding replication-group and remote-cluster annotation to the PV")
+	csmlog.Info("Adding replication-group and remote-cluster annotation to the PV")
 
 	if _, ok := volume.Annotations[controller.ReplicationGroup]; !ok {
 		controller.AddAnnotation(volume, controller.ReplicationGroup, replicationGroupName)
@@ -201,7 +212,7 @@ func (r *PersistentVolumeReconciler) processVolumeForReplicationGroup(ctx contex
 	// Adds `retain` as default retention policy for PV, in case no or incorrect value
 	// is specified by the user.
 
-	log.V(logger.DebugLevel).Info("Adding retention policy annotation for syncing deletion across clusters")
+	csmlog.Info("Adding retention policy annotation for syncing deletion across clusters")
 
 	if strings.ToLower(scParams[controller.RemotePVRetentionPolicy]) == controller.RemoteRetentionValueDelete {
 		controller.AddAnnotation(volume, controller.RemotePVRetentionPolicy, controller.RemoteRetentionValueDelete)
@@ -209,7 +220,7 @@ func (r *PersistentVolumeReconciler) processVolumeForReplicationGroup(ctx contex
 		controller.AddAnnotation(volume, controller.RemotePVRetentionPolicy, controller.RemoteRetentionValueRetain)
 	}
 
-	log.V(logger.DebugLevel).Info("Adding replication-group and remote-cluster label to the PV")
+	csmlog.Info("Adding replication-group and remote-cluster label to the PV")
 
 	if scParams[controller.StorageClassRemoteClusterParam] != "" {
 		controller.AddAnnotation(volume, controller.RemoteClusterID, scParams[controller.StorageClassRemoteClusterParam])
@@ -217,7 +228,7 @@ func (r *PersistentVolumeReconciler) processVolumeForReplicationGroup(ctx contex
 		controller.AddLabel(volume, controller.RemoteClusterID, scParams[controller.StorageClassRemoteClusterParam])
 	}
 
-	log.V(logger.DebugLevel).Info("Adding driver specific labels")
+	csmlog.Info("Adding driver specific labels")
 
 	if r.ContextPrefix != "" {
 		if volume.Spec.CSI != nil {
@@ -233,38 +244,46 @@ func (r *PersistentVolumeReconciler) processVolumeForReplicationGroup(ctx contex
 	controller.AddAnnotation(volume, controller.PVProtectionComplete, "yes")
 
 	if err := r.Update(ctx, volume); err != nil {
-		log.Error(err, "Failed to add label and annotation to the PV")
+		csmlog.Errorf("Failed to add label and annotation to the PV: %v", err)
 		return err
 	}
 
-	log.V(logger.InfoLevel).Info("Label and annotation added to the pv", "PVName", volume.Name)
+	csmlog.WithFields(csmlog.Fields{
+		"controller":           "persistentvolume",
+		"pvName":               volume.Name,
+		"driverName":           r.DriverName,
+		"replicationGroupName": replicationGroupName,
+	}).Info("Label and annotation added to the pv")
 	r.EventRecorder.Eventf(volume, v1.EventTypeNormal, "Updated", "DellCSIReplicationGroup[%s] annotation added to the pv", replicationGroupName)
 
 	return nil
 }
 
 func (r *PersistentVolumeReconciler) createProtectionGroupAndRG(ctx context.Context, volumeHandle string, scParams map[string]string) (string, error) {
-	log := logger.FromContext(ctx)
-	log.V(logger.InfoLevel).Info("Creating protection-group and RG")
+	csmlog.WithFields(csmlog.Fields{
+		"controller":   "persistentvolume",
+		"driverName":   r.DriverName,
+		"volumeHandle": volumeHandle,
+	}).Info("Creating protection-group and RG")
 
 	if r.ClusterUID != "" {
-		log.V(logger.InfoLevel).Info("Adding Cluster UUID to storage parameters")
+		csmlog.Info("Adding Cluster UUID to storage parameters")
 		scParams[controller.ClusterUID] = r.ClusterUID
 	}
 
 	res, err := r.ReplicationClient.CreateStorageProtectionGroup(ctx, volumeHandle, scParams)
 	if err != nil {
-		log.Error(err, "Failed to create protection group", "volumeHandle", volumeHandle)
+		csmlog.Errorf("Failed to create protection group: %v", err)
 		return "", err
 	}
 
-	log.V(logger.DebugLevel).Info("Checking if a DellCSIReplicationGroup instance already exists for the ProtectionGroup")
+	csmlog.Info("Checking if a DellCSIReplicationGroup instance already exists for the ProtectionGroup")
 
 	rgList := new(repv1.DellCSIReplicationGroupList)
 	if err = r.List(ctx, rgList, client.MatchingFields{
 		protectionIndexKey: res.GetLocalProtectionGroupId(),
 	}); err != nil {
-		log.Error(err, "Failed to check for a pre-existing replication-group for this pv")
+		csmlog.Errorf("Failed to check for a pre-existing replication-group for this pv: %v", err)
 		return "", err
 	}
 
@@ -280,7 +299,12 @@ func (r *PersistentVolumeReconciler) createProtectionGroupAndRG(ctx context.Cont
 	} else {
 		// DellCSIReplicationGroup instance already exits; using the same one
 		replicationGroup = &rgList.Items[0]
-		log.V(logger.InfoLevel).Info("DellCSIReplicationGroup instance already exists for the protection group of this PV", "DellCSIReplicationGroupName", replicationGroup.Name)
+		csmlog.WithFields(csmlog.Fields{
+			"controller":   "persistentvolume",
+			"driverName":   r.DriverName,
+			"rgName":       replicationGroup.Name,
+			"volumeHandle": volumeHandle,
+		}).Info("DellCSIReplicationGroup instance already exists for the protection group of this PV")
 	}
 
 	return replicationGroup.Name, nil
@@ -297,8 +321,11 @@ func (r *PersistentVolumeReconciler) createReplicationGroupOnce(ctx context.Cont
 }
 
 func (r *PersistentVolumeReconciler) createReplicationGroup(ctx context.Context, res *replication.CreateStorageProtectionGroupResponse, remoteClusterID string, remoteRGRetentionPolicy string) (*repv1.DellCSIReplicationGroup, error) {
-	log := logger.FromContext(ctx)
-	log.V(logger.InfoLevel).Info("Creating replication-group")
+	csmlog.WithFields(csmlog.Fields{
+		"pgID":       res.GetLocalProtectionGroupId(),
+		"driverName": r.DriverName,
+		"clusterID":  remoteClusterID,
+	}).Info("Creating replication pair")
 
 	annotations := make(map[string]string)
 	labels := make(map[string]string)
@@ -320,7 +347,7 @@ func (r *PersistentVolumeReconciler) createReplicationGroup(ctx context.Context,
 	// Adds `retain` as default retention policy for RG, in case no or incorrect value
 	// is specified by the user.
 
-	log.V(logger.DebugLevel).Info("Adding retention policy annotation")
+	csmlog.Info("Adding retention policy annotation")
 
 	if strings.ToLower(remoteRGRetentionPolicy) == controller.RemoteRetentionValueDelete {
 		annotations[controller.RemoteRGRetentionPolicy] = controller.RemoteRetentionValueDelete
@@ -346,10 +373,18 @@ func (r *PersistentVolumeReconciler) createReplicationGroup(ctx context.Context,
 	}
 
 	if err := r.Create(ctx, replicationGroup); err != nil {
-		log.Error(err, "Failed to create the replication-group")
+		csmlog.WithFields(csmlog.Fields{
+			"rgName": replicationGroup.Name,
+		}).Errorf("Failed to create the replication-group: %v", err)
 		return nil, err
 	}
-	log.V(logger.InfoLevel).Info("DellCSIReplicationGroup instance created for the protection group of the PV", "DellCSIReplicationGroupName", replicationGroup.Name)
+	csmlog.WithFields(csmlog.Fields{
+		"rgName":     replicationGroup.Name,
+		"pgID":       res.GetLocalProtectionGroupId(),
+		"driverName": r.DriverName,
+		"clusterID":  remoteClusterID,
+		"status":     "created",
+	}).Info("Replication pair created successfully")
 	return replicationGroup, nil
 }
 

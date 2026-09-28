@@ -1,5 +1,5 @@
 <!--
- Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2021-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -50,6 +50,7 @@ have been implemented using [controller-runtime](https://github.com/kubernetes-s
 * [List of Adopters](https://github.com/dell/csm/blob/main/docs/ADOPTERS.md)
 * [Dell support](https://www.dell.com/support/incidents-online/en-us/contactus/product/container-storage-modules)
 * [Security](https://github.com/dell/csm/blob/main/docs/SECURITY.md)
+* [Documentation](#documentation)
 
 ## Build
 
@@ -137,7 +138,13 @@ You can install the CSM Replication Controller by running the command `make depl
 You can also run the `dell-replication-controller` process directly in your Kubernetes cluster by running the command `make run-controller`.
 Make sure that the kubernetes user has the desired RBAC permissions.
 
+#### Platform Notes
+
+If you wish to install CSM Replication Controller with repctl on your openSUSE server, you need to install `glibc-devel-static` devel package before running `make build`.
+
 ## Testing
 
 Click [here](/TESTING.md) for details on how to test.
 
+## Documentation
+For more detailed information on the driver, please refer to [Container Storage Modules documentation](https://www.dell.com/support/product-details/en-us/product/container-storage-modules/resources/manuals).

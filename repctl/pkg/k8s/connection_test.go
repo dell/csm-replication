@@ -48,12 +48,12 @@ func TestGetControllerRuntimeClient(t *testing.T) {
 	testCases := []testCase{
 		{
 			name:       "Valid kubeconfig",
-			kubeconfig: createTempKubeconfig(t),
+			kubeconfig: createTempKubeconfig(nil),
 			setupMocks: func() {
-				clientNewFunc = func(config *rest.Config, options client.Options) (client.Client, error) {
+				clientNewFunc = func(_ *rest.Config, _ client.Options) (client.Client, error) {
 					return &mockClient{}, nil
 				}
-				buildConfigFromFlags = func(masterUrl, kubeconfigPath string) (*rest.Config, error) {
+				buildConfigFromFlags = func(_, _ string) (*rest.Config, error) {
 					return &rest.Config{}, nil
 				}
 			},
@@ -63,7 +63,7 @@ func TestGetControllerRuntimeClient(t *testing.T) {
 			name:       "Invalid kubeconfig path",
 			kubeconfig: "invalid/path/to/kubeconfig",
 			setupMocks: func() {
-				buildConfigFromFlags = func(masterUrl, kubeconfigPath string) (*rest.Config, error) {
+				buildConfigFromFlags = func(_, _ string) (*rest.Config, error) {
 					return nil, errors.New("failed to build config from flags")
 				}
 			},
@@ -72,12 +72,12 @@ func TestGetControllerRuntimeClient(t *testing.T) {
 		},
 		{
 			name:       "Error in client creation",
-			kubeconfig: createTempKubeconfig(t),
+			kubeconfig: createTempKubeconfig(nil),
 			setupMocks: func() {
-				clientNewFunc = func(config *rest.Config, options client.Options) (client.Client, error) {
+				clientNewFunc = func(_ *rest.Config, _ client.Options) (client.Client, error) {
 					return nil, errors.New("client creation error")
 				}
-				buildConfigFromFlags = func(masterUrl, kubeconfigPath string) (*rest.Config, error) {
+				buildConfigFromFlags = func(_, _ string) (*rest.Config, error) {
 					return &rest.Config{}, nil
 				}
 			},
@@ -115,6 +115,6 @@ type mockClient struct {
 }
 
 // Helper function to create a temporary kubeconfig file
-func createTempKubeconfig(t *testing.T) string {
+func createTempKubeconfig(_ *testing.T) string {
 	return "/path/to/temp/kubeconfig"
 }

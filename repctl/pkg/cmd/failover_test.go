@@ -20,9 +20,9 @@ import (
 	"time"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
-	"github.com/dell/repctl/mocks"
-	"github.com/dell/repctl/pkg/config"
-	"github.com/dell/repctl/pkg/k8s"
+	"github.com/dell/csm-replication/repctl/mocks"
+	"github.com/dell/csm-replication/repctl/pkg/config"
+	"github.com/dell/csm-replication/repctl/pkg/k8s"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/spf13/viper"
@@ -75,7 +75,7 @@ func TestGetFailoverCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -148,7 +148,7 @@ func TestGetFailoverCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -221,7 +221,7 @@ func TestGetFailoverCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -308,7 +308,7 @@ func TestGetFailoverCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -384,7 +384,7 @@ func TestGetFailoverCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -457,7 +457,7 @@ func TestGetFailoverCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -543,7 +543,7 @@ func TestGetFailoverCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -623,7 +623,7 @@ func TestGetFailoverCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -700,7 +700,7 @@ func TestGetFailoverCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -790,7 +790,7 @@ func TestGetFailoverCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -870,7 +870,7 @@ func TestGetFailoverCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -947,7 +947,7 @@ func TestGetFailoverCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -1037,7 +1037,7 @@ func TestGetFailoverCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -1078,7 +1078,7 @@ func TestWaitForStateToUpdate(t *testing.T) {
 
 		cluster.EXPECT().GetReplicationGroups(gomock.Any(), gomock.Any()).Times(1).Return(rg, nil)
 
-		cluster.EXPECT().GetReplicationGroups(gomock.Any(), gomock.Any()).Times(1).DoAndReturn(func(ctx context.Context, name string) (*repv1.DellCSIReplicationGroup, error) {
+		cluster.EXPECT().GetReplicationGroups(gomock.Any(), gomock.Any()).Times(1).DoAndReturn(func(_ context.Context, _ string) (*repv1.DellCSIReplicationGroup, error) {
 			rg.Status.ReplicationLinkState.LastSuccessfulUpdate = &metav1.Time{
 				Time: time.Now().Add(maxWaitTimeout),
 			}

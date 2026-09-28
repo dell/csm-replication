@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dell/csm-replication/pkg/common/logger"
+	"github.com/dell/csmlog"
 
 	"golang.org/x/sync/singleflight"
 
@@ -34,7 +34,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storageV1 "k8s.io/api/storage/v1"
 
-	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -47,7 +46,6 @@ import (
 // PersistentVolumeClaimReconciler reconciles a PersistentVolumeClaim object
 type PersistentVolumeClaimReconciler struct {
 	client.Client
-	Log               logr.Logger
 	Scheme            *runtime.Scheme
 	EventRecorder     record.EventRecorder
 	DriverName        string
@@ -65,16 +63,18 @@ type PersistentVolumeClaimReconciler struct {
 
 // Reconcile contains reconciliation logic that updates PersistentVolumeClaim depending on it's current state
 func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("persistentvolumeclaim", req.NamespacedName)
-	ctx = context.WithValue(ctx, logger.LoggerContextKey, log)
-	log.V(logger.InfoLevel).Info("Begin reconcile - PVC controller")
-
 	claim := new(v1.PersistentVolumeClaim)
 	err := r.Get(ctx, req.NamespacedName, claim)
 	if err != nil {
-		log.Error(err, "Failed to find claim's namespace", "req.NamespacedName", req.NamespacedName)
+		csmlog.Errorf("Failed to find claim's namespace: %v", err)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+	csmlog.WithFields(csmlog.Fields{
+		"controller": "persistentvolumeclaim",
+		"pvcName":    req.Name,
+		"namespace":  req.Namespace,
+		"driverName": r.DriverName,
+	}).Info("Begin reconcile - PVC controller")
 	var scName string
 	scList := new(storageV1.StorageClassList)
 	if claim.Spec.StorageClassName == nil {
@@ -86,7 +86,7 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 					return nil
 				}
 			}
-			log.Error(err, "No StorageClass specified and no default SC present in cluster")
+			csmlog.Errorf("No StorageClass specified and no default SC present in cluster: %v", err)
 			return client.IgnoreNotFound(fmt.Errorf("%s", "Default SC not found "))
 		}()
 		if listError != nil {
@@ -102,10 +102,10 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 	}, storageClass)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			log.Error(err, "The storage class specified in the PVC doesn't exist", "storageClass", storageClass)
+			csmlog.Errorf("The storage class specified in the PVC doesn't exist: %v", err)
 			return ctrl.Result{}, nil
 		}
-		log.Error(err, "Failed to fetch storage class of the PVC", "storageClass", storageClass)
+		csmlog.Errorf("Failed to fetch storage class of the PVC: %v", err)
 		return ctrl.Result{}, err
 	}
 
@@ -113,20 +113,24 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 		return ctrl.Result{}, nil
 	}
 
-	log.V(logger.DebugLevel).Info("Checking for the PVC state")
+	csmlog.Info("Checking for the PVC state")
 
 	if claim.Status.Phase != v1.ClaimBound {
-		log.V(logger.InfoLevel).Info("PVC not in bound state yet", "claim", claim)
+		csmlog.WithFields(csmlog.Fields{
+			"pvcName":   claim.Name,
+			"namespace": claim.Namespace,
+			"phase":     claim.Status.Phase,
+		}).Info("PVC not in bound state yet")
 		return ctrl.Result{}, nil
 	}
 
-	log.V(logger.DebugLevel).Info("Getting VolumeHandle from the PV")
+	csmlog.Info("Getting VolumeHandle from the PV")
 
 	pv := new(v1.PersistentVolume)
 	if err := r.Get(ctx, client.ObjectKey{
 		Name: claim.Spec.VolumeName,
 	}, pv); err != nil {
-		log.Error(err, "Failed to fetch PV details of the PVC", "pv", pv, "claim", claim)
+		csmlog.Errorf("Failed to fetch PV details of the PVC: %v", err)
 		return ctrl.Result{}, err
 	}
 
@@ -134,11 +138,11 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 	// Add remote-volume-annotations and labels to the PVC, if not already exist
 	if _, ok := claim.Annotations[controller.RemoteVolumeAnnotation]; !ok {
 		if _, ok := pv.Annotations[controller.RemoteVolumeAnnotation]; !ok {
-			log.V(logger.InfoLevel).Info("Waiting for RemoteVolume to be created by PV controller and set the corresponding annotation")
+			csmlog.Info("Waiting for RemoteVolume to be created by PV controller and set the corresponding annotation")
 			return ctrl.Result{Requeue: true, RequeueAfter: controller.DefaultRetryInterval}, nil
 		}
 		if err := r.processClaimForRemoteVolume(ctx, claim.DeepCopy(), pv, storageClass.Parameters, pv.Annotations[controller.RemoteVolumeAnnotation]); err != nil {
-			log.Error(err, "Failed to fetch PV details of the PVC", "pv", pv, "claim", claim)
+			csmlog.Errorf("Failed to fetch PV details of the PVC: %v", err)
 			return ctrl.Result{}, err
 		}
 		isClaimUpdated = true
@@ -150,21 +154,21 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 			// PVC has already been updated with remote-volume-annotations,
 			// in the current reconcile invocation, so fetching a new PVC object
 			if err := r.Get(ctx, req.NamespacedName, claim); err != nil {
-				log.Error(err, "Failed to get PVC to add replication-group annotation", "claim", claim)
+				csmlog.Errorf("Failed to get PVC to add replication-group annotation: %v", err)
 				return ctrl.Result{}, err
 			}
-			log.V(logger.InfoLevel).Info("Successfully fetched the PVC again to add replication-group annotation to it")
+			csmlog.Info("Successfully fetched the PVC again to add replication-group annotation to it")
 		}
 		var err error
 
 		_, ok = pv.Annotations[controller.ReplicationGroup]
 		if ok {
 			if pv.Annotations[controller.ReplicationGroup] == "" {
-				log.V(logger.InfoLevel).Info("RG annotation is empty on PV, retry..")
+				csmlog.Info("RG annotation is empty on PV, retry..")
 				return ctrl.Result{Requeue: true, RequeueAfter: controller.DefaultRetryInterval}, nil
 			}
 		} else {
-			log.V(logger.InfoLevel).Info("RG annotation is missing on PV, retry..")
+			csmlog.Info("RG annotation is missing on PV, retry..")
 			return ctrl.Result{Requeue: true, RequeueAfter: controller.DefaultRetryInterval}, nil
 		}
 		err = r.processClaimForReplicationGroup(ctx, claim.DeepCopy(), pv)
@@ -179,14 +183,19 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 func (r *PersistentVolumeClaimReconciler) processClaimForRemoteVolume(ctx context.Context, claim *v1.PersistentVolumeClaim,
 	pv *v1.PersistentVolume, scParams map[string]string, buffer string,
 ) error {
-	log := logger.FromContext(ctx)
-	log.V(logger.InfoLevel).Info("Begin process claim for remote-volume")
+	csmlog.WithFields(csmlog.Fields{
+		"controller": "persistentvolumeclaim",
+		"pvcName":    claim.Name,
+		"namespace":  claim.Namespace,
+		"pvName":     pv.Name,
+		"driverName": r.DriverName,
+	}).Info("Begin process claim for remote-volume")
 
-	log.V(logger.DebugLevel).Info("Adding remote-volume annotation to the PVC")
+	csmlog.Info("Adding remote-volume annotation to the PVC")
 	controller.AddAnnotation(claim, controller.RemoteVolumeAnnotation, buffer)
-	log.V(logger.DebugLevel).Info("Adding remote-storage-class")
+	csmlog.Info("Adding remote-storage-class")
 	controller.AddAnnotation(claim, controller.RemoteStorageClassAnnotation, scParams[controller.StorageClassRemoteStorageClassParam])
-	log.V(logger.DebugLevel).Info("Adding remote-cluster annotation and label")
+	csmlog.Info("Adding remote-cluster annotation and label")
 	if remoteCluster, ok := scParams[controller.StorageClassRemoteClusterParam]; ok {
 		controller.AddAnnotation(claim, controller.RemoteClusterID, remoteCluster)
 		controller.AddLabel(claim, controller.RemoteClusterID, remoteCluster)
@@ -205,29 +214,48 @@ func (r *PersistentVolumeClaimReconciler) processClaimForRemoteVolume(ctx contex
 	}
 	err := r.Update(ctx, claim)
 	if err != nil {
-		log.Error(err, "Failed to add remote volume annotation to the pvc", "claim", claim)
+		csmlog.Errorf("Failed to add remote volume annotation to the pvc: %v", err)
 		return err
 	}
-	log.V(logger.InfoLevel).Info("RemoteVolume annotation added to the PVC")
+	csmlog.WithFields(csmlog.Fields{
+		"controller": "persistentvolumeclaim",
+		"pvcName":    claim.Name,
+		"namespace":  claim.Namespace,
+		"pvName":     pv.Name,
+		"driverName": r.DriverName,
+	}).Info("RemoteVolume annotation added to the PVC")
 	return nil
 }
 
 func (r *PersistentVolumeClaimReconciler) processClaimForReplicationGroup(ctx context.Context, claim *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) error {
-	log := logger.FromContext(ctx)
-	log.V(logger.InfoLevel).Info("Begin process claim for replication-group")
+	csmlog.WithFields(csmlog.Fields{
+		"controller": "persistentvolumeclaim",
+		"pvcName":    claim.Name,
+		"namespace":  claim.Namespace,
+		"pvName":     pv.Name,
+		"driverName": r.DriverName,
+		"rgName":     pv.Annotations[controller.ReplicationGroup],
+	}).Info("Begin process claim for replication-group")
 
-	log.V(logger.DebugLevel).Info("Adding replication-group annotation to the PVC")
+	csmlog.Info("Adding replication-group annotation to the PVC")
 	controller.AddAnnotation(claim, controller.ReplicationGroup, pv.Annotations[controller.ReplicationGroup])
-	log.V(logger.DebugLevel).Info("Adding PVC protection complete annotation")
+	csmlog.Info("Adding PVC protection complete annotation")
 	controller.AddAnnotation(claim, controller.PVCProtectionComplete, "yes")
-	log.V(logger.DebugLevel).Info("Adding replication-group label to the PVC")
+	csmlog.Info("Adding replication-group label to the PVC")
 	controller.AddLabel(claim, controller.ReplicationGroup, pv.Annotations[controller.ReplicationGroup])
 
 	if err := r.Update(ctx, claim); err != nil {
-		log.Error(err, "Failed to add replication-group annotation to the PVC", "claim", claim)
+		csmlog.Errorf("Failed to add replication-group annotation to the PVC: %v", err)
 		return err
 	}
-	log.V(logger.InfoLevel).Info("Replication-group annotation and label added to the pvc")
+	csmlog.WithFields(csmlog.Fields{
+		"controller": "persistentvolumeclaim",
+		"pvcName":    claim.Name,
+		"namespace":  claim.Namespace,
+		"pvName":     pv.Name,
+		"driverName": r.DriverName,
+		"rgName":     pv.Annotations[controller.ReplicationGroup],
+	}).Info("Replication-group annotation and label added to the pvc")
 	r.EventRecorder.Eventf(claim, v1.EventTypeNormal, "Updated", "DellCSIReplicationGroup[%s] annotation added to the pvc", pv.Annotations[controller.ReplicationGroup])
 
 	return nil

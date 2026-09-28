@@ -17,7 +17,7 @@ package main
 import (
 	"testing"
 
-	"github.com/dell/repctl/pkg/config"
+	"github.com/dell/csm-replication/repctl/pkg/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"

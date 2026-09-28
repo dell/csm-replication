@@ -19,6 +19,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dell/csmlog"
+
 	storagev1 "github.com/dell/csm-replication/api/v1"
 	controller "github.com/dell/csm-replication/controllers"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
@@ -27,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -43,12 +44,10 @@ type testCase struct {
 
 func setupTestReconciler() (*NodeRescanReconciler, context.Context) {
 	mockClient := utils.GetFakeClient()
-	log := zap.New(zap.UseDevMode(true))
 	ctx := context.TODO()
 
 	reconciler := &NodeRescanReconciler{
 		Client:                     mockClient,
-		Log:                        log,
 		Scheme:                     &runtime.Scheme{},
 		DriverName:                 "powermax",
 		NodeName:                   "test-node",
@@ -81,7 +80,6 @@ func TestSetupWithManager(t *testing.T) {
 
 func runTestCases(t *testing.T, tests []testCase) {
 	reconciler, ctx := setupTestReconciler()
-	log := zap.New(zap.UseDevMode(true))
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -105,7 +103,7 @@ func runTestCases(t *testing.T, tests []testCase) {
 			}
 
 			if err := reconciler.Client.Create(ctx, mg); err != nil {
-				log.Error(err, "failed to create test object")
+				csmlog.Errorf("failed to create test object: %v", err)
 			}
 
 			res, err := reconciler.Reconcile(ctx, reconcile.Request{
@@ -113,7 +111,7 @@ func runTestCases(t *testing.T, tests []testCase) {
 			})
 
 			if (err != nil) != tt.expectErr {
-				log.Error(err, "failed to create test object")
+				csmlog.Errorf("failed to create test object: %v", err)
 			}
 			if res != tt.expectedRes {
 				t.Errorf("Expected result: %v, got: %v", tt.expectedRes, res)

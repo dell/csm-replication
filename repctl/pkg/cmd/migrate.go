@@ -22,9 +22,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dell/repctl/pkg/config"
-	"github.com/dell/repctl/pkg/k8s"
-	log "github.com/sirupsen/logrus"
+	csmlog "github.com/dell/csmlog"
+	"github.com/dell/csm-replication/repctl/pkg/config"
+	"github.com/dell/csm-replication/repctl/pkg/k8s"
 	"github.com/spf13/viper"
 	v12 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -87,7 +87,7 @@ This command will perform a migrate command to target StorageClass.`,
 			wait := viper.GetBool("pvwait")
 			configFolder, err := getClustersFolderPathFunction("/.repctl/clusters/")
 			if err != nil {
-				log.Fatalf("failover: error getting clusters folder path: %s\n", err.Error())
+				csmlog.Fatalf("failover: error getting clusters folder path: %s\n", err.Error())
 			}
 			migrate(mc, configFolder, "pv", pvName, "", toSc, targetNs, wait, false)
 		},
@@ -101,7 +101,7 @@ This command will perform a migrate command to target StorageClass.`,
 	_ = viper.BindPFlag("pvwait", migrateCmd.Flags().Lookup("wait"))
 	err := migrateCmd.MarkFlagRequired("to-sc")
 	if err != nil {
-		log.Fatalf(" error in marking flag to-sc required %s", err.Error())
+		csmlog.Fatalf(" error in marking flag to-sc required %s", err.Error())
 	}
 	return migrateCmd
 }
@@ -129,7 +129,7 @@ This command will perform a migrate command to target StorageClass.`,
 			wait := viper.GetBool("pvcwait")
 			configFolder, err := getClustersFolderPathFunction("/.repctl/clusters/")
 			if err != nil {
-				log.Fatalf("failover: error getting clusters folder path: %s\n", err.Error())
+				csmlog.Fatalf("failover: error getting clusters folder path: %s\n", err.Error())
 			}
 			migrate(mc, configFolder, "pvc", pvcName, pvcNS, toSc, targetNs, wait, false)
 		},
@@ -145,11 +145,11 @@ This command will perform a migrate command to target StorageClass.`,
 	_ = viper.BindPFlag("pvcwait", migrateCmd.Flags().Lookup("wait"))
 	err := migrateCmd.MarkFlagRequired("to-sc")
 	if err != nil {
-		log.Fatalf(" error in marking flag to-sc required %s", err.Error())
+		csmlog.Fatalf(" error in marking flag to-sc required %s", err.Error())
 	}
 	err = migrateCmd.MarkFlagRequired("namespace")
 	if err != nil {
-		log.Fatalf(" error in marking flag namespace required %s", err.Error())
+		csmlog.Fatalf(" error in marking flag namespace required %s", err.Error())
 	}
 	return migrateCmd
 }
@@ -179,7 +179,7 @@ This command will perform a migrate command to target StorageClass.`,
 			yes = viper.GetBool("yes")
 			configFolder, err := getClustersFolderPathFunction("/.repctl/clusters/")
 			if err != nil {
-				log.Fatalf("failover: error getting clusters folder path: %s\n", err.Error())
+				csmlog.Fatalf("failover: error getting clusters folder path: %s\n", err.Error())
 			}
 			migrate(mc, configFolder, "sts", stsName, stsNS, toSc, targetNs, wait, ndu)
 		},
@@ -199,11 +199,11 @@ This command will perform a migrate command to target StorageClass.`,
 	_ = viper.BindPFlag("yes", migrateCmd.Flags().Lookup("yes"))
 	err := migrateCmd.MarkFlagRequired("to-sc")
 	if err != nil {
-		log.Fatalf(" error in marking flag to-sc required %s", err.Error())
+		csmlog.Fatalf(" error in marking flag to-sc required %s", err.Error())
 	}
 	err = migrateCmd.MarkFlagRequired("namespace")
 	if err != nil {
-		log.Fatalf(" error in marking flag namespace required %s", err.Error())
+		csmlog.Fatalf(" error in marking flag namespace required %s", err.Error())
 	}
 	return migrateCmd
 }
@@ -228,7 +228,7 @@ This command will perform a migration of all volumes on source to target.`,
 			wait := viper.GetBool("mgwait")
 			configFolder, err := getClustersFolderPathFunction("/.repctl/clusters/")
 			if err != nil {
-				log.Fatalf("migrate: error getting clusters folder path: %s\n", err.Error())
+				csmlog.Fatalf("migrate: error getting clusters folder path: %s\n", err.Error())
 			}
 			migrateMG(mc, configFolder, "mg", mgName, wait)
 		},
@@ -243,7 +243,7 @@ func migrate(mc GetClustersInterface, configFolder, resource string, resName str
 	clusterIDs := viper.GetStringSlice(config.Clusters)
 	clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
 	if err != nil {
-		log.Fatalf("edit secret: error in initializing cluster info: %s", err.Error())
+		csmlog.Fatalf("edit secret: error in initializing cluster info: %s", err.Error())
 	}
 	switch resource {
 	case "pv":
@@ -259,10 +259,10 @@ func migrate(mc GetClustersInterface, configFolder, resource string, resName str
 		for _, i := range clusters.Clusters {
 			pvc, err := i.GetPersistentVolumeClaim(context.Background(), resNS, resName)
 			if err != nil {
-				log.Error(err)
+				csmlog.Errorf("%s", err.Error())
 				os.Exit(1)
 			}
-			log.Info(pvc.OwnerReferences)
+			csmlog.Infof("%v", pvc.OwnerReferences)
 			pvName := pvc.Spec.VolumeName
 			wg.Add(1)
 			go migratePV(context.Background(), i, pvName, toSC, targetNS, wg, wait)
@@ -274,12 +274,12 @@ func migrate(mc GetClustersInterface, configFolder, resource string, resName str
 		for _, i := range clusters.Clusters {
 			sts, err := i.GetStatefulSet(context.Background(), resNS, resName)
 			if err != nil {
-				log.Error(err)
+				csmlog.Errorf("%s", err.Error())
 				os.Exit(1)
 			}
 			list, err := i.FilterPods(context.Background(), resNS, sts.Name)
 			if err != nil {
-				log.Error(err)
+				csmlog.Errorf("%s", err.Error())
 				os.Exit(1)
 			}
 			scMap := make(map[string]struct{})
@@ -289,9 +289,9 @@ func migrate(mc GetClustersInterface, configFolder, resource string, resName str
 				}
 			}
 			if len(scMap) > 1 {
-				log.Warnf("Multiple source StorageClasses detected in StatefulSet. Make sure all of your volumes can be migrated to target SC.")
+				csmlog.Warnf("Multiple source StorageClasses detected in StatefulSet. Make sure all of your volumes can be migrated to target SC.")
 				for s := range scMap {
-					log.Infof("SC: %s", s)
+					csmlog.Infof("SC: %s", s)
 				}
 				fmt.Println("Do you want to continue? [y/N]")
 				if !yes {
@@ -299,7 +299,7 @@ func migrate(mc GetClustersInterface, configFolder, resource string, resName str
 					fmt.Print("-> ")
 					charContinue, _, err := reader.ReadRune()
 					if err != nil {
-						log.Error(err)
+						csmlog.Errorf("%s", err.Error())
 					}
 					switch charContinue {
 					case 'y', 'Y':
@@ -307,14 +307,14 @@ func migrate(mc GetClustersInterface, configFolder, resource string, resName str
 						return
 					}
 				}
-				log.Info("Continuing")
+				csmlog.Info("Continuing")
 			}
 			for _, pod := range list.Items {
 				for _, volume := range pod.Spec.Volumes {
 					if volume.PersistentVolumeClaim != nil {
 						pvc, err := i.GetPersistentVolumeClaim(context.Background(), resNS, volume.PersistentVolumeClaim.ClaimName)
 						if err != nil {
-							log.Error(err)
+							csmlog.Errorf("%s", err.Error())
 							os.Exit(1)
 						}
 						wg.Add(1)
@@ -328,30 +328,30 @@ func migrate(mc GetClustersInterface, configFolder, resource string, resName str
 			for _, i := range clusters.Clusters {
 				sts, err := i.GetStatefulSet(context.Background(), resNS, resName)
 				if err != nil {
-					log.Error(err)
+					csmlog.Errorf("%s", err.Error())
 					os.Exit(1)
 				}
 				err = recreateStsNdu(i, sts, toSC)
 				if err != nil {
-					log.Error("Failed to recreate STS: ", err)
+					csmlog.Errorf("Failed to recreate STS: %s", err.Error())
 				}
 			}
 		}
 	default:
-		log.Error("Unknown resource")
+		csmlog.Error("Unknown resource")
 		os.Exit(1)
 	}
 }
 
-func migratePV(ctx context.Context, cluster k8s.ClusterInterface, pvName string, toSC string, targetNS string, wg *sync.WaitGroup, wait bool) {
+func migratePV(_ context.Context, cluster k8s.ClusterInterface, pvName string, toSC string, targetNS string, wg *sync.WaitGroup, wait bool) {
 	defer wg.Done()
-	log.Info(pvName)
+	csmlog.Infof("%s", pvName)
 	pv, err := cluster.GetPersistentVolume(context.Background(), pvName)
 	if err != nil {
-		log.Error(err, "Unable to find backing PV")
+		csmlog.Errorf("%s: Unable to find backing PV", err.Error())
 		os.Exit(1)
 	}
-	log.Infof("Setting migration annotation %s on pv %s", migrationAnnotation+"/"+toSC, pv.Name)
+	csmlog.Infof("Setting migration annotation %s on pv %s", migrationAnnotation+"/"+toSC, pv.Name)
 	annotations := pv.Annotations
 	if annotations == nil {
 		annotations = make(map[string]string)
@@ -363,29 +363,29 @@ func migratePV(ctx context.Context, cluster k8s.ClusterInterface, pvName string,
 	pv.Annotations = annotations
 	err = cluster.UpdatePersistentVolume(context.Background(), pv)
 	if err != nil {
-		log.Error(err, "unable to update persistent volume")
+		csmlog.Errorf("%s: unable to update persistent volume", err.Error())
 		os.Exit(1)
 	}
 	if wait {
 		done := waitForPVToBeBound(pvName+"-to-"+toSC, cluster)
 		if done {
 			fmt.Printf("Successfully updated pv") // This message is validated in UT; do not delete or change
-			log.Infof("Successfully updated pv %s in cluster %s. Consider using new PV: [%s]", pv.Name, cluster.GetID(), pvName+"-to-"+toSC)
+			csmlog.Infof("Successfully updated pv %s in cluster %s. Consider using new PV: [%s]", pv.Name, cluster.GetID(), pvName+"-to-"+toSC)
 		} else {
-			log.Error("time out waiting for the PV to be bound")
+			csmlog.Error("time out waiting for the PV to be bound")
 		}
 	} else {
 		fmt.Printf("Successfully updated pv") // This message is validated in UT; do not delete or change
-		log.Infof("Successfully updated pv %s in cluster %s. Consider using new PV: [%s]", pv.Name, cluster.GetID(), pvName+"-to-"+toSC)
+		csmlog.Infof("Successfully updated pv %s in cluster %s. Consider using new PV: [%s]", pv.Name, cluster.GetID(), pvName+"-to-"+toSC)
 	}
 }
 
 func waitForPVToBeBound(pvName string, cluster k8s.ClusterInterface) bool {
-	log.Info("migrated pv name:", pvName)
+	csmlog.Infof("migrated pv name: %s", pvName)
 	t := time.NewTicker(5 * time.Second)
 	ret := make(chan bool)
 	go func() {
-		log.Print("Waiting for action to complete ...")
+		csmlog.Info("Waiting for action to complete ...")
 		for {
 			select {
 			case <-time.After(5 * time.Minute):
@@ -393,7 +393,7 @@ func waitForPVToBeBound(pvName string, cluster k8s.ClusterInterface) bool {
 			case <-t.C:
 				pv, err := cluster.GetPersistentVolume(context.Background(), pvName)
 				if err != nil && !errors.IsNotFound(err) {
-					log.Fatalf("migrate: error in fecthing pv info: %s\n", err.Error())
+					csmlog.Fatalf("migrate: error in fecthing pv info: %s\n", err.Error())
 				}
 				if pv != nil && (pv.Status.Phase == v1.VolumeBound || pv.Status.Phase == v1.VolumeAvailable) {
 					ret <- true
@@ -410,7 +410,7 @@ func waitForPodToBeReady(podName string, podNS string, cluster k8s.ClusterInterf
 	t := time.NewTicker(5 * time.Second)
 	ret := make(chan bool)
 	go func() {
-		log.Print("Waiting for action to complete ...")
+		csmlog.Info("Waiting for action to complete ...")
 		for {
 			select {
 			case <-time.After(5 * time.Minute):
@@ -418,7 +418,7 @@ func waitForPodToBeReady(podName string, podNS string, cluster k8s.ClusterInterf
 			case <-t.C:
 				pod, err := cluster.GetPod(context.Background(), podName, podNS)
 				if err != nil && !errors.IsNotFound(err) {
-					log.Fatalf("migrate: error in fecthing pod info: %s\n", err.Error())
+					csmlog.Fatalf("migrate: error in fecthing pod info: %s\n", err.Error())
 				}
 				if pod != nil && pod.Status.Phase == v1.PodRunning {
 					for _, condition := range pod.Status.Conditions {
@@ -443,16 +443,16 @@ func recreateStsNdu(cluster k8s.ClusterInterface, sts *v12.StatefulSet, targetSC
 			return errors.NewBadRequest("Unable to perform NDU with replicas <= 1")
 		}
 	}
-	log.Info("Trying to delete original sts with orphan option")
+	csmlog.Info("Trying to delete original sts with orphan option")
 	err := cluster.DeleteStsOrphan(context.Background(), sts)
 	if err != nil {
 		return err
 	}
-	log.Info("Changing SC in STS manifest")
+	csmlog.Info("Changing SC in STS manifest")
 	for _, template := range stsDeepCopy.Spec.VolumeClaimTemplates {
 		template.Spec.StorageClassName = &targetSC
 	}
-	log.Info("trying to apply modified sts")
+	csmlog.Info("trying to apply modified sts")
 	err = cluster.CreateStatefulSet(context.Background(), stsDeepCopy)
 	if err != nil {
 		return err
@@ -462,7 +462,7 @@ func recreateStsNdu(cluster k8s.ClusterInterface, sts *v12.StatefulSet, targetSC
 	if err != nil {
 		return err
 	}
-	log.Info("trying to delete old resources")
+	csmlog.Info("trying to delete old resources")
 	for i := range list.Items {
 		pod := list.Items[i]
 		for j := range pod.Spec.Volumes {
@@ -472,7 +472,7 @@ func recreateStsNdu(cluster k8s.ClusterInterface, sts *v12.StatefulSet, targetSC
 				if err != nil {
 					return err
 				}
-				log.Infof("trying to delete pvc %s", pvc.Name)
+				csmlog.Infof("trying to delete pvc %s", pvc.Name)
 				err = cluster.DeletePersistentVolumeClaim(context.Background(), pvc, &client.DeleteOptions{})
 				if err != nil {
 					return err
@@ -480,7 +480,7 @@ func recreateStsNdu(cluster k8s.ClusterInterface, sts *v12.StatefulSet, targetSC
 
 			}
 		}
-		log.Infof("trying to delete pod %s", pod.Name)
+		csmlog.Infof("trying to delete pod %s", pod.Name)
 		err = cluster.DeletePod(context.Background(), &pod, &client.DeleteOptions{})
 		if err != nil {
 			return err
@@ -493,11 +493,11 @@ func recreateStsNdu(cluster k8s.ClusterInterface, sts *v12.StatefulSet, targetSC
 	return nil
 }
 
-func migrateMG(mc GetClustersInterface, configFolder, resource string, resName string, wait bool) {
+func migrateMG(mc GetClustersInterface, configFolder, _ string, resName string, wait bool) {
 	clusterIDs := viper.GetStringSlice(config.Clusters)
 	clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
 	if err != nil {
-		log.Fatalf("edit secret: error in initializing cluster info: %s", err.Error())
+		csmlog.Fatalf("edit secret: error in initializing cluster info: %s", err.Error())
 	}
 	wg := &sync.WaitGroup{}
 	for _, cluster := range clusters.Clusters {
@@ -512,12 +512,12 @@ func migrateMG(mc GetClustersInterface, configFolder, resource string, resName s
 	wg.Wait()
 }
 
-func migrateArray(ctx context.Context, cluster k8s.ClusterInterface, mgName string, wg *sync.WaitGroup, wait bool) {
+func migrateArray(_ context.Context, cluster k8s.ClusterInterface, mgName string, wg *sync.WaitGroup, wait bool) {
 	defer wg.Done()
-	log.Info(mgName)
+	csmlog.Info(mgName)
 	mg, err := cluster.GetMigrationGroup(context.Background(), mgName)
 	if err != nil {
-		log.Error(err, "Unable to find mg")
+		csmlog.Errorf("%s: Unable to find mg", err.Error())
 		os.Exit(1)
 	}
 	annotations := mg.Annotations
@@ -526,12 +526,12 @@ func migrateArray(ctx context.Context, cluster k8s.ClusterInterface, mgName stri
 	}
 	migrationAnnotation = "ArrayMigrate"
 	Action := "Ready"
-	log.Infof("Setting Array migration annotation %s on mg %s", migrationAnnotation+"/"+Action, mg.Name)
+	csmlog.Infof("Setting Array migration annotation %s on mg %s", migrationAnnotation+"/"+Action, mg.Name)
 	annotations[migrationAnnotation] = Action
 	mg.Annotations = annotations
 	err = cluster.UpdateMigrationGroup(context.Background(), mg)
 	if err != nil {
-		log.Error(err, "unable to update mg")
+		csmlog.Errorf("%s: unable to update mg", err.Error())
 		os.Exit(1)
 	}
 	// Command exit criteria
@@ -539,13 +539,13 @@ func migrateArray(ctx context.Context, cluster k8s.ClusterInterface, mgName stri
 		done := waitForArrayMigration(mgName, cluster)
 		if done {
 			fmt.Printf("Successfully migrated all volumes from source array to target") // This message is validated in UT; do not delete or change
-			log.Infof("Successfully migrated all volumes from source array to target")
+			csmlog.Infof("Successfully migrated all volumes from source array to target")
 		} else {
-			log.Error("time out waiting for array migration")
+			csmlog.Error("time out waiting for array migration")
 		}
 	} else {
 		fmt.Printf("Successfully migrated all volumes from source array to target") // This message is validated in UT; do not delete or change
-		log.Infof("Successfully migrated all volumes from source array to target")
+		csmlog.Infof("Successfully migrated all volumes from source array to target")
 	}
 }
 
@@ -553,7 +553,7 @@ func waitForArrayMigration(mgName string, cluster k8s.ClusterInterface) bool {
 	t := time.NewTicker(5 * time.Second)
 	ret := make(chan bool)
 	go func() {
-		log.Print("Waiting for action to complete ...")
+		csmlog.Info("Waiting for action to complete ...")
 		for {
 			select {
 			case <-time.After(5 * time.Minute):
@@ -561,7 +561,7 @@ func waitForArrayMigration(mgName string, cluster k8s.ClusterInterface) bool {
 			case <-t.C:
 				mg, err := cluster.GetMigrationGroup(context.Background(), mgName)
 				if err != nil && !errors.IsNotFound(err) {
-					log.Fatalf("migrate: error in fecthing pv info: %s\n", err.Error())
+					csmlog.Fatalf("migrate: error in fecthing pv info: %s\n", err.Error())
 				}
 				if mg != nil && (mg.Status.State == "Committed") {
 					ret <- true

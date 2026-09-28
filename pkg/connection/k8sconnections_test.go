@@ -23,7 +23,6 @@ import (
 	"testing"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
-	"github.com/go-logr/logr"
 	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -58,11 +57,8 @@ func TestRemoteK8sConnHandler_GetConnection(t *testing.T) {
 		Host: "https://example.com",
 	}
 
-	// Create a new logger
-	log := logr.Discard()
-
 	// Add test-cluster config
-	k8sConnHandler.AddOrUpdateConfig(clusterID, restConfig, log)
+	k8sConnHandler.AddOrUpdateConfig(clusterID, restConfig)
 
 	// Get the connection for test-cluster
 	connection, err := k8sConnHandler.GetConnection(clusterID)
@@ -117,11 +113,8 @@ func TestRemoteK8sConnHandler_Verify(t *testing.T) {
 		Host: "https://example.com",
 	}
 
-	// Create a new logger
-	log := logr.Discard()
-
 	// Add test-cluster config
-	k8sConnHandler.AddOrUpdateConfig(clusterID, restConfig, log)
+	k8sConnHandler.AddOrUpdateConfig(clusterID, restConfig)
 
 	// Verify the configured connections
 	err := k8sConnHandler.Verify(context.Background())
@@ -151,11 +144,8 @@ func TestRemoteK8sConnHandler_VerifyEmptyCRD(t *testing.T) {
 		Host: "https://example.com",
 	}
 
-	// Create a new logger
-	log := logr.Discard()
-
 	// Add test-cluster config
-	k8sConnHandler.AddOrUpdateConfig(clusterID, restConfig, log)
+	k8sConnHandler.AddOrUpdateConfig(clusterID, restConfig)
 
 	// Verify the configured connections
 	err := k8sConnHandler.Verify(context.Background())
@@ -173,11 +163,8 @@ func TestRemoteK8sConnHandler_VerifyUnableToListCRD(t *testing.T) {
 		Host: "https://example.com",
 	}
 
-	// Create a new logger
-	log := logr.Discard()
-
 	// Add test-cluster config
-	k8sConnHandler.AddOrUpdateConfig(clusterID, restConfig, log)
+	k8sConnHandler.AddOrUpdateConfig(clusterID, restConfig)
 
 	// Verify the configured connections
 	err := k8sConnHandler.Verify(context.Background())
@@ -222,11 +209,8 @@ func TestRemoteK8sConnHandler_VerifyInvalidCRD(t *testing.T) {
 		Host: "https://example.com",
 	}
 
-	// Create a new logger
-	log := logr.Discard()
-
 	// Add test-cluster config
-	k8sConnHandler.AddOrUpdateConfig(clusterID, restConfig, log)
+	k8sConnHandler.AddOrUpdateConfig(clusterID, restConfig)
 
 	// Verify the configured connections
 	err := k8sConnHandler.Verify(context.Background())
@@ -242,11 +226,8 @@ func TestRemoteK8sConnHandler_AddOrUpdateConfig(t *testing.T) {
 		Host: "https://example.com",
 	}
 
-	// Create a new logger
-	log := logr.Discard()
-
 	// Add test-cluster config
-	k8sConnHandler.AddOrUpdateConfig("test-cluster", restConfig, log)
+	k8sConnHandler.AddOrUpdateConfig("test-cluster", restConfig)
 
 	// Check that the config was added to the map
 	config, ok := k8sConnHandler.configs["test-cluster"]
@@ -260,7 +241,7 @@ func TestRemoteK8sConnHandler_AddOrUpdateConfig(t *testing.T) {
 	}
 
 	// Update test-cluster config
-	k8sConnHandler.AddOrUpdateConfig("test-cluster", restConfig, log)
+	k8sConnHandler.AddOrUpdateConfig("test-cluster", restConfig)
 
 	// Check that the config was added to the map
 	config, ok = k8sConnHandler.configs["test-cluster"]
@@ -285,11 +266,8 @@ func TestRemoteK8sConnHandler_CleanCachedClients(t *testing.T) {
 		Host: "https://example.com",
 	}
 
-	// Create a new logger
-	log := logr.Discard()
-
 	// Add test-cluster config
-	k8sConnHandler.AddOrUpdateConfig(clusterID, restConfig, log)
+	k8sConnHandler.AddOrUpdateConfig(clusterID, restConfig)
 
 	// Check that the config was added to the map
 	config, ok := k8sConnHandler.configs[clusterID]
@@ -306,7 +284,7 @@ func TestRemoteK8sConnHandler_CleanCachedClients(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Update test-cluster config
-	k8sConnHandler.AddOrUpdateConfig(clusterID, restConfig, log)
+	k8sConnHandler.AddOrUpdateConfig(clusterID, restConfig)
 
 	// Check that the config was added to the map
 	config, ok = k8sConnHandler.configs[clusterID]

@@ -12,6 +12,7 @@
  limitations under the License.
 */
 
+// Package test generates repctl storage class fixtures.
 package test
 
 import (
@@ -65,7 +66,7 @@ func getRepctlPath() (path string, err error) {
 	// Try to locate repctl using the path provided via REPCTL_PATH
 	fmt.Println("looking for repctl using the path provided via REPCTL_PATH")
 	path = filepath.Join(os.Getenv(envRepctlPath), repctlCLI)
-	_, err = os.Stat(path)
+	_, err = os.Stat(path) // #nosec G703 -- path is derived from controlled test inputs
 	if err == nil {
 		return path, nil
 	}
@@ -110,15 +111,17 @@ func TestGeneratePowerScaleStorageClass(t *testing.T) {
 
 	for _, tt := range tests {
 		configFilePath := filepath.Join(configFileDir, tt.args.templateName+"_tmpl_values.yaml")
-		generated, err := exec.CommandContext(context.Background(), repctl, cmdCreate, resourceStorageClass, optFromConfig, configFilePath, optDryRun).CombinedOutput()
+		generated, err := exec.CommandContext(context.Background(), repctl, cmdCreate, resourceStorageClass, optFromConfig, configFilePath, optDryRun).CombinedOutput() // #nosec G204 -- test harness executes the local repctl binary with controlled arguments
 		if err != nil {
 			t.Errorf("encountered error while generating storage class: %s", err.Error())
 			t.FailNow()
 		}
 
 		// remove the log message printed by repctl at the beginning of the print out
-		newlineIndex := bytes.IndexRune(generated, '\n')
-		generated = generated[newlineIndex:]
+		markerIndex := bytes.Index(generated, []byte("# yamllint disable-file"))
+		if markerIndex >= 0 {
+			generated = generated[markerIndex-1:]
+		}
 
 		assert.Equal(t, string(tt.want), string(generated))
 	}

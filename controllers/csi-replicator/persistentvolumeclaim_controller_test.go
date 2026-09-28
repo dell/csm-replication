@@ -21,7 +21,6 @@ import (
 
 	"github.com/dell/csm-replication/controllers"
 	"github.com/dell/csm-replication/pkg/common/constants"
-	"github.com/dell/csm-replication/pkg/common/logger"
 	fakeclient "github.com/dell/csm-replication/test/e2e-framework/fake-client"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
 	csireplication "github.com/dell/csm-replication/test/mocks"
@@ -33,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -80,7 +78,6 @@ func (suite *PVControllerTestSuite) runFakeReplicationManager() {
 
 	PVCReconciler = PersistentVolumeClaimReconciler{
 		Client:            suite.mockUtils.FakeControllerClient,
-		Log:               ctrl.Log.WithName("controllers").WithName("PersistentVolumeClaim"),
 		Scheme:            utils.Scheme,
 		EventRecorder:     fakeRecorder,
 		DriverName:        suite.driver.DriverName,
@@ -108,14 +105,7 @@ func (suite *PVControllerTestSuite) TestVolumeCreationFail() {
 	err = suite.mockUtils.FakeControllerClient.Create(ctx, pvcObj)
 	suite.NoError(err, "No error on PVC create")
 
-	req := reconcile.Request{
-		NamespacedName: types.NamespacedName{
-			Namespace: suite.mockUtils.Specs.Namespace,
-			Name:      "fake-pvc1",
-		},
-	}
-	loggerInstance := PVCReconciler.Log.WithValues("persistentvolumeclaim", req.NamespacedName)
-	e := PVCReconciler.processClaimForRemoteVolume(context.WithValue(ctx, logger.LoggerContextKey, loggerInstance), &corev1.PersistentVolumeClaim{},
+	e := PVCReconciler.processClaimForRemoteVolume(ctx, &corev1.PersistentVolumeClaim{},
 		&corev1.PersistentVolume{}, map[string]string{}, dummyBuffer)
 	suite.Error(e, "CreateRemoteVolume failed with an error")
 }
@@ -137,15 +127,7 @@ func (suite *PVControllerTestSuite) TestPVProcessingFailure() {
 	err = suite.mockUtils.FakeControllerClient.Create(ctx, pvcObj)
 	assert.NotNil(suite.T(), pvcObj)
 
-	req := reconcile.Request{
-		NamespacedName: types.NamespacedName{
-			Namespace: suite.mockUtils.Specs.Namespace,
-			Name:      "fake-pvc3",
-		},
-	}
-
-	loggerInstance := PVCReconciler.Log.WithValues("persistentvolumeclaim", req.NamespacedName)
-	e := PVCReconciler.processClaimForReplicationGroup(context.WithValue(ctx, logger.LoggerContextKey, loggerInstance), &corev1.PersistentVolumeClaim{},
+	e := PVCReconciler.processClaimForReplicationGroup(ctx, &corev1.PersistentVolumeClaim{},
 		pvObj)
 	suite.Error(e, "CreateRemoteVolume failed with an error")
 }
@@ -167,15 +149,7 @@ func (suite *PVControllerTestSuite) TestRGCreationFailure() {
 	err = suite.mockUtils.FakeControllerClient.Create(ctx, pvcObj)
 	assert.NotNil(suite.T(), pvcObj)
 
-	req := reconcile.Request{
-		NamespacedName: types.NamespacedName{
-			Namespace: suite.mockUtils.Specs.Namespace,
-			Name:      "fake-pvc3",
-		},
-	}
-
-	loggerInstance := PVCReconciler.Log.WithValues("persistentvolumeclaim", req.NamespacedName)
-	e := PVCReconciler.processClaimForReplicationGroup(context.WithValue(ctx, logger.LoggerContextKey, loggerInstance), &corev1.PersistentVolumeClaim{},
+	e := PVCReconciler.processClaimForReplicationGroup(ctx, &corev1.PersistentVolumeClaim{},
 		pvObj)
 	suite.Error(e, "CreateRemoteVolume failed with an error")
 }

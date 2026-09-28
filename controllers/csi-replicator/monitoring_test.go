@@ -18,18 +18,32 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
+	"github.com/dell/csm-replication/internal/metrics"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
 	csireplication "github.com/dell/csm-replication/test/mocks"
 	"github.com/dell/dell-csi-extensions/replication"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
-	ctrl "sigs.k8s.io/controller-runtime"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+type failingListClient struct {
+	client.Client
+}
+
+func (f failingListClient) List(context.Context, client.ObjectList, ...client.ListOption) error {
+	return errors.New("list failed")
+}
 
 type MonitoringControllerTestSuite struct {
 	suite.Suite
@@ -78,7 +92,6 @@ func (suite *MonitoringControllerTestSuite) Init() {
 func (suite *MonitoringControllerTestSuite) initController() {
 	rgMonitor := ReplicationGroupMonitoring{
 		Client:             suite.client,
-		Log:                ctrl.Log.WithName("controllers").WithName("Monitoring"),
 		DriverName:         suite.driver.DriverName,
 		ReplicationClient:  suite.repClient,
 		MonitoringInterval: 1 * time.Second,
@@ -155,4 +168,148 @@ func (suite *MonitoringControllerTestSuite) TestMonitorReplicationGroupsWithErro
 
 func (suite *MonitoringControllerTestSuite) TearDownTest() {
 	suite.T().Log("Cleaning up resources...")
+}
+
+func TestReplicationGroupMonitoringTracksCompleteCollectionCycles(t *testing.T) {
+	tests := []struct {
+		name      string
+		client    client.Client
+		wantStale string
+		wantTime  bool
+	}{
+		{name: "complete", client: utils.GetFakeClient(), wantStale: "0", wantTime: true},
+		{name: "list failure", client: failingListClient{Client: utils.GetFakeClient()}, wantStale: "1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			registry := prometheus.NewPedanticRegistry()
+			previous := metrics.GetGlobalReplicationMetrics()
+			metrics.SetGlobalReplicationMetrics(metrics.NewReplicationMetrics(registry))
+			defer metrics.SetGlobalReplicationMetrics(previous)
+
+			monitor := &ReplicationGroupMonitoring{Client: tt.client, DriverName: "driver", MonitoringInterval: time.Second}
+			monitor.monitorReplicationGroups()
+
+			expected := fmt.Sprintf(`# HELP dell_csm_repl_metrics_stale 1 when replication metrics are stale (monitoring loop failing), 0 when fresh.
+# TYPE dell_csm_repl_metrics_stale gauge
+dell_csm_repl_metrics_stale{driver="driver"} %s
+`, tt.wantStale)
+			assert.NoError(t, testutil.GatherAndCompare(registry, strings.NewReader(expected), metrics.MetricReplicationMetricsStale))
+
+			families, err := registry.Gather()
+			assert.NoError(t, err)
+			foundTimestamp := false
+			for _, family := range families {
+				if family.GetName() == metrics.MetricReplicationLastCollectionTimestamp {
+					foundTimestamp = len(family.Metric) == 1 && family.Metric[0].GetGauge().GetValue() > 0
+				}
+			}
+			assert.Equal(t, tt.wantTime, foundTimestamp)
+		})
+	}
+}
+
+func TestReplicationGroupMonitoring_isUpdateRequired(t *testing.T) {
+	monitor := &ReplicationGroupMonitoring{MonitoringInterval: time.Second}
+
+	rg := repv1.DellCSIReplicationGroup{}
+	if !monitor.isUpdateRequired(rg) {
+		t.Fatalf("expected update to be required when last update time is zero")
+	}
+
+	rg.Spec.Action = "Suspend"
+	rg.Status.ReplicationLinkState.LastSuccessfulUpdate = &metav1.Time{Time: time.Now().Add(-2 * time.Second)}
+	if monitor.isUpdateRequired(rg) {
+		t.Fatalf("expected update to be skipped while an action is in progress")
+	}
+
+	rg.Spec.Action = ""
+	rg.Status.ReplicationLinkState.LastSuccessfulUpdate = &metav1.Time{Time: time.Now()}
+	if monitor.isUpdateRequired(rg) {
+		t.Fatalf("expected update to be skipped before monitoring interval elapses")
+	}
+
+	rg.Status.ReplicationLinkState.LastSuccessfulUpdate = &metav1.Time{Time: time.Now().Add(-2 * time.Second)}
+	if !monitor.isUpdateRequired(rg) {
+		t.Fatalf("expected update after monitoring interval elapsed")
+	}
+}
+
+func TestUpdateRGLinkStatus(t *testing.T) {
+	rg := utils.GetRGObj("rg-link-status", "driver", "remote-cluster", utils.LocalPGID, utils.RemotePGID, nil, nil)
+	cl := utils.GetFakeClientWithObjects(rg)
+
+	err := updateRGLinkStatus(context.Background(), cl, rg.DeepCopy(), replication.StorageProtectionGroupStatus_SYNCHRONIZED.String(), true, "")
+	if err != nil {
+		t.Fatalf("expected status update to succeed, got %v", err)
+	}
+
+	updatedRG := &repv1.DellCSIReplicationGroup{}
+	err = cl.Get(context.Background(), types.NamespacedName{Name: rg.Name}, updatedRG)
+	if err != nil {
+		t.Fatalf("expected to fetch updated RG, got %v", err)
+	}
+	if updatedRG.Status.ReplicationLinkState.State != replication.StorageProtectionGroupStatus_SYNCHRONIZED.String() {
+		t.Fatalf("expected replication link state to be updated")
+	}
+
+	err = updateRGLinkStatus(context.Background(), utils.GetFakeClient(), rg.DeepCopy(), replication.StorageProtectionGroupStatus_UNKNOWN.String(), false, "err")
+	if err == nil {
+		t.Fatalf("expected status update to fail for missing object")
+	}
+}
+
+func TestReplicationGroupMonitoring_monitorReplicationGroupsWithoutAssociatedPVs(t *testing.T) {
+	driver := utils.GetDefaultDriver()
+	rg := utils.GetRGObj("rg-without-pv", driver.DriverName, driver.RemoteClusterID, utils.LocalPGID, utils.RemotePGID, nil, nil)
+	cl := utils.GetFakeClientWithObjects(rg)
+	monitor := &ReplicationGroupMonitoring{
+		Client:             cl,
+		DriverName:         driver.DriverName,
+		ReplicationClient:  nil,
+		MonitoringInterval: time.Second,
+	}
+
+	monitor.monitorReplicationGroups()
+
+	updatedRG := &repv1.DellCSIReplicationGroup{}
+	err := cl.Get(context.Background(), types.NamespacedName{Name: rg.Name}, updatedRG)
+	if err != nil {
+		t.Fatalf("expected to fetch updated RG, got %v", err)
+	}
+	if updatedRG.Status.ReplicationLinkState.State != replication.StorageProtectionGroupStatus_EMPTY.String() {
+		t.Fatalf("expected RG link state to be EMPTY when no associated PVs exist")
+	}
+}
+
+func TestReplicationGroupMonitoring_monitorReplicationGroupsSkipsUpdateWhenActionInProgress(t *testing.T) {
+	driver := utils.GetDefaultDriver()
+	rg := utils.GetRGObj("rg-action-in-progress", driver.DriverName, driver.RemoteClusterID, utils.LocalPGID, utils.RemotePGID, nil, nil)
+	rg.Spec.Action = "Suspend"
+	rg.Status.ReplicationLinkState.LastSuccessfulUpdate = &metav1.Time{Time: time.Now().Add(-5 * time.Second)}
+	rg.Status.ReplicationLinkState.State = "old-status"
+	pv := utils.GetPVObj("pv-rg-action-in-progress", "vol-handle", driver.DriverName, driver.StorageClass, nil)
+	pv.Labels = map[string]string{
+		controllers.DriverName:       driver.DriverName,
+		controllers.ReplicationGroup: rg.Name,
+	}
+	cl := utils.GetFakeClientWithObjects(rg, pv)
+	monitor := &ReplicationGroupMonitoring{
+		Client:             cl,
+		DriverName:         driver.DriverName,
+		ReplicationClient:  nil,
+		MonitoringInterval: time.Second,
+	}
+
+	monitor.monitorReplicationGroups()
+
+	updatedRG := &repv1.DellCSIReplicationGroup{}
+	err := cl.Get(context.Background(), types.NamespacedName{Name: rg.Name}, updatedRG)
+	if err != nil {
+		t.Fatalf("expected to fetch updated RG, got %v", err)
+	}
+	if updatedRG.Status.ReplicationLinkState.State != "old-status" {
+		t.Fatalf("expected RG link state to remain unchanged while action is in progress")
+	}
 }

@@ -23,9 +23,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dell/repctl/pkg/config"
-	"github.com/dell/repctl/pkg/k8s"
-	log "github.com/sirupsen/logrus"
+	csmlog "github.com/dell/csmlog"
+	"github.com/dell/csm-replication/repctl/pkg/config"
+	"github.com/dell/csm-replication/repctl/pkg/k8s"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v2"
@@ -69,7 +69,7 @@ func getAddClusterCommand(mc GetClustersInterface) *cobra.Command {
 			./repctl cluster add -f <file1> -n <name1> -f <file2> -n <name2> ...
 			./repctl cluster add <...> --auto-inject
 		`,
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			configs := viper.GetStringSlice("files")
 			clusterNames := viper.GetStringSlice("add-name")
 			force := viper.GetBool("force")
@@ -77,7 +77,7 @@ func getAddClusterCommand(mc GetClustersInterface) *cobra.Command {
 
 			err := addCluster(configs, clusterNames, "/.repctl/clusters/", force)
 			if err != nil {
-				log.Fatalf("cluster add: %s", err.Error())
+				csmlog.Fatalf("cluster add: %s", err.Error())
 			}
 
 			if autoInject {
@@ -85,7 +85,7 @@ func getAddClusterCommand(mc GetClustersInterface) *cobra.Command {
 
 				err := injectCluster(mc, clusterIDs, "/.repctl/clusters/")
 				if err != nil {
-					log.Fatalf("cluster add: auto-inject: %s", err.Error())
+					csmlog.Fatalf("cluster add: auto-inject: %s", err.Error())
 				}
 			}
 		},
@@ -114,14 +114,14 @@ func getRemoveClusterCommand() *cobra.Command {
 		Use:     "delete",
 		Aliases: []string{"rm"},
 		Short:   "removes cluster by name from list of clusters being managed by repctl",
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			clusterName := viper.GetString("remove-name")
 
 			err := removeCluster(clusterName, "/.repctl/clusters/")
 			if err != nil {
-				log.Fatalf("cluster remove: %s", err.Error())
+				csmlog.Fatalf("cluster remove: %s", err.Error())
 			}
-			log.Printf("removed cluster %s", clusterName)
+			csmlog.Infof("removed cluster %s", clusterName)
 		},
 	}
 
@@ -137,15 +137,15 @@ func getListClusterCommand(mc GetClustersInterface) *cobra.Command {
 		Use:     "get",
 		Aliases: []string{"ls"},
 		Short:   "list all clusters currently being managed by repctl",
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			configFolder, err := getClustersFolderPathFunction("/.repctl/clusters/")
 			if err != nil {
-				log.Fatalf("cluster list: error getting clusters folder path: %s", err.Error())
+				csmlog.Fatalf("cluster list: error getting clusters folder path: %s", err.Error())
 			}
 
 			clusters, err := mc.GetAllClusters([]string{}, configFolder)
 			if err != nil {
-				log.Fatalf("cluster list: error in initializing cluster info: %s", err.Error())
+				csmlog.Fatalf("cluster list: error in initializing cluster info: %s", err.Error())
 			}
 			clusters.Print()
 		},
@@ -163,7 +163,7 @@ func getInjectClustersCommand(mc GetClustersInterface) *cobra.Command {
 			./repctl cluster inject
 			./repctl cluster inject --custom-configs <path-to-config-1>,<path-to-config-2>...
 		`,
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			clusterIDs := viper.GetStringSlice(config.Clusters)
 			customConfigs := viper.GetStringSlice("custom-configs")
 			useSA := viper.GetBool("use-sa")
@@ -172,14 +172,14 @@ func getInjectClustersCommand(mc GetClustersInterface) *cobra.Command {
 				generatedConfigs, err := generateConfigsFromSA(mc, clusterIDs)
 				defer os.RemoveAll("/tmp/repctl")
 				if err != nil {
-					log.Fatalf("cluster inject: generate cfg: %s", err.Error())
+					csmlog.Fatalf("cluster inject: generate cfg: %s", err.Error())
 				}
 				customConfigs = append(customConfigs, generatedConfigs...)
 			}
 
 			err := injectCluster(mc, clusterIDs, "/.repctl/clusters/", customConfigs...)
 			if err != nil {
-				log.Fatalf("cluster inject: %s", err.Error())
+				csmlog.Fatalf("cluster inject: %s", err.Error())
 			}
 		},
 	}
@@ -196,7 +196,7 @@ func getInjectClustersCommand(mc GetClustersInterface) *cobra.Command {
 /* METHODS */
 
 func addCluster(configs, clusterNames []string, folderPath string, force bool) error {
-	log.Print("Adding clusters")
+	csmlog.Info("Adding clusters")
 
 	if len(configs) != len(clusterNames) {
 		return fmt.Errorf("number of config files != number of cluster names")
@@ -213,6 +213,7 @@ func addCluster(configs, clusterNames []string, folderPath string, force bool) e
 	return nil
 }
 
+// GetFileName returns the base name for the provided config path.
 var GetFileName = func(cfg string) (string, error) {
 	info, err := os.Stat(cfg)
 	if err != nil {
@@ -221,6 +222,7 @@ var GetFileName = func(cfg string) (string, error) {
 	return info.Name(), nil
 }
 
+// CreateCluster creates a cluster client for the provided name and kubeconfig.
 var CreateCluster = func(name string, cfg string) (k8s.ClusterInterface, error) {
 	return k8s.CreateCluster(name, cfg)
 }
@@ -238,7 +240,7 @@ func injectCluster(mc k8s.MultiClusterConfiguratorInterface, clusterIDs []string
 
 	configs := &k8s.Clusters{}
 	if len(customConfigs) != 0 {
-		log.Print("Custom configs provided, injecting them into clusters")
+		csmlog.Info("Custom configs provided, injecting them into clusters")
 		for _, cfg := range customConfigs {
 			name, err := GetFileName(cfg)
 			if err != nil {
@@ -253,14 +255,14 @@ func injectCluster(mc k8s.MultiClusterConfiguratorInterface, clusterIDs []string
 			configs.Clusters = append(configs.Clusters, cluster)
 		}
 	} else {
-		log.Print("Injecting current cluster configuration to all clusters")
+		csmlog.Info("Injecting current cluster configuration to all clusters")
 		configs = clusters
 	}
 
 	for _, srcCluster := range clusters.Clusters {
 		err := injectConfigIntoCluster(srcCluster, configs)
 		if err != nil {
-			log.Printf("error during injecting configs: %s", err.Error())
+			csmlog.Infof("error during injecting configs: %s", err.Error())
 			continue
 		}
 	}
@@ -269,7 +271,7 @@ func injectCluster(mc k8s.MultiClusterConfiguratorInterface, clusterIDs []string
 }
 
 func removeCluster(clusterName string, path string) error {
-	log.Printf("Removing cluster %s", clusterName)
+	csmlog.Infof("Removing cluster %s", clusterName)
 	folderPath, err := getClustersFolderPathFunction(path)
 	if err != nil {
 		return err
@@ -312,7 +314,7 @@ func injectConfigIntoCluster(srcCluster k8s.ClusterInterface, clusters *k8s.Clus
 
 	_, err := srcCluster.GetNamespace(context.Background(), namespace)
 	if err != nil {
-		log.Printf("Creating %s namespace ", namespace)
+		csmlog.Infof("Creating %s namespace ", namespace)
 		cErr := srcCluster.CreateNamespace(context.Background(), ns)
 		if cErr != nil {
 			return fmt.Errorf("error creating namespace: %s", err.Error())
@@ -352,7 +354,7 @@ func injectConfigIntoCluster(srcCluster k8s.ClusterInterface, clusters *k8s.Clus
 			return fmt.Errorf("error while adding file to secret: %s", err.Error())
 		}
 
-		log.Printf("Creating/Updating %s secret in %s cluster ", secret.Name, srcCluster.GetID())
+		csmlog.Infof("Creating/Updating %s secret in %s cluster ", secret.Name, srcCluster.GetID())
 		err = srcCluster.GetClient().Create(context.Background(), secret)
 		if err != nil {
 			uErr := srcCluster.GetClient().Update(context.Background(), secret)
@@ -360,7 +362,7 @@ func injectConfigIntoCluster(srcCluster k8s.ClusterInterface, clusters *k8s.Clus
 				return fmt.Errorf("error while creating secret in cluster: %s", err.Error())
 			}
 		}
-		log.Printf("secret %s created ", secret.Name)
+		csmlog.Infof("secret %s created ", secret.Name)
 
 		connectionConfig.Targets = append(connectionConfig.Targets, Target{
 			ClusterID: tgtCluster.GetID(),
@@ -387,7 +389,7 @@ func injectConfigIntoCluster(srcCluster k8s.ClusterInterface, clusters *k8s.Clus
 	}
 	configMap.Data["config.yaml"] = string(bytes)
 
-	log.Printf("Creating/Updating replication config map in %s cluster ", srcCluster.GetID())
+	csmlog.Infof("Creating/Updating replication config map in %s cluster ", srcCluster.GetID())
 	err = srcCluster.GetClient().Create(context.Background(), configMap)
 	if err != nil {
 		cmap := &corev1.ConfigMap{}
@@ -412,12 +414,12 @@ func injectConfigIntoCluster(srcCluster k8s.ClusterInterface, clusters *k8s.Clus
 			return fmt.Errorf("error while creating config map in cluster: %s", uErr.Error())
 		}
 	}
-	log.Printf("config map %s created ", configMap.Name)
+	csmlog.Infof("config map %s created ", configMap.Name)
 	return nil
 }
 
-func updateClusters(kubeConfig, clusterName, path string, force bool) error {
-	log.Print(clusterName)
+func updateClusters(kubeConfig, clusterName, path string, _ bool) error {
+	csmlog.Infof("%s", clusterName)
 
 	folderPath, err := getClustersFolderPathFunction(path)
 	if err != nil {
@@ -430,7 +432,7 @@ func updateClusters(kubeConfig, clusterName, path string, force bool) error {
 	}
 	defer func() {
 		if err := srcFile.Close(); err != nil {
-			log.Errorf("error encountered in closing src file. Error: %s", err.Error())
+			csmlog.Errorf("error encountered in closing src file. Error: %s", err.Error())
 		}
 	}()
 
@@ -450,7 +452,7 @@ func updateClusters(kubeConfig, clusterName, path string, force bool) error {
 	}
 	defer func() {
 		if err := destFile.Close(); err != nil {
-			log.Printf("error encountered in closing destination file. Error: %s", err.Error())
+			csmlog.Infof("error encountered in closing destination file. Error: %s", err.Error())
 		}
 	}()
 
@@ -463,7 +465,7 @@ func updateClusters(kubeConfig, clusterName, path string, force bool) error {
 		return err
 	}
 
-	log.Printf("Successfully created %s in %s folder. %d bytes copied",
+	csmlog.Infof("Successfully created %s in %s folder. %d bytes copied",
 		clusterName, folderPath, bytes)
 
 	return nil
@@ -491,7 +493,7 @@ func getClustersFolderPath(path string) (string, error) {
 func generateConfigsFromSA(mc GetClustersInterface, clusterIDs []string) ([]string, error) {
 	var res []string
 
-	log.Print("Generating config maps from existing service accounts")
+	csmlog.Info("Generating config maps from existing service accounts")
 	namespace := "dell-replication-controller"
 
 	err := os.MkdirAll("/tmp/repctl", 0o750)
@@ -532,10 +534,10 @@ func generateConfigsFromSA(mc GetClustersInterface, clusterIDs []string) ([]stri
 	}
 
 	for _, cluster := range clusters.Clusters {
-		log.Printf("Generating config for service account in %s cluster", cluster.GetID())
+		csmlog.Infof("Generating config for service account in %s cluster", cluster.GetID())
 		_, err := cluster.GetNamespace(context.Background(), namespace)
 		if err != nil {
-			log.Errorf("cluster inject: %s",
+			csmlog.Errorf("cluster inject: %s",
 				fmt.Errorf("can't find namespace %s in cluster %s, skipping", namespace, cluster.GetID()))
 			continue
 		}
@@ -553,18 +555,19 @@ func generateConfigsFromSA(mc GetClustersInterface, clusterIDs []string) ([]stri
 
 		err = RunCommand(c)
 		if err != nil {
-			log.Errorf("cluster inject: %s",
+			csmlog.Errorf("cluster inject: %s",
 				fmt.Errorf("failed to get kubeconfig from service account %s", err.Error()))
 			continue
 		}
 
 		res = append(res, cfgPath)
-		log.Print()
+		csmlog.Info("")
 	}
 
 	return res, nil
 }
 
+// RunCommand executes the provided command.
 var RunCommand = func(cmd *exec.Cmd) error {
 	return cmd.Run()
 }

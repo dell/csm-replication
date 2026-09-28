@@ -27,3 +27,8 @@ targets:
 #   "trace" "debug" "info" "warn" "error" "fatal" "panic"
 # Default Value: "info"
 CSI_LOG_LEVEL: "INFO"
+# logFormat: format of log output
+# Allowed Values:
+#   "json" "text"
+# Default Value: "json"
+CSI_LOG_FORMAT: "JSON"

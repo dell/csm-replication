@@ -18,14 +18,13 @@ package csinoderescanner
 
 import (
 	"context"
-	"fmt"
 	"time"
+
+	"github.com/dell/csmlog"
 
 	storagev1 "github.com/dell/csm-replication/api/v1"
 	controller "github.com/dell/csm-replication/controllers"
-	"github.com/dell/csm-replication/pkg/common/logger"
 	"github.com/dell/csm-replication/pkg/noderescan"
-	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -54,7 +53,6 @@ type ActionType string
 // NodeRescanReconciler reconciles PersistentVolume resources
 type NodeRescanReconciler struct {
 	Client                     client.Client
-	Log                        logr.Logger
 	Scheme                     *runtime.Scheme
 	EventRecorder              record.EventRecorder
 	DriverName                 string
@@ -70,15 +68,12 @@ var myNode *corev1.Pod
 
 // Reconcile contains reconciliation logic that updates MigrationGroup depending on it's current state
 func (r *NodeRescanReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("MigrationGroup", req.NamespacedName)
-	ctx = context.WithValue(ctx, logger.LoggerContextKey, log)
-
-	log.V(logger.InfoLevel).Info("Begin reconcile - Node ReScanner")
+	csmlog.Info("Begin reconcile - Node ReScanner")
 
 	mg := new(storagev1.DellCSIMigrationGroup)
 	err := r.Client.Get(ctx, req.NamespacedName, mg)
 	if err != nil {
-		log.Error(err, "MG not found", "mg", mg)
+		csmlog.Errorf("MG not found: %v", err)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
@@ -90,7 +85,10 @@ func (r *NodeRescanReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	case MigratedState:
 		return r.processMGForRescan(ctx, mg.DeepCopy())
 	default:
-		log.Info(fmt.Sprintf("Ignoring MG (%s) for rescan in %s state", mg.Name, currentState))
+		csmlog.WithFields(csmlog.Fields{
+			"mgName":       mg.Name,
+			"currentState": currentState,
+		}).Info("Ignoring MG for rescan")
 		return ctrl.Result{}, nil
 	}
 }
@@ -107,15 +105,17 @@ func (r *NodeRescanReconciler) processMGForRescan(ctx context.Context, mg *stora
 	if err != nil && errors.IsNotFound(err) {
 		return ctrl.Result{}, err
 	}
-	log := logger.FromContext(ctx)
 	// Check if rescanned label is already on the pod
 	for _, pod := range podList.Items {
 		if pod.Spec.NodeName == r.NodeName {
 			myNode = pod.DeepCopy()
-			log.V(logger.DebugLevel).Info(fmt.Sprintf("Found node: %+v", myNode))
+			csmlog.WithFields(csmlog.Fields{
+				"nodeName": myNode.Name,
+				"nodeUID":  string(myNode.UID),
+			}).Info("Found node")
 			labels := pod.GetLabels()
 			if _, ok := labels[controller.NodeReScanned]; ok {
-				r.Log.Info("rescan done on node: ", r.NodeName)
+				csmlog.Infof("rescan done on node: %s", r.NodeName)
 				return ctrl.Result{}, nil
 			}
 		}
@@ -124,7 +124,7 @@ func (r *NodeRescanReconciler) processMGForRescan(ctx context.Context, mg *stora
 		return ctrl.Result{}, errors.NewBadRequest("no node name found")
 	}
 
-	log.V(logger.DebugLevel).Info("Begin rescan on node for MG spec", "Name: ", mg.Name, "Node:", myNode.Name)
+	csmlog.WithFields(csmlog.Fields{"mgName": mg.Name, "nodeName": myNode.Name}).Info("Begin rescan on node for MG spec")
 	// Perform rescan on the node
 	err = noderescan.RescanNode(ctx)
 	if err != nil {
@@ -132,13 +132,13 @@ func (r *NodeRescanReconciler) processMGForRescan(ctx context.Context, mg *stora
 	}
 	// Update label on the node
 	controller.AddLabel(myNode, controller.NodeReScanned, "yes")
-	log.V(logger.InfoLevel).Info("Updating", "label", "yes")
+	csmlog.Info("Updating label to yes")
 	err = r.Client.Update(ctx, myNode)
 	if err != nil {
-		log.Error(err, "Failed to update", "label", "yes")
+		csmlog.Errorf("Failed to update label: %v", err)
 		return ctrl.Result{}, err
 	}
-	log.V(logger.InfoLevel).Info("Pod was successfully updated with", "Node-Rescanned", "yes")
+	csmlog.Info("Pod was successfully updated with Node-Rescanned=yes")
 	return ctrl.Result{}, err
 }
 
@@ -154,25 +154,27 @@ func (r *NodeRescanReconciler) processMGinDeletingState(ctx context.Context, mg 
 	if err != nil && errors.IsNotFound(err) {
 		return ctrl.Result{}, nil
 	}
-	log := logger.FromContext(ctx)
 	// Check if rescanned label is already on the pod
 	for _, pod := range podList.Items {
 		if pod.Spec.NodeName == r.NodeName {
 			myNode = pod.DeepCopy()
-			log.V(logger.DebugLevel).Info(fmt.Sprintf("Found node: %+v", myNode))
+			csmlog.WithFields(csmlog.Fields{
+				"nodeName": myNode.Name,
+				"nodeUID":  string(myNode.UID),
+			}).Info("Found node")
 			labels := pod.GetLabels()
 			if _, ok := labels[controller.NodeReScanned]; ok {
 				// Remove label from the pod
-				log.V(logger.DebugLevel).Info("Begin deletion of label on node for MG spec", "Name: ", mg.Name, "Node:", myNode.Name)
+				csmlog.WithFields(csmlog.Fields{"mgName": mg.Name, "nodeName": myNode.Name}).Info("Begin deletion of label on node for MG spec")
 				// Update label on the node
 				controller.DeleteLabel(myNode, controller.NodeReScanned)
-				log.V(logger.InfoLevel).Info("deleting", "label:", controller.NodeReScanned)
+				csmlog.Infof("deleting label: %s", controller.NodeReScanned)
 				err = r.Client.Update(ctx, myNode)
 				if err != nil {
-					log.Error(err, "Failed to delete", "label", controller.NodeReScanned)
+					csmlog.Errorf("Failed to delete label %s: %v", controller.NodeReScanned, err)
 					return ctrl.Result{}, err
 				}
-				log.V(logger.InfoLevel).Info("Pod was successfully updated with", "Node-Rescanned", "nil")
+				csmlog.Info("Pod was successfully updated with Node-Rescanned=nil")
 				return ctrl.Result{}, nil
 			}
 		}

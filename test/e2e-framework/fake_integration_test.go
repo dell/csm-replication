@@ -44,7 +44,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -93,7 +92,6 @@ func (suite *FakeReplicationTestSuite) runCSIReplicator() {
 	mockReplicationClient := csireplication.NewFakeReplicationClient(utils.ContextPrefix)
 	pvReconciler := &controller.PersistentVolumeReconciler{
 		Client:            suite.client,
-		Log:               ctrl.Log.WithName("controllers").WithName("PersistentVolumeClaim"),
 		Scheme:            utils.Scheme,
 		EventRecorder:     fakeRecorder,
 		DriverName:        suite.driver.DriverName,
@@ -104,7 +102,6 @@ func (suite *FakeReplicationTestSuite) runCSIReplicator() {
 	}
 	pvcReconciler := &controller.PersistentVolumeClaimReconciler{
 		Client:            suite.client,
-		Log:               ctrl.Log.WithName("controllers").WithName("PersistentVolumeClaim"),
 		Scheme:            utils.Scheme,
 		EventRecorder:     fakeRecorder,
 		DriverName:        suite.driver.DriverName,
@@ -113,7 +110,6 @@ func (suite *FakeReplicationTestSuite) runCSIReplicator() {
 	}
 	rgReconciler := &controller.ReplicationGroupReconciler{
 		Client:            suite.client,
-		Log:               ctrl.Log.WithName("controllers").WithName("DellCSIReplicationGroup"),
 		Scheme:            utils.Scheme,
 		DriverName:        suite.driver.DriverName,
 		EventRecorder:     fakeRecorder,
@@ -132,7 +128,6 @@ func (suite *FakeReplicationTestSuite) runReplicationController() {
 	suite.multiClusterClient = mocks.NewFakeConfig(suite.driver.SourceClusterID, suite.driver.RemoteClusterID)
 	pvReconciler := &replicationController.PersistentVolumeReconciler{
 		Client:        suite.client,
-		Log:           ctrl.Log.WithName("controllers").WithName("PersistentVolumeClaim"),
 		Scheme:        utils.Scheme,
 		EventRecorder: fakeRecorder,
 		Domain:        constants.DefaultDomain,
@@ -140,7 +135,6 @@ func (suite *FakeReplicationTestSuite) runReplicationController() {
 	}
 	pvcReconciler := &replicationController.PersistentVolumeClaimReconciler{
 		Client:        suite.client,
-		Log:           ctrl.Log.WithName("controllers").WithName("PersistentVolumeClaim"),
 		Scheme:        utils.Scheme,
 		EventRecorder: fakeRecorder,
 		Domain:        constants.DefaultDomain,
@@ -148,7 +142,6 @@ func (suite *FakeReplicationTestSuite) runReplicationController() {
 	}
 	rgReconciler := &replicationController.ReplicationGroupReconciler{
 		Client:        suite.client,
-		Log:           ctrl.Log.WithName("controllers").WithName("DellCSIReplicationGroup"),
 		Scheme:        utils.Scheme,
 		EventRecorder: fakeRecorder,
 		Domain:        constants.DefaultDomain,

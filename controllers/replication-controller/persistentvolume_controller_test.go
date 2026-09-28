@@ -25,12 +25,10 @@ import (
 	"github.com/dell/csm-replication/controllers"
 	controller "github.com/dell/csm-replication/controllers"
 	"github.com/dell/csm-replication/pkg/common/constants"
-	"github.com/dell/csm-replication/pkg/common/logger"
 	"github.com/dell/csm-replication/pkg/connection"
 	fakeclient "github.com/dell/csm-replication/test/e2e-framework/fake-client"
 	"github.com/dell/csm-replication/test/e2e-framework/utils"
 	"github.com/dell/csm-replication/test/mocks"
-	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"
@@ -41,7 +39,6 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -96,7 +93,6 @@ func (suite *PVReconcileSuite) runRemoteReplicationManager(fakeConfig connection
 
 	PVReconciler = PersistentVolumeReconciler{
 		Client:        suite.mockUtils.FakeClient,
-		Log:           ctrl.Log.WithName("controllers").WithName("PersistentVolume"),
 		Scheme:        utils.Scheme,
 		EventRecorder: fakeRecorder,
 		Domain:        constants.DefaultDomain,
@@ -157,23 +153,22 @@ func (suite *PVReconcileSuite) runRemoteReplicationManager(fakeConfig connection
 	}
 
 	// scenario: processLocalPV should fail with an error
-	loggerInstance := PVReconciler.Log.WithValues("persistentvolumeclaim")
 
 	// Test case where PV has already been synced
 	localPV.Annotations[controller.PVSyncComplete] = "yes"
-	e := PVReconciler.processLocalPV(context.WithValue(context.TODO(), logger.LoggerContextKey, loggerInstance), localPV, "", "")
+	e := PVReconciler.processLocalPV(context.TODO(), localPV, "", "")
 	assert.NoError(suite.T(), e, "PV has already been synced")
 
 	// Test case where processLocalPV should fail with an error
-	e = PVReconciler.processLocalPV(context.WithValue(context.TODO(), logger.LoggerContextKey, loggerInstance), &corev1.PersistentVolume{}, "", "")
+	e = PVReconciler.processLocalPV(context.TODO(), &corev1.PersistentVolume{}, "", "")
 	assert.Error(suite.T(), e, "Process local PV failed with an error")
 
 	// scenario: process remotePV should fail with an error
-	_, e = PVReconciler.processRemotePV(context.WithValue(context.TODO(), logger.LoggerContextKey, loggerInstance), remoteClient, &corev1.PersistentVolume{}, "xyz")
+	_, e = PVReconciler.processRemotePV(context.TODO(), remoteClient, &corev1.PersistentVolume{}, "xyz")
 	assert.Error(suite.T(), e, "Process remote PV failed with an error")
 
 	// scenario: process remotePV should work with no error
-	_, e = PVReconciler.processRemotePV(context.WithValue(context.TODO(), logger.LoggerContextKey, loggerInstance), remoteClient, localPV, "")
+	_, e = PVReconciler.processRemotePV(context.TODO(), remoteClient, localPV, "")
 	assert.NoError(suite.T(), e, "Process remote PV with no error")
 
 	annotations := make(map[string]string)
@@ -501,7 +496,6 @@ func (suite *PVReconcileSuite) initReconciler(config connection.MultiClusterClie
 	fakeRecorder := record.NewFakeRecorder(100)
 	reconciler := PersistentVolumeReconciler{
 		Client:        suite.client,
-		Log:           ctrl.Log.WithName("controllers").WithName("PersistentVolume"),
 		Scheme:        utils.Scheme,
 		EventRecorder: fakeRecorder,
 		Domain:        constants.DefaultDomain,
@@ -1012,7 +1006,6 @@ func TestUpdateRemotePVDetails(t *testing.T) {
 		volume          *v1.PersistentVolume
 		remotePV        *v1.PersistentVolume
 		remoteClusterID string
-		log             logr.Logger
 		expected        error
 	}{
 		{
@@ -1047,16 +1040,13 @@ func TestUpdateRemotePVDetails(t *testing.T) {
 				},
 			},
 			remoteClusterID: "xyz066",
-			// log: logr.Logger{
-			// 	InfoLevel: logger.InfoLevel,
-			// },
-			expected: nil,
+			expected:        nil,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := UpdateRemotePVDetails(tc.ctx, remoteClient, tc.remotePV, tc.volume, tc.remoteClusterID, tc.log)
+			err := UpdateRemotePVDetails(tc.ctx, remoteClient, tc.remotePV, tc.volume, tc.remoteClusterID)
 			assert.NotNil(t, tc.remotePV.Spec.ClaimRef)
 			assert.NotNil(t, tc.remotePV.Spec.ClaimRef.Name)
 			assert.Error(t, err)

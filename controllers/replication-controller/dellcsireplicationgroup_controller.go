@@ -23,11 +23,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dell/csmlog"
+
 	csireplicator "github.com/dell/csm-replication/controllers/csi-replicator"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	controller "github.com/dell/csm-replication/controllers"
-	"github.com/dell/csm-replication/pkg/common/logger"
 	"github.com/dell/csm-replication/pkg/connection"
 	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	v1 "k8s.io/api/core/v1"
@@ -36,7 +37,6 @@ import (
 	reconciler "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -51,6 +51,11 @@ const (
 	eventTypeNormal    = "Normal"
 	eventTypeWarning   = "Warning"
 	eventReasonUpdated = "Updated"
+)
+
+const (
+	reservedClaimRefMaxAttempts = 5
+	reservedClaimRefRetryDelay  = 1 * time.Second
 )
 
 var (
@@ -69,8 +74,8 @@ var (
 	getDellCsiReplicationGroupCreateSnapshotObject = func(remoteClient connection.RemoteClusterClient, ctx context.Context, snapshot *s1.VolumeSnapshot) error {
 		return remoteClient.CreateSnapshotObject(ctx, snapshot)
 	}
-	getDellCsiReplicationGroupProcessSnapshotEvent = func(r *ReplicationGroupReconciler, ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
-		return r.processSnapshotEvent(ctx, group, remoteClient, log)
+	getDellCsiReplicationGroupProcessSnapshotEvent = func(r *ReplicationGroupReconciler, ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient) error {
+		return r.processSnapshotEvent(ctx, group, remoteClient)
 	}
 	getDellCsiReplicationGroupUpdate = func(r *ReplicationGroupReconciler, ctx context.Context, group *repv1.DellCSIReplicationGroup) error {
 		return r.Update(ctx, group)
@@ -107,7 +112,6 @@ var (
 // ReplicationGroupReconciler reconciles a ReplicationGroup object
 type ReplicationGroupReconciler struct {
 	client.Client
-	Log                    logr.Logger
 	Scheme                 *runtime.Scheme
 	EventRecorder          record.EventRecorder
 	PVCRequeueInterval     time.Duration
@@ -123,15 +127,11 @@ type ReplicationGroupReconciler struct {
 
 // Reconcile contains reconciliation logic that updates ReplicationGroup depending on it's current state
 func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("dellcsireplicationgroup", req.Name)
-	ctx = context.WithValue(ctx, logger.LoggerContextKey, log)
-
 	localRG := new(repv1.DellCSIReplicationGroup)
 	err := r.Get(ctx, req.NamespacedName, localRG)
 	if err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	log.V(logger.InfoLevel).Info("Reconciling RG event!!!")
 	localRGName := req.Name
 	remoteRGName := localRG.Annotations[controller.RemoteReplicationGroup]
 	if remoteRGName == "" {
@@ -140,10 +140,10 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	rgSyncComplete := false
 
 	if localRG.Annotations == nil {
-		log.V(logger.InfoLevel).Info("RG is not ready yet, requeue as we will get another event")
+		csmlog.Info("RG is not ready yet, requeue as we will get another event")
 		return ctrl.Result{}, nil
 	} else if localRG.Annotations[controller.RGSyncComplete] == "yes" {
-		log.V(logger.DebugLevel).Info("RG Sync already completed")
+		csmlog.Info("RG Sync already completed")
 		remoteRGName = localRG.Annotations[controller.RemoteReplicationGroup]
 		rgSyncComplete = true
 		// Continue as we can re verify
@@ -159,6 +159,13 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			remoteRGName = replicated + "-" + localRGName
 		}
 	}
+	csmlog.WithFields(csmlog.Fields{
+		"controller":      "replicationgroup",
+		"rgName":          localRGName,
+		"remoteRGName":    remoteRGName,
+		"localClusterID":  localClusterID,
+		"remoteClusterID": remoteClusterID,
+	}).Info("Reconciling RG event")
 
 	annotations := make(map[string]string)
 	annotations[controller.RemoteReplicationGroup] = localRGName
@@ -208,33 +215,33 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	// Check for RG retention policy annotation
 	retentionPolicy, ok := localRG.Annotations[controller.RemoteRGRetentionPolicy]
 	if !ok {
-		log.Info(fmt.Sprintf("RetentionPolicy:found:%v,value-->%s", ok, retentionPolicy))
-		log.Info("Retention policy not set, using retain as the default policy")
+		csmlog.Infof("RetentionPolicy:found:%v,value-->%s", ok, retentionPolicy)
+		csmlog.Info("Retention policy not set, using retain as the default policy")
 		retentionPolicy = controller.RemoteRetentionValueRetain // we will default to retain the RG if there is no retention policy is set
 	}
 
 	// Handle RG deletion if timestamp is set
 	if !localRG.DeletionTimestamp.IsZero() {
 		// Process deletion of remote RG
-		log.V(logger.InfoLevel).Info("Deletion timestamp is not zero")
-		log.V(logger.InfoLevel).WithValues(localRG.Annotations).Info("Annotations")
+		csmlog.Info("Deletion timestamp is not zero")
+		csmlog.Info("Annotations")
 		_, ok := localRG.Annotations[controller.DeletionRequested]
-		log.V(logger.InfoLevel).WithValues(ok).Info("Deletion requested?", ok)
+		csmlog.Infof("Deletion requested?", ok)
 
 		if _, ok := localRG.Annotations[controller.DeletionRequested]; !ok {
-			log.V(logger.InfoLevel).Info("Deletion requested annotation not found")
+			csmlog.Info("Deletion requested annotation not found")
 			remoteRG, err := remoteClient.GetReplicationGroup(ctx, localRG.Annotations[controller.RemoteReplicationGroup])
 			if err != nil {
-				log.V(logger.ErrorLevel).WithValues(err.Error()).Info("error getting replication group")
+				csmlog.Infof("error getting replication group: %v", err)
 				// If remote RG doesn't exist, proceed to removing finalizer
 				if !errors.IsNotFound(err) {
-					log.Error(err, "Failed to get remote replication group")
+					csmlog.Errorf("Failed to get remote replication group: %v", err)
 					return ctrl.Result{}, err
 				}
 			} else {
-				log.V(logger.InfoLevel).Info("Got remote RG")
+				csmlog.Info("Got remote RG")
 				if strings.ToLower(retentionPolicy) == controller.RemoteRetentionValueDelete {
-					log.Info("Retention policy is set to Delete")
+					csmlog.Info("Retention policy is set to Delete")
 					if _, ok := remoteRG.Annotations[controller.DeletionRequested]; !ok {
 						// Add annotation on the remote RG to request its deletion
 						remoteRGCopy := remoteRG.DeepCopy()
@@ -252,26 +259,26 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			}
 		}
 
-		log.V(logger.InfoLevel).Info("Removing finalizer RGFinalizer")
+		csmlog.Info("Removing finalizer RGFinalizer")
 		finalizerRemoved := controller.RemoveFinalizerIfExists(localRG, controller.RGFinalizer)
 		if finalizerRemoved {
-			log.V(logger.InfoLevel).Info("Updating rg copy to remove finalizer")
+			csmlog.Info("Updating rg copy to remove finalizer")
 			return ctrl.Result{}, r.Update(ctx, localRG)
 		}
 	}
 
 	rgCopy := localRG.DeepCopy()
 
-	log.V(logger.InfoLevel).Info("Adding finalizer RGFinalizer")
+	csmlog.Info("Adding finalizer RGFinalizer")
 	// Check for the finalizer; add, if doesn't exist
 	if finalizerAdded := controller.AddFinalizerIfNotExist(rgCopy, controller.RGFinalizer); finalizerAdded {
-		log.V(logger.InfoLevel).Info("Finalizer not found adding it")
+		csmlog.Info("Finalizer not found adding it")
 		return ctrl.Result{}, r.Update(ctx, rgCopy)
 	}
-	log.V(logger.InfoLevel).Info("Trying to delete RG if deletion request annotation found")
+	csmlog.Info("Trying to delete RG if deletion request annotation found")
 	// Check for deletion request annotation
 	if _, ok := rgCopy.Annotations[controller.DeletionRequested]; ok {
-		log.V(logger.InfoLevel).Info("Deletion Requested annotation found and deleting the remote RG")
+		csmlog.Info("Deletion Requested annotation found and deleting the remote RG")
 		return ctrl.Result{}, r.Delete(ctx, rgCopy)
 	}
 
@@ -279,19 +286,28 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	// If the RG already exists on the Remote Cluster,
 	// We treat this as idempotent.
-	log.V(logger.InfoLevel).Info(fmt.Sprintf("Checking if remote RG with the name %s exists on ClusterId: %s",
-		remoteRGName, remoteClusterID))
+	csmlog.WithFields(csmlog.Fields{
+		"controller":      "replicationgroup",
+		"rgName":          localRGName,
+		"remoteRGName":    remoteRGName,
+		"remoteClusterID": remoteClusterID,
+	}).Info("Checking if remote RG exists")
 	rgObj, err := remoteClient.GetReplicationGroup(ctx, remoteRGName)
 	if err != nil && !errors.IsNotFound(err) {
-		log.Error(err, "failed to get RG details on the remote cluster")
+		csmlog.WithFields(csmlog.Fields{
+			"controller":      "replicationgroup",
+			"rgName":          localRGName,
+			"remoteRGName":    remoteRGName,
+			"remoteClusterID": remoteClusterID,
+		}).Errorf("failed to get RG details on the remote cluster: %v", err)
 		return ctrl.Result{Requeue: true}, err
 	} else if errors.IsNotFound(err) {
 		if rgSyncComplete {
-			log.Error(err, "Something went wrong. Local RG has already been synced to the remote cluster")
+			csmlog.Errorf("Something went wrong. Local RG has already been synced to the remote cluster: %v", err)
 			// If the RG has been successfully synced to the remote cluster once
 			// and now it's not found,
 			// Let's not recreate the RGs in this case.
-			log.V(logger.InfoLevel).Info("RG not found on target cluster. " +
+			csmlog.Info("RG not found on target cluster. " +
 				"Since the local RG carries a SyncComplete annotation, " +
 				"we will not be creating RG on remote once again.")
 			return ctrl.Result{}, nil
@@ -306,7 +322,7 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 	} else {
 		// We got the object
-		log.V(logger.InfoLevel).Info(" The RG already exists on the remote cluster")
+		csmlog.Info(" The RG already exists on the remote cluster")
 		// First verify the source cluster for this RG
 		if rgObj.Spec.RemoteClusterID == localClusterID {
 			// Confirmed that this object was created by this controller
@@ -315,7 +331,7 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			// Verify driver name
 			if rgObj.Spec.DriverName != remoteRG.Spec.DriverName {
 				// Lets create a new object
-				remoteRGName = fmt.Sprintf("SourceClusterId-%s-%s", localClusterID, localRGName)
+				remoteRGName = strings.ToLower(fmt.Sprintf("sourceclusterid-%s-%s", localClusterID, localRGName))
 				remoteRG.Name = remoteRGName
 				createRG = true
 				rgSyncComplete = false
@@ -326,14 +342,17 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 					// Lets raise an event and stop reconciling
 					r.EventRecorder.Eventf(localRG, eventTypeWarning, eventReasonUpdated,
 						"Found conflicting RG on remote ClusterId: %s", remoteClusterID)
-					log.Error(fmt.Errorf("conflicting RG with name: %s exists on ClusterId: %s",
-						localRGName, remoteClusterID), "stopping reconcile")
+					csmlog.WithFields(csmlog.Fields{
+						"localRGName":     localRGName,
+						"remoteClusterID": remoteClusterID,
+						"reason":          "conflicting RG",
+					}).Error("conflicting RG exists - stopping reconcile")
 					return ctrl.Result{}, nil
 				}
 			}
 		} else {
 			// update the name of the RG and create it
-			remoteRGName = fmt.Sprintf("SourceClusterId-%s-%s", localClusterID, localRGName)
+			remoteRGName = strings.ToLower(fmt.Sprintf("sourceclusterid-%s-%s", localClusterID, localRGName))
 			remoteRG.Name = remoteRGName
 			createRG = true
 			rgSyncComplete = false
@@ -343,12 +362,22 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	if createRG {
 		err = remoteClient.CreateReplicationGroup(ctx, remoteRG)
 		if err != nil {
-			log.Error(err, "failed to create remote CR for DellCSIReplicationGroup")
+			csmlog.WithFields(csmlog.Fields{
+				"controller":      "replicationgroup",
+				"rgName":          localRGName,
+				"remoteRGName":    remoteRGName,
+				"remoteClusterID": remoteClusterID,
+			}).Errorf("failed to create remote CR for DellCSIReplicationGroup: %v", err)
 			r.EventRecorder.Eventf(localRG, eventTypeWarning, eventReasonUpdated,
 				"Failed to create remote CR for DellCSIReplicationGroup on ClusterId: %s", remoteClusterID)
 			return ctrl.Result{}, err
 		}
-		log.V(logger.InfoLevel).Info("The remote RG has been successfully created!!")
+		csmlog.WithFields(csmlog.Fields{
+			"controller":      "replicationgroup",
+			"rgName":          localRGName,
+			"remoteRGName":    remoteRGName,
+			"remoteClusterID": remoteClusterID,
+		}).Info("The remote RG has been successfully created")
 		r.EventRecorder.Eventf(localRG, eventTypeNormal, eventReasonUpdated,
 			"Created remote ReplicationGroup with name: %s on cluster: %s", remoteRGName, remoteClusterID)
 	}
@@ -364,20 +393,25 @@ func (r *ReplicationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	err = r.processLastActionResult(ctx, localRG, remoteRG, remoteClient, log)
+	err = r.processLastActionResult(ctx, localRG, remoteRG, remoteClient)
 	if err != nil {
-		log.V(logger.ErrorLevel).Error(err, "failed to process the last action")
+		csmlog.WithFields(csmlog.Fields{
+			"controller":      "replicationgroup",
+			"rgName":          localRG.Name,
+			"remoteRGName":    remoteRG.Name,
+			"remoteClusterID": remoteClusterID,
+		}).Errorf("failed to process the last action: %v", err)
 		r.EventRecorder.Eventf(localRG, eventTypeWarning, eventReasonUpdated,
 			"failed to process the last action %s", localRG.Status.LastAction.Condition)
 	}
 
-	log.V(logger.InfoLevel).Info("RG has already been synced to the remote cluster")
+	csmlog.Info("RG has already been synced to the remote cluster")
 	return ctrl.Result{}, nil
 }
 
-func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteGroup *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
+func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteGroup *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient) error {
 	if len(group.Status.Conditions) == 0 || group.Status.LastAction.Time == nil {
-		log.V(logger.InfoLevel).Info("No action to process")
+		csmlog.Info("No action to process")
 		return nil
 	}
 
@@ -387,41 +421,41 @@ func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context
 
 	val, ok := group.Annotations[controller.ActionProcessedTime]
 	if !ok {
-		log.V(logger.InfoLevel).Info("Action Processed does not exist.")
+		csmlog.Info("Action Processed does not exist.")
 		return nil
 	}
 
 	if val == group.Status.LastAction.Time.GoString() {
-		log.V(logger.InfoLevel).Info("Last action has already been processed")
+		csmlog.Info("Last action has already been processed")
 		return nil
 	}
 
 	if strings.Contains(group.Status.LastAction.Condition, "CREATE_SNAPSHOT") {
-		if err := getDellCsiReplicationGroupProcessSnapshotEvent(r, ctx, group, remoteClient, log); err != nil {
+		if err := getDellCsiReplicationGroupProcessSnapshotEvent(r, ctx, group, remoteClient); err != nil {
 			return err
 		}
 	}
 
 	if strings.Contains(group.Status.LastAction.Condition, "FAILOVER_REMOTE") {
-		if err := r.processFailoverEvent(ctx, group, remoteClient, log); err != nil {
+		if err := r.processFailoverEvent(ctx, group, remoteClient); err != nil {
 			return err
 		}
 	}
 
 	if strings.Contains(group.Status.LastAction.Condition, "UNPLANNED_FAILOVER_LOCAL") {
-		if err := r.processFailoverEvent(ctx, remoteGroup, remoteClient, log); err != nil {
+		if err := r.processFailoverEvent(ctx, remoteGroup, remoteClient); err != nil {
 			return err
 		}
 	}
 
 	if strings.Contains(group.Status.LastAction.Condition, "FAILBACK_LOCAL") {
-		if err := r.processFailBackEvent(ctx, remoteGroup, remoteClient, log); err != nil {
+		if err := r.processFailBackEvent(ctx, remoteGroup, remoteClient); err != nil {
 			return err
 		}
 	}
 
 	if strings.Contains(group.Status.LastAction.Condition, "ACTION_FAILBACK_DISCARD_CHANGES_LOCAL") {
-		if err := r.processFailBackEvent(ctx, remoteGroup, remoteClient, log); err != nil {
+		if err := r.processFailBackEvent(ctx, remoteGroup, remoteClient); err != nil {
 			return err
 		}
 	}
@@ -432,7 +466,7 @@ func (r *ReplicationGroupReconciler) processLastActionResult(ctx context.Context
 	return getDellCsiReplicationGroupUpdate(r, ctx, group)
 }
 
-func (r *ReplicationGroupReconciler) processFailoverEvent(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
+func (r *ReplicationGroupReconciler) processFailoverEvent(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient) error {
 	if r.DisablePVCRemap {
 		return nil
 	}
@@ -441,16 +475,16 @@ func (r *ReplicationGroupReconciler) processFailoverEvent(ctx context.Context, g
 		rgName := group.Name
 		rgTarget := group.Annotations[controller.RemoteReplicationGroup]
 
-		err := r.swapAllPVC(ctx, remoteClient, rgName, rgTarget, log)
+		err := r.swapAllPVC(ctx, remoteClient, rgName, rgTarget)
 		if err != nil {
-			log.Error(err, "Error swapping all PVCs")
+			csmlog.Errorf("Error swapping all PVCs: %v", err)
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *ReplicationGroupReconciler) processFailBackEvent(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
+func (r *ReplicationGroupReconciler) processFailBackEvent(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient) error {
 	if r.DisablePVCRemap {
 		return nil
 	}
@@ -459,51 +493,51 @@ func (r *ReplicationGroupReconciler) processFailBackEvent(ctx context.Context, g
 		rgName := group.Name
 		rgTarget := group.Annotations[controller.RemoteReplicationGroup]
 
-		err := r.swapAllPVC(ctx, remoteClient, rgName, rgTarget, log)
+		err := r.swapAllPVC(ctx, remoteClient, rgName, rgTarget)
 		if err != nil {
-			log.Error(err, "Error swapping all PVCs")
+			csmlog.Errorf("Error swapping all PVCs: %v", err)
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient, log logr.Logger) error {
+func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, group *repv1.DellCSIReplicationGroup, remoteClient connection.RemoteClusterClient) error {
 	lastAction := group.Status.LastAction
 
 	val, ok := group.Annotations[csireplicator.Action]
 	if !ok {
-		log.V(logger.InfoLevel).Info("No action", "val", val)
+		csmlog.Info("No action")
 		return nil
 	}
 
 	var actionAnnotation csireplicator.ActionAnnotation
 	err := json.Unmarshal([]byte(val), &actionAnnotation)
 	if err != nil {
-		log.Error(err, "JSON unmarshal error", "actionAnnotation", actionAnnotation)
+		csmlog.Errorf("JSON unmarshal error: %v", err)
 		return err
 	}
 
 	if _, err := getDellCsiReplicationGroupGetSnapshotClass(remoteClient, ctx, actionAnnotation.SnapshotClass); err != nil {
-		log.Error(err, "Snapshot class does not exist on remote cluster. Not creating the remote snapshots.")
+		csmlog.Errorf("Snapshot class does not exist on remote cluster. Not creating the remote snapshots.: %v", err)
 		return err
 	}
 
 	if _, err := getDellCsiReplicationGroupGetNamespace(remoteClient, ctx, actionAnnotation.SnapshotNamespace); err != nil {
-		log.V(logger.InfoLevel).Info("Namespace - " + actionAnnotation.SnapshotNamespace + " not found, creating it.")
+		csmlog.Info("Namespace - " + actionAnnotation.SnapshotNamespace + " not found, creating it.")
 		nsRef := makeNamespaceReference(actionAnnotation.SnapshotNamespace)
 
 		err = getDellCsiReplicationGroupCreateNamespace(remoteClient, ctx, nsRef)
 		if err != nil {
 			msg := "unable to create the desired namespace" + actionAnnotation.SnapshotNamespace
-			log.V(logger.ErrorLevel).Error(err, msg)
+			csmlog.Errorf("%s: %v", msg, err)
 			return err
 		}
 	}
 
 	for volumeHandle, snapshotHandle := range lastAction.ActionAttributes {
 		msg := "ActionAttributes - volumeHandle: " + volumeHandle + ", snapshotHandle: " + snapshotHandle
-		log.V(logger.InfoLevel).Info(msg)
+		csmlog.Info(msg)
 
 		snapRef := makeSnapReference(snapshotHandle, actionAnnotation.SnapshotNamespace)
 		sc := makeStorageClassContent(group.Labels[controller.DriverName], actionAnnotation.SnapshotClass)
@@ -511,14 +545,14 @@ func (r *ReplicationGroupReconciler) processSnapshotEvent(ctx context.Context, g
 
 		err = getDellCsiReplicationGroupCreateSnapshotContent(remoteClient, ctx, snapContent)
 		if err != nil {
-			log.Error(err, "unable to create snapshot content")
+			csmlog.Errorf("unable to create snapshot content: %v", err)
 			return err
 		}
 
 		snapshot := makeSnapshotObject(snapRef.Name, snapContent.Name, sc.ObjectMeta.Name, actionAnnotation.SnapshotNamespace)
 		err = getDellCsiReplicationGroupCreateSnapshotObject(remoteClient, ctx, snapshot)
 		if err != nil {
-			log.Error(err, "unable to create snapshot object")
+			csmlog.Errorf("unable to create snapshot object: %v", err)
 			return err
 		}
 	}
@@ -608,7 +642,7 @@ type pvcSwapBackup struct {
 
 // savePVCBackupToPV persists the PVC swap backup as a JSON annotation on the local PV.
 // It also sets the PV reclaim policy to Retain in the same update to minimize API calls.
-func savePVCBackupToPV(ctx context.Context, c connection.RemoteClusterClient, localPV *v1.PersistentVolume, backup *pvcSwapBackup, log logr.Logger) error {
+func savePVCBackupToPV(ctx context.Context, c connection.RemoteClusterClient, localPV *v1.PersistentVolume, backup *pvcSwapBackup) error {
 	data, err := json.Marshal(backup)
 	if err != nil {
 		return fmt.Errorf("error marshaling PVC backup: %w", err)
@@ -621,13 +655,13 @@ func savePVCBackupToPV(ctx context.Context, c connection.RemoteClusterClient, lo
 	if err := updatePersistentVolume(ctx, c, localPV); err != nil {
 		return fmt.Errorf("error saving PVC backup to PV %s: %w", localPV.Name, err)
 	}
-	log.V(logger.InfoLevel).Info(fmt.Sprintf("Saved PVC swap backup to PV %s and set Retain policy", localPV.Name))
+	csmlog.Infof("Saved PVC swap backup to PV %s and set Retain policy", localPV.Name)
 	return nil
 }
 
 // recoverPVCBackup attempts to recover a PVC swap backup from the local PV.
 // It uses the target PV's RemotePV annotation to find the local PV name.
-func recoverPVCBackup(ctx context.Context, c connection.RemoteClusterClient, targetPV string, log logr.Logger) (*pvcSwapBackup, error) {
+func recoverPVCBackup(ctx context.Context, c connection.RemoteClusterClient, targetPV string) (*pvcSwapBackup, error) {
 	remotePV, err := getPersistentVolume(ctx, c, targetPV)
 	if err != nil {
 		return nil, fmt.Errorf("error getting target PV %s for recovery: %w", targetPV, err)
@@ -648,7 +682,7 @@ func recoverPVCBackup(ctx context.Context, c connection.RemoteClusterClient, tar
 	if err := json.Unmarshal([]byte(backupJSON), &backup); err != nil {
 		return nil, fmt.Errorf("error unmarshaling PVC backup from PV %s: %w", localPVName, err)
 	}
-	log.V(logger.InfoLevel).Info(fmt.Sprintf("Recovered PVC swap backup from PV %s", localPVName))
+	csmlog.Infof("Recovered PVC swap backup from PV %s", localPVName)
 	return &backup, nil
 }
 
@@ -656,7 +690,7 @@ func recoverPVCBackup(ctx context.Context, c connection.RemoteClusterClient, tar
 // It also retains the original reclaimPolicy and operates within a single cluster.
 // After processing listed PVCs, it checks for orphaned PVs with pending swap annotations
 // to recover PVCs that were mid-swap when the controller crashed.
-func (r *ReplicationGroupReconciler) swapAllPVC(ctx context.Context, c connection.RemoteClusterClient, rgName string, rgTarget string, log logr.Logger) error {
+func (r *ReplicationGroupReconciler) swapAllPVC(ctx context.Context, c connection.RemoteClusterClient, rgName string, rgTarget string) error {
 	pvcs, err := c.ListPersistentVolumeClaim(ctx, client.MatchingLabels{controller.ReplicationGroup: rgName})
 	if err != nil {
 		return fmt.Errorf("failed to list PVCs: %w", err)
@@ -673,7 +707,7 @@ func (r *ReplicationGroupReconciler) swapAllPVC(ctx context.Context, c connectio
 		wg.Add(1)
 		go func(pvc v1.PersistentVolumeClaim) {
 			defer wg.Done()
-			err := r.swapPVC(ctx, c, pvc.Name, pvc.Namespace, pvc.Annotations[controller.RemotePV], rgTarget, log)
+			err := r.swapPVC(ctx, c, pvc.Name, pvc.Namespace, pvc.Annotations[controller.RemotePV], rgTarget)
 			if err != nil {
 				errChan <- fmt.Errorf("error swapping PVC %s/%s: %s", pvc.Namespace, pvc.Name, err)
 			}
@@ -702,7 +736,7 @@ func (r *ReplicationGroupReconciler) swapAllPVC(ctx context.Context, c connectio
 			}
 			var backup pvcSwapBackup
 			if err := json.Unmarshal([]byte(backupJSON), &backup); err != nil {
-				log.V(logger.WarnLevel).Info(fmt.Sprintf("Failed to unmarshal PVC backup from PV %s: %v", pv.Name, err))
+				csmlog.Infof("Failed to unmarshal PVC backup from PV %s: %v", pv.Name, err)
 				continue
 			}
 			key := backup.PVC.Namespace + "/" + backup.PVC.Name
@@ -710,13 +744,27 @@ func (r *ReplicationGroupReconciler) swapAllPVC(ctx context.Context, c connectio
 				continue // already handled in the main loop
 			}
 			targetPV := backup.PVC.Annotations[controller.RemotePV]
-			log.V(logger.InfoLevel).Info(fmt.Sprintf("Recovering orphaned PVC swap for %s from PV %s", key, pv.Name))
-			if err := r.swapPVC(ctx, c, backup.PVC.Name, backup.PVC.Namespace, targetPV, rgTarget, log); err != nil {
+
+			// Guard: if the PVC already exists and is bound to the target PV,
+			// the swap was already completed on a previous attempt.
+			// Clear the stale backup annotation and skip re-processing.
+			existingPVC, pvcErr := getPersistentVolumeClaim(ctx, c, backup.PVC.Namespace, backup.PVC.Name)
+			if pvcErr == nil && existingPVC.Spec.VolumeName == targetPV {
+				csmlog.Infof("PVC %s already bound to target PV %s, clearing stale PendingPVCSwap from PV %s",
+					key, targetPV, pv.Name)
+				if clearErr := clearPendingPVCSwap(ctx, c, pv.Name); clearErr != nil {
+					csmlog.Warnf("failed to clear PendingPVCSwap from PV %s: %v", pv.Name, clearErr)
+				}
+				continue
+			}
+
+			csmlog.Infof("Recovering orphaned PVC swap for %s from PV %s", key, pv.Name)
+			if err := r.swapPVC(ctx, c, backup.PVC.Name, backup.PVC.Namespace, targetPV, rgTarget); err != nil {
 				errs = append(errs, fmt.Errorf("error recovering PVC swap %s: %s", key, err))
 			}
 		}
 	} else {
-		log.V(logger.WarnLevel).Info(fmt.Sprintf("Failed to list PVs for swap recovery: %v", listErr))
+		csmlog.Infof("Failed to list PVs for swap recovery: %v", listErr)
 	}
 
 	if len(errs) > 0 {
@@ -726,7 +774,7 @@ func (r *ReplicationGroupReconciler) swapAllPVC(ctx context.Context, c connectio
 	return nil
 }
 
-func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connection.RemoteClusterClient, pvcName, namespace, targetPV, rgTarget string, log logr.Logger) error {
+func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connection.RemoteClusterClient, pvcName, namespace, targetPV, rgTarget string) error {
 	var pvc *v1.PersistentVolumeClaim
 	var localPVPolicy, remotePVPolicy v1.PersistentVolumeReclaimPolicy
 	recovered := false
@@ -738,7 +786,7 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 			return fmt.Errorf("error getting pvc %s: %s", pvcName, err)
 		}
 		// PVC not found — attempt recovery from local PV backup annotation
-		backup, recoveryErr := recoverPVCBackup(ctx, client, targetPV, log)
+		backup, recoveryErr := recoverPVCBackup(ctx, client, targetPV)
 		if recoveryErr != nil {
 			return fmt.Errorf("PVC %s/%s not found and recovery failed: %w", namespace, pvcName, recoveryErr)
 		}
@@ -746,7 +794,7 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 		localPVPolicy = backup.LocalPVPolicy
 		remotePVPolicy = backup.RemotePVPolicy
 		recovered = true
-		log.V(logger.InfoLevel).Info(fmt.Sprintf("Recovered PVC %s/%s from PV backup, skipping to recreation", namespace, pvcName))
+		csmlog.Infof("Recovered PVC %s/%s from PV backup, skipping to recreation", namespace, pvcName)
 	} else {
 		pvc = pvcFetched
 
@@ -754,8 +802,8 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 		// skip the swap entirely — we cannot safely delete a DV-owned PVC without
 		// first handling the DataVolume dependency.
 		if !r.EnableKubevirtPVCRemap && findDataVolumeOwnerRef(pvc.OwnerReferences) != nil {
-			log.V(logger.WarnLevel).Info(fmt.Sprintf("PVC %s/%s is owned by a DataVolume but KubeVirt PVC remap is disabled; skipping PVC swap",
-				pvc.Namespace, pvc.Name))
+			csmlog.Infof("PVC %s/%s is owned by a DataVolume but KubeVirt PVC remap is disabled; skipping PVC swap",
+				pvc.Namespace, pvc.Name)
 			return nil
 		}
 	}
@@ -778,7 +826,7 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 		// The target PV should be unclaimed.
 		if remotePV.Spec.ClaimRef != nil {
 			if remotePV.Spec.ClaimRef.Name == controller.ReservedPVCName && remotePV.Spec.ClaimRef.Namespace == controller.ReservedPVCNamespace {
-				err = removeReservedClaimRefForTargetPV(ctx, client, remotePV.Name, log)
+				err = removeReservedClaimRefForTargetPV(ctx, client, remotePV.Name)
 				if err != nil {
 					return fmt.Errorf("error removing PV claim ref from %s: %s", remotePV, err.Error())
 				}
@@ -788,8 +836,8 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 				_, pvcErr := getPersistentVolumeClaim(ctx, client, remotePV.Spec.ClaimRef.Namespace, remotePV.Spec.ClaimRef.Name)
 				if pvcErr != nil && errors.IsNotFound(pvcErr) {
 					// PVC doesn't exist, safe to remove the ClaimRef
-					log.V(logger.InfoLevel).Info(fmt.Sprintf("PVC %s/%s not found, removing stale ClaimRef from target PV %s",
-						remotePV.Spec.ClaimRef.Namespace, remotePV.Spec.ClaimRef.Name, remotePV.Name))
+					csmlog.Infof("PVC %s/%s not found, removing stale ClaimRef from target PV %s",
+						remotePV.Spec.ClaimRef.Namespace, remotePV.Spec.ClaimRef.Name, remotePV.Name)
 					remotePV.Spec.ClaimRef = nil
 					if err := updatePersistentVolume(ctx, client, remotePV); err != nil {
 						return fmt.Errorf("error removing stale ClaimRef from target PV %s: %s", remotePV.Name, err)
@@ -810,7 +858,7 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 			LocalPVPolicy:  localPVPolicy,
 			RemotePVPolicy: remotePVPolicy,
 		}
-		if err := savePVCBackupToPV(ctx, client, localPV, backup, log); err != nil {
+		if err := savePVCBackupToPV(ctx, client, localPV, backup); err != nil {
 			return err
 		}
 
@@ -825,7 +873,7 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 		dvDeleted := false
 		if r.EnableKubevirtPVCRemap {
 			var dvErr error
-			dvDeleted, dvErr = r.handleDataVolumeDependencies(ctx, client, pvc, log)
+			dvDeleted, dvErr = r.handleDataVolumeDependencies(ctx, client, pvc)
 			if dvErr != nil {
 				return dvErr
 			}
@@ -894,7 +942,7 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	// Update the target PV's claimref to point to our pvc.
 	pvcUID := pvc.ObjectMeta.UID
 	pvcResourceVersion := pvc.ObjectMeta.ResourceVersion
-	err = updatePVClaimRef(ctx, client, targetPV, pvc.Namespace, pvcResourceVersion, pvc.Name, pvcUID, log)
+	err = updatePVClaimRef(ctx, client, targetPV, pvc.Namespace, pvcResourceVersion, pvc.Name, pvcUID)
 	if err != nil {
 		return fmt.Errorf("unable to update PV ClaimRef for %s: %s", targetPV, err.Error())
 	}
@@ -906,32 +954,25 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 		return fmt.Errorf("error verifying PVC %s: %s", pvcName, err.Error())
 	}
 
+	// Clear the PendingPVCSwap backup annotation immediately after PVC recreation succeeds.
+	// This must happen before any further PV updates that may conflict, so that orphan
+	// recovery does not re-process an already-completed swap on the next reconciliation.
+	if err := clearPendingPVCSwap(ctx, client, localPV); err != nil {
+		csmlog.Warnf("failed to clear PendingPVCSwap from PV %s: %v", localPV, err)
+	}
+
 	// Remove the PVC reclaim of local PV
-	err = removePVClaimRef(ctx, client, localPV, namespace, pvcName, log)
+	err = removePVClaimRef(ctx, client, localPV, namespace, pvcName)
 	if err != nil {
 		return fmt.Errorf("error removing PV claim ref from %s: %s", localPV, err.Error())
 	}
 
-	// Updating the claimRef of localPV to reserved/reserved and clear backup annotation
-	pv, err := getPersistentVolume(ctx, client, localPV)
-	if err != nil {
-		return fmt.Errorf("error retrieving PV %s: %s", localPV, err.Error())
-	}
-
-	claimRef := &v1.ObjectReference{
-		APIVersion: "v1",
-		Kind:       "PersistentVolumeClaim",
-		Name:       controller.ReservedPVCName,
-		Namespace:  controller.ReservedPVCNamespace,
-	}
-	pv.Spec.ClaimRef = claimRef
-	delete(pv.Annotations, controller.PendingPVCSwap)
-
-	err = updatePersistentVolume(ctx, client, pv)
-	if err != nil {
+	// Updating the claimRef of localPV to reserved/reserved with retry to handle conflicts
+	// from concurrent PV reconciler updates.
+	if err := setReservedClaimRefWithRetry(ctx, client, localPV); err != nil {
 		return fmt.Errorf("error updating PV %s: %s", localPV, err.Error())
 	}
-	log.V(logger.InfoLevel).Info(fmt.Sprintf("added remote pv %s claimref %s/%s", pv.Name, controller.ReservedPVCName, controller.ReservedPVCNamespace))
+	csmlog.Infof("added remote pv %s claimref %s/%s", localPV, controller.ReservedPVCName, controller.ReservedPVCNamespace)
 
 	// Restore the PVs original volume reclaim policy
 	err = setPVReclaimPolicy(ctx, client, pvc.Spec.VolumeName, remotePVPolicy)
@@ -944,6 +985,58 @@ func (r *ReplicationGroupReconciler) swapPVC(ctx context.Context, client connect
 	}
 
 	return nil
+}
+
+// clearPendingPVCSwap removes the PendingPVCSwap backup annotation from the named PV.
+// It fetches the latest version of the PV to avoid conflicts.
+func clearPendingPVCSwap(ctx context.Context, client connection.RemoteClusterClient, pvName string) error {
+	pv, err := getPersistentVolume(ctx, client, pvName)
+	if err != nil {
+		return fmt.Errorf("error retrieving PV %s: %w", pvName, err)
+	}
+	if _, ok := pv.Annotations[controller.PendingPVCSwap]; !ok {
+		return nil // already cleared
+	}
+	delete(pv.Annotations, controller.PendingPVCSwap)
+	if err := updatePersistentVolume(ctx, client, pv); err != nil {
+		return fmt.Errorf("error clearing PendingPVCSwap from PV %s: %w", pvName, err)
+	}
+	csmlog.Infof("Cleared PendingPVCSwap annotation from PV %s", pvName)
+	return nil
+}
+
+// setReservedClaimRefWithRetry sets the ClaimRef of the named PV to reserved/reserved.
+// It retries on conflict errors caused by concurrent modifications.
+func setReservedClaimRefWithRetry(ctx context.Context, client connection.RemoteClusterClient, pvName string) error {
+	for attempt := 0; attempt < reservedClaimRefMaxAttempts; attempt++ {
+		pv, err := getPersistentVolume(ctx, client, pvName)
+		if err != nil {
+			return fmt.Errorf("error retrieving PV %s: %w", pvName, err)
+		}
+
+		pv.Spec.ClaimRef = &v1.ObjectReference{
+			APIVersion: "v1",
+			Kind:       "PersistentVolumeClaim",
+			Name:       controller.ReservedPVCName,
+			Namespace:  controller.ReservedPVCNamespace,
+		}
+		// Also clear PendingPVCSwap if it was not already cleared
+		delete(pv.Annotations, controller.PendingPVCSwap)
+
+		err = updatePersistentVolume(ctx, client, pv)
+		if err == nil {
+			return nil
+		}
+		if errors.IsConflict(err) {
+			csmlog.Infof("Conflict updating PV %s ClaimRef to reserved, retrying (%d/%d)", pvName, attempt+1, reservedClaimRefMaxAttempts)
+			if attempt < reservedClaimRefMaxAttempts-1 {
+				sleep(reservedClaimRefRetryDelay)
+			}
+			continue
+		}
+		return err
+	}
+	return fmt.Errorf("failed to set reserved ClaimRef on PV %s after %d attempts", pvName, reservedClaimRefMaxAttempts)
 }
 
 func verifyPVC(ctx context.Context, client connection.RemoteClusterClient, localPVName string, remotePVName string, pvcName string, namespace string) error {
@@ -987,8 +1080,8 @@ func setPVReclaimPolicy(ctx context.Context, client connection.RemoteClusterClie
 	return fmt.Errorf("timed out waiting on PV VolumeReclaimPolicy to be set to previous policy")
 }
 
-func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient, pvName, pvcNamespace, pvcName string, log logr.Logger) error {
-	log.V(logger.InfoLevel).Info(fmt.Sprintf("Removing ClaimRef on LocalPV: %s", pvName))
+func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient, pvName, pvcNamespace, pvcName string) error {
+	csmlog.Infof("Removing ClaimRef on LocalPV: %s", pvName)
 	for iteration := 0; iteration < 30; iteration++ {
 		pv, err := getPersistentVolume(ctx, client, pvName)
 		if err != nil {
@@ -996,7 +1089,7 @@ func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 		}
 
 		if pv.Spec.ClaimRef == nil {
-			log.V(logger.InfoLevel).Info(fmt.Sprintf("ClaimRef removed from LocalPV: %s", pvName))
+			csmlog.Infof("ClaimRef removed from LocalPV: %s", pvName)
 			return nil
 		}
 		pv.Spec.ClaimRef = nil
@@ -1010,7 +1103,7 @@ func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 				return fmt.Errorf("error updating PV %s: %s", pvName, err.Error())
 			}
 
-			log.V(logger.InfoLevel).Info(fmt.Sprintf("Issue updating PV %s so trying again", pvName))
+			csmlog.Infof("Issue updating PV %s so trying again", pvName)
 			sleep(2 * time.Second)
 		}
 	}
@@ -1018,17 +1111,17 @@ func removePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 	return fmt.Errorf("timed out waiting on Local PV Claim Ref to be removed")
 }
 
-func removeReservedClaimRefForTargetPV(ctx context.Context, client connection.RemoteClusterClient, pvName string, log logr.Logger) error {
-	log.V(logger.InfoLevel).Info(fmt.Sprintf("Removing ClaimRef on Target PV: %s", pvName))
+func removeReservedClaimRefForTargetPV(ctx context.Context, client connection.RemoteClusterClient, pvName string) error {
+	csmlog.Infof("Removing ClaimRef on Target PV: %s", pvName)
 	for iteration := 0; iteration < 30; iteration++ {
-		log.V(logger.DebugLevel).Info(fmt.Sprintf("*** ITERATION: %d ***", iteration))
+		csmlog.Infof("*** ITERATION: %d ***", iteration)
 		pv, err := getPersistentVolume(ctx, client, pvName)
 		if err != nil {
 			return fmt.Errorf("error retrieving PV %s: %s", pvName, err.Error())
 		}
 
 		if pv.Spec.ClaimRef == nil {
-			log.V(logger.InfoLevel).Info(fmt.Sprintf("Reserved ClaimRef removed from TargetPV: %s", pvName))
+			csmlog.Infof("Reserved ClaimRef removed from TargetPV: %s", pvName)
 			return nil
 		}
 
@@ -1039,7 +1132,7 @@ func removeReservedClaimRefForTargetPV(ctx context.Context, client connection.Re
 				return fmt.Errorf("error updating PV %s: %s", pvName, err.Error())
 			}
 
-			log.V(logger.InfoLevel).Info(fmt.Sprintf("Issue updating PV %s so trying again", pvName))
+			csmlog.Infof("Issue updating PV %s so trying again", pvName)
 			sleep(2 * time.Second)
 		}
 	}
@@ -1047,11 +1140,11 @@ func removeReservedClaimRefForTargetPV(ctx context.Context, client connection.Re
 	return fmt.Errorf("timed out waiting on Target PV Reserved Claim Ref to be removed")
 }
 
-func updatePVClaimRef(ctx context.Context, client connection.RemoteClusterClient, pvName, pvcNamespace, pvcResourceVersion, pvcName string, pvcUID types.UID, log logr.Logger) error {
+func updatePVClaimRef(ctx context.Context, client connection.RemoteClusterClient, pvName, pvcNamespace, pvcResourceVersion, pvcName string, pvcUID types.UID) error {
 	for iteration := 0; iteration < 30; iteration++ {
 		pv, err := getPersistentVolume(ctx, client, pvName)
 		if err != nil {
-			log.V(logger.InfoLevel).Info(fmt.Sprintf("Error retrieving PV %s: %s", pvName, err.Error()))
+			csmlog.Infof("Error retrieving PV %s: %s", pvName, err.Error())
 
 			return err
 		}
@@ -1086,7 +1179,7 @@ func updatePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 				return fmt.Errorf("error updating PV %s: %s", pvName, err.Error())
 			}
 
-			log.V(logger.InfoLevel).Info(fmt.Sprintf("Issue retrieving latest for %s and trying again", pvName))
+			csmlog.Infof("Issue retrieving latest for %s and trying again", pvName)
 			sleep(2 * time.Second)
 		}
 	}
@@ -1107,14 +1200,14 @@ func updatePVClaimRef(ctx context.Context, client connection.RemoteClusterClient
 // When dvDeleted=true, the caller should NOT explicitly delete the PVC. Kubernetes garbage
 // collection will cascade-delete the PVC via the DV ownerReference. The caller should wait
 // for PVC deletion before recreating it.
-func (r *ReplicationGroupReconciler) handleDataVolumeDependencies(ctx context.Context, c connection.RemoteClusterClient, pvc *v1.PersistentVolumeClaim, log logr.Logger) (bool, error) {
+func (r *ReplicationGroupReconciler) handleDataVolumeDependencies(ctx context.Context, c connection.RemoteClusterClient, pvc *v1.PersistentVolumeClaim) (bool, error) {
 	dvOwnerRef := findDataVolumeOwnerRef(pvc.OwnerReferences)
 	if dvOwnerRef == nil {
 		return false, nil
 	}
 
-	log.V(logger.InfoLevel).Info(fmt.Sprintf("PVC %s/%s has DataVolume ownerRef %s, fetching DV to check ownership",
-		pvc.Namespace, pvc.Name, dvOwnerRef.Name))
+	csmlog.Infof("PVC %s/%s has DataVolume ownerRef %s, fetching DV to check ownership",
+		pvc.Namespace, pvc.Name, dvOwnerRef.Name)
 
 	// Fetch the DataVolume to inspect its ownerReferences
 	dv := &unstructured.Unstructured{}
@@ -1123,8 +1216,8 @@ func (r *ReplicationGroupReconciler) handleDataVolumeDependencies(ctx context.Co
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// DV already deleted — PVC may still exist, caller should delete it explicitly
-			log.V(logger.InfoLevel).Info(fmt.Sprintf("DataVolume %s/%s not found, PVC deletion will be handled by caller",
-				pvc.Namespace, dvOwnerRef.Name))
+			csmlog.Infof("DataVolume %s/%s not found, PVC deletion will be handled by caller",
+				pvc.Namespace, dvOwnerRef.Name)
 			return false, nil
 		}
 		return false, fmt.Errorf("error fetching DataVolume %s/%s: %w", pvc.Namespace, dvOwnerRef.Name, err)
@@ -1136,20 +1229,20 @@ func (r *ReplicationGroupReconciler) handleDataVolumeDependencies(ctx context.Co
 		msg := fmt.Sprintf("PVC %s/%s is backed by DataVolume %s owned by VirtualMachine %s; skipping cleanup — "+
 			"stop the VM and remove the dataVolumeTemplate before retrying PVC remap",
 			pvc.Namespace, pvc.Name, dvOwnerRef.Name, vmOwnerRef.Name)
-		log.V(logger.WarnLevel).Info(msg)
+		csmlog.Info(msg)
 		r.EventRecorder.Event(pvc, eventTypeWarning, "VirtualMachineOwnedDataVolume", msg)
 		return false, fmt.Errorf("%s", msg)
 	}
 
 	// DV is NOT owned by a VM — remove finalizers and delete DV.
 	// Kubernetes GC will cascade-delete the PVC via the ownerReference.
-	log.V(logger.InfoLevel).Info(fmt.Sprintf("DataVolume %s/%s is standalone (not VM-owned), removing finalizers and deleting",
-		pvc.Namespace, dvOwnerRef.Name))
+	csmlog.Infof("DataVolume %s/%s is standalone (not VM-owned), removing finalizers and deleting",
+		pvc.Namespace, dvOwnerRef.Name)
 
 	// Remove finalizers from DV so deletion is immediate
 	if len(dv.GetFinalizers()) > 0 {
-		log.V(logger.InfoLevel).Info(fmt.Sprintf("Removing finalizers %v from DataVolume %s/%s",
-			dv.GetFinalizers(), pvc.Namespace, dvOwnerRef.Name))
+		csmlog.Infof("Removing finalizers %v from DataVolume %s/%s",
+			dv.GetFinalizers(), pvc.Namespace, dvOwnerRef.Name)
 		dv.SetFinalizers(nil)
 		if err := updateObject(ctx, c, dv); err != nil {
 			return false, fmt.Errorf("error removing finalizers from DataVolume %s/%s: %w",
@@ -1163,8 +1256,8 @@ func (r *ReplicationGroupReconciler) handleDataVolumeDependencies(ctx context.Co
 		}
 	}
 
-	log.V(logger.InfoLevel).Info(fmt.Sprintf("Deleted DataVolume %s/%s; PVC will be garbage-collected",
-		pvc.Namespace, dvOwnerRef.Name))
+	csmlog.Infof("Deleted DataVolume %s/%s; PVC will be garbage-collected",
+		pvc.Namespace, dvOwnerRef.Name)
 	return true, nil
 }
 

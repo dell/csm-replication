@@ -18,8 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-logr/logr"
-
+	"github.com/dell/csmlog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/credentials/insecure"
@@ -28,7 +27,7 @@ import (
 const connectionLoggingInterval = 10 * time.Second
 
 // Connect establishes connection to socket
-func Connect(address string, log logr.Logger) (*grpc.ClientConn, error) {
+func Connect(address string) (*grpc.ClientConn, error) {
 	dialOptions := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithConnectParams(grpc.ConnectParams{
@@ -41,7 +40,7 @@ func Connect(address string, log logr.Logger) (*grpc.ClientConn, error) {
 		address = unixPrefix + address
 	}
 
-	log.Info("Connecting to", "address", address)
+	csmlog.WithFields(csmlog.Fields{"address": address}).Info("Connecting to")
 	var conn *grpc.ClientConn
 	var err error
 	ready := make(chan bool)
@@ -57,9 +56,9 @@ func Connect(address string, log logr.Logger) (*grpc.ClientConn, error) {
 	for {
 		select {
 		case <-ticker.C:
-			log.Info("Still connecting to", "address", address)
+			csmlog.WithFields(csmlog.Fields{"address": address}).Info("Still connecting to")
 		case <-ready:
-			log.Info("Connected to socket")
+			csmlog.Info("Connected to socket")
 			return conn, err
 		}
 	}

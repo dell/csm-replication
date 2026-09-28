@@ -88,7 +88,7 @@ func TestReplicationTestSuite(t *testing.T) {
 
 func (suite *ReplicationTestSuite) runReplicationManager() {
 	// Connect to CSI
-	csiConn, err := connection.Connect("localhost:4772", utils.GetLogger())
+	csiConn, err := connection.Connect("localhost:4772")
 	if err != nil {
 		suite.T().Error(err, "failed to connect to CSI driver")
 		os.Exit(1)
@@ -111,11 +111,10 @@ func (suite *ReplicationTestSuite) runReplicationManager() {
 	expRateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](5*time.Minute, 10*time.Minute)
 	if err = (&controller.PersistentVolumeClaimReconciler{
 		Client:            mgr.GetClient(),
-		Log:               ctrl.Log.WithName("controllers").WithName("PersistentVolumeClaim"),
 		Scheme:            mgr.GetScheme(),
 		EventRecorder:     mgr.GetEventRecorderFor(constants.DellCSIReplicator),
 		DriverName:        suite.driver.DriverName,
-		ReplicationClient: csireplication.New(csiConn, ctrl.Log.WithName("replication-client"), 10*time.Second),
+		ReplicationClient: csireplication.New(csiConn, 10*time.Second),
 		Domain:            constants.DefaultDomain,
 	}).SetupWithManager(mgr, expRateLimiter, 2); err != nil {
 		suite.T().Error(err, "unable to create controller", "controller", "PersistentVolumeClaim")
@@ -124,11 +123,10 @@ func (suite *ReplicationTestSuite) runReplicationManager() {
 
 	if err = (&controller.ReplicationGroupReconciler{
 		Client:            mgr.GetClient(),
-		Log:               ctrl.Log.WithName("controllers").WithName("DellCSIReplicationGroup"),
 		Scheme:            mgr.GetScheme(),
 		EventRecorder:     mgr.GetEventRecorderFor(constants.DellCSIReplicator),
 		DriverName:        suite.driver.DriverName,
-		ReplicationClient: csireplication.New(csiConn, ctrl.Log.WithName("replication-client"), 10*time.Second),
+		ReplicationClient: csireplication.New(csiConn, 10*time.Second),
 	}).SetupWithManager(mgr, expRateLimiter, 2); err != nil {
 		suite.T().Error(err, "unable to create controller", "controller", "DellCSIReplicationGroup")
 		os.Exit(1)

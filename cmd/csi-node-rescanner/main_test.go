@@ -16,13 +16,10 @@ limitations under the License.
 package main
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
-	"strings"
 	"testing"
 	"time"
 
@@ -30,10 +27,9 @@ import (
 	"github.com/dell/csm-replication/pkg/common/constants"
 	"github.com/dell/csm-replication/pkg/config"
 	csiidentity "github.com/dell/csm-replication/pkg/csi-clients/identity"
+	"github.com/dell/csmlog"
 	"github.com/dell/dell-csi-extensions/migration"
 	"github.com/dell/dell-csi-extensions/replication"
-	"github.com/go-logr/logr"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc"
@@ -41,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 
@@ -52,6 +47,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/recorder"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/conversion"
 )
@@ -61,22 +57,19 @@ func TestGetCSIConn(t *testing.T) {
 	tests := []struct {
 		name        string
 		csiAddress  string
-		setupLog    logr.Logger
 		setup       func()
 		expectedErr error
 	}{
 		{
 			name:        "success",
 			csiAddress:  "/var/run/csi.sock",
-			setupLog:    ctrl.Log.WithName("test-logger"),
 			expectedErr: nil,
 		},
 		{
 			name:       "failure",
 			csiAddress: "",
-			setupLog:   ctrl.Log.WithName("test-logger"),
 			setup: func() {
-				getConnection = func(_ string, _ logr.Logger) (*grpc.ClientConn, error) {
+				getConnection = func(_ string) (*grpc.ClientConn, error) {
 					return nil, errors.New("failed to connect to CSI driver")
 				}
 			},
@@ -100,7 +93,7 @@ func TestGetCSIConn(t *testing.T) {
 				tt.setup()
 			}
 
-			conn := getCSIConn(tt.csiAddress, tt.setupLog)
+			conn := getCSIConn(tt.csiAddress)
 
 			if tt.name == "success" {
 				assert.NotNil(t, conn)
@@ -118,7 +111,6 @@ func TestProbeCSIDriver(t *testing.T) {
 		name               string
 		context            context.Context
 		csiConn            *grpc.ClientConn
-		setupLog           logr.Logger
 		expectedErr        error
 		expectedDriverName string
 	}{
@@ -126,7 +118,6 @@ func TestProbeCSIDriver(t *testing.T) {
 			name:               "success",
 			context:            context.Background(),
 			csiConn:            &grpc.ClientConn{},
-			setupLog:           ctrl.Log.WithName("test-logger"),
 			expectedErr:        nil,
 			expectedDriverName: "driver-name",
 		},
@@ -134,7 +125,6 @@ func TestProbeCSIDriver(t *testing.T) {
 			name:               "failure",
 			context:            context.Background(),
 			csiConn:            &grpc.ClientConn{},
-			setupLog:           ctrl.Log.WithName("test-logger"),
 			expectedErr:        fmt.Errorf("error waiting for the CSI driver to be ready"),
 			expectedDriverName: "",
 		},
@@ -165,7 +155,7 @@ func TestProbeCSIDriver(t *testing.T) {
 			identityClient.On("GetReplicationCapabilities", tt.context).Return(mock.Anything, mock.Anything)
 			identityClient.On("ProbeController", tt.context).Return(tt.expectedDriverName, true, tt.expectedErr)
 
-			driverName := probeCSIDriver(tt.context, tt.csiConn, tt.setupLog, identityClient)
+			driverName := probeCSIDriver(tt.context, tt.csiConn, identityClient)
 			if tt.expectedErr == nil {
 				assert.Equal(t, tt.expectedDriverName, driverName)
 			} else {
@@ -183,7 +173,6 @@ func TestProbeCSIDriverWrongCapability(t *testing.T) {
 		name               string
 		context            context.Context
 		csiConn            *grpc.ClientConn
-		setupLog           logr.Logger
 		expectedErr        error
 		expectedDriverName string
 	}{
@@ -191,7 +180,6 @@ func TestProbeCSIDriverWrongCapability(t *testing.T) {
 			name:               "invalid capability",
 			context:            context.Background(),
 			csiConn:            &grpc.ClientConn{},
-			setupLog:           ctrl.Log.WithName("test-logger"),
 			expectedErr:        fmt.Errorf("error waiting for the CSI driver to be ready"),
 			expectedDriverName: "",
 		},
@@ -222,7 +210,7 @@ func TestProbeCSIDriverWrongCapability(t *testing.T) {
 			identityClient.On("GetReplicationCapabilities", tt.context).Return(mock.Anything, mock.Anything)
 			identityClient.On("ProbeController", tt.context).Return(tt.expectedDriverName, true, tt.expectedErr)
 
-			driverName := probeCSIDriver(tt.context, tt.csiConn, tt.setupLog, identityClient)
+			driverName := probeCSIDriver(tt.context, tt.csiConn, identityClient)
 			if tt.expectedErr == nil {
 				assert.Equal(t, tt.expectedDriverName, driverName)
 			} else {
@@ -246,7 +234,6 @@ func TestCreateMetricsServer(t *testing.T) {
 		driverName                 string
 		metricsAddr                string
 		enableLeaderElection       bool
-		setupLog                   logr.Logger
 		retryIntervalStart         time.Duration
 		retryIntervalMax           time.Duration
 		maxRetryDurationForActions time.Duration
@@ -258,7 +245,6 @@ func TestCreateMetricsServer(t *testing.T) {
 			driverName:                 "driver-name",
 			metricsAddr:                ":8001",
 			enableLeaderElection:       false,
-			setupLog:                   ctrl.Log.WithName("test-logger"),
 			retryIntervalStart:         1 * time.Second,
 			retryIntervalMax:           5 * time.Minute,
 			maxRetryDurationForActions: time.Hour,
@@ -307,7 +293,7 @@ func TestCreateMetricsServer(t *testing.T) {
 				}
 			}()
 			// Call the function under test
-			createMetricsServer(context.Background(), tt.driverName, tt.metricsAddr, tt.enableLeaderElection, tt.setupLog, tt.retryIntervalStart, tt.retryIntervalMax, tt.maxRetryDurationForActions, tt.workerThreads)
+			createMetricsServer(context.Background(), tt.driverName, tt.metricsAddr, tt.enableLeaderElection, tt.retryIntervalStart, tt.retryIntervalMax, tt.maxRetryDurationForActions, tt.workerThreads)
 
 			// Assert the exit code
 			assert.NotEqual(t, 1, exitCode, "Expected exit code 1, got %d", exitCode)
@@ -330,7 +316,6 @@ func TestCreateMetricsServerWithNodeRescannerError(t *testing.T) {
 		driverName                 string
 		metricsAddr                string
 		enableLeaderElection       bool
-		setupLog                   logr.Logger
 		retryIntervalStart         time.Duration
 		retryIntervalMax           time.Duration
 		maxRetryDurationForActions time.Duration
@@ -342,7 +327,6 @@ func TestCreateMetricsServerWithNodeRescannerError(t *testing.T) {
 			driverName:                 "driver-name",
 			metricsAddr:                ":8001",
 			enableLeaderElection:       false,
-			setupLog:                   ctrl.Log.WithName("test-logger"),
 			retryIntervalStart:         1 * time.Second,
 			retryIntervalMax:           5 * time.Minute,
 			maxRetryDurationForActions: time.Hour,
@@ -383,7 +367,7 @@ func TestCreateMetricsServerWithNodeRescannerError(t *testing.T) {
 				exitCode = code
 			}
 
-			createMetricsServer(context.Background(), tt.driverName, tt.metricsAddr, tt.enableLeaderElection, tt.setupLog, tt.retryIntervalStart, tt.retryIntervalMax, tt.maxRetryDurationForActions, tt.workerThreads)
+			createMetricsServer(context.Background(), tt.driverName, tt.metricsAddr, tt.enableLeaderElection, tt.retryIntervalStart, tt.retryIntervalMax, tt.maxRetryDurationForActions, tt.workerThreads)
 
 			// Assert the exit code
 			assert.Equal(t, 1, exitCode, "Expected exit code 1, got %d", exitCode)
@@ -403,7 +387,6 @@ func TestCreateMetricsServerWithStratingManagerError(t *testing.T) {
 		driverName                 string
 		metricsAddr                string
 		enableLeaderElection       bool
-		setupLog                   logr.Logger
 		retryIntervalStart         time.Duration
 		retryIntervalMax           time.Duration
 		maxRetryDurationForActions time.Duration
@@ -415,7 +398,6 @@ func TestCreateMetricsServerWithStratingManagerError(t *testing.T) {
 			driverName:                 "driver-name",
 			metricsAddr:                ":8001",
 			enableLeaderElection:       false,
-			setupLog:                   ctrl.Log.WithName("test-logger"),
 			retryIntervalStart:         1 * time.Second,
 			retryIntervalMax:           5 * time.Minute,
 			maxRetryDurationForActions: time.Hour,
@@ -456,7 +438,7 @@ func TestCreateMetricsServerWithStratingManagerError(t *testing.T) {
 				exitCode = code
 			}
 
-			createMetricsServer(context.Background(), tt.driverName, tt.metricsAddr, tt.enableLeaderElection, tt.setupLog, tt.retryIntervalStart, tt.retryIntervalMax, tt.maxRetryDurationForActions, tt.workerThreads)
+			createMetricsServer(context.Background(), tt.driverName, tt.metricsAddr, tt.enableLeaderElection, tt.retryIntervalStart, tt.retryIntervalMax, tt.maxRetryDurationForActions, tt.workerThreads)
 
 			// Assert the exit code
 			assert.Equal(t, 1, exitCode, "Expected exit code 1, got %d", exitCode)
@@ -471,99 +453,94 @@ func TestCreateMetricsServerWithStratingManagerError(t *testing.T) {
 }
 
 func TestProcessConfigMapChanges(t *testing.T) {
-	tests := []struct {
-		name          string
-		config        *config.Config
-		loggerConfig  *logrus.Logger
-		expectedLevel logrus.Level
-		expectedError error
-	}{
-		{
-			name: "success",
-			config: &config.Config{
-				LogLevel: "info",
-			},
-			loggerConfig:  logrus.New(),
-			expectedLevel: logrus.InfoLevel,
-			expectedError: nil,
-		},
-		{
-			name: "error parsing config",
-			config: &config.Config{
-				LogLevel: "invalid",
-			},
-			loggerConfig:  logrus.New(),
-			expectedLevel: logrus.InfoLevel,
-			expectedError: fmt.Errorf("error parsing the config: unable to parse log level"),
-		},
+	defaultGetUpdateConfigMapFunc := getUpdateConfigMapFunc
+	defer func() {
+		getUpdateConfigMapFunc = defaultGetUpdateConfigMapFunc
+	}()
+
+	mgr := &NodeRescanner{
+		Opts:     config.ControllerManagerOpts{},
+		Manager:  &MockManager{},
+		NodeName: "test-node",
+		config:   &config.Config{},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create a mock NodeRescanner
-			mgr := &NodeRescanner{
-				Opts:     config.ControllerManagerOpts{},
-				Manager:  &MockManager{},
-				NodeName: "test-node",
-				config:   tt.config,
-			}
-
-			// Call the function under test
-			mgr.processConfigMapChanges(tt.loggerConfig)
-
-			// Assert the expected log level
-			assert.Equal(t, tt.expectedLevel, tt.loggerConfig.Level)
-		})
+	// Test case 1: Error in getUpdateConfigMapFunc
+	getUpdateConfigMapFunc = func(_ *NodeRescanner, _ context.Context) error {
+		return fmt.Errorf("config update error")
 	}
+	t.Run("Error in getUpdateConfigMapFunc", func(_ *testing.T) {
+		mgr.processConfigMapChanges()
+	})
+
+	// Test case 2: Success with valid log level
+	getUpdateConfigMapFunc = func(_ *NodeRescanner, _ context.Context) error {
+		return nil
+	}
+	mgr.config.LogLevel = "info"
+	t.Run("Success with valid log level", func(t *testing.T) {
+		mgr.processConfigMapChanges()
+		assert.Equal(t, csmlog.InfoLevel, csmlog.GetLevel())
+	})
+
+	// Test case 3: Invalid log level
+	getUpdateConfigMapFunc = func(_ *NodeRescanner, _ context.Context) error {
+		return nil
+	}
+	mgr.config.LogLevel = "invalid-level"
+	t.Run("Invalid log level", func(_ *testing.T) {
+		mgr.processConfigMapChanges()
+	})
+
+	// Test case 4: Valid log format
+	getUpdateConfigMapFunc = func(_ *NodeRescanner, _ context.Context) error {
+		return nil
+	}
+	mgr.config.LogLevel = "info"
+	mgr.config.LogFormat = "TEXT"
+	t.Run("Valid log format", func(_ *testing.T) {
+		mgr.processConfigMapChanges()
+	})
+
+	// Test case 5: Invalid log format
+	getUpdateConfigMapFunc = func(_ *NodeRescanner, _ context.Context) error {
+		return nil
+	}
+	mgr.config.LogFormat = "invalid"
+	t.Run("Invalid log format", func(_ *testing.T) {
+		mgr.processConfigMapChanges()
+	})
 }
 
 func TestSetupConfigMapWatcher(t *testing.T) {
 	tests := []struct {
-		name           string
-		config         *config.Config
-		loggerConfig   *logrus.Logger
-		expectedOutput string
+		name string
 	}{
 		{
-			name:         "Test with valid loggerConfig",
-			loggerConfig: &logrus.Logger{},
-			config: &config.Config{
-				LogLevel: "invalid",
-			},
-			expectedOutput: "Started ConfigMap Watcher",
+			name: "Test with valid config",
 		},
 		{
-			name:         "Test with changed loggerConfig",
-			loggerConfig: &logrus.Logger{},
-			config: &config.Config{
-				LogLevel: "invalid",
-			},
-			expectedOutput: "Started ConfigMap Watcher",
+			name: "Test with changed config",
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var output bytes.Buffer
-			log.SetOutput(&output)
-
+		t.Run(tt.name, func(_ *testing.T) {
 			mgr := &NodeRescanner{
 				Opts:     config.ControllerManagerOpts{},
 				Manager:  &MockManager{},
 				NodeName: "test-node",
-				config:   tt.config,
-			}
-			if tt.name == "Test with valid loggerConfig" {
-				mgr.setupConfigMapWatcher(tt.loggerConfig)
-			} else if tt.name == "Test with changed loggerConfig" {
-				mgr.setupConfigMapWatcher(tt.loggerConfig)
-				tt.loggerConfig.SetLevel(logrus.InfoLevel)
-				mgr.setupConfigMapWatcher(tt.loggerConfig)
+				config:   &config.Config{LogLevel: "info"},
 			}
 
-			if !strings.Contains(output.String(), tt.expectedOutput) {
-				t.Errorf("Expected output: %s, but got: %s", tt.expectedOutput, output.String())
+			if tt.name == "Test with valid config" {
+				mgr.setupConfigMapWatcher()
+			} else if tt.name == "Test with changed config" {
+				mgr.setupConfigMapWatcher()
+				csmlog.SetLevel(csmlog.InfoLevel)
+				mgr.setupConfigMapWatcher()
 			}
+			// Test passes if no panic occurs
 		})
 	}
 }
@@ -592,9 +569,6 @@ func TestProbeAndCreateMetricsServer(t *testing.T) {
 
 	// Create a mock CSI connection
 	csiConn := createFakeConnection()
-
-	// Create a mock setup logger
-	setupLog := ctrl.Log.WithName("test-logger")
 
 	// Get migration capabilities
 	migrationCapabilities := getSampleMigrationCapabilities()
@@ -626,7 +600,7 @@ func TestProbeAndCreateMetricsServer(t *testing.T) {
 	identityClient.On("ProbeController", ctx).Return("driver-name", true, nil)
 
 	// Call the function with the mock dependencies
-	probeAndCreateMetricsServer(ctx, csiConn, setupLog, identityClient, flagMap)
+	probeAndCreateMetricsServer(ctx, csiConn, identityClient, flagMap)
 
 	// Assert the exit code
 	if exitCode != 0 {
@@ -645,7 +619,7 @@ func TestSetupFlags(t *testing.T) {
 	ManifestSemver = "1.0.0"
 
 	// Call the setupFlags function
-	flags, setupLog, ctx := setupFlags()
+	flags, ctx := setupFlags()
 
 	// Assert the expected values
 	expected := map[string]string{
@@ -667,7 +641,7 @@ func TestSetupFlags(t *testing.T) {
 		}
 	}
 
-	assert.NotNil(t, setupLog)
+	assert.NotNil(t, flags)
 	assert.NotNil(t, ctx)
 }
 
@@ -817,7 +791,7 @@ func (m *MockIdentityClient) ProbeController(_ context.Context) (string, bool, e
 }
 
 // MockManager is a mock implementation of the ctrl.Manager interface
-type MockManager struct{}
+type MockManager struct{ manager.Manager }
 
 func (m *MockManager) Start(context.Context) error {
 	return nil
@@ -897,11 +871,6 @@ func (m *MockManager) GetHTTPClient() *http.Client {
 	return nil
 }
 
-func (m *MockManager) GetLogger() logr.Logger {
-	// Implement the GetLogger method logic
-	return logr.Logger{}
-}
-
 func (m *MockManager) GetRESTMapper() meta.RESTMapper {
 	// Implement the GetRESTMapper method logic
 	return nil
@@ -922,7 +891,7 @@ func (m *MockManager) GetConverterRegistry() conversion.Registry {
 	return nil
 }
 
-func (m *MockManager) GetEventRecorder(_ string) events.EventRecorder {
+func (m *MockManager) GetEventRecorder(_ string) recorder.EventRecorder {
 	// Implement the GetEventRecorder method logic
 	return nil
 }

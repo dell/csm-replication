@@ -23,21 +23,19 @@ import (
 	"time"
 
 	"github.com/dell/dell-csi-extensions/migration"
-	"github.com/go-logr/logr"
 	"google.golang.org/grpc"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
 	"github.com/dell/csm-replication/pkg/config"
-	"github.com/bombsimon/logrusr/v4"
+	"github.com/dell/csmlog"
 	"github.com/fsnotify/fsnotify"
-	"github.com/sirupsen/logrus"
+	"github.com/go-logr/logr"
 	"github.com/spf13/viper"
 
 	storagev1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
 	"github.com/dell/csm-replication/pkg/common/constants"
-	"github.com/dell/csm-replication/pkg/common/logger"
 
 	"golang.org/x/sync/singleflight"
 
@@ -59,7 +57,6 @@ import (
 
 var (
 	scheme                       = runtime.NewScheme()
-	setupLog                     = ctrl.Log.WithName("setup")
 	currentSupportedCapabilities = map[migration.MigrateTypes]bool{
 		migration.MigrateTypes_NON_REPL_TO_REPL: true,
 		migration.MigrateTypes_REPL_TO_NON_REPL: true,
@@ -83,15 +80,15 @@ type MigratorManager struct {
 
 var (
 	getUpdateConfigMapFunc = func(mgr *MigratorManager, ctx context.Context) error {
-		return mgr.config.UpdateConfigMap(ctx, nil, mgr.Opts, nil, mgr.Manager.GetLogger())
+		return mgr.config.UpdateConfigMap(ctx, nil, mgr.Opts, nil)
 	}
 
-	getConfigFunc = func(ctx context.Context, opts config.ControllerManagerOpts, mgrLogr logr.Logger) (*config.Config, error) {
-		return config.GetConfig(ctx, nil, opts, nil, mgrLogr)
+	getConfigFunc = func(ctx context.Context, opts config.ControllerManagerOpts) (*config.Config, error) {
+		return config.GetConfig(ctx, nil, opts, nil)
 	}
 
-	getConnectToCsiFunc = func(csiAddress string, setupLog logr.Logger) (*grpc.ClientConn, error) {
-		return connection.Connect(csiAddress, setupLog)
+	getConnectToCsiFunc = func(csiAddress string) (*grpc.ClientConn, error) {
+		return connection.Connect(csiAddress)
 	}
 
 	getProbeForeverFunc = func(ctx context.Context, identityClient csiidentity.Identity) (string, error) {
@@ -108,10 +105,6 @@ var (
 
 	getcreateMigratorManagerFunc = func(ctx context.Context, mgr manager.Manager) (*MigratorManager, error) {
 		return createMigratorManager(ctx, mgr)
-	}
-
-	getParseLevelFunc = func(level string) (logrus.Level, error) {
-		return logger.ParseLevel(level)
 	}
 
 	getWorkqueueReconcileRequest = func(retryIntervalStart time.Duration, retryIntervalMax time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
@@ -153,28 +146,43 @@ var (
 	}
 )
 
-func (mgr *MigratorManager) processConfigMapChanges(loggerConfig *logrus.Logger) {
-	loggerConfig.Info("Received a config change event")
+func (mgr *MigratorManager) processConfigMapChanges() {
+	csmlog.Info("Received a config change event")
 	err := getUpdateConfigMapFunc(mgr, context.Background())
 	if err != nil {
-		loggerConfig.Error("Error parsing the config: ", err)
+		csmlog.Errorf("Error parsing the config: %v", err)
 		return
 	}
 	mgr.config.Lock.Lock()
 	defer mgr.config.Lock.Unlock()
-	level, err := logger.ParseLevel(mgr.config.LogLevel)
-	if err != nil {
-		loggerConfig.Error("Unable to parse ", err)
+	normalizedLogLevel := strings.ToLower(strings.TrimSpace(mgr.config.LogLevel))
+	if normalizedLogLevel != "" {
+		level, err := csmlog.ParseLevel(normalizedLogLevel)
+		if err != nil {
+			csmlog.Errorf("Unable to parse log level: %v", err)
+		} else {
+			csmlog.Infof("set level to %v", level)
+			csmlog.SetLevel(level)
+		}
 	}
-	loggerConfig.Info("set level to", level)
-	loggerConfig.SetLevel(level)
+	format := mgr.config.LogFormat
+	if format != "" {
+		switch strings.ToLower(format) {
+		case "json", "text":
+			csmlog.Infof("set format to %v", strings.ToLower(format))
+			csmlog.SetFormat(strings.ToLower(format))
+		default:
+			csmlog.Errorf("invalid log format %q, falling back to json", format)
+			csmlog.SetFormat("json")
+		}
+	}
 }
 
-func (mgr *MigratorManager) setupConfigMapWatcher(loggerConfig *logrus.Logger) {
-	loggerConfig.Info("Started ConfigMap Watcher")
+func (mgr *MigratorManager) setupConfigMapWatcher() {
+	csmlog.Info("Started ConfigMap Watcher")
 	viper.WatchConfig()
 	viper.OnConfigChange(func(_ fsnotify.Event) {
-		mgr.processConfigMapChanges(loggerConfig)
+		mgr.processConfigMapChanges()
 	})
 }
 
@@ -185,8 +193,7 @@ func createMigratorManager(ctx context.Context, mgr ctrl.Manager) (*MigratorMana
 	}
 	opts := config.GetControllerManagerOpts()
 	opts.Mode = "sidecar"
-	mgrLogger := mgr.GetLogger()
-	repConfig, err := getConfigFunc(ctx, opts, mgrLogger)
+	repConfig, err := getConfigFunc(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -220,47 +227,44 @@ type flags struct {
 func main() {
 	flags := setupFlags()
 
-	logrusLog := logrus.New()
-	logrusLog.SetFormatter(&logrus.JSONFormatter{
-		TimestampFormat: time.RFC3339Nano,
-	})
+	// Set controller-runtime logger to discard to prevent goroutine error
+	// controller-runtime requires a global logger to be set; we discard its internal logs
+	// and use csmlog for all application-specific logging instead
+	ctrl.SetLogger(logr.Discard())
 
-	logger := logrusr.New(logrusLog)
-	ctrl.SetLogger(logger)
-
-	setupLog.V(1).Info("Prefix", "Domain", flags.domain)
-	setupLog.V(1).Info(constants.DellCSIMigrator, "Version", ManifestSemver, "Creation Time", core.CommitTime.Format(time.RFC1123))
+	csmlog.Infof("Prefix: %v", flags.domain)
+	csmlog.Infof("%s Version: %s, Creation Time: %s", constants.DellCSIMigrator, ManifestSemver, core.CommitTime.Format(time.RFC1123))
 
 	ctx := context.Background()
 
 	// Connect to csi
-	csiConn, err := getConnectToCsiFunc(flags.csiAddress, setupLog)
+	csiConn, err := getConnectToCsiFunc(flags.csiAddress)
 	if err != nil {
-		setupLog.Error(err, "failed to connect to CSI driver")
+		csmlog.Errorf("failed to connect to CSI driver: %v", err)
 		osExit(1)
 	}
 
-	identityClient := csiidentity.New(csiConn, ctrl.Log.WithName("identity-client"), flags.operationTimeout, flags.probeFrequency)
+	identityClient := csiidentity.New(csiConn, flags.operationTimeout, flags.probeFrequency)
 
 	driverName, err := getProbeForeverFunc(ctx, identityClient)
 	if err != nil {
-		setupLog.Error(err, "error waiting for the CSI driver to be ready")
+		csmlog.Errorf("error waiting for the CSI driver to be ready: %v", err)
 		osExit(1)
 	}
-	setupLog.V(1).Info("CSI driver name", "driverName", driverName)
+	csmlog.Infof("CSI driver name: %v", driverName)
 
 	capabilitySet, err := getMigrationCapabilitiesFunc(ctx, identityClient)
 	if err != nil {
-		setupLog.Error(err, "error fetching migration capabilities")
+		csmlog.Errorf("error fetching migration capabilities: %v", err)
 		osExit(1)
 	}
 	if len(capabilitySet) == 0 {
-		setupLog.Error(fmt.Errorf("driver doesn't support migration"), "migration not supported")
+		csmlog.Error("migration not supported: driver doesn't support migration")
 		osExit(1)
 	}
 	for types := range capabilitySet {
 		if _, ok := currentSupportedCapabilities[types]; !ok {
-			setupLog.Error(err, "unknown capability advertised")
+			csmlog.Errorf("unknown capability advertised: %v", err)
 			osExit(1)
 		}
 	}
@@ -276,60 +280,79 @@ func main() {
 		LeaderElectionID:           leaderElectionID,
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
+		csmlog.Errorf("unable to start manager: %v", err)
 		osExit(1)
 	}
 
 	MigratorMgr, err := getcreateMigratorManagerFunc(ctx, mgr)
 	if err != nil {
-		setupLog.Error(err, "failed to configure the migrator manager")
+		csmlog.Errorf("failed to configure the migrator manager: %v", err)
 		osExit(1)
 	}
 	// Start the watch on configmap
-	MigratorMgr.setupConfigMapWatcher(logrusLog)
+	MigratorMgr.setupConfigMapWatcher()
 
-	// Process the config. Get initial log level
-	level, err := getParseLevelFunc(MigratorMgr.config.LogLevel)
-	if err != nil {
-		logrusLog.Error("Unable to parse ", err)
+	// Process the config. Get initial log level and format
+	normalizedLogLevel := strings.ToLower(strings.TrimSpace(MigratorMgr.config.LogLevel))
+	if normalizedLogLevel != "" {
+		level, err := csmlog.ParseLevel(normalizedLogLevel)
+		if err != nil {
+			csmlog.Errorf("Unable to parse log level: %v", err)
+		} else {
+			csmlog.Infof("set level to %v", level)
+			csmlog.SetLevel(level)
+		}
 	}
-	logrusLog.Info("set level to", level)
-	logrusLog.SetLevel(level)
+	if MigratorMgr.config.LogFormat != "" {
+		switch strings.ToLower(MigratorMgr.config.LogFormat) {
+		case "json", "text":
+			csmlog.Infof("set format to %v", strings.ToLower(MigratorMgr.config.LogFormat))
+			csmlog.SetFormat(strings.ToLower(MigratorMgr.config.LogFormat))
+		default:
+			csmlog.Errorf("invalid log format %q, falling back to json", MigratorMgr.config.LogFormat)
+			csmlog.SetFormat("json")
+		}
+	}
+
+	csmlog.Info("Starting manager")
+	csmlog.Info("Starting controller-runtime")
 
 	expRateLimiter := getWorkqueueReconcileRequest(flags.retryIntervalStart, flags.retryIntervalMax)
 
+	csmlog.Info("Starting PersistentVolume controller")
 	if err = getPersistentVolumeReconcilerSetupWithManager(&controller.PersistentVolumeReconciler{
 		Client:            mgr.GetClient(),
-		Log:               ctrl.Log.WithName("controllers").WithName("PersistentVolume"),
 		Scheme:            mgr.GetScheme(),
 		EventRecorder:     mgr.GetEventRecorderFor(constants.DellCSIReplicator),
 		DriverName:        driverName,
-		MigrationClient:   csimigration.New(csiConn, ctrl.Log.WithName("migration-client"), flags.operationTimeout),
+		MigrationClient:   csimigration.New(csiConn, flags.operationTimeout),
 		ContextPrefix:     flags.pgContextKeyPrefix,
 		SingleFlightGroup: singleflight.Group{},
 		Domain:            flags.domain,
 		ReplDomain:        flags.replicationDomain,
 	}, ctx, mgr, expRateLimiter, flags.workerThreads); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "PersistentVolume")
+		csmlog.Errorf("unable to create controller: %v", err)
 		osExit(1)
 	}
 
+	csmlog.Info("Starting MigrationGroup controller")
 	if err = getMigrationGroupReconcilerSetupWithManager(&controller.MigrationGroupReconciler{
 		Client:                     mgr.GetClient(),
-		Log:                        ctrl.Log.WithName("controllers").WithName("DellCSIMigrationGroup"),
 		Scheme:                     mgr.GetScheme(),
 		EventRecorder:              mgr.GetEventRecorderFor(constants.DellCSIMigrator),
 		DriverName:                 driverName,
-		MigrationClient:            csimigration.New(csiConn, ctrl.Log.WithName("migration-client"), flags.operationTimeout),
+		MigrationClient:            csimigration.New(csiConn, flags.operationTimeout),
 		MaxRetryDurationForActions: flags.maxRetryDurationForActions,
 	}, mgr, expRateLimiter, flags.workerThreads); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "DellCSIMigrationGroup")
+		csmlog.Errorf("unable to create controller: %v", err)
 		osExit(1)
 	}
 
-	setupLog.Info("starting manager")
+	csmlog.Infof("Starting workers with %d threads", flags.workerThreads)
+
+	csmlog.Info("starting manager")
 	if err := getManagerStart(mgr); err != nil {
-		setupLog.Error(err, "problem running manager")
+		csmlog.Errorf("problem running manager: %v", err)
 		osExit(1)
 	}
 }

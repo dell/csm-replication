@@ -12,6 +12,7 @@
  limitations under the License.
 */
 
+// Package types defines helpers for repctl table output.
 package types
 
 import (
@@ -19,9 +20,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/dell/repctl/pkg/display"
-	"github.com/dell/repctl/pkg/metadata"
-	log "github.com/sirupsen/logrus"
+	csmlog "github.com/dell/csmlog"
+	"github.com/dell/csm-replication/repctl/pkg/display"
+	"github.com/dell/csm-replication/repctl/pkg/metadata"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -58,7 +59,7 @@ func GetPV(persistentVolume *v1.PersistentVolume) (PersistentVolume, error) {
 	if requests != "" {
 		err := json.Unmarshal([]byte(requests), &requestsResReq)
 		if err != nil {
-			log.Printf("Failed to unmarshal json for resource requirements. Error: %s", err.Error())
+			csmlog.Infof("Failed to unmarshal json for resource requirements. Error: %s", err.Error())
 			return PersistentVolume{}, err
 		}
 	}

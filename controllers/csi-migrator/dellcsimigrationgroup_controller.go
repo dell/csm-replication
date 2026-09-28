@@ -23,18 +23,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dell/csmlog"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 
 	storagev1 "github.com/dell/csm-replication/api/v1"
 	"github.com/dell/csm-replication/controllers"
-	"github.com/dell/csm-replication/pkg/common/logger"
 	reconciler "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	csimigration "github.com/dell/csm-replication/pkg/csi-clients/migration"
 	"github.com/dell/dell-csi-extensions/migration"
-	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -75,7 +75,6 @@ type ActionType string
 // MigrationGroupReconciler reconciles PersistentVolume resources
 type MigrationGroupReconciler struct {
 	client.Client
-	Log                        logr.Logger
 	Scheme                     *runtime.Scheme
 	EventRecorder              record.EventRecorder
 	DriverName                 string
@@ -103,15 +102,12 @@ var NodesToRescan NodeList
 
 // Reconcile contains reconciliation logic that updates MigrationGroup depending on it's current state
 func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("MigrationGroup", req.NamespacedName)
-	ctx = context.WithValue(ctx, logger.LoggerContextKey, log)
-
-	log.V(logger.InfoLevel).Info("Begin reconcile - MG Controller")
+	csmlog.Info("Begin reconcile - MG Controller")
 
 	mg := new(storagev1.DellCSIMigrationGroup)
 	err := r.Get(ctx, req.NamespacedName, mg)
 	if err != nil {
-		log.Error(err, "MG not found", "mg", mg)
+		csmlog.WithFields(csmlog.Fields{"mgName": req.Name, "namespace": req.Namespace}).Errorf("Migration group not found: %v", err)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
@@ -131,7 +127,7 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	var ArrayMigrationAction migration.ActionTypes
 	switch currentState {
 	case NoState:
-		log.V(logger.InfoLevel).Info("Processing MG with no state")
+		csmlog.Info("Processing MG with no state")
 		return r.processMGInNoState(ctx, mg.DeepCopy())
 	case ErrorState:
 		if mg.Status.LastAction != "" {
@@ -155,10 +151,10 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		NextState = DeletingState
 		NextAnnotationAction = "Delete"
 	case DeletingState:
-		log.Info("Migration has completed successfully; MigrationGroup can be deleted")
+		csmlog.Info("Migration has completed successfully; MigrationGroup can be deleted")
 		return r.processMGForDeletion(ctx, mg.DeepCopy())
 	default:
-		log.Info("Strange migration type..")
+		csmlog.Info("Strange migration type..")
 		return ctrl.Result{}, fmt.Errorf("Unknown state")
 	}
 
@@ -179,7 +175,7 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			for _, nodePod := range podList.Items {
 				labels := nodePod.GetLabels()
 				if _, ok := labels[controllers.NodeReScanned]; !ok {
-					log.Info("Awaiting rescan on Nodes")
+					csmlog.Info("Awaiting rescan on Nodes")
 					allNodesScanned = false
 					break
 				}
@@ -224,7 +220,10 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 
 		if ArrayMigrateResponse.GetSuccess() {
-			log.V(logger.InfoLevel).Info("Successfully executed action [%s]", CurrentAction.String())
+			csmlog.WithFields(csmlog.Fields{
+				"mgName": mg.Name,
+				"action": CurrentAction.String(),
+			}).Info("Successfully executed action")
 		}
 	} else if NextAnnotationAction == "Delete" {
 		// reset NodesToRescan
@@ -241,18 +240,23 @@ func (r *MigrationGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	isSpecUpdated := r.updateMGSpecWithActionResult(ctx, mg, NextAnnotationAction)
 	if isSpecUpdated {
 		if err := r.Client.Update(ctx, mg.DeepCopy()); err != nil {
-			log.Error(err, "Failed to update spec", "mg", mg, "Next State", NextState)
+			csmlog.WithFields(csmlog.Fields{
+				"mgName":    mg.Name,
+				"nextState": NextState,
+			}).Errorf("Failed to update migration group spec: %v", err)
 			return ctrl.Result{}, err
 		}
-		log.V(logger.InfoLevel).Info("Successfully updated spec", "Next State", NextState)
+		csmlog.WithFields(csmlog.Fields{
+			"mgName":    mg.Name,
+			"nextState": NextState,
+		}).Info("Successfully updated migration group spec")
 	}
 	return ctrl.Result{}, err
 }
 
 // Getting MG to its first valid state
 func (r *MigrationGroupReconciler) processMGInNoState(ctx context.Context, dellCSIMigrationGroup *storagev1.DellCSIMigrationGroup) (ctrl.Result, error) {
-	log := logger.FromContext(ctx)
-	log.V(logger.InfoLevel).Info("Processing MG in NoState")
+	csmlog.Info("Processing MG in NoState")
 	ok, err := r.addFinalizer(ctx, dellCSIMigrationGroup.DeepCopy())
 	if err != nil {
 		return ctrl.Result{}, err
@@ -268,21 +272,28 @@ func (r *MigrationGroupReconciler) processMGInNoState(ctx context.Context, dellC
 
 // Update mg spec with current state
 func (r *MigrationGroupReconciler) updateMGSpecWithState(ctx context.Context, mg *storagev1.DellCSIMigrationGroup, NextState string) error {
-	log := logger.FromContext(ctx)
-	log.V(logger.InfoLevel).Info("Begin updating MG spec with", "State", NextState)
+	csmlog.WithFields(csmlog.Fields{
+		"mgName": mg.Name,
+		"state":  NextState,
+	}).Info("Updating migration group status state")
 	mg.Status.State = NextState
 	if err := r.Status().Update(ctx, mg.DeepCopy()); err != nil {
-		log.Error(err, "Failed updating to", "State", NextState)
+		csmlog.WithFields(csmlog.Fields{
+			"mgName": mg.Name,
+			"state":  NextState,
+		}).Errorf("Failed to update migration group status state: %v", err)
 		return err
 	}
-	log.V(logger.InfoLevel).Info("Successfully updated to", "state", NextState)
+	csmlog.WithFields(csmlog.Fields{
+		"mgName": mg.Name,
+		"state":  NextState,
+	}).Info("Successfully updated migration group status state")
 	return nil
 }
 
 // Update mg on error
 func (r *MigrationGroupReconciler) updateMGOnError(ctx context.Context, mg *storagev1.DellCSIMigrationGroup, currentState string, _ string) error {
-	log := logger.FromContext(ctx)
-	log.V(logger.InfoLevel).Info("Begin updating MG status with", "ErrorState", ErrorState)
+	csmlog.WithFields(csmlog.Fields{"errorState": ErrorState}).Info("Begin updating MG status with error state")
 	mg.Status.LastAction = currentState
 	/*
 		r.EventRecorder.Eventf(mg, v1.EventTypeWarning, "Error",
@@ -294,8 +305,7 @@ func (r *MigrationGroupReconciler) updateMGOnError(ctx context.Context, mg *stor
 
 // Update mg with annotation
 func (r *MigrationGroupReconciler) updateMGSpecWithActionResult(ctx context.Context, mg *storagev1.DellCSIMigrationGroup, NextAnnotation string) bool {
-	log := logger.FromContext(ctx)
-	log.V(logger.InfoLevel).Info("Begin updating MG status with", "Annotation", NextAnnotation)
+	csmlog.Info("Updating annotation with migration state")
 
 	isUpdated := false
 	actionAnnotation := ActionAnnotation{
@@ -303,13 +313,13 @@ func (r *MigrationGroupReconciler) updateMGSpecWithActionResult(ctx context.Cont
 	}
 	bytes, _ := json.Marshal(&actionAnnotation)
 	controllers.AddAnnotation(mg, ArrayMigrationState, string(bytes))
-	log.V(logger.InfoLevel).Info("Updating", "annotation", string(bytes))
+	csmlog.Info("Updating annotation")
 	err := r.Update(ctx, mg.DeepCopy())
 	if err != nil {
-		log.Error(err, "Failed to update", "annotation", string(bytes))
+		csmlog.Error("Failed to update annotation")
 		return false
 	}
-	log.V(logger.InfoLevel).Info("MG was successfully updated with", "Action Result", NextAnnotation)
+	csmlog.WithFields(csmlog.Fields{"nextAnnotation": NextAnnotation}).Info("MG was successfully updated with Action Result")
 
 	isUpdated = true
 	return isUpdated
@@ -331,16 +341,15 @@ func (r *MigrationGroupReconciler) SetupWithManager(mgr ctrl.Manager, limiter wo
 
 // Function to add a Finalizer to MG
 func (r *MigrationGroupReconciler) addFinalizer(ctx context.Context, mg *storagev1.DellCSIMigrationGroup) (bool, error) {
-	log := logger.FromContext(ctx)
-	log.V(logger.InfoLevel).Info("Adding finalizer")
+	csmlog.Info("Adding finalizer")
 
 	ok := controllers.AddFinalizerIfNotExist(mg, controllers.MigrationFinalizer)
 	if ok {
 		if err := r.Update(ctx, mg); err != nil {
-			log.Error(err, "Failed to add finalizer", "mg", mg)
+			csmlog.WithFields(csmlog.Fields{"mgName": mg.Name}).Errorf("Failed to add finalizer: %v", err)
 			return ok, err
 		}
-		log.V(logger.DebugLevel).Info("Successfully add finalizer. Requesting a requeue")
+		csmlog.Info("Successfully add finalizer. Requesting a requeue")
 	}
 	return ok, nil
 }
@@ -358,18 +367,17 @@ func (r *MigrationGroupReconciler) processMGForDeletion(ctx context.Context, del
 }
 
 func (r *MigrationGroupReconciler) removeFinalizer(ctx context.Context, mg *storagev1.DellCSIMigrationGroup) error {
-	log := logger.FromContext(ctx)
-	log.V(logger.InfoLevel).Info("Removing finalizer")
+	csmlog.Info("Removing finalizer")
 
 	// Remove migration group finalizer
 	if ok := controllers.RemoveFinalizerIfExists(mg, controllers.MigrationFinalizer); ok {
 		// Adding annotation to mark the removal of protection-group
 		// controllers.AddAnnotation(mg, controllers.MigrationGroupRemovedAnnotation, "yes")
 		if err := r.Update(ctx, mg.DeepCopy()); err != nil {
-			log.Error(err, "Failed to remove finalizer", "mg", mg, "MigrationGroupRemovedAnnotation")
+			csmlog.WithFields(csmlog.Fields{"mgName": mg.Name}).Errorf("Failed to remove finalizer: %v", err)
 			return err
 		}
-		log.V(logger.InfoLevel).Info("Finalizer removed successfully")
+		csmlog.Info("Finalizer removed successfully")
 	}
 	return nil
 }

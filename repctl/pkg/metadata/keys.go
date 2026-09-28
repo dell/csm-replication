@@ -12,6 +12,7 @@
  limitations under the License.
 */
 
+// Package metadata defines replication label and annotation keys for repctl.
 package metadata
 
 import (

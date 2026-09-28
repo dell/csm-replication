@@ -9,8 +9,8 @@ import (
 	reflect "reflect"
 
 	v1 "github.com/dell/csm-replication/api/v1"
-	k8s "github.com/dell/repctl/pkg/k8s"
-	types "github.com/dell/repctl/pkg/types"
+	k8s "github.com/dell/csm-replication/repctl/pkg/k8s"
+	types "github.com/dell/csm-replication/repctl/pkg/types"
 	gomock "github.com/golang/mock/gomock"
 	v10 "k8s.io/api/apps/v1"
 	v11 "k8s.io/api/core/v1"
