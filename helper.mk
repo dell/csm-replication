@@ -4,14 +4,15 @@
 # or its subsidiaries. Other trademarks may be trademarks of their respective 
 # owners.
 
+.PHONY: gen-semver copy-csm-common vendor
+
 gen-semver:
 	(cd core; rm -f core_generated.go; go generate)
 	go run core/semver/semver.go -f mk > semver.mk
 
-download-csm-common:
-	git clone --depth 1 git@github.com:dell/csm.git temp-repo
-	cp temp-repo/config/csm-common.mk .
-	rm -rf temp-repo
+copy-csm-common:
+	cp ../csm/config/csm-common.mk .
 
 vendor:
+	rm -rf vendor
 	GOPRIVATE=github.com go mod vendor

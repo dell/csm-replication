@@ -3,7 +3,7 @@
 package mocks
 
 import (
-	k8s "github.com/dell/repctl/pkg/k8s"
+	k8s "github.com/dell/csm-replication/repctl/pkg/k8s"
 	mock "github.com/stretchr/testify/mock"
 )
 

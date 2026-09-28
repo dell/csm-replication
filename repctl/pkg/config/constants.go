@@ -12,6 +12,7 @@
  limitations under the License.
 */
 
+// Package config holds Viper keys used by the repctl CLI.
 package config
 
 // Config parameters for viper

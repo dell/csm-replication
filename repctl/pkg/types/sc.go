@@ -17,8 +17,8 @@ package types
 import (
 	"os"
 
-	"github.com/dell/repctl/pkg/display"
-	"github.com/dell/repctl/pkg/metadata"
+	"github.com/dell/csm-replication/repctl/pkg/display"
+	"github.com/dell/csm-replication/repctl/pkg/metadata"
 	storagev1 "k8s.io/api/storage/v1"
 )
 

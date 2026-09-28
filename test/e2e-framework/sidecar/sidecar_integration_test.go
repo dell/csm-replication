@@ -27,7 +27,7 @@ import (
 	"time"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
-	"github.com/dell/csm-replication/test/e2e-framework/utils"
+	"github.com/dell/csmlog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 
@@ -81,7 +81,6 @@ const (
 
 var (
 	scheme               = runtime.NewScheme()
-	log                  = ctrl.Log.WithName("sidecar-integration-test")
 	requiredCapabilities = []replication.ReplicationCapability_RPC_Type{
 		replication.ReplicationCapability_RPC_CREATE_REMOTE_VOLUME,
 		replication.ReplicationCapability_RPC_CREATE_PROTECTION_GROUP,
@@ -181,7 +180,7 @@ func (ss *SidecarTestSuite) createCSIConnection() error {
 		return fmt.Errorf("csi_address not found")
 	}
 	var err error
-	ss.csiConn, err = connection.Connect(csiAddress, utils.GetLogger())
+	ss.csiConn, err = connection.Connect(csiAddress)
 	return err
 }
 
@@ -192,7 +191,7 @@ func (ss *SidecarTestSuite) identifyDriverAndCapabilities() error {
 			probeTimeout = timeout
 		}
 	}
-	client := csiidentity.New(ss.csiConn, log.WithName("identity-client"), ss.timeout, probeTimeout)
+	client := csiidentity.New(ss.csiConn, ss.timeout, probeTimeout)
 	var err error
 	ss.driverName, err = client.ProbeForever(context.Background())
 	if err != nil {
@@ -248,11 +247,10 @@ func (ss *SidecarTestSuite) createRateLimiter() {
 func (ss *SidecarTestSuite) createClaimController() error {
 	return (&controller.PersistentVolumeClaimReconciler{
 		Client:            ss.manager.GetClient(),
-		Log:               log.WithName("controllers").WithName("PersistentVolumeClaim"),
 		Scheme:            ss.manager.GetScheme(),
 		EventRecorder:     ss.manager.GetEventRecorderFor(constants.DellCSIReplicator),
 		SingleFlightGroup: singleflight.Group{},
-		ReplicationClient: csireplication.New(ss.csiConn, log.WithName("replication-client"), ss.timeout),
+		ReplicationClient: csireplication.New(ss.csiConn, ss.timeout),
 		DriverName:        ss.driverName,
 		ContextPrefix:     ss.contextPrefix,
 		Domain:            ss.domain,
@@ -262,11 +260,10 @@ func (ss *SidecarTestSuite) createClaimController() error {
 func (ss *SidecarTestSuite) createVolumeController() error {
 	return (&controller.PersistentVolumeReconciler{
 		Client:            ss.manager.GetClient(),
-		Log:               log.WithName("controllers").WithName("PersistentVolume"),
 		Scheme:            ss.manager.GetScheme(),
 		SingleFlightGroup: singleflight.Group{},
 		EventRecorder:     ss.manager.GetEventRecorderFor(constants.DellCSIReplicator),
-		ReplicationClient: csireplication.New(ss.csiConn, log.WithName("replication-client"), ss.timeout),
+		ReplicationClient: csireplication.New(ss.csiConn, ss.timeout),
 		Domain:            ss.domain,
 		DriverName:        ss.driverName,
 		ContextPrefix:     ss.contextPrefix,
@@ -278,10 +275,9 @@ func (ss *SidecarTestSuite) createReplicationGroupController() error {
 		Client:                     ss.manager.GetClient(),
 		Scheme:                     ss.manager.GetScheme(),
 		EventRecorder:              ss.manager.GetEventRecorderFor(constants.DellCSIReplicator),
-		Log:                        log.WithName("controllers").WithName("DellCSIReplicationGroup"),
 		SupportedActions:           ss.supportedActions,
 		DriverName:                 ss.driverName,
-		ReplicationClient:          csireplication.New(ss.csiConn, log.WithName("replication-client"), ss.timeout),
+		ReplicationClient:          csireplication.New(ss.csiConn, ss.timeout),
 		MaxRetryDurationForActions: ss.timeout, // TODO: Need to check if set to correct value
 	}).SetupWithManager(ss.manager, ss.rateLimiter, ss.workers)
 }
@@ -291,10 +287,10 @@ func (ss *SidecarTestSuite) runManager() {
 	go func() {
 		err := ss.manager.Start(ss.ctx)
 		if err != nil {
-			log.Error(err, "Manager stopped due to an error")
+			csmlog.Errorf("Manager stopped due to an error: %v", err)
 			ss.ctxCancel()
 		} else {
-			log.Info("Manager stop due to context cancellation")
+			csmlog.Info("Manager stop due to context cancellation")
 		}
 	}()
 }

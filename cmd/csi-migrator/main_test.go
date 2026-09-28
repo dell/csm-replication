@@ -26,16 +26,13 @@ import (
 	"github.com/dell/csm-replication/pkg/common/constants"
 	"github.com/dell/csm-replication/pkg/config"
 	csiidentity "github.com/dell/csm-replication/pkg/csi-clients/identity"
+	"github.com/dell/csmlog"
 	"github.com/dell/dell-csi-extensions/migration"
-	"github.com/go-logr/logr"
-	"github.com/go-logr/logr/funcr"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -45,12 +42,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/recorder"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/conversion"
 )
 
 type mockManager struct {
-	logger              logr.Logger
+	manager.Manager
 	client              client.Client
 	scheme              *runtime.Scheme
 	eventRec            record.EventRecorder
@@ -59,10 +57,6 @@ type mockManager struct {
 	controllerName      string
 	controllerGroupName string
 	reconciler          *controller.PersistentVolumeReconciler
-}
-
-func (m *mockManager) GetLogger() logr.Logger {
-	return m.logger
 }
 
 func (m *mockManager) Add(_ manager.Runnable) error {
@@ -183,7 +177,7 @@ func (m *mockManager) GetConverterRegistry() conversion.Registry {
 	return nil
 }
 
-func (m *mockManager) GetEventRecorder(_ string) events.EventRecorder {
+func (m *mockManager) GetEventRecorder(_ string) recorder.EventRecorder {
 	// Implement the method as needed for your mock
 	return nil
 }
@@ -199,11 +193,8 @@ func TestProcessConfigMapChanges(t *testing.T) {
 		return nil
 	}
 
-	mockMgr := &mockManager{
-		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
-	}
+	mockMgr := &mockManager{}
 
-	loggerConfig := logrus.New()
 	migrator := &MigratorManager{
 		Opts:    config.ControllerManagerOpts{},
 		Manager: mockMgr,
@@ -211,7 +202,7 @@ func TestProcessConfigMapChanges(t *testing.T) {
 	}
 
 	t.Run("Success Test Case", func(_ *testing.T) {
-		migrator.processConfigMapChanges(loggerConfig)
+		migrator.processConfigMapChanges()
 	})
 
 	// Test case 2: Error in getUpdateConfigMapFunc
@@ -220,7 +211,7 @@ func TestProcessConfigMapChanges(t *testing.T) {
 	}
 
 	t.Run("Error in getUpdateConfigMapFunc", func(_ *testing.T) {
-		migrator.processConfigMapChanges(loggerConfig)
+		migrator.processConfigMapChanges()
 	})
 
 	// Test case 3: Error in ParseLevel (invalid log level)
@@ -231,7 +222,7 @@ func TestProcessConfigMapChanges(t *testing.T) {
 	migrator.config.LogLevel = "invalid-log-level" // Set an invalid log level
 
 	t.Run("Error in ParseLevel", func(_ *testing.T) {
-		migrator.processConfigMapChanges(loggerConfig)
+		migrator.processConfigMapChanges()
 	})
 
 	// Test case 4: Valid Log Level set in config
@@ -242,10 +233,31 @@ func TestProcessConfigMapChanges(t *testing.T) {
 	migrator.config.LogLevel = "info" // Set a valid log level
 
 	t.Run("Valid Log Level", func(t *testing.T) {
-		migrator.processConfigMapChanges(loggerConfig)
-		if loggerConfig.GetLevel() != logrus.InfoLevel {
-			t.Errorf("Expected log level to be info, but got %v", loggerConfig.GetLevel())
+		migrator.processConfigMapChanges()
+		if csmlog.GetLevel() != csmlog.InfoLevel {
+			t.Errorf("Expected log level to be info, but got %v", csmlog.GetLevel())
 		}
+	})
+
+	// Test case 5: Valid log format
+	getUpdateConfigMapFunc = func(_ *MigratorManager, _ context.Context) error {
+		return nil
+	}
+	migrator.config.LogLevel = "info"
+	migrator.config.LogFormat = "TEXT"
+
+	t.Run("Valid Log Format", func(_ *testing.T) {
+		migrator.processConfigMapChanges()
+	})
+
+	// Test case 6: Invalid log format
+	getUpdateConfigMapFunc = func(_ *MigratorManager, _ context.Context) error {
+		return nil
+	}
+	migrator.config.LogFormat = "invalid"
+
+	t.Run("Invalid Log Format", func(_ *testing.T) {
+		migrator.processConfigMapChanges()
 	})
 }
 
@@ -257,14 +269,12 @@ func TestCreateMigratorManager(t *testing.T) {
 	}()
 
 	// Test case 1: Successful creation of MigratorManager
-	getConfigFunc = func(_ context.Context, _ config.ControllerManagerOpts, _ logr.Logger) (*config.Config, error) {
+	getConfigFunc = func(_ context.Context, _ config.ControllerManagerOpts) (*config.Config, error) {
 		// Mock the successful config return
 		return &config.Config{LogLevel: "info"}, nil
 	}
 
-	mockMgr := &mockManager{
-		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
-	}
+	mockMgr := &mockManager{}
 
 	t.Run("Success Test Case", func(t *testing.T) {
 		migratorManager, err := createMigratorManager(context.Background(), mockMgr)
@@ -278,7 +288,7 @@ func TestCreateMigratorManager(t *testing.T) {
 	})
 
 	// Test case 2: Error in getConfigFunc
-	getConfigFunc = func(_ context.Context, _ config.ControllerManagerOpts, _ logr.Logger) (*config.Config, error) {
+	getConfigFunc = func(_ context.Context, _ config.ControllerManagerOpts) (*config.Config, error) {
 		// Mock an error return from getConfigFunc
 		return nil, fmt.Errorf("failed to get config")
 	}
@@ -309,14 +319,12 @@ func TestCreateMigratorManager(t *testing.T) {
 
 	// Test case 4: Check if the correct mode is set in options
 	t.Run("Correct Mode Set", func(t *testing.T) {
-		getConfigFunc = func(_ context.Context, _ config.ControllerManagerOpts, _ logr.Logger) (*config.Config, error) {
+		getConfigFunc = func(_ context.Context, _ config.ControllerManagerOpts) (*config.Config, error) {
 			// Return config with any log level
 			return &config.Config{LogLevel: "info"}, nil
 		}
 
-		mockMgr := &mockManager{
-			logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
-		}
+		mockMgr := &mockManager{}
 
 		migratorManager, err := createMigratorManager(context.Background(), mockMgr)
 		if err != nil {
@@ -328,18 +336,15 @@ func TestCreateMigratorManager(t *testing.T) {
 	})
 }
 
-func TestSetupConfigMapWatcher(t *testing.T) {
-	mockMgr := &mockManager{
-		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
-	}
+func TestSetupConfigMapWatcher(_ *testing.T) {
+	mockMgr := &mockManager{}
 
-	loggerConfig := logrus.New()
 	migrator := &MigratorManager{
 		Opts:    config.ControllerManagerOpts{},
 		Manager: mockMgr,
 		config:  &config.Config{},
 	}
-	migrator.setupConfigMapWatcher(loggerConfig)
+	migrator.setupConfigMapWatcher()
 }
 
 func TestMain(t *testing.T) {
@@ -347,7 +352,6 @@ func TestMain(t *testing.T) {
 	defaultGetProbeForeverFunc := getProbeForeverFunc
 	defaultGetMigrationCapabilitiesFunc := getMigrationCapabilitiesFunc
 	defaultGetcreateMigratorManagerFunc := getcreateMigratorManagerFunc
-	defaultGetParseLevelFunc := getParseLevelFunc
 	defaultGetManagerStart := getManagerStart
 	defaultGetCtrlNewManager := getCtrlNewManager
 	defaultGetWorkqueueReconcileRequest := getWorkqueueReconcileRequest
@@ -364,7 +368,6 @@ func TestMain(t *testing.T) {
 		getProbeForeverFunc = defaultGetProbeForeverFunc
 		getMigrationCapabilitiesFunc = defaultGetMigrationCapabilitiesFunc
 		getcreateMigratorManagerFunc = defaultGetcreateMigratorManagerFunc
-		getParseLevelFunc = defaultGetParseLevelFunc
 		getManagerStart = defaultGetManagerStart
 		getCtrlNewManager = defaultGetCtrlNewManager
 		getWorkqueueReconcileRequest = defaultGetWorkqueueReconcileRequest
@@ -407,10 +410,6 @@ func TestMain(t *testing.T) {
 					}, nil
 				}
 
-				getParseLevelFunc = func(level string) (logrus.Level, error) {
-					return logrus.Level(0), fmt.Errorf("unable to parse log level: %s", level)
-				}
-
 				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 					return nil
 				}
@@ -436,7 +435,7 @@ func TestMain(t *testing.T) {
 		{
 			name: "failed to connect to CSI driver",
 			setup: func() {
-				getConnectToCsiFunc = func(_ string, _ logr.Logger) (*grpc.ClientConn, error) {
+				getConnectToCsiFunc = func(_ string) (*grpc.ClientConn, error) {
 					return &grpc.ClientConn{}, errors.New("error connecting to CSI driver")
 				}
 
@@ -460,10 +459,6 @@ func TestMain(t *testing.T) {
 							LogLevel: "info",
 						},
 					}, nil
-				}
-
-				getParseLevelFunc = func(_ string) (logrus.Level, error) {
-					return logrus.InfoLevel, nil
 				}
 
 				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
@@ -528,10 +523,6 @@ func TestMain(t *testing.T) {
 					}, nil
 				}
 
-				getParseLevelFunc = func(_ string) (logrus.Level, error) {
-					return logrus.InfoLevel, nil
-				}
-
 				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 					return nil
 				}
@@ -592,10 +583,6 @@ func TestMain(t *testing.T) {
 							LogLevel: "info",
 						},
 					}, nil
-				}
-
-				getParseLevelFunc = func(_ string) (logrus.Level, error) {
-					return logrus.InfoLevel, nil
 				}
 
 				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
@@ -660,10 +647,6 @@ func TestMain(t *testing.T) {
 					}, nil
 				}
 
-				getParseLevelFunc = func(_ string) (logrus.Level, error) {
-					return logrus.InfoLevel, nil
-				}
-
 				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 					return nil
 				}
@@ -726,10 +709,6 @@ func TestMain(t *testing.T) {
 							LogLevel: "info",
 						},
 					}, nil
-				}
-
-				getParseLevelFunc = func(_ string) (logrus.Level, error) {
-					return logrus.InfoLevel, nil
 				}
 
 				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
@@ -797,10 +776,6 @@ func TestMain(t *testing.T) {
 					}, nil
 				}
 
-				getParseLevelFunc = func(_ string) (logrus.Level, error) {
-					return logrus.InfoLevel, nil
-				}
-
 				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 					return nil
 				}
@@ -864,10 +839,6 @@ func TestMain(t *testing.T) {
 							LogLevel: "info",
 						},
 					}, errors.New("failed to configure the migrator manager")
-				}
-
-				getParseLevelFunc = func(_ string) (logrus.Level, error) {
-					return logrus.Level(0), fmt.Errorf("unable to parse log level")
 				}
 
 				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
@@ -935,10 +906,6 @@ func TestMain(t *testing.T) {
 					}, nil
 				}
 
-				getParseLevelFunc = func(_ string) (logrus.Level, error) {
-					return logrus.InfoLevel, nil
-				}
-
 				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 					return nil
 				}
@@ -1004,10 +971,6 @@ func TestMain(t *testing.T) {
 					}, nil
 				}
 
-				getParseLevelFunc = func(_ string) (logrus.Level, error) {
-					return logrus.Level(0), nil
-				}
-
 				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 					return nil
 				}
@@ -1060,10 +1023,6 @@ func TestMain(t *testing.T) {
 							LogLevel: "info",
 						},
 					}, nil
-				}
-
-				getParseLevelFunc = func(_ string) (logrus.Level, error) {
-					return logrus.Level(0), nil
 				}
 
 				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {

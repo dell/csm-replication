@@ -26,10 +26,10 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/dell/repctl/pkg/config"
-	"github.com/dell/repctl/pkg/k8s"
-	"github.com/dell/repctl/pkg/types"
-	log "github.com/sirupsen/logrus"
+	csmlog "github.com/dell/csmlog"
+	"github.com/dell/csm-replication/repctl/pkg/config"
+	"github.com/dell/csm-replication/repctl/pkg/k8s"
+	"github.com/dell/csm-replication/repctl/pkg/types"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -39,6 +39,8 @@ import (
 var f embed.FS
 
 var createMultiClusterConfiguratorInterface = createMultiClusterConfig
+
+var createFatalfFunc = func(format string, args ...interface{}) { csmlog.Fatalf(format, args...) }
 
 // Mirrored is a struct that contains parameters for both src and dst systems
 type Mirrored struct {
@@ -108,7 +110,7 @@ func GetCreateCommand() *cobra.Command {
 ./repctl create -f <path-to-file>
 cat <path-to-file> | ./repctl create -f -
 		`,
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			var data [][]byte
 			var err error
 			fileName := viper.GetString("create-file")
@@ -120,19 +122,19 @@ cat <path-to-file> | ./repctl create -f -
 				// input from an actual file
 				file, fileErr := os.Open(filepath.Clean(fileName))
 				if fileErr != nil {
-					log.Fatalf("create: error opening file: %s", fileErr.Error())
+					createFatalfFunc("create: error opening file: %s", fileErr.Error())
 				}
 
 				data, err = processCreateCmd(file)
 			}
 
 			if err != nil {
-				log.Fatalf("create: error while parsing input file: %s", err.Error())
+				createFatalfFunc("create: error while parsing input file: %s", err.Error())
 			}
 
 			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
 			if err != nil {
-				log.Fatalf("cluster list: error getting clusters folder path: %s", err.Error())
+				createFatalfFunc("cluster list: error getting clusters folder path: %s", err.Error())
 			}
 
 			clusterIDs := viper.GetStringSlice(config.Clusters)
@@ -140,18 +142,18 @@ cat <path-to-file> | ./repctl create -f -
 			mc := createMultiClusterConfiguratorInterface()
 			clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
 			if err != nil {
-				log.Fatalf("list pv: error in initializing cluster info: %s", err.Error())
+				createFatalfFunc("list pv: error in initializing cluster info: %s", err.Error())
 			}
 
 			for _, cluster := range clusters.Clusters {
-				log.Printf("Creating objects in %s", cluster.GetID())
+				csmlog.Infof("Creating objects in %s", cluster.GetID())
 				for _, resource := range data {
 					_, err := cluster.CreateObject(context.Background(), resource)
 					if err != nil {
 						if strings.Contains(err.Error(), "already exists") {
-							log.Warnf("Object already exists: %s", err.Error())
+							csmlog.Warnf("Object already exists: %s", err.Error())
 						} else {
-							log.Errorf("Encountered error during creating object. Error: %s",
+							csmlog.Errorf("Encountered error during creating object. Error: %s",
 								err.Error())
 						}
 						continue
@@ -191,7 +193,7 @@ associated with a ReplicationGroup or a single PersistentVolume
 
 If you don't encounter any issues in the dry-run, then you can
 re-run the command by removing the dry run flag.`,
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			tgtNamespace := viper.GetString("target-namespace")
 			dryRun := viper.GetBool("dry-run")
 			rgName := viper.GetString(config.ReplicationGroup)
@@ -200,18 +202,18 @@ re-run the command by removing the dry run flag.`,
 			providedPVList := viper.GetStringSlice("pvs")
 
 			if len(clusterIDs) > 1 || len(clusterIDs) == 0 {
-				log.Fatalf("create pvc: error please provide single cluster")
+				createFatalfFunc("create pvc: error please provide single cluster")
 			}
 
 			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
 			if err != nil {
-				log.Fatalf("create pvc: error getting clusters folder path: %s", err.Error())
+				createFatalfFunc("create pvc: error getting clusters folder path: %s", err.Error())
 			}
 
 			mc := createMultiClusterConfiguratorInterface()
 			clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
 			if err != nil {
-				log.Fatalf("create pvc: error in initializing cluster info: %s", err.Error())
+				createFatalfFunc("create pvc: error in initializing cluster info: %s", err.Error())
 			}
 
 			// Get the first cluster object
@@ -219,7 +221,7 @@ re-run the command by removing the dry run flag.`,
 
 			err = createPVCs(providedPVList, cluster, rgName, tgtNamespace, prefix, dryRun)
 			if err != nil {
-				log.Fatalf("create pvc: %s", err.Error())
+				createFatalfFunc("create pvc: %s", err.Error())
 			}
 		},
 	}
@@ -245,8 +247,8 @@ func getCreateStorageClassCommand() *cobra.Command {
 		Long:  `Create storage class from config`,
 		Example: `
 ./repctl create sc --from-config <config-file>`,
-		Run: func(cmd *cobra.Command, args []string) {
-			log.Print("Started generating storage classes")
+		Run: func(_ *cobra.Command, _ []string) {
+			csmlog.Info("Started generating storage classes")
 
 			clusterIDs := viper.GetStringSlice(config.Clusters)
 			dryRun := viper.GetBool("create-sc-dry-run")
@@ -258,28 +260,28 @@ func getCreateStorageClassCommand() *cobra.Command {
 
 			err := localViper.ReadInConfig() // Find and read the config file
 			if err != nil {                  // Handle errors reading the config file
-				log.Fatalf("create sc: can't find config file: %s", err.Error())
+				createFatalfFunc("create sc: can't find config file: %s", err.Error())
 			}
 
 			err = localViper.Unmarshal(&scConfig)
 			if err != nil {
-				log.Fatalf("create sc: unable to decode sc config: %s", err.Error())
+				createFatalfFunc("create sc: unable to decode sc config: %s", err.Error())
 			}
 
 			configFolder, err := getClustersFolderPath("/.repctl/clusters/")
 			if err != nil {
-				log.Fatalf("create sc: error getting clusters folder path: %s", err.Error())
+				createFatalfFunc("create sc: error getting clusters folder path: %s", err.Error())
 			}
 
 			mc := createMultiClusterConfiguratorInterface()
 			clusters, err := mc.GetAllClusters(clusterIDs, configFolder)
 			if err != nil {
-				log.Fatalf("create sc: error in initializing cluster info: %s", err.Error())
+				createFatalfFunc("create sc: error in initializing cluster info: %s", err.Error())
 			}
 
 			err = createSCs(scConfig, clusters, dryRun)
 			if err != nil {
-				log.Fatalf("create sc: %s", err.Error())
+				createFatalfFunc("create sc: %s", err.Error())
 			}
 		},
 	}
@@ -288,7 +290,7 @@ func getCreateStorageClassCommand() *cobra.Command {
 	_ = viper.BindPFlag("from-config", createSCCmd.Flags().Lookup("from-config"))
 	err := createSCCmd.MarkFlagRequired("from-config") // TODO: required because we don't have interactive option rn
 	if err != nil {
-		log.Fatalf(" error in marking flag from-config required %s", err.Error())
+		createFatalfFunc(" error in marking flag from-config required %s", err.Error())
 	}
 	createSCCmd.Flags().Bool("dry-run", false, "generate storage classes but don't create them")
 	_ = viper.BindPFlag("create-sc-dry-run", createSCCmd.Flags().Lookup("dry-run"))
@@ -322,12 +324,12 @@ func createPVCs(providedPVList []string, cluster k8s.ClusterInterface, rgName, t
 		}
 	}
 
-	log.Printf("\nCluster: %s\n", cluster.GetID())
+	csmlog.Infof("\nCluster: %s\n", cluster.GetID())
 
 	printableList := &types.PersistentVolumeList{PVList: pvList}
 	printableList.Print()
 
-	log.Print()
+	csmlog.Info("")
 	create := true
 	if !dryRun {
 		create, err = askForConfirmation("Proceed with creation of PVCs", os.Stdin, 3)
@@ -337,7 +339,7 @@ func createPVCs(providedPVList []string, cluster k8s.ClusterInterface, rgName, t
 	}
 
 	if create {
-		log.Print("Creating persistent volume claims")
+		csmlog.Info("Creating persistent volume claims")
 		err = cluster.CreatePersistentVolumeClaimsFromPVs(context.Background(), tgtNamespace, pvList, prefix, dryRun)
 		if err != nil {
 			return fmt.Errorf("error encountered while creating PVCs: %s", err.Error())
@@ -372,24 +374,24 @@ func createSCs(scConfig ScConfig, clusters *k8s.Clusters, dryRun bool) error {
 		return nil
 	}
 
-	log.Print("Creating generated storage classes in clusters")
+	csmlog.Info("Creating generated storage classes in clusters")
 
 	for _, cluster := range clusters.Clusters {
 		if cluster.GetID() == scConfig.SourceClusterID {
-			log.Print("Creating storage class in source cluster")
+			csmlog.Info("Creating storage class in source cluster")
 			_, err := cluster.CreateObject(context.Background(), srcSC)
 			if err != nil {
-				log.Errorf("Encountered error during creating object. Error: %s\n",
+				csmlog.Errorf("Encountered error during creating object. Error: %s\n",
 					err.Error())
 				continue
 			}
 		}
 
 		if cluster.GetID() == scConfig.TargetClusterID {
-			log.Print("Creating storage class in target cluster")
+			csmlog.Info("Creating storage class in target cluster")
 			_, err := cluster.CreateObject(context.Background(), tgtSC)
 			if err != nil {
-				log.Errorf("Encountered error during creating object. Error: %s\n",
+				csmlog.Errorf("Encountered error during creating object. Error: %s\n",
 					err.Error())
 				continue
 			}
@@ -422,7 +424,7 @@ func processCreateCmd(r io.Reader) ([][]byte, error) {
 func askForConfirmation(s string, in io.Reader, tries int) (bool, error) {
 	r := bufio.NewReader(in)
 	for ; tries > 0; tries-- {
-		log.Printf("%s [y/n]: ", s)
+		csmlog.Infof("%s [y/n]: ", s)
 		res, err := r.ReadString('\n')
 		if err != nil {
 			return false, err

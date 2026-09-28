@@ -20,9 +20,9 @@ import (
 	"time"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
-	"github.com/dell/repctl/mocks"
-	"github.com/dell/repctl/pkg/config"
-	"github.com/dell/repctl/pkg/k8s"
+	"github.com/dell/csm-replication/repctl/mocks"
+	"github.com/dell/csm-replication/repctl/pkg/config"
+	"github.com/dell/csm-replication/repctl/pkg/k8s"
 	"github.com/golang/mock/gomock"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
@@ -92,7 +92,7 @@ func TestGetSwapCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -164,7 +164,7 @@ func TestGetSwapCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -200,7 +200,7 @@ func TestGetSwapCommand(t *testing.T) {
 		getClustersFolderPathFunction = func(path string) (string, error) {
 			return path, nil
 		}
-		getWaitForStateToUpdateFunction = func(rgName string, cluster k8s.ClusterInterface, rLinkState repv1.ReplicationLinkState) bool {
+		getWaitForStateToUpdateFunction = func(_ string, _ k8s.ClusterInterface, _ repv1.ReplicationLinkState) bool {
 			return true
 		}
 
@@ -240,7 +240,7 @@ func TestGetSwapCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -288,7 +288,7 @@ func TestGetSwapCommand(t *testing.T) {
 		getClustersFolderPathFunction = func(path string) (string, error) {
 			return path, nil
 		}
-		getWaitForStateToUpdateFunction = func(rgName string, cluster k8s.ClusterInterface, rLinkState repv1.ReplicationLinkState) bool {
+		getWaitForStateToUpdateFunction = func(_ string, _ k8s.ClusterInterface, _ repv1.ReplicationLinkState) bool {
 			return false
 		}
 
@@ -329,7 +329,7 @@ func TestGetSwapCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -374,7 +374,7 @@ func TestGetSwapCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -446,7 +446,7 @@ func TestGetSwapCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -482,7 +482,7 @@ func TestGetSwapCommand(t *testing.T) {
 		getClustersFolderPathFunction = func(path string) (string, error) {
 			return path, nil
 		}
-		getWaitForStateToUpdateFunction = func(rgName string, cluster k8s.ClusterInterface, rLinkState repv1.ReplicationLinkState) bool {
+		getWaitForStateToUpdateFunction = func(_ string, _ k8s.ClusterInterface, _ repv1.ReplicationLinkState) bool {
 			return true
 		}
 
@@ -523,7 +523,7 @@ func TestGetSwapCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 
@@ -571,7 +571,7 @@ func TestGetSwapCommand(t *testing.T) {
 		getClustersFolderPathFunction = func(path string) (string, error) {
 			return path, nil
 		}
-		getWaitForStateToUpdateFunction = func(rgName string, cluster k8s.ClusterInterface, rLinkState repv1.ReplicationLinkState) bool {
+		getWaitForStateToUpdateFunction = func(_ string, _ k8s.ClusterInterface, _ repv1.ReplicationLinkState) bool {
 			return false
 		}
 
@@ -612,7 +612,7 @@ func TestGetSwapCommand(t *testing.T) {
 		defer func() {
 			k8s.GetCtrlRuntimeClient = defaultGetControllerRuntimeClient
 		}()
-		k8s.GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+		k8s.GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 			return mockClient, nil
 		}
 

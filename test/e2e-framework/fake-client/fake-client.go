@@ -1,5 +1,5 @@
 /*
-Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+Copyright © 2021-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,7 +39,8 @@ type ErrorInjector interface {
 	ShouldFail(method string, obj runtime.Object) error
 }
 
-type deleteSpoofer interface {
+// DeleteSpoofer intercepts delete requests in fake client.
+type DeleteSpoofer interface {
 	match(obj runtime.Object) bool
 }
 
@@ -47,7 +48,8 @@ type deleteSpooferImpl struct {
 	allowedObject runtime.Object
 }
 
-func NewDeleteSpooferImpl(allowedObject runtime.Object) deleteSpoofer {
+// NewDeleteSpooferImpl initializes and returns a DeleteSpoofer implementation.
+func NewDeleteSpooferImpl(allowedObject runtime.Object) DeleteSpoofer {
 	return &deleteSpooferImpl{allowedObject: allowedObject}
 }
 
@@ -76,7 +78,7 @@ type storageKey struct {
 type Client struct {
 	Objects       map[storageKey]runtime.Object
 	errorInjector ErrorInjector
-	deleteSpoofer deleteSpoofer
+	deleteSpoofer DeleteSpoofer
 	SubResourceClient
 }
 
@@ -100,8 +102,7 @@ func getKey(obj runtime.Object) (storageKey, error) {
 }
 
 // NewFakeClient initializes and returns new fake k8s client
-
-func NewFakeClient(initialObjects []runtime.Object, errorInjector ErrorInjector, deleteSpoofer deleteSpoofer) (*Client, error) {
+func NewFakeClient(initialObjects []runtime.Object, errorInjector ErrorInjector, deleteSpoofer DeleteSpoofer) (*Client, error) {
 	err := repv1.AddToScheme(scheme.Scheme)
 	if err != nil {
 		return nil, err

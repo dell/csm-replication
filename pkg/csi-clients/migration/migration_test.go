@@ -20,7 +20,6 @@ import (
 	"time"
 
 	csiext "github.com/dell/dell-csi-extensions/migration"
-	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -60,7 +59,7 @@ func TestVolumeMigrate(t *testing.T) {
 			scParams:       map[string]string{"param1": "value1"},
 			scSourceParams: map[string]string{"sourceParam1": "sourceValue1"},
 			toClone:        true,
-			expectedError:  "connection refused",
+			expectedError:  "rpc error",
 		},
 	}
 
@@ -68,7 +67,6 @@ func TestVolumeMigrate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &migration{
 				conn:    createFakeConnection(),
-				log:     logr.Discard(),
 				timeout: 5 * time.Second,
 			}
 
@@ -90,7 +88,7 @@ func TestArrayMigrate(t *testing.T) {
 			name:          "Failed to migrate array",
 			migrateAction: &csiext.ArrayMigrateRequest_Action{},
 			params:        map[string]string{"param1": "value1"},
-			expectedError: "connection refused",
+			expectedError: "rpc error",
 		},
 	}
 
@@ -98,7 +96,6 @@ func TestArrayMigrate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &migration{
 				conn:    createFakeConnection(),
-				log:     logr.Discard(),
 				timeout: 5 * time.Second,
 			}
 

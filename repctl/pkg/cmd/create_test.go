@@ -20,11 +20,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dell/repctl/mocks"
-	"github.com/dell/repctl/pkg/config"
-	"github.com/dell/repctl/pkg/k8s"
-	"github.com/dell/repctl/pkg/types"
-	log "github.com/sirupsen/logrus"
+	"github.com/dell/csm-replication/repctl/mocks"
+	"github.com/dell/csm-replication/repctl/pkg/config"
+	"github.com/dell/csm-replication/repctl/pkg/k8s"
+	"github.com/dell/csm-replication/repctl/pkg/types"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -73,19 +72,20 @@ func (suite *CreateTestSuite) TestCreatePVCs() {
 		suite.NotNil(cmd)
 
 		// cmd.Flag("rg").Value.Set(rgName)
-		cmd.Flag("target-namespace").Value.Set("test-ns")
+		_ = cmd.Flag("target-namespace").Value.Set("test-ns")
 		viper.Set("pvs", pvList)
-		cmd.Flag("dry-run").Value.Set("true")
+		_ = cmd.Flag("dry-run").Value.Set("true")
 		viper.Set(config.Clusters, "cluster-1")
 		viper.Set(config.ReplicationGroup, rgName)
 		viper.Set(config.ReplicationPrefix, prefix)
 		cmd.Run(nil, []string{})
 
-		defer func() { log.StandardLogger().ExitFunc = nil }()
+		originalFatalfFunc := createFatalfFunc
+		defer func() { createFatalfFunc = originalFatalfFunc }()
 		var fatal bool
-		log.StandardLogger().ExitFunc = func(int) { fatal = true }
+		createFatalfFunc = func(_ string, _ ...interface{}) { fatal = true }
 
-		cmd.Flag("dry-run").Value.Set("false")
+		_ = cmd.Flag("dry-run").Value.Set("false")
 		cmd.Run(nil, []string{})
 		suite.Equal(true, fatal)
 
@@ -130,19 +130,20 @@ func (suite *CreateTestSuite) TestCreatePVCs() {
 		suite.NotNil(cmd)
 
 		// cmd.Flag("rg").Value.Set(rgName)
-		cmd.Flag("target-namespace").Value.Set("test-ns")
+		_ = cmd.Flag("target-namespace").Value.Set("test-ns")
 		viper.Set("pvs", pvList)
-		cmd.Flag("dry-run").Value.Set("true")
+		_ = cmd.Flag("dry-run").Value.Set("true")
 		viper.Set(config.Clusters, "cluster-1")
 		viper.Set(config.ReplicationGroup, "")
 		viper.Set(config.ReplicationPrefix, prefix)
 		cmd.Run(nil, []string{})
 
-		defer func() { log.StandardLogger().ExitFunc = nil }()
+		originalFatalfFunc := createFatalfFunc
+		defer func() { createFatalfFunc = originalFatalfFunc }()
 		var fatal bool
-		log.StandardLogger().ExitFunc = func(int) { fatal = true }
+		createFatalfFunc = func(_ string, _ ...interface{}) { fatal = true }
 
-		cmd.Flag("dry-run").Value.Set("false")
+		_ = cmd.Flag("dry-run").Value.Set("false")
 		cmd.Run(nil, []string{})
 		suite.Equal(true, fatal)
 
@@ -215,12 +216,12 @@ func (suite *CreateTestSuite) TestCreateSCs() {
 	enc := yaml.NewEncoder(file)
 	err = enc.Encode(config)
 	suite.Nil(err)
-	cmd.Flag("from-config").Value.Set("testdata/test.yaml")
-	cmd.Flag("dry-run").Value.Set("true")
+	_ = cmd.Flag("from-config").Value.Set("testdata/test.yaml")
+	_ = cmd.Flag("dry-run").Value.Set("true")
 	cmd.Run(nil, []string{})
 	// err := createSCs(config, clusters, false)
 
-	cmd.Flag("dry-run").Value.Set("fasle")
+	_ = cmd.Flag("dry-run").Value.Set("fasle")
 	cmd.Run(nil, []string{})
 
 	createMultiClusterConfiguratorInterface = originalFunc
@@ -305,19 +306,20 @@ func (suite *CreateTestSuite) TestCreateFile() {
 		cmd := GetCreateCommand()
 		suite.NotNil(cmd)
 
-		cmd.Flag("file").Value.Set("testdata/test-ns.yaml")
+		_ = cmd.Flag("file").Value.Set("testdata/test-ns.yaml")
 		viper.Set(config.Clusters, "")
 
 		cmd.Run(nil, []string{})
 
-		cmd.Flag("file").Value.Set("-")
+		_ = cmd.Flag("file").Value.Set("-")
 		cmd.Run(nil, []string{})
 
-		defer func() { log.StandardLogger().ExitFunc = nil }()
+		originalFatalfFunc := createFatalfFunc
+		defer func() { createFatalfFunc = originalFatalfFunc }()
 		var fatal bool
-		log.StandardLogger().ExitFunc = func(int) { fatal = true }
+		createFatalfFunc = func(_ string, _ ...interface{}) { fatal = true }
 
-		cmd.Flag("file").Value.Set("testdata/invalid.yaml")
+		_ = cmd.Flag("file").Value.Set("testdata/invalid.yaml")
 		cmd.Run(nil, []string{})
 		suite.Equal(true, fatal)
 	})
@@ -341,12 +343,13 @@ func (suite *CreateTestSuite) TestCreateFile() {
 		cmd := GetCreateCommand()
 		suite.NotNil(cmd)
 
-		cmd.Flag("file").Value.Set("testdata/test-ns.yaml")
+		_ = cmd.Flag("file").Value.Set("testdata/test-ns.yaml")
 		viper.Set(config.Clusters, "")
 
-		defer func() { log.StandardLogger().ExitFunc = nil }()
+		originalFatalfFunc := createFatalfFunc
+		defer func() { createFatalfFunc = originalFatalfFunc }()
 		var fatal bool
-		log.StandardLogger().ExitFunc = func(int) { fatal = true }
+		createFatalfFunc = func(_ string, _ ...interface{}) { fatal = true }
 		cmd.Run(nil, []string{})
 		suite.Equal(true, fatal)
 	})
@@ -370,12 +373,13 @@ func (suite *CreateTestSuite) TestCreateFile() {
 		cmd := GetCreateCommand()
 		suite.NotNil(cmd)
 
-		cmd.Flag("file").Value.Set("testdata/test-ns.yaml")
+		_ = cmd.Flag("file").Value.Set("testdata/test-ns.yaml")
 		viper.Set(config.Clusters, "")
 
-		defer func() { log.StandardLogger().ExitFunc = nil }()
+		originalFatalfFunc := createFatalfFunc
+		defer func() { createFatalfFunc = originalFatalfFunc }()
 		var fatal bool
-		log.StandardLogger().ExitFunc = func(int) { fatal = true }
+		createFatalfFunc = func(_ string, _ ...interface{}) { fatal = true }
 		cmd.Run(nil, []string{})
 		suite.Equal(false, fatal)
 	})
@@ -399,12 +403,13 @@ func (suite *CreateTestSuite) TestCreateFile() {
 		cmd := GetCreateCommand()
 		suite.NotNil(cmd)
 
-		cmd.Flag("file").Value.Set("testdata/test-ns.yaml")
+		_ = cmd.Flag("file").Value.Set("testdata/test-ns.yaml")
 		viper.Set(config.Clusters, "")
 
-		defer func() { log.StandardLogger().ExitFunc = nil }()
+		originalFatalfFunc := createFatalfFunc
+		defer func() { createFatalfFunc = originalFatalfFunc }()
 		var fatal bool
-		log.StandardLogger().ExitFunc = func(int) { fatal = true }
+		createFatalfFunc = func(_ string, _ ...interface{}) { fatal = true }
 		cmd.Run(nil, []string{})
 		suite.Equal(false, fatal)
 	})

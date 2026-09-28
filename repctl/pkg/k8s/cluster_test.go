@@ -25,9 +25,9 @@ import (
 
 	repv1 "github.com/dell/csm-replication/api/v1"
 	fake_client "github.com/dell/csm-replication/test/e2e-framework/fake-client"
-	"github.com/dell/repctl/pkg/display"
-	"github.com/dell/repctl/pkg/metadata"
-	"github.com/dell/repctl/pkg/types"
+	"github.com/dell/csm-replication/repctl/pkg/display"
+	"github.com/dell/csm-replication/repctl/pkg/metadata"
+	"github.com/dell/csm-replication/repctl/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	appsv1 "k8s.io/api/apps/v1"
@@ -386,7 +386,7 @@ func (suite *ClusterTestSuite) TestFilterPersistentVolumeClaims() {
 		},
 	}
 
-	suite.Suite.T().Run("success: get all PVC", func(t *testing.T) {
+	suite.Suite.T().Run("success: get all PVC", func(_ *testing.T) {
 		fake, err := fake_client.NewFakeClient([]runtime.Object{pvc1, pvc2}, nil, nil)
 		suite.NoError(err)
 
@@ -406,7 +406,7 @@ func (suite *ClusterTestSuite) TestFilterPersistentVolumeClaims() {
 		suite.ElementsMatch(names, []string{"test-pvc-1", "test-pvc-2"})
 	})
 
-	suite.Suite.T().Run("success: match labels get PVC", func(t *testing.T) {
+	suite.Suite.T().Run("success: match labels get PVC", func(_ *testing.T) {
 		fake, err := fake_client.NewFakeClient([]runtime.Object{pvc1, pvc2, repPVC}, nil, nil)
 		suite.NoError(err)
 
@@ -450,7 +450,7 @@ func (suite *ClusterTestSuite) TestCreatePVCsFromPVs() {
 		Annotations:   annotations,
 	}
 
-	suite.Suite.T().Run("success: create pvc from pv", func(t *testing.T) {
+	suite.Suite.T().Run("success: create pvc from pv", func(_ *testing.T) {
 		fake, err := fake_client.NewFakeClient([]runtime.Object{}, nil, nil)
 		suite.NoError(err)
 
@@ -473,7 +473,7 @@ func (suite *ClusterTestSuite) TestCreatePVCsFromPVs() {
 		suite.ElementsMatch(pvNames, []string{"pv-1", "pv-2"})
 	})
 
-	suite.Suite.T().Run("success: pvc already exist", func(t *testing.T) {
+	suite.Suite.T().Run("success: pvc already exist", func(_ *testing.T) {
 		fake, err := fake_client.NewFakeClient([]runtime.Object{}, nil, nil)
 		suite.NoError(err)
 
@@ -485,7 +485,7 @@ func (suite *ClusterTestSuite) TestCreatePVCsFromPVs() {
 		suite.NoError(err)
 	})
 
-	suite.Suite.T().Run("success: dryrun only", func(t *testing.T) {
+	suite.Suite.T().Run("success: dryrun only", func(_ *testing.T) {
 		fake, err := fake_client.NewFakeClient([]runtime.Object{}, nil, nil)
 		suite.NoError(err)
 
@@ -497,7 +497,7 @@ func (suite *ClusterTestSuite) TestCreatePVCsFromPVs() {
 		// Do to fake_client implementation, dryRun does not work as it should.
 	})
 
-	suite.Suite.T().Run("fail: unable to create", func(t *testing.T) {
+	suite.Suite.T().Run("fail: unable to create", func(_ *testing.T) {
 		fake, err := fake_client.NewFakeClient([]runtime.Object{}, &errorInjector{}, nil)
 		suite.NoError(err)
 
@@ -615,56 +615,56 @@ func TestClusterTestSuite(t *testing.T) {
 // Mock implementation of ClientInterface
 type MockClient struct{}
 
-func (m *MockClient) On(s string, ctx context.Context, rg *repv1.DellCSIReplicationGroup, patch client.Patch) {
+func (m *MockClient) On(_ context.Context, _ string, _ *repv1.DellCSIReplicationGroup, _ client.Patch) {
 	panic("unimplemented")
 }
 
 // Create implements ClientInterface.
-func (m *MockClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+func (m *MockClient) Create(_ context.Context, _ client.Object, _ ...client.CreateOption) error {
 	panic("unimplemented")
 }
 
 // Delete implements ClientInterface.
-func (m *MockClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
+func (m *MockClient) Delete(_ context.Context, _ client.Object, _ ...client.DeleteOption) error {
 	panic("unimplemented")
 }
 
 // DeleteAllOf implements ClientInterface.
-func (m *MockClient) DeleteAllOf(ctx context.Context, obj client.Object, opts ...client.DeleteAllOfOption) error {
+func (m *MockClient) DeleteAllOf(_ context.Context, _ client.Object, _ ...client.DeleteAllOfOption) error {
 	panic("unimplemented")
 }
 
 // Get implements ClientInterface.
-func (m *MockClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+func (m *MockClient) Get(_ context.Context, _ client.ObjectKey, _ client.Object, _ ...client.GetOption) error {
 	panic("unimplemented")
 }
 
 // Apply implements ClientInterface.
-func (f *MockClient) Apply(_ context.Context, _ runtime.ApplyConfiguration, _ ...client.ApplyOption) error {
+func (m *MockClient) Apply(_ context.Context, _ runtime.ApplyConfiguration, _ ...client.ApplyOption) error {
 	panic("unimplemented")
 }
 
 // GroupVersionKindFor implements ClientInterface.
-func (m *MockClient) GroupVersionKindFor(obj runtime.Object) (schema.GroupVersionKind, error) {
+func (m *MockClient) GroupVersionKindFor(_ runtime.Object) (schema.GroupVersionKind, error) {
 	panic("unimplemented")
 }
 
 // IsObjectNamespaced implements ClientInterface.
-func (m *MockClient) IsObjectNamespaced(obj runtime.Object) (bool, error) {
+func (m *MockClient) IsObjectNamespaced(_ runtime.Object) (bool, error) {
 	panic("unimplemented")
 }
 
 // List implements ClientInterface.
-func (m *MockClient) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+func (m *MockClient) List(_ context.Context, _ client.ObjectList, _ ...client.ListOption) error {
 	panic("unimplemented")
 }
 
 // Patch implements ClientInterface.
-func (m *MockClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+func (m *MockClient) Patch(_ context.Context, _ client.Object, _ client.Patch, _ ...client.PatchOption) error {
 	panic("unimplemented")
 }
 
-func (m *MockClient) Called(ctx context.Context, obj client.Object, patch client.Patch) any {
+func (m *MockClient) Called(_ context.Context, _ client.Object, _ client.Patch) any {
 	panic("unimplemented")
 }
 
@@ -684,12 +684,12 @@ func (m *MockClient) Status() client.SubResourceWriter {
 }
 
 // SubResource implements ClientInterface.
-func (m *MockClient) SubResource(subResource string) client.SubResourceClient {
+func (m *MockClient) SubResource(_ string) client.SubResourceClient {
 	panic("unimplemented")
 }
 
 // Update implements ClientInterface.
-func (m *MockClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+func (m *MockClient) Update(_ context.Context, _ client.Object, _ ...client.UpdateOption) error {
 	panic("unimplemented")
 }
 
@@ -697,7 +697,7 @@ func (m *MockClient) GetClient() ClientInterface {
 	return m
 }
 
-func (m *MockClient) SetClient(client ClientInterface) {}
+func (m *MockClient) SetClient(_ ClientInterface) {}
 
 func (m *MockClient) GetID() string {
 	return "mock-id"
@@ -1359,10 +1359,10 @@ func TestNewClientSet(t *testing.T) {
 		{
 			name: "Clientset creation is successful",
 			setup: func() {
-				clientcmdBuildConfigFromFlags = func(masterUrl, kubeconfigPath string) (*rest.Config, error) {
+				clientcmdBuildConfigFromFlags = func(_ string, _ string) (*rest.Config, error) {
 					return &rest.Config{}, nil
 				}
-				kubernetesNewForConfig = func(config *rest.Config) (*kubernetes.Clientset, error) {
+				kubernetesNewForConfig = func(_ *rest.Config) (*kubernetes.Clientset, error) {
 					return &kubernetes.Clientset{}, nil
 				}
 			},
@@ -1371,7 +1371,7 @@ func TestNewClientSet(t *testing.T) {
 		{
 			name: "Config creation fails",
 			setup: func() {
-				clientcmdBuildConfigFromFlags = func(masterUrl, kubeconfigPath string) (*rest.Config, error) {
+				clientcmdBuildConfigFromFlags = func(_ string, _ string) (*rest.Config, error) {
 					return nil, fmt.Errorf("mock error")
 				}
 			},
@@ -1380,10 +1380,10 @@ func TestNewClientSet(t *testing.T) {
 		{
 			name: "Clientset creation fails",
 			setup: func() {
-				clientcmdBuildConfigFromFlags = func(masterUrl, kubeconfigPath string) (*rest.Config, error) {
+				clientcmdBuildConfigFromFlags = func(_ string, _ string) (*rest.Config, error) {
 					return &rest.Config{}, nil
 				}
-				kubernetesNewForConfig = func(config *rest.Config) (*kubernetes.Clientset, error) {
+				kubernetesNewForConfig = func(_ *rest.Config) (*kubernetes.Clientset, error) {
 					return nil, fmt.Errorf("mock error")
 				}
 			},
@@ -1448,7 +1448,7 @@ func TestClusters_Print(t *testing.T) {
 		{
 			name: "Table writer creation fails",
 			setup: func() {
-				displayNewTableWriter = func(obj interface{}, w io.Writer) (*display.TableWriter, error) {
+				displayNewTableWriter = func(_ interface{}, _ io.Writer) (*display.TableWriter, error) {
 					return nil, fmt.Errorf("mock error")
 				}
 			},
@@ -1508,13 +1508,13 @@ func TestCreateCluster(t *testing.T) {
 		{
 			name: "Cluster creation is successful",
 			setup: func() {
-				GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+				GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 					return &mockClient{}, nil
 				}
-				newClntSet = func(kubeconfig string) (*kubernetes.Clientset, *rest.Config, error) {
+				newClntSet = func(_ string) (*kubernetes.Clientset, *rest.Config, error) {
 					return &kubernetes.Clientset{}, &rest.Config{Host: "https://mock-host"}, nil
 				}
-				getServiceVersion = func(clientset *kubernetes.Clientset) (*version.Info, error) {
+				getServiceVersion = func(_ *kubernetes.Clientset) (*version.Info, error) {
 					return &version.Info{Major: "1", Minor: "20"}, nil
 				}
 			},
@@ -1523,7 +1523,7 @@ func TestCreateCluster(t *testing.T) {
 		{
 			name: "Controller runtime client creation fails",
 			setup: func() {
-				GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+				GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 					return nil, fmt.Errorf("mock error")
 				}
 			},
@@ -1532,10 +1532,10 @@ func TestCreateCluster(t *testing.T) {
 		{
 			name: "Clientset creation fails",
 			setup: func() {
-				GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
+				GetCtrlRuntimeClient = func(_ string) (client.Client, error) {
 					return &mockClient{}, nil
 				}
-				newClntSet = func(kubeconfig string) (*kubernetes.Clientset, *rest.Config, error) {
+				newClntSet = func(_ string) (*kubernetes.Clientset, *rest.Config, error) {
 					return nil, nil, fmt.Errorf("mock error")
 				}
 			},
@@ -1561,7 +1561,7 @@ func TestCreateCluster(t *testing.T) {
 	}
 }
 
-func (m *mockClient) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+func (m *mockClient) List(_ context.Context, list client.ObjectList, _ ...client.ListOption) error {
 	podList := list.(*v1.PodList)
 	*podList = v1.PodList{
 		Items: []v1.Pod{
@@ -1626,7 +1626,7 @@ func TestFilterPods(t *testing.T) {
 	}
 }
 
-func (m *mockClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
+func (m *mockClient) Delete(_ context.Context, obj client.Object, _ ...client.DeleteOption) error {
 	// Mock deletion logic
 	if obj.GetName() == "error-sts" {
 		return fmt.Errorf("mock error")
@@ -1675,7 +1675,7 @@ func TestDeleteStsOrphan(t *testing.T) {
 	}
 }
 
-func (m *mockClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+func (m *mockClient) Create(_ context.Context, obj client.Object, _ ...client.CreateOption) error {
 	// Mock creation logic
 	if obj.GetName() == "error-object" {
 		return fmt.Errorf("mock error")
@@ -1686,7 +1686,7 @@ func (m *mockClient) Create(ctx context.Context, obj client.Object, opts ...clie
 	return nil
 }
 
-func (m *mockClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+func (m *mockClient) Update(_ context.Context, obj client.Object, _ ...client.UpdateOption) error {
 	// Mock update logic
 	if obj.GetName() == "error-object" {
 		return fmt.Errorf("mock error")

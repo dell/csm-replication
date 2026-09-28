@@ -17,9 +17,9 @@ package cmd
 import (
 	"context"
 
-	"github.com/dell/repctl/pkg/config"
-	"github.com/dell/repctl/pkg/k8s"
-	log "github.com/sirupsen/logrus"
+	csmlog "github.com/dell/csmlog"
+	"github.com/dell/csm-replication/repctl/pkg/config"
+	"github.com/dell/csm-replication/repctl/pkg/k8s"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -39,7 +39,7 @@ For single cluster config:
 This command will perform a reprotect at specified cluster or at the RG.
 To perform a reprotect at a cluster, use --at <clusterID> with --rg <rg-id> and to do reprotect at RG, use --rg <rg-id>.
 repctl will patch CR at cluster1 with action REPROTECT_LOCAL.`,
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			rgName := viper.GetString(config.ReplicationGroup)
 			inputCluster := viper.GetString("atTgt")
 			verbose := viper.GetBool(config.Verbose)
@@ -47,14 +47,14 @@ repctl will patch CR at cluster1 with action REPROTECT_LOCAL.`,
 			input, res := verifyInputForAction(inputCluster, rgName)
 			configFolder, err := getClustersFolderPathFunction(clusterPath)
 			if err != nil {
-				log.Fatalf("reprotect: error getting clusters folder path: %s\n", err.Error())
+				csmlog.Fatalf("reprotect: error getting clusters folder path: %s\n", err.Error())
 			}
 			if input == "cluster" {
 				reprotectAtCluster(configFolder, res, rgName, verbose, wait)
 			} else if input == "rg" {
 				reprotectAtRG(configFolder, res, verbose, wait)
 			} else {
-				log.Error("unexpected input received")
+				csmlog.Error("unexpected input received")
 				return
 			}
 		},
@@ -74,19 +74,19 @@ func verifyInputForAction(input string, rg string) (res string, tgt string) {
 		if rg != "" {
 			input = rg
 		} else {
-			log.Fatalf("failover: wrong input, no input provided. Either clusterID or RGID is needed.\n")
+			csmlog.Fatalf("failover: wrong input, no input provided. Either clusterID or RGID is needed.\n")
 		}
 	}
 
 	configFolder, err := getClustersFolderPathFunction(clusterPath)
 	if err != nil {
-		log.Fatalf("list pvc: error getting clusters folder path: %s", err.Error())
+		csmlog.Fatalf("list pvc: error getting clusters folder path: %s", err.Error())
 	}
 
 	mc := &k8s.MultiClusterConfigurator{}
 	clusters, err := mc.GetAllClusters([]string{}, configFolder)
 	if err != nil {
-		log.Fatalf("error in initializing cluster info: %s", err.Error())
+		csmlog.Fatalf("error in initializing cluster info: %s", err.Error())
 	}
 
 	for _, cluster := range clusters.Clusters {
@@ -95,7 +95,7 @@ func verifyInputForAction(input string, rg string) (res string, tgt string) {
 		}
 		rgList, err := cluster.ListReplicationGroups(context.Background())
 		if err != nil {
-			log.Printf("Encountered error during filtering persistent volume claims. Error: %s",
+			csmlog.Infof("Encountered error during filtering persistent volume claims. Error: %s",
 				err.Error())
 			continue
 		}
@@ -110,74 +110,74 @@ func verifyInputForAction(input string, rg string) (res string, tgt string) {
 
 func reprotectAtRG(configFolder, rgName string, verbose bool, wait bool) {
 	if verbose {
-		log.Printf("fetching RG and cluster info...\n")
+		csmlog.Infof("fetching RG and cluster info...\n")
 	}
 	// fetch the specified RG and the cluster info
 	cluster, rg, err := GetRGAndClusterFromRGID(configFolder, rgName, "")
 	if err != nil {
-		log.Fatalf("reprotect to RG: error fetching RG info: (%s)\n", err.Error())
+		csmlog.Fatalf("reprotect to RG: error fetching RG info: (%s)\n", err.Error())
 	}
 	if verbose {
-		log.Printf("found specified RG (%s) on cluster (%s)...\n", rg.Name, cluster.GetID())
-		log.Print("updating spec...", rg.Name)
+		csmlog.Infof("found specified RG (%s) on cluster (%s)...\n", rg.Name, cluster.GetID())
+		csmlog.Infof("updating spec... %s", rg.Name)
 
 	}
 	rLinkState := rg.Status.ReplicationLinkState
 	if rLinkState.LastSuccessfulUpdate == nil {
-		log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
+		csmlog.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
 	}
 	rg.Spec.Action = config.ActionReprotect
 	if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
-		log.Fatalf("reprotect: error executing UpdateAction %s\n", err.Error())
+		csmlog.Fatalf("reprotect: error executing UpdateAction %s\n", err.Error())
 	}
 	if wait {
 		success := waitForStateToUpdate(rgName, cluster, rLinkState)
 		if success {
-			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
+			csmlog.Infof("Successfully executed action on RG (%s)\n", rg.Name)
 			return
 		}
-		log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
+		csmlog.Infof("RG (%s), timed out with action: failover\n", rg.Name)
 		return
 	}
-	log.Printf("RG (%s), successfully updated with action: reprotect\n", rg.Name)
+	csmlog.Infof("RG (%s), successfully updated with action: reprotect\n", rg.Name)
 }
 
 func reprotectAtCluster(configFolder, inputCluster, rgName string, verbose bool, wait bool) {
 	if verbose {
-		log.Print("reading cluster configs...")
+		csmlog.Info("reading cluster configs...")
 	}
 	mc := &k8s.MultiClusterConfigurator{}
 	clusters, err := mc.GetAllClusters([]string{inputCluster}, configFolder)
 	if err != nil {
-		log.Fatalf("reprotect: error in initializing cluster info: %s\n", err.Error())
+		csmlog.Fatalf("reprotect: error in initializing cluster info: %s\n", err.Error())
 	}
 	cluster := clusters.Clusters[0]
 	if verbose {
-		log.Printf("found cluster (%s)\n", cluster.GetID())
+		csmlog.Infof("found cluster (%s)\n", cluster.GetID())
 	}
 	rg, err := cluster.GetReplicationGroups(context.Background(), rgName)
 	if err != nil {
-		log.Fatalf("reprotect: error in fecthing RG info: %s\n", err.Error())
+		csmlog.Fatalf("reprotect: error in fecthing RG info: %s\n", err.Error())
 	}
 	if verbose {
-		log.Printf("found RG (%s) on cluster, updating spec...\n", rg.Name)
+		csmlog.Infof("found RG (%s) on cluster, updating spec...\n", rg.Name)
 	}
 	rLinkState := rg.Status.ReplicationLinkState
 	if rLinkState.LastSuccessfulUpdate == nil {
-		log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
+		csmlog.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
 	}
 	rg.Spec.Action = config.ActionReprotect
 	if err := cluster.UpdateReplicationGroup(context.Background(), rg); err != nil {
-		log.Fatalf("reprotect: error executing UpdateAction %s\n", err.Error())
+		csmlog.Fatalf("reprotect: error executing UpdateAction %s\n", err.Error())
 	}
 	if wait {
 		success := waitForStateToUpdate(rgName, cluster, rLinkState)
 		if success {
-			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
+			csmlog.Infof("Successfully executed action on RG (%s)\n", rg.Name)
 			return
 		}
-		log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
+		csmlog.Infof("RG (%s), timed out with action: failover\n", rg.Name)
 		return
 	}
-	log.Printf("RG (%s), successfully updated with action: reprotect\n", rg.Name)
+	csmlog.Infof("RG (%s), successfully updated with action: reprotect\n", rg.Name)
 }

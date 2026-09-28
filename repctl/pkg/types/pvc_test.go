@@ -68,7 +68,7 @@ func TestGetPVC(t *testing.T) {
 	}
 }
 
-func TestPersistentVolumeClaimList_Print(t *testing.T) {
+func TestPersistentVolumeClaimList_Print(_ *testing.T) {
 	pvcList := &PersistentVolumeClaimList{
 		PVCList: []PersistentVolumeClaim{
 			{

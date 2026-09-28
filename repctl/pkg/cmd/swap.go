@@ -18,10 +18,10 @@ import (
 	"context"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
-	"github.com/dell/repctl/pkg/k8s"
+	"github.com/dell/csm-replication/repctl/pkg/k8s"
 
-	"github.com/dell/repctl/pkg/config"
-	log "github.com/sirupsen/logrus"
+	csmlog "github.com/dell/csmlog"
+	"github.com/dell/csm-replication/repctl/pkg/config"
 	"github.com/spf13/viper"
 
 	"github.com/spf13/cobra"
@@ -42,7 +42,7 @@ For single cluster config:
 This command will perform a swap at specified cluster or at the RG.
 To perform a swap at a cluster, use --at <clusterID> with --rg <rg-id> and to do failover to RG, use --rg <rg-id>.
 repctl will patch CR at cluster1 with action SWAP_LOCAL.`,
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			rgName := viper.GetString(config.ReplicationGroup)
 			inputCluster := viper.GetString("toTgt")
 			verbose := viper.GetBool(config.Verbose)
@@ -50,14 +50,14 @@ repctl will patch CR at cluster1 with action SWAP_LOCAL.`,
 			input, res := verifyInputForAction(inputCluster, rgName)
 			configFolder, err := getClustersFolderPathFunction(clusterPath)
 			if err != nil {
-				log.Fatalf("swap: error getting clusters folder path: %s", err.Error())
+				csmlog.Fatalf("swap: error getting clusters folder path: %s", err.Error())
 			}
 			if input == "cluster" {
 				swapAtCluster(configFolder, res, rgName, verbose, wait)
 			} else if input == "rg" {
 				swapAtRG(configFolder, res, verbose, wait)
 			} else {
-				log.Errorf("Unexpected input received")
+				csmlog.Errorf("Unexpected input received")
 				return
 			}
 		},
@@ -74,76 +74,76 @@ repctl will patch CR at cluster1 with action SWAP_LOCAL.`,
 
 func swapAtRG(configFolder string, rgName string, verbose bool, wait bool) {
 	if verbose {
-		log.Printf("fetching RG and cluster info...")
+		csmlog.Infof("fetching RG and cluster info...")
 	}
 	// fetch the specified RG and the cluster info
 	cluster, rg, err := getRGAndClusterFromRGIDFunction(configFolder, rgName, "")
 	if err != nil {
-		log.Fatalf("failover to RG: error fetching RG info: (%s)", err.Error())
+		csmlog.Fatalf("failover to RG: error fetching RG info: (%s)", err.Error())
 	}
 	if verbose {
-		log.Printf("found specified RG (%s) on cluster (%s)...", rg.Name, cluster.GetID())
-		log.Print("updating spec...", rg.Name)
+		csmlog.Infof("found specified RG (%s) on cluster (%s)...", rg.Name, cluster.GetID())
+		csmlog.Infof("updating spec... %s", rg.Name)
 
 	}
 	rLinkState := rg.Status.ReplicationLinkState
 	if rLinkState.LastSuccessfulUpdate == nil {
-		log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
+		csmlog.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
 	}
 	rg.Spec.Action = config.ActionSwap
 	if err := getUpdateReplicationGroupFunction(cluster, context.Background(), rg); err != nil {
-		log.Fatalf("swap: error executing UpdateAction %s", err.Error())
+		csmlog.Fatalf("swap: error executing UpdateAction %s", err.Error())
 	}
 	if wait {
 		success := getWaitForStateToUpdateFunction(rgName, cluster, rLinkState)
 		if success {
-			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
+			csmlog.Infof("Successfully executed action on RG (%s)\n", rg.Name)
 			return
 		}
-		log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
+		csmlog.Infof("RG (%s), timed out with action: failover\n", rg.Name)
 		return
 	}
-	log.Printf("RG (%s), successfully updated with action: swap", rg.Name)
+	csmlog.Infof("RG (%s), successfully updated with action: swap", rg.Name)
 }
 
 func swapAtCluster(configFolder string, inputCluster string, rgName string, verbose bool, wait bool) {
 	if verbose {
-		log.Print("reading cluster configs...")
+		csmlog.Info("reading cluster configs...")
 	}
 	// mc := &k8s.MultiClusterConfigurator{}
 	clusters, err := getAllClustersFunction([]string{inputCluster}, configFolder)
 	if err != nil {
-		log.Fatalf("swap: error in initializing cluster info: %s", err.Error())
+		csmlog.Fatalf("swap: error in initializing cluster info: %s", err.Error())
 	}
 	cluster := clusters.Clusters[0]
 	if verbose {
-		log.Printf("found cluster (%s)", cluster.GetID())
+		csmlog.Infof("found cluster (%s)", cluster.GetID())
 	}
 	rg, err := getReplicationGroupsFunction(cluster, context.Background(), rgName)
 	if err != nil {
-		log.Fatalf("swap: error in fecthing RG info: %s", err.Error())
+		csmlog.Fatalf("swap: error in fecthing RG info: %s", err.Error())
 	}
 	if verbose {
-		log.Printf("found RG (%s) on cluster, updating spec...", rg.Name)
+		csmlog.Infof("found RG (%s) on cluster, updating spec...", rg.Name)
 	}
 	rLinkState := rg.Status.ReplicationLinkState
 	if rLinkState.LastSuccessfulUpdate == nil {
-		log.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
+		csmlog.Fatal("Aborted. One of your RGs is in error state. Please verify RGs logs/events and try again.")
 	}
 	rg.Spec.Action = config.ActionSwap
 	if err := getUpdateReplicationGroupFunction(cluster, context.Background(), rg); err != nil {
-		log.Fatalf("swap: error executing UpdateAction %s", err.Error())
+		csmlog.Fatalf("swap: error executing UpdateAction %s", err.Error())
 	}
 	if wait {
 		success := getWaitForStateToUpdateFunction(rgName, cluster, rLinkState)
 		if success {
-			log.Printf("Successfully executed action on RG (%s)\n", rg.Name)
+			csmlog.Infof("Successfully executed action on RG (%s)\n", rg.Name)
 			return
 		}
-		log.Printf("RG (%s), timed out with action: failover\n", rg.Name)
+		csmlog.Infof("RG (%s), timed out with action: failover\n", rg.Name)
 		return
 	}
-	log.Printf("RG (%s), successfully updated with action: swap", rg.Name)
+	csmlog.Infof("RG (%s), successfully updated with action: swap", rg.Name)
 }
 
 var getReplicationGroupsFunction = func(cluster k8s.ClusterInterface, ctx context.Context, rgName string) (*repv1.DellCSIReplicationGroup, error) {

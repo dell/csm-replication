@@ -18,8 +18,6 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -30,14 +28,12 @@ import (
 	controller "github.com/dell/csm-replication/controllers/csi-node-rescanner"
 	"github.com/dell/csm-replication/core"
 	"github.com/dell/csm-replication/pkg/common/constants"
-	"github.com/dell/csm-replication/pkg/common/logger"
 	"github.com/dell/csm-replication/pkg/config"
 	csiidentity "github.com/dell/csm-replication/pkg/csi-clients/identity"
+	"github.com/dell/csmlog"
 	"github.com/dell/dell-csi-extensions/migration"
-	"github.com/bombsimon/logrusr/v4"
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-logr/logr"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -56,7 +52,6 @@ import (
 
 var (
 	scheme                       = runtime.NewScheme()
-	setupLog                     = ctrl.Log.WithName("setup")
 	currentSupportedCapabilities = map[migration.MigrateTypes]bool{
 		migration.MigrateTypes_NON_REPL_TO_REPL: true,
 		migration.MigrateTypes_REPL_TO_NON_REPL: true,
@@ -87,8 +82,12 @@ var (
 		return mgr.Start(ctrl.SetupSignalHandler())
 	}
 
-	getConnection = func(csiAddress string, setupLog logr.Logger) (*grpc.ClientConn, error) {
-		return connection.Connect(csiAddress, setupLog)
+	getConnection = func(csiAddress string) (*grpc.ClientConn, error) {
+		return connection.Connect(csiAddress)
+	}
+
+	getUpdateConfigMapFunc = func(mgr *NodeRescanner, ctx context.Context) error {
+		return mgr.config.UpdateConfigMap(ctx, nil, mgr.Opts, nil)
 	}
 
 	ManifestSemver string
@@ -108,42 +107,52 @@ type NodeRescanner struct {
 	NodeName string
 }
 
-func (mgr *NodeRescanner) processConfigMapChanges(loggerConfig *logrus.Logger) {
-	loggerConfig.Info("Received a config change event")
-	err := mgr.config.UpdateConfigMap(context.Background(), nil, mgr.Opts, nil, mgr.Manager.GetLogger())
+func (mgr *NodeRescanner) processConfigMapChanges() {
+	csmlog.Info("Received a config change event")
+	err := getUpdateConfigMapFunc(mgr, context.Background())
 	if err != nil {
-		loggerConfig.Error("Error parsing the config: ", err)
+		csmlog.Errorf("Error parsing the config: %v", err)
 		return
 	}
 	mgr.config.Lock.Lock()
 	defer mgr.config.Lock.Unlock()
-	level, err := logger.ParseLevel(mgr.config.LogLevel)
-	if err != nil {
-		loggerConfig.Error("Unable to parse ", err)
+	normalizedLogLevel := strings.ToLower(strings.TrimSpace(mgr.config.LogLevel))
+	if normalizedLogLevel != "" {
+		level, err := csmlog.ParseLevel(normalizedLogLevel)
+		if err != nil {
+			csmlog.Errorf("Unable to parse log level: %v", err)
+		} else {
+			csmlog.Infof("set level to %v", level)
+			csmlog.SetLevel(level)
+		}
 	}
-	loggerConfig.Info("set level to", level)
-	loggerConfig.SetLevel(level)
+	format := mgr.config.LogFormat
+	if format != "" {
+		switch strings.ToLower(format) {
+		case "json", "text":
+			csmlog.Infof("set format to %v", strings.ToLower(format))
+			csmlog.SetFormat(strings.ToLower(format))
+		default:
+			csmlog.Errorf("invalid log format %q, falling back to json", format)
+			csmlog.SetFormat("json")
+		}
+	}
 }
 
-func (mgr *NodeRescanner) setupConfigMapWatcher(loggerConfig *logrus.Logger) {
-	log.Println("Started ConfigMap Watcher")
+func (mgr *NodeRescanner) setupConfigMapWatcher() {
+	csmlog.Info("Started ConfigMap Watcher")
 	viper.WatchConfig()
 	viper.OnConfigChange(func(_ fsnotify.Event) {
-		mgr.processConfigMapChanges(loggerConfig)
+		mgr.processConfigMapChanges()
 	})
 }
 
 func createNodeReScannerManager(_ context.Context, mgr ctrl.Manager) *NodeRescanner {
 	opts := config.GetControllerManagerOpts()
 	opts.Mode = "sidecar"
-	//mgrLogger := mgr.GetLogger()
-	//repConfig, err := config.GetConfig(ctx, nil, opts, nil, mgrLogger)
-	//if err != nil {
-	//	return nil, err
-	//}
 	nodeName, found := os.LookupEnv(constants.EnvNodeName)
 	if !found {
-		logrus.Warning("Node name not found")
+		csmlog.Warn("Node name not found")
 		nodeName = ""
 	}
 	controllerManager := NodeRescanner{
@@ -158,26 +167,26 @@ func createNodeReScannerManager(_ context.Context, mgr ctrl.Manager) *NodeRescan
 // +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;watch;list;delete;update;create
 
 func main() {
-	flagMap, setupLog, ctx := setupFlags()
+	flagMap, ctx := setupFlags()
 
 	// Connect to csi
-	csiConn := getCSIConn(flagMap["csi-address"], setupLog)
+	csiConn := getCSIConn(flagMap["csi-address"])
 
 	// Create an instance of the identity client
-	identityClient := csiidentity.New(csiConn, ctrl.Log.WithName("identity-client"), stringToTimeDuration(flagMap["timeout"]), stringToTimeDuration(flagMap["probe-frequency"]))
+	identityClient := csiidentity.New(csiConn, stringToTimeDuration(flagMap["timeout"]), stringToTimeDuration(flagMap["probe-frequency"]))
 
 	// Probe the CSI driverand create the metrics server
-	probeAndCreateMetricsServer(ctx, csiConn, setupLog, identityClient, flagMap)
+	probeAndCreateMetricsServer(ctx, csiConn, identityClient, flagMap)
 }
 
-func probeAndCreateMetricsServer(ctx context.Context, csiConn *grpc.ClientConn, setupLog logr.Logger, identityClient csiidentity.Identity, flagMap map[string]string) {
-	driverName := probeCSIDriver(ctx, csiConn, setupLog, identityClient)
+func probeAndCreateMetricsServer(ctx context.Context, csiConn *grpc.ClientConn, identityClient csiidentity.Identity, flagMap map[string]string) {
+	driverName := probeCSIDriver(ctx, csiConn, identityClient)
 
 	// Create the metrics server
-	createMetricsServer(ctx, driverName, flagMap["metrics-addr"], stringToBoolean(flagMap["leader-election"]), setupLog, stringToTimeDuration(flagMap["retry-interval-start"]), stringToTimeDuration(flagMap["retry-interval-max"]), stringToTimeDuration(flagMap["max-retry-duration-for-actions"]), stringToInt(flagMap["worker-threads"]))
+	createMetricsServer(ctx, driverName, flagMap["metrics-addr"], stringToBoolean(flagMap["leader-election"]), stringToTimeDuration(flagMap["retry-interval-start"]), stringToTimeDuration(flagMap["retry-interval-max"]), stringToTimeDuration(flagMap["max-retry-duration-for-actions"]), stringToInt(flagMap["worker-threads"]))
 }
 
-func setupFlags() (map[string]string, logr.Logger, context.Context) {
+func setupFlags() (map[string]string, context.Context) {
 	var (
 		metricsAddr                string
 		enableLeaderElection       bool
@@ -208,8 +217,13 @@ func setupFlags() (map[string]string, logr.Logger, context.Context) {
 	flag.Parse()
 	controllers.InitLabelsAndAnnotations(domain)
 
-	setupLog.V(1).Info("Prefix", "Domain", domain)
-	setupLog.V(1).Info(constants.DellCSINodeReScanner, "Version", ManifestSemver, "Creation Time", core.CommitTime.Format(time.RFC1123))
+	// Set controller-runtime logger to discard to prevent goroutine error
+	// controller-runtime requires a global logger to be set; we discard its internal logs
+	// and use csmlog for all application-specific logging instead
+	ctrl.SetLogger(logr.Discard())
+
+	csmlog.Infof("Prefix: %v", domain)
+	csmlog.Infof("%s Version: %s, Creation Time: %s", constants.DellCSINodeReScanner, ManifestSemver, core.CommitTime.Format(time.RFC1123))
 
 	flags := make(map[string]string)
 	flags["metrics-addr"] = metricsAddr
@@ -223,38 +237,38 @@ func setupFlags() (map[string]string, logr.Logger, context.Context) {
 	flags["timeout"] = operationTimeout.String()
 	flags["probe-frequency"] = probeFrequency.String()
 	flags["max-retry-action-duration"] = maxRetryDurationForActions.String()
-	return flags, setupLog, context.Background()
+	return flags, context.Background()
 }
 
-func getCSIConn(csiAddress string, setupLog logr.Logger) *grpc.ClientConn {
-	csiConn, err := getConnection(csiAddress, setupLog)
+func getCSIConn(csiAddress string) *grpc.ClientConn {
+	csiConn, err := getConnection(csiAddress)
 	if err != nil {
-		setupLog.Error(err, "failed to connect to CSI driver")
+		csmlog.Errorf("failed to connect to CSI driver: %v", err)
 		osExit(1)
 	}
 	return csiConn
 }
 
-func probeCSIDriver(ctx context.Context, _ *grpc.ClientConn, setupLog logr.Logger, identityClient csiidentity.Identity) string {
+func probeCSIDriver(ctx context.Context, _ *grpc.ClientConn, identityClient csiidentity.Identity) string {
 	driverName, err := identityClient.ProbeForever(ctx)
 	if err != nil {
-		setupLog.Error(err, "error waiting for the CSI driver to be ready")
+		csmlog.Errorf("error waiting for the CSI driver to be ready: %v", err)
 		osExit(1)
 	}
-	setupLog.V(1).Info("CSI driver name", "driverName", driverName)
+	csmlog.WithFields(csmlog.Fields{"driverName": driverName}).Info("CSI driver name")
 
 	capabilitySet, err := identityClient.GetMigrationCapabilities(ctx)
 	if err != nil {
-		setupLog.Error(err, "error fetching migration capabilities")
+		csmlog.Errorf("error fetching migration capabilities: %v", err)
 		osExit(1)
 	}
 	if len(capabilitySet) == 0 {
-		setupLog.Error(fmt.Errorf("driver doesn't support migration"), "migration not supported")
+		csmlog.Error("driver doesn't support migration")
 		osExit(1)
 	}
 	for types := range capabilitySet {
 		if _, ok := currentSupportedCapabilities[types]; !ok {
-			setupLog.Error(err, "unknown capability advertised")
+			csmlog.Error("unknown capability advertised")
 			osExit(1)
 		}
 	}
@@ -262,15 +276,7 @@ func probeCSIDriver(ctx context.Context, _ *grpc.ClientConn, setupLog logr.Logge
 	return driverName
 }
 
-func createMetricsServer(ctx context.Context, driverName string, metricsAddr string, enableLeaderElection bool, setupLog logr.Logger, retryIntervalStart, retryIntervalMax, maxRetryDurationForActions time.Duration, workerThreads int) {
-	logrusLog := logrus.New()
-	logrusLog.SetFormatter(&logrus.JSONFormatter{
-		TimestampFormat: time.RFC3339Nano,
-	})
-
-	logger := logrusr.New(logrusLog)
-	ctrl.SetLogger(logger)
-
+func createMetricsServer(ctx context.Context, driverName string, metricsAddr string, enableLeaderElection bool, retryIntervalStart, retryIntervalMax, maxRetryDurationForActions time.Duration, workerThreads int) {
 	leaderElectionID := constants.DellCSINodeReScanner + strings.ReplaceAll(driverName, ".", "-")
 
 	mgr, err := getCtrlNewManager(ctrl.Options{
@@ -284,49 +290,51 @@ func createMetricsServer(ctx context.Context, driverName string, metricsAddr str
 		LeaderElectionID:           leaderElectionID,
 	})
 	if err != nil {
-		logrusLog.Error("Unable to start manager")
-		setupLog.Error(err, "unable to start manager")
+		csmlog.Error("Unable to start manager")
+		csmlog.Errorf("unable to start manager")
 		osExit(1)
 	}
 
 	// Create the node rescan manager
-	createRescanManager(ctx, mgr, driverName, retryIntervalStart, retryIntervalMax, maxRetryDurationForActions, workerThreads, logrusLog)
+	createRescanManager(ctx, mgr, driverName, retryIntervalStart, retryIntervalMax, maxRetryDurationForActions, workerThreads)
 }
 
-func createRescanManager(ctx context.Context, mgr manager.Manager, driverName string, retryIntervalStart time.Duration, retryIntervalMax time.Duration, maxRetryDurationForActions time.Duration, workerThreads int, logrusLog *logrus.Logger) {
+func createRescanManager(ctx context.Context, mgr manager.Manager, driverName string, retryIntervalStart time.Duration, retryIntervalMax time.Duration, maxRetryDurationForActions time.Duration, workerThreads int) {
 	rescanMgr := createNodeReScannerManagerWrapper(ctx, mgr)
-	log.Printf("Rescan manager configured: (+%v)", rescanMgr)
+	csmlog.Infof("Rescan manager configured: (+%v)", rescanMgr)
 	// Start the watch on configmap
-	// rescanMgr.setupConfigMapWatcher(logrusLog)
+	// rescanMgr.setupConfigMapWatcher()
 
 	// Process the config. Get initial log level
-	level, _ := logger.ParseLevel("debug")
-	logrusLog.Info("set level to", level)
-	logrusLog.SetLevel(level)
+	level, _ := csmlog.ParseLevel("debug")
+	csmlog.Infof("set level to %v", level)
+	csmlog.SetLevel(level)
+
+	csmlog.Info("Starting manager")
+	csmlog.Info("Starting controller-runtime")
 
 	expRateLimiter := getWorkqueueReconcileRequest(retryIntervalStart, retryIntervalMax)
-	logrusLog.Info("expRateLimiter", expRateLimiter)
+	csmlog.Infof("expRateLimiter %v", expRateLimiter)
 
+	csmlog.Info("Starting NodeRescan controller")
 	if err := getNodeRescanReconcilerManager(&controller.NodeRescanReconciler{
 		Client:                     mgr.GetClient(),
-		Log:                        ctrl.Log.WithName("controllers").WithName("DellCSINodeReScanner"),
 		Scheme:                     mgr.GetScheme(),
 		EventRecorder:              mgr.GetEventRecorderFor(constants.DellCSINodeReScanner),
 		DriverName:                 driverName,
 		NodeName:                   rescanMgr.NodeName,
 		MaxRetryDurationForActions: maxRetryDurationForActions,
 	}, mgr, expRateLimiter, workerThreads); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "DellCSINodeReScanner")
+		csmlog.WithFields(csmlog.Fields{"controller": constants.DellCSINodeReScanner}).Errorf("unable to create controller: %v", err)
 		osExit(1)
 	}
-	logrusLog.Info("strating manager")
-	setupLog.Info("starting manager")
+	csmlog.Infof("Starting workers with %d threads", workerThreads)
+	csmlog.Info("starting manager")
 	if err := getManagerStart(mgr); err != nil {
-		logrusLog.Error("problem running manager")
-		setupLog.Error(err, "problem running manager")
+		csmlog.Errorf("problem running manager: %v", err)
 		osExit(1)
 	}
-	logrusLog.Info("manager started successfully")
+	csmlog.Info("manager started successfully")
 }
 
 func stringToTimeDuration(timeString string) time.Duration {

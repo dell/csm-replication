@@ -31,7 +31,9 @@ import (
 )
 
 // Replication mock controller that implements replication related calls
-type Replication struct{}
+type Replication struct {
+	replication.UnimplementedReplicationServer
+}
 
 // VolumeMigrate - mocks Migrate function
 func (s *Replication) VolumeMigrate(_ context.Context, _ *migration.VolumeMigrateRequest) (*migration.VolumeMigrateResponse, error) {

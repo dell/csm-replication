@@ -21,13 +21,9 @@ import (
 	"os"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/dell/csm-replication/pkg/common/constants"
 	"github.com/dell/csm-replication/pkg/connection"
-	"github.com/bombsimon/logrusr/v4"
-	"github.com/go-logr/logr"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	v1 "k8s.io/api/core/v1"
@@ -387,23 +383,8 @@ func TestVerifyConfig(t *testing.T) {
 	})
 }
 
-// MockManager is a mock implementation of Manager for testing purposes
-type MockManager struct {
-	mock.Mock
-}
-
-func (m *MockManager) GetLogger() logr.Logger {
-	args := m.Called()
-	return args.Get(0).(logr.Logger)
-}
-
 func TestPrint(t *testing.T) {
 	t.Run("PrintTest", func(_ *testing.T) {
-		logrusLog := logrus.New()
-		logrusLog.SetFormatter(&logrus.JSONFormatter{
-			TimestampFormat: time.RFC3339Nano,
-		})
-		logger := logrusr.New(logrusLog)
 		// Create a replicationConfig instance with some test data
 		config := &replicationConfig{
 			ClusterID: "cluster-id",
@@ -412,11 +393,7 @@ func TestPrint(t *testing.T) {
 				{ClusterID: "target-id2", SecretRef: "secret2"},
 			},
 		}
-		mockManager := new(MockManager)
-		mockManager.On("GetLogger").Return(logger)
-
-		// Call the Print method with the mock logger
-		config.Print(mockManager.GetLogger())
+		config.Print()
 
 		// Assert that the expected Info calls were made
 	})
@@ -424,22 +401,13 @@ func TestPrint(t *testing.T) {
 
 func TestConfig_PrintConfig(t *testing.T) {
 	t.Run("PrintConfigTest", func(_ *testing.T) {
-		logrusLog := logrus.New()
-		logrusLog.SetFormatter(&logrus.JSONFormatter{
-			TimestampFormat: time.RFC3339Nano,
-		})
-		logger := logrusr.New(logrusLog)
 		// Create a replicationConfig instance with some test data
 		c := &Config{
 			repConfig: &replicationConfig{
 				ClusterID: "test-cluster-id",
 			},
 		}
-		mockManager := new(MockManager)
-		mockManager.On("GetLogger").Return(logger)
-
-		// Call the Print method with the mock logger
-		c.PrintConfig(mockManager.GetLogger())
+		c.PrintConfig()
 	})
 }
 
@@ -655,14 +623,6 @@ ggcetQ4yvATR
 }
 
 func Test_getConnHandler(t *testing.T) {
-	logrusLog := logrus.New()
-	logrusLog.SetFormatter(&logrus.JSONFormatter{
-		TimestampFormat: time.RFC3339Nano,
-	})
-	logger := logrusr.New(logrusLog)
-
-	mockManager := new(MockManager)
-	mockManager.On("GetLogger").Return(logger)
 	configMap, err := readConfigFile("config.yaml", "../../deploy")
 	assert.NoError(t, err)
 	type args struct {
@@ -670,7 +630,6 @@ func Test_getConnHandler(t *testing.T) {
 		targets []target
 		client  ctrlClient.Client
 		opts    ControllerManagerOpts
-		log     logr.Logger
 	}
 
 	t.Run("SecretFoundAndValidDataWithTargets", func(t *testing.T) {
@@ -724,10 +683,9 @@ users:
 				InCluster:         true,
 				Mode:              "",
 			},
-			log: mockManager.GetLogger(),
 		}
 
-		_, err := getConnHandler(args.ctx, args.targets, args.client, args.opts, args.log)
+		_, err := getConnHandler(args.ctx, args.targets, args.client, args.opts)
 		assert.Error(t, err)
 	})
 	t.Run("SecretFoundAndValidDataWithTargetsUseConfFileFormatToFalse", func(t *testing.T) {
@@ -749,10 +707,9 @@ users:
 				InCluster:         true,
 				Mode:              "",
 			},
-			log: mockManager.GetLogger(),
 		}
 
-		_, err := getConnHandler(args.ctx, args.targets, args.client, args.opts, args.log)
+		_, err := getConnHandler(args.ctx, args.targets, args.client, args.opts)
 		assert.Error(t, err)
 	})
 	t.Run("SecretFoundAndValidData", func(t *testing.T) {
@@ -783,10 +740,9 @@ users:
 				InCluster:         true,
 				Mode:              "",
 			},
-			log: mockManager.GetLogger(),
 		}
 
-		_, err := getConnHandler(args.ctx, args.targets, args.client, args.opts, args.log)
+		_, err := getConnHandler(args.ctx, args.targets, args.client, args.opts)
 		assert.NoError(t, err)
 	})
 	t.Run("InCluster to false", func(t *testing.T) {
@@ -804,10 +760,9 @@ users:
 				InCluster:         true,
 				Mode:              "",
 			},
-			log: mockManager.GetLogger(),
 		}
 
-		_, err := getConnHandler(args.ctx, args.targets, args.client, args.opts, args.log)
+		_, err := getConnHandler(args.ctx, args.targets, args.client, args.opts)
 		assert.Equal(t, err.Error(), "failed to get kube config path")
 	})
 	t.Run("InCluster to false with kubeconfig path", func(t *testing.T) {
@@ -826,10 +781,9 @@ users:
 				InCluster:         true,
 				Mode:              "",
 			},
-			log: mockManager.GetLogger(),
 		}
 
-		_, err := getConnHandler(args.ctx, args.targets, args.client, args.opts, args.log)
+		_, err := getConnHandler(args.ctx, args.targets, args.client, args.opts)
 		assert.Error(t, err)
 	})
 
@@ -855,10 +809,9 @@ users:
 				InCluster:         true,
 				Mode:              "",
 			},
-			log: mockManager.GetLogger(),
 		}
 
-		_, err := getConnHandler(args.ctx, args.targets, args.client, args.opts, args.log)
+		_, err := getConnHandler(args.ctx, args.targets, args.client, args.opts)
 		assert.Error(t, err)
 	})
 }
@@ -916,16 +869,6 @@ func Test_buildRestConfigFromCustomFormat(t *testing.T) {
 }
 
 func Test_getReplicationConfig(t *testing.T) {
-	logrusLog := logrus.New()
-	logrusLog.SetFormatter(&logrus.JSONFormatter{
-		TimestampFormat: time.RFC3339Nano,
-	})
-	logger := logrusr.New(logrusLog)
-
-	mockManager := new(MockManager)
-	mockManager.On("GetLogger").Return(logger)
-
-	log := mockManager.GetLogger()
 	t.Run("SuccessModeEmpty", func(t *testing.T) {
 		ctx := context.Background()
 		ConfgMap := &replicationConfigMap{
@@ -942,7 +885,7 @@ func Test_getReplicationConfig(t *testing.T) {
 			Mode:              "controller",
 		}
 
-		got, got1, err := getReplicationConfig(ctx, nil, opts, nil, log)
+		got, got1, err := getReplicationConfig(ctx, nil, opts, nil)
 		if (got1 == nil) && (err != nil) {
 			t.Errorf("getReplicationConfig() error = %v and wantErr is ni, got1 = %v and wamt1= ", err, nil)
 			return
@@ -964,7 +907,7 @@ func Test_getReplicationConfig(t *testing.T) {
 
 		// os.Setenv(constants.EnvInClusterConfig, "true")
 		client := fake.NewClientBuilder().Build()
-		got, got1, err := getReplicationConfig(ctx, client, opts, nil, log)
+		got, got1, err := getReplicationConfig(ctx, client, opts, nil)
 		if (got != nil) && (got1 != nil) && (err == nil) {
 			t.Errorf("getReplicationConfig() error = %v and wantErr is nil, got1 = %v and wamt1= ", err, nil)
 			return
@@ -1045,7 +988,7 @@ users:
 		}
 		fakeRecorder := record.NewFakeRecorder(100)
 		os.Setenv(constants.EnvInClusterConfig, "true")
-		got, got1, err := getReplicationConfig(ctx, client, opts, fakeRecorder, log)
+		got, got1, err := getReplicationConfig(ctx, client, opts, fakeRecorder)
 		assert.Error(t, err)
 		assert.Nil(t, got)
 		assert.Nil(t, got)
@@ -1149,7 +1092,7 @@ users:
 		}
 		fakeRecorder := record.NewFakeRecorder(100)
 		os.Setenv(constants.EnvInClusterConfig, "true")
-		got, got1, err := getReplicationConfig(ctx, client, opts, fakeRecorder, log)
+		got, got1, err := getReplicationConfig(ctx, client, opts, fakeRecorder)
 		assert.Error(t, err)
 		assert.Nil(t, got)
 		assert.Nil(t, got)
@@ -1227,24 +1170,12 @@ users:
 		}
 		fakeRecorder := record.NewFakeRecorder(100)
 		os.Setenv(constants.EnvInClusterConfig, "true")
-		_, _, err := getReplicationConfig(ctx, client, opts, fakeRecorder, log)
+		_, _, err := getReplicationConfig(ctx, client, opts, fakeRecorder)
 		assert.NoError(t, err)
 	})
 }
 
 func TestConfig_updateConfig(t *testing.T) {
-	logrusLog := logrus.New()
-	logrusLog.SetFormatter(&logrus.JSONFormatter{
-		TimestampFormat: time.RFC3339Nano,
-	})
-	logger := logrusr.New(logrusLog)
-
-	mockManager := new(MockManager)
-	mockManager.On("GetLogger").Return(logger)
-
-	// client1 := fake.NewClientBuilder().Build()
-	log := mockManager.GetLogger()
-
 	t.Run("Success", func(t *testing.T) {
 		opts := ControllerManagerOpts{
 			UseConfFileFormat: true,
@@ -1265,7 +1196,7 @@ func TestConfig_updateConfig(t *testing.T) {
 		}
 		ctx := context.Background()
 
-		err := c.updateConfig(ctx, nil, opts, nil, log)
+		err := c.updateConfig(ctx, nil, opts, nil)
 		if err != nil {
 			t.Errorf("Config.updateConfig() error = %v, wantErr nil", err)
 		}
@@ -1290,7 +1221,7 @@ func TestConfig_updateConfig(t *testing.T) {
 		}
 		ctx := context.Background()
 
-		err := c.updateConfig(ctx, nil, opts, nil, log)
+		err := c.updateConfig(ctx, nil, opts, nil)
 
 		if err == nil {
 			t.Errorf("Config.updateConfig() error = %v, wantErr nil", err)
@@ -1299,17 +1230,6 @@ func TestConfig_updateConfig(t *testing.T) {
 }
 
 func TestConfig_UpdateConfigMap(t *testing.T) {
-	logrusLog := logrus.New()
-	logrusLog.SetFormatter(&logrus.JSONFormatter{
-		TimestampFormat: time.RFC3339Nano,
-	})
-	logger := logrusr.New(logrusLog)
-
-	mockManager := new(MockManager)
-	mockManager.On("GetLogger").Return(logger)
-
-	log := mockManager.GetLogger()
-
 	t.Run("Success", func(t *testing.T) {
 		opts := ControllerManagerOpts{
 			UseConfFileFormat: true,
@@ -1330,7 +1250,7 @@ func TestConfig_UpdateConfigMap(t *testing.T) {
 		}
 		ctx := context.Background()
 
-		err := c.UpdateConfigMap(ctx, nil, opts, nil, log)
+		err := c.UpdateConfigMap(ctx, nil, opts, nil)
 		if err != nil {
 			t.Errorf("Config.UpdateConfigMap() error = %v, wantErr nil", err)
 		}
@@ -1356,7 +1276,7 @@ func TestConfig_UpdateConfigMap(t *testing.T) {
 		}
 		ctx := context.Background()
 
-		err := c.UpdateConfigMap(ctx, nil, opts, nil, log)
+		err := c.UpdateConfigMap(ctx, nil, opts, nil)
 
 		if err == nil {
 			t.Errorf("Config.UpdateConfigMap() error = %v, wantErr non-nil", err)
@@ -1365,17 +1285,6 @@ func TestConfig_UpdateConfigMap(t *testing.T) {
 }
 
 func TestConfig_UpdateConfigOnSecretEvent(t *testing.T) {
-	logrusLog := logrus.New()
-	logrusLog.SetFormatter(&logrus.JSONFormatter{
-		TimestampFormat: time.RFC3339Nano,
-	})
-	logger := logrusr.New(logrusLog)
-
-	mockManager := new(MockManager)
-	mockManager.On("GetLogger").Return(logger)
-
-	log := mockManager.GetLogger()
-
 	t.Run("RelevantSecret_UpdatesConfig", func(t *testing.T) {
 		opts := ControllerManagerOpts{
 			UseConfFileFormat: true,
@@ -1397,7 +1306,7 @@ func TestConfig_UpdateConfigOnSecretEvent(t *testing.T) {
 		ctx := context.Background()
 		secretName := "secret1"
 
-		err := c.UpdateConfigOnSecretEvent(ctx, nil, opts, secretName, nil, log)
+		err := c.UpdateConfigOnSecretEvent(ctx, nil, opts, secretName, nil)
 		if err != nil {
 			t.Errorf("Config.UpdateConfigOnSecretEvent() error = %v, wantErr nil", err)
 		}
@@ -1424,7 +1333,7 @@ func TestConfig_UpdateConfigOnSecretEvent(t *testing.T) {
 		ctx := context.Background()
 		secretName := "secret3" // Secret not in targets
 
-		err := c.UpdateConfigOnSecretEvent(ctx, nil, opts, secretName, nil, log)
+		err := c.UpdateConfigOnSecretEvent(ctx, nil, opts, secretName, nil)
 		if err != nil {
 			t.Errorf("Config.UpdateConfigOnSecretEvent() error = %v, wantErr nil", err)
 		}
@@ -1451,7 +1360,7 @@ func TestConfig_UpdateConfigOnSecretEvent(t *testing.T) {
 		ctx := context.Background()
 		secretName := "secret1"
 
-		err := c.UpdateConfigOnSecretEvent(ctx, nil, opts, secretName, nil, log)
+		err := c.UpdateConfigOnSecretEvent(ctx, nil, opts, secretName, nil)
 
 		if err == nil {
 			t.Errorf("Config.UpdateConfigOnSecretEvent() error = %v, wantErr non-nil", err)
@@ -1460,17 +1369,6 @@ func TestConfig_UpdateConfigOnSecretEvent(t *testing.T) {
 }
 
 func TestConfig_GetConfig(t *testing.T) {
-	logrusLog := logrus.New()
-	logrusLog.SetFormatter(&logrus.JSONFormatter{
-		TimestampFormat: time.RFC3339Nano,
-	})
-	logger := logrusr.New(logrusLog)
-
-	mockManager := new(MockManager)
-	mockManager.On("GetLogger").Return(logger)
-
-	log := mockManager.GetLogger()
-
 	t.Run("Success", func(t *testing.T) {
 		opts := ControllerManagerOpts{
 			UseConfFileFormat: true,
@@ -1483,7 +1381,7 @@ func TestConfig_GetConfig(t *testing.T) {
 
 		ctx := context.Background()
 
-		got, err := GetConfig(ctx, nil, opts, nil, log)
+		got, err := GetConfig(ctx, nil, opts, nil)
 		if err != nil {
 			t.Errorf("Config.updateConfig() error = %v, wantErr nil", err)
 		}
@@ -1501,7 +1399,7 @@ func TestConfig_GetConfig(t *testing.T) {
 
 		ctx := context.Background()
 
-		_, err := GetConfig(ctx, nil, opts, nil, log)
+		_, err := GetConfig(ctx, nil, opts, nil)
 
 		if err == nil {
 			t.Errorf("Config.updateConfig() error = %v, wantErr nil", err)

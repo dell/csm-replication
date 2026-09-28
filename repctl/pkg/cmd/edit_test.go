@@ -24,8 +24,8 @@ import (
 	"testing"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
-	"github.com/dell/repctl/pkg/k8s"
-	"github.com/dell/repctl/pkg/metadata"
+	"github.com/dell/csm-replication/repctl/pkg/k8s"
+	"github.com/dell/csm-replication/repctl/pkg/metadata"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -40,7 +40,7 @@ type MockCluster struct {
 	repGroups map[string]*repv1.DellCSIReplicationGroup
 }
 
-func (m *MockCluster) GetReplicationGroups(ctx context.Context, rgID string) (*repv1.DellCSIReplicationGroup, error) {
+func (m *MockCluster) GetReplicationGroups(_ context.Context, rgID string) (*repv1.DellCSIReplicationGroup, error) {
 	if rg, exists := m.repGroups[rgID]; exists {
 		return rg, nil
 	}
@@ -52,7 +52,7 @@ type MockMultiClusterConfigurator struct {
 	clusters []k8s.ClusterInterface
 }
 
-func (m *MockMultiClusterConfigurator) GetAllClusters(args []string, configFolder string) (*k8s.Clusters, error) {
+func (m *MockMultiClusterConfigurator) GetAllClusters(_ []string, _ string) (*k8s.Clusters, error) {
 	return &k8s.Clusters{Clusters: m.clusters}, nil
 }
 
@@ -169,10 +169,10 @@ func TestParseSecret(t *testing.T) {
 		{
 			name: "Success - valid YAML",
 			setup: func() {
-				readFile = func(path string) ([]byte, error) {
+				readFile = func(_ string) ([]byte, error) {
 					return []byte("key: value"), nil
 				}
-				unmarshalYAML = func(content []byte, v interface{}, opts ...yaml.JSONOpt) error {
+				unmarshalYAML = func(_ []byte, v interface{}, _ ...yaml.JSONOpt) error {
 					*v.(*DecodedSecret) = DecodedSecret{}
 					return nil
 				}
@@ -182,7 +182,7 @@ func TestParseSecret(t *testing.T) {
 		{
 			name: "Error - readFile fails",
 			setup: func() {
-				readFile = func(path string) ([]byte, error) {
+				readFile = func(_ string) ([]byte, error) {
 					return nil, fmt.Errorf("read file error")
 				}
 			},
@@ -191,10 +191,10 @@ func TestParseSecret(t *testing.T) {
 		{
 			name: "Error - unmarshalYAML fails",
 			setup: func() {
-				readFile = func(path string) ([]byte, error) {
+				readFile = func(_ string) ([]byte, error) {
 					return []byte("key: value"), nil
 				}
-				unmarshalYAML = func(content []byte, v interface{}, opts ...yaml.JSONOpt) error {
+				unmarshalYAML = func(_ []byte, _ interface{}, _ ...yaml.JSONOpt) error {
 					return fmt.Errorf("unmarshal error")
 				}
 			},
@@ -241,10 +241,10 @@ func TestObjectYAML(t *testing.T) {
 		{
 			name: "Success - valid object",
 			setup: func() {
-				jsonMarshal = func(v interface{}) ([]byte, error) {
+				jsonMarshal = func(_ interface{}) ([]byte, error) {
 					return []byte(`{"key":"value"}`), nil
 				}
-				jsonToYAML = func(j []byte) ([]byte, error) {
+				jsonToYAML = func(_ []byte) ([]byte, error) {
 					return []byte("key: value\n"), nil
 				}
 			},
@@ -254,7 +254,7 @@ func TestObjectYAML(t *testing.T) {
 		{
 			name: "Error - jsonMarshal fails",
 			setup: func() {
-				jsonMarshal = func(v interface{}) ([]byte, error) {
+				jsonMarshal = func(_ interface{}) ([]byte, error) {
 					return nil, fmt.Errorf("json marshal error")
 				}
 			},
@@ -264,10 +264,10 @@ func TestObjectYAML(t *testing.T) {
 		{
 			name: "Error - jsonToYAML fails",
 			setup: func() {
-				jsonMarshal = func(v interface{}) ([]byte, error) {
+				jsonMarshal = func(_ interface{}) ([]byte, error) {
 					return []byte(`{"key":"value"}`), nil
 				}
-				jsonToYAML = func(j []byte) ([]byte, error) {
+				jsonToYAML = func(_ []byte) ([]byte, error) {
 					return nil, fmt.Errorf("yaml conversion error")
 				}
 			},
@@ -343,10 +343,10 @@ func (suite *EditTestSuite) TestEditSecretCommand() {
 	}{
 		{
 			name: "Successful edit secret",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				return clusterPath, nil
 			},
-			getMultiConfigClusters: func(mc *k8s.MultiClusterConfigurator, clusterIDs []string, configDir string) (*k8s.Clusters, error) {
+			getMultiConfigClusters: func(_ *k8s.MultiClusterConfigurator, _ []string, _ string) (*k8s.Clusters, error) {
 				return &k8s.Clusters{
 					Clusters: []k8s.ClusterInterface{
 						&k8s.Cluster{
@@ -355,7 +355,7 @@ func (suite *EditTestSuite) TestEditSecretCommand() {
 					},
 				}, nil
 			},
-			getSecretFunction: func(cluster k8s.ClusterInterface, ctx context.Context, secretNamespace string, secretName string) (*v1.Secret, error) {
+			getSecretFunction: func(_ k8s.ClusterInterface, _ context.Context, secretNamespace string, secretName string) (*v1.Secret, error) {
 				return &v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      secretName,
@@ -366,7 +366,7 @@ func (suite *EditTestSuite) TestEditSecretCommand() {
 					},
 				}, nil
 			},
-			getUpdateSecretFunction: func(cluster k8s.ClusterInterface, ctx context.Context, secret *v1.Secret) error {
+			getUpdateSecretFunction: func(_ k8s.ClusterInterface, _ context.Context, _ *v1.Secret) error {
 				return nil
 			},
 			secretName:                "test-secret",
@@ -413,8 +413,8 @@ func (suite *EditTestSuite) TestEditSecretCommand() {
 
 			// Mock the editor interaction
 			originalEditor := os.Getenv("EDITOR")
-			defer os.Setenv("EDITOR", originalEditor)
-			os.Setenv("EDITOR", "true") // Mock editor command
+			defer func() { _ = os.Setenv("EDITOR", originalEditor) }()
+			_ = os.Setenv("EDITOR", "true") // Mock editor command
 
 			rescueStdout := os.Stdout
 			r, w, _ := os.Pipe()
@@ -425,7 +425,7 @@ func (suite *EditTestSuite) TestEditSecretCommand() {
 
 			cmd.Run(nil, []string{tt.secretName})
 
-			w.Close()
+			_ = w.Close()
 			out, _ := io.ReadAll(r)
 			os.Stdout = rescueStdout
 			for _, expected := range tt.expectedOutputContains {

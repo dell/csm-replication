@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dell/repctl/pkg/display"
-	"github.com/dell/repctl/pkg/types"
+	"github.com/dell/csm-replication/repctl/pkg/display"
+	"github.com/dell/csm-replication/repctl/pkg/types"
 	"github.com/stretchr/testify/suite"
 )
 

@@ -24,14 +24,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
+
+	metricscommon "github.com/dell/csm-metrics-common/pkg/server"
 	controller "github.com/dell/csm-replication/controllers/csi-replicator"
 	"github.com/dell/csm-replication/pkg/common/constants"
 	repcnf "github.com/dell/csm-replication/pkg/config"
 	csiidentity "github.com/dell/csm-replication/pkg/csi-clients/identity"
+	"github.com/dell/csmlog"
 	"github.com/dell/dell-csi-extensions/replication"
-	"github.com/go-logr/logr"
-	"github.com/go-logr/logr/funcr"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	v1 "k8s.io/api/core/v1"
@@ -40,7 +41,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -51,16 +51,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/recorder"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/conversion"
 )
 
 type mockManager struct {
-	logger logr.Logger
-}
-
-func (m *mockManager) GetLogger() logr.Logger {
-	return m.logger
+	manager.Manager
 }
 
 func (m *mockManager) Add(_ manager.Runnable) error {
@@ -181,7 +178,7 @@ func (m *mockManager) GetConverterRegistry() conversion.Registry {
 	return nil
 }
 
-func (m *mockManager) GetEventRecorder(_ string) events.EventRecorder {
+func (m *mockManager) GetEventRecorder(_ string) recorder.EventRecorder {
 	// Implement the method as needed for your mock
 	return nil
 }
@@ -198,9 +195,7 @@ func TestCreateReplicatorManager(t *testing.T) {
 	}
 
 	// Mock manager
-	mockMgr := &mockManager{
-		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
-	}
+	mockMgr := &mockManager{}
 
 	tests := []struct {
 		name    string
@@ -218,7 +213,7 @@ func TestCreateReplicatorManager(t *testing.T) {
 				getControllerManagerOpts = func() repcnf.ControllerManagerOpts {
 					return repcnf.ControllerManagerOpts{}
 				}
-				getConfig = func(_ context.Context, _ client.Client, _ repcnf.ControllerManagerOpts, _ record.EventRecorder, _ logr.Logger) (*repcnf.Config, error) {
+				getConfig = func(_ context.Context, _ client.Client, _ repcnf.ControllerManagerOpts, _ record.EventRecorder) (*repcnf.Config, error) {
 					return &repcnf.Config{}, nil
 				}
 			},
@@ -237,7 +232,7 @@ func TestCreateReplicatorManager(t *testing.T) {
 				getControllerManagerOpts = func() repcnf.ControllerManagerOpts {
 					return repcnf.ControllerManagerOpts{}
 				}
-				getConfig = func(_ context.Context, _ client.Client, _ repcnf.ControllerManagerOpts, _ record.EventRecorder, _ logr.Logger) (*repcnf.Config, error) {
+				getConfig = func(_ context.Context, _ client.Client, _ repcnf.ControllerManagerOpts, _ record.EventRecorder) (*repcnf.Config, error) {
 					return nil, assert.AnError
 				}
 			},
@@ -273,28 +268,40 @@ func TestCreateReplicatorManager(t *testing.T) {
 }
 
 func Test_getClusterUID(t *testing.T) {
+	defaultGetControllerClient := getControllerClient
+	defer func() {
+		getControllerClient = defaultGetControllerClient
+	}()
+
 	tests := []struct {
 		name    string
-		prepare func() client.Client
+		prepare func() (client.Client, error)
 		wantErr bool
 	}{
 		{
 			name: "Success",
-			prepare: func() client.Client {
+			prepare: func() (client.Client, error) {
 				return fake.NewClientBuilder().WithObjects(&v1.Namespace{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "kube-system",
 						UID:  "999", // fake UID
 					},
-				}).Build()
+				}).Build(), nil
 			},
 			wantErr: false,
 		},
 		{
-			name: "Error",
-			prepare: func() client.Client {
+			name: "NamespaceNotFound",
+			prepare: func() (client.Client, error) {
 				// no objects in fake client
-				return fake.NewClientBuilder().Build()
+				return fake.NewClientBuilder().Build(), nil
+			},
+			wantErr: true,
+		},
+		{
+			name: "ClientError",
+			prepare: func() (client.Client, error) {
+				return nil, errors.New("client error")
 			},
 			wantErr: true,
 		},
@@ -303,7 +310,7 @@ func Test_getClusterUID(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			getControllerClient = func(_ *rest.Config, _ *runtime.Scheme) (client.Client, error) {
-				return tt.prepare(), nil
+				return tt.prepare()
 			}
 
 			got, err := getClusterUID(context.TODO())
@@ -335,11 +342,8 @@ func TestProcessConfigMapChanges(t *testing.T) {
 		return nil
 	}
 
-	mockMgr := &mockManager{
-		logger: funcr.New(func(prefix, args string) { t.Logf("%s: %s", prefix, args) }, funcr.Options{}),
-	}
+	mockMgr := &mockManager{}
 
-	loggerConfig := logrus.New()
 	mgr := &ReplicatorManager{
 		Opts:    repcnf.ControllerManagerOpts{},
 		Manager: mockMgr,
@@ -347,7 +351,7 @@ func TestProcessConfigMapChanges(t *testing.T) {
 	}
 
 	t.Run("Success Test Case", func(_ *testing.T) {
-		mgr.processConfigMapChanges(loggerConfig)
+		mgr.processConfigMapChanges()
 	})
 
 	// Test case 2: Error in getUpdateConfigMapFunc
@@ -356,7 +360,7 @@ func TestProcessConfigMapChanges(t *testing.T) {
 	}
 
 	t.Run("Error in getUpdateConfigMapFunc", func(_ *testing.T) {
-		mgr.processConfigMapChanges(loggerConfig)
+		mgr.processConfigMapChanges()
 	})
 
 	// Test case 3: Error in ParseLevel (invalid log level)
@@ -367,7 +371,7 @@ func TestProcessConfigMapChanges(t *testing.T) {
 	mgr.config.LogLevel = "invalid-log-level" // Set an invalid log level
 
 	t.Run("Error in ParseLevel", func(_ *testing.T) {
-		mgr.processConfigMapChanges(loggerConfig)
+		mgr.processConfigMapChanges()
 	})
 
 	// Test case 4: Valid Log Level set in config
@@ -378,30 +382,54 @@ func TestProcessConfigMapChanges(t *testing.T) {
 	mgr.config.LogLevel = "info" // Set a valid log level
 
 	t.Run("Valid Log Level", func(t *testing.T) {
-		mgr.processConfigMapChanges(loggerConfig)
-		if loggerConfig.GetLevel() != logrus.InfoLevel {
-			t.Errorf("Expected log level to be info, but got %v", loggerConfig.GetLevel())
+		mgr.processConfigMapChanges()
+		if csmlog.GetLevel() != csmlog.InfoLevel {
+			t.Errorf("Expected log level to be info, but got %v", csmlog.GetLevel())
 		}
+	})
+
+	// Test case 5: Valid log format
+	getUpdateConfigMapFunc = func(_ *ReplicatorManager, _ context.Context) error {
+		return nil
+	}
+	mgr.config.LogLevel = "info"
+	mgr.config.LogFormat = "TEXT"
+
+	t.Run("Valid Log Format", func(_ *testing.T) {
+		mgr.processConfigMapChanges()
+	})
+
+	// Test case 6: Invalid log format
+	getUpdateConfigMapFunc = func(_ *ReplicatorManager, _ context.Context) error {
+		return nil
+	}
+	mgr.config.LogFormat = "invalid"
+
+	t.Run("Invalid Log Format", func(_ *testing.T) {
+		mgr.processConfigMapChanges()
 	})
 }
 
-func TestSetupConfigMapWatcher(t *testing.T) {
-	tests := []struct {
-		name         string
-		loggerConfig *logrus.Logger
-	}{
-		{
-			name:         "Test with valid loggerConfig",
-			loggerConfig: logrus.New(),
-		},
+func TestSetupConfigMapWatcher(_ *testing.T) {
+	defaultWatchConfig := watchConfig
+	defaultOnConfigChange := onConfigChange
+	defaultGetUpdateConfigMapFunc := getUpdateConfigMapFunc
+	defer func() {
+		watchConfig = defaultWatchConfig
+		onConfigChange = defaultOnConfigChange
+		getUpdateConfigMapFunc = defaultGetUpdateConfigMapFunc
+	}()
+
+	watchConfig = func() {}
+	onConfigChange = func(runner func(fsnotify.Event)) {
+		runner(fsnotify.Event{})
+	}
+	getUpdateConfigMapFunc = func(_ *ReplicatorManager, _ context.Context) error {
+		return errors.New("config update error")
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(_ *testing.T) {
-			mgr := &ReplicatorManager{}
-			mgr.setupConfigMapWatcher(tt.loggerConfig)
-		})
-	}
+	mgr := &ReplicatorManager{}
+	mgr.setupConfigMapWatcher()
 }
 
 func TestMain(t *testing.T) {
@@ -409,13 +437,15 @@ func TestMain(t *testing.T) {
 	defaultGetProbeForeverFunc := getProbeForeverFunc
 	defaultGetReplicationCapabilitiesFunc := getReplicationCapabilitiesFunc
 	defaultGetcreateReplicatorManagerFunc := getcreateReplicatorManagerFunc
-	defaultGetParseLevelFunc := getParseLevelFunc
 	defaultGetManagerStart := getManagerStart
 	defaultGetCtrlNewManager := getCtrlNewManager
 	defaultGetWorkqueueReconcileRequest := getWorkqueueReconcileRequest
 	defaultGetPersistentVolumeClaimReconcilerSetupWithManager := getPersistentVolumeClaimReconcilerSetupWithManager
 	defaultGetPersistentVolumeReconcilerSetupWithManager := getPersistentVolumeReconcilerSetupWithManager
 	defaultGetReplicationGroupReconcilerSetupWithManager := getReplicationGroupReconcilerSetupWithManager
+	defaultGetControllerClient := getControllerClient
+	defaultNewMetricsServerFunc := newMetricsServerFunc
+	defaultStartMetricsServerFunc := startMetricsServerFunc
 	defaultOSExit := osExit
 	defaultSetupFlags := setupFlags
 
@@ -427,13 +457,15 @@ func TestMain(t *testing.T) {
 		getProbeForeverFunc = defaultGetProbeForeverFunc
 		getReplicationCapabilitiesFunc = defaultGetReplicationCapabilitiesFunc
 		getcreateReplicatorManagerFunc = defaultGetcreateReplicatorManagerFunc
-		getParseLevelFunc = defaultGetParseLevelFunc
 		getManagerStart = defaultGetManagerStart
 		getCtrlNewManager = defaultGetCtrlNewManager
 		getWorkqueueReconcileRequest = defaultGetWorkqueueReconcileRequest
 		getPersistentVolumeClaimReconcilerSetupWithManager = defaultGetPersistentVolumeClaimReconcilerSetupWithManager
 		getPersistentVolumeReconcilerSetupWithManager = defaultGetPersistentVolumeReconcilerSetupWithManager
 		getReplicationGroupReconcilerSetupWithManager = defaultGetReplicationGroupReconcilerSetupWithManager
+		getControllerClient = defaultGetControllerClient
+		newMetricsServerFunc = defaultNewMetricsServerFunc
+		startMetricsServerFunc = defaultStartMetricsServerFunc
 		osExit = defaultOSExit
 		setupFlags = defaultSetupFlags
 	}
@@ -446,7 +478,7 @@ func TestMain(t *testing.T) {
 		{
 			name: "Successful run of main function",
 			setup: func() {
-				getConnectToCsiFunc = func(_ string, _ logr.Logger) (*grpc.ClientConn, error) {
+				getConnectToCsiFunc = func(_ string) (*grpc.ClientConn, error) {
 					return &grpc.ClientConn{}, nil
 				}
 
@@ -478,10 +510,6 @@ func TestMain(t *testing.T) {
 					}, nil
 				}
 
-				getParseLevelFunc = func(_ string) (logrus.Level, error) {
-					return logrus.InfoLevel, nil
-				}
-
 				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 					return nil
 				}
@@ -511,7 +539,7 @@ func TestMain(t *testing.T) {
 		{
 			name: "failed to connect to CSI driver",
 			setup: func() {
-				getConnectToCsiFunc = func(_ string, _ logr.Logger) (*grpc.ClientConn, error) {
+				getConnectToCsiFunc = func(_ string) (*grpc.ClientConn, error) {
 					return &grpc.ClientConn{}, errors.New("error connecting to CSI driver")
 				}
 
@@ -535,10 +563,6 @@ func TestMain(t *testing.T) {
 							LogLevel: "info",
 						},
 					}, nil
-				}
-
-				getParseLevelFunc = func(_ string) (logrus.Level, error) {
-					return logrus.InfoLevel, nil
 				}
 
 				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
@@ -609,10 +633,6 @@ func TestMain(t *testing.T) {
 					}, nil
 				}
 
-				getParseLevelFunc = func(_ string) (logrus.Level, error) {
-					return logrus.InfoLevel, nil
-				}
-
 				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 					return nil
 				}
@@ -679,10 +699,6 @@ func TestMain(t *testing.T) {
 							LogLevel: "info",
 						},
 					}, nil
-				}
-
-				getParseLevelFunc = func(_ string) (logrus.Level, error) {
-					return logrus.InfoLevel, nil
 				}
 
 				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
@@ -753,10 +769,6 @@ func TestMain(t *testing.T) {
 					}, nil
 				}
 
-				getParseLevelFunc = func(_ string) (logrus.Level, error) {
-					return logrus.InfoLevel, nil
-				}
-
 				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 					return nil
 				}
@@ -823,10 +835,6 @@ func TestMain(t *testing.T) {
 							LogLevel: "invalid",
 						},
 					}, nil
-				}
-
-				getParseLevelFunc = func(_ string) (logrus.Level, error) {
-					return logrus.Level(0), fmt.Errorf("unable to parse log level")
 				}
 
 				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
@@ -897,10 +905,6 @@ func TestMain(t *testing.T) {
 					}, nil
 				}
 
-				getParseLevelFunc = func(_ string) (logrus.Level, error) {
-					return logrus.InfoLevel, nil
-				}
-
 				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 					return nil
 				}
@@ -967,10 +971,6 @@ func TestMain(t *testing.T) {
 							LogLevel: "info",
 						},
 					}, errors.New("failed to configure the controller manager")
-				}
-
-				getParseLevelFunc = func(_ string) (logrus.Level, error) {
-					return logrus.InfoLevel, nil
 				}
 
 				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
@@ -1041,10 +1041,6 @@ func TestMain(t *testing.T) {
 					}, errors.New("failed to configure the controller manager")
 				}
 
-				getParseLevelFunc = func(_ string) (logrus.Level, error) {
-					return logrus.InfoLevel, nil
-				}
-
 				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 					return nil
 				}
@@ -1113,10 +1109,6 @@ func TestMain(t *testing.T) {
 					}, nil
 				}
 
-				getParseLevelFunc = func(_ string) (logrus.Level, error) {
-					return logrus.InfoLevel, nil
-				}
-
 				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
 					return nil
 				}
@@ -1160,6 +1152,183 @@ func TestMain(t *testing.T) {
 			},
 			expectedOsExitCode: 1,
 		},
+		{
+			name: "Successful run with monitoring capability, cluster UID, and replication metrics",
+			setup: func() {
+				t.Setenv(constants.EnvReplicationMetricsEnabled, "true")
+				t.Setenv(constants.EnvReplicationMetricsPort, "0")
+
+				getConnectToCsiFunc = func(_ string) (*grpc.ClientConn, error) {
+					return &grpc.ClientConn{}, nil
+				}
+
+				getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
+					return "csi-driver", nil
+				}
+
+				getReplicationCapabilitiesFunc = func(_ context.Context, _ csiidentity.Identity) (csiidentity.ReplicationCapabilitySet, []*replication.SupportedActions, error) {
+					capabilitySet := csiidentity.ReplicationCapabilitySet{
+						replication.ReplicationCapability_RPC_CREATE_REMOTE_VOLUME:         true,
+						replication.ReplicationCapability_RPC_CREATE_PROTECTION_GROUP:      true,
+						replication.ReplicationCapability_RPC_MONITOR_PROTECTION_GROUP:     true,
+						replication.ReplicationCapability_RPC_REPLICATION_ACTION_EXECUTION: true,
+					}
+					supportedActions := []*replication.SupportedActions{}
+					return capabilitySet, supportedActions, nil
+				}
+
+				getCtrlNewManager = func(_ manager.Options) (manager.Manager, error) {
+					return &mockManager{}, nil
+				}
+
+				getcreateReplicatorManagerFunc = func(_ context.Context, _ manager.Manager) (*ReplicatorManager, error) {
+					return &ReplicatorManager{
+						config: &repcnf.Config{
+							LogLevel:  "info",
+							LogFormat: "json",
+						},
+					}, nil
+				}
+
+				getControllerClient = func(_ *rest.Config, _ *runtime.Scheme) (client.Client, error) {
+					return fake.NewClientBuilder().WithObjects(&v1.Namespace{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "kube-system",
+							UID:  "fake-uid",
+						},
+					}).Build(), nil
+				}
+
+				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+					return nil
+				}
+
+				getPersistentVolumeClaimReconcilerSetupWithManager = func(_ *controller.PersistentVolumeClaimReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getPersistentVolumeReconcilerSetupWithManager = func(_ *controller.PersistentVolumeReconciler, _ context.Context, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getReplicationGroupReconcilerSetupWithManager = func(_ *controller.ReplicationGroupReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getManagerStart = func(_ manager.Manager) error {
+					return nil
+				}
+
+				newMetricsServerFunc = func(_ ...interface{}) *metricscommon.MetricsServer {
+					return &metricscommon.MetricsServer{}
+				}
+
+				startMetricsServerFunc = func(_ *metricscommon.MetricsServer) error {
+					return nil
+				}
+
+				osExit = func(code int) {
+					osExitCode = code
+				}
+
+				setupFlags = func() flags {
+					return flags{
+						metricsAddr:                ":8001",
+						enableLeaderElection:       false,
+						csiAddress:                 "/var/run/csi.sock",
+						workerThreads:              2,
+						retryIntervalStart:         time.Second,
+						retryIntervalMax:           5 * time.Minute,
+						operationTimeout:           300 * time.Second,
+						pgContextKeyPrefix:         "prefix",
+						domain:                     constants.DefaultDomain,
+						monitoringInterval:         10 * time.Second,
+						probeFrequency:             5 * time.Second,
+						maxRetryDurationForActions: 10 * time.Minute,
+					}
+				}
+			},
+			expectedOsExitCode: 0,
+		},
+		{
+			name: "missing required replication capability",
+			setup: func() {
+				getConnectToCsiFunc = func(_ string) (*grpc.ClientConn, error) {
+					return &grpc.ClientConn{}, nil
+				}
+
+				getProbeForeverFunc = func(_ context.Context, _ csiidentity.Identity) (string, error) {
+					return "csi-driver", nil
+				}
+
+				getReplicationCapabilitiesFunc = func(_ context.Context, _ csiidentity.Identity) (csiidentity.ReplicationCapabilitySet, []*replication.SupportedActions, error) {
+					capabilitySet := csiidentity.ReplicationCapabilitySet{
+						// CREATE_REMOTE_VOLUME intentionally missing
+						replication.ReplicationCapability_RPC_CREATE_PROTECTION_GROUP: true,
+					}
+					supportedActions := []*replication.SupportedActions{}
+					return capabilitySet, supportedActions, nil
+				}
+
+				getCtrlNewManager = func(_ manager.Options) (manager.Manager, error) {
+					return &mockManager{}, nil
+				}
+
+				getcreateReplicatorManagerFunc = func(_ context.Context, _ manager.Manager) (*ReplicatorManager, error) {
+					return &ReplicatorManager{
+						config: &repcnf.Config{
+							LogLevel: "info",
+						},
+					}, nil
+				}
+
+				getControllerClient = func(_ *rest.Config, _ *runtime.Scheme) (client.Client, error) {
+					return nil, errors.New("client error")
+				}
+
+				getWorkqueueReconcileRequest = func(_ time.Duration, _ time.Duration) workqueue.TypedRateLimiter[reconcile.Request] {
+					return nil
+				}
+
+				getPersistentVolumeClaimReconcilerSetupWithManager = func(_ *controller.PersistentVolumeClaimReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getPersistentVolumeReconcilerSetupWithManager = func(_ *controller.PersistentVolumeReconciler, _ context.Context, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getReplicationGroupReconcilerSetupWithManager = func(_ *controller.ReplicationGroupReconciler, _ ctrl.Manager, _ workqueue.TypedRateLimiter[reconcile.Request], _ int) error {
+					return nil
+				}
+
+				getManagerStart = func(_ manager.Manager) error {
+					return nil
+				}
+
+				osExit = func(code int) {
+					osExitCode = code
+				}
+
+				setupFlags = func() flags {
+					return flags{
+						metricsAddr:                ":8001",
+						enableLeaderElection:       false,
+						csiAddress:                 "/var/run/csi.sock",
+						workerThreads:              2,
+						retryIntervalStart:         time.Second,
+						retryIntervalMax:           5 * time.Minute,
+						operationTimeout:           300 * time.Second,
+						pgContextKeyPrefix:         "prefix",
+						domain:                     constants.DefaultDomain,
+						monitoringInterval:         10 * time.Second,
+						probeFrequency:             5 * time.Second,
+						maxRetryDurationForActions: 10 * time.Minute,
+					}
+				}
+			},
+			expectedOsExitCode: 1,
+		},
 	}
 
 	// Set Manifest version similar to how the image would be built.
@@ -1175,5 +1344,98 @@ func TestMain(t *testing.T) {
 			t.Errorf("Expected osExitCode: %v, but got osExitCode: %v", tt.expectedOsExitCode, osExitCode)
 		}
 		osExitCode = 0
+	}
+}
+
+func TestReplicationMetricsCollectionIntervalFromEnv(t *testing.T) {
+	t.Run("uses env override when valid", func(t *testing.T) {
+		t.Setenv("X_CSI_REPLICATION_METRICS_COLLECTION_INTERVAL", "45s")
+
+		got := getReplicationMetricsCollectionInterval(60 * time.Second)
+
+		assert.Equal(t, 45*time.Second, got)
+	})
+
+	t.Run("falls back to default when env missing", func(t *testing.T) {
+		got := getReplicationMetricsCollectionInterval(60 * time.Second)
+
+		assert.Equal(t, 60*time.Second, got)
+	})
+
+	t.Run("falls back to default when env invalid", func(t *testing.T) {
+		t.Setenv("X_CSI_REPLICATION_METRICS_COLLECTION_INTERVAL", "bad-value")
+
+		got := getReplicationMetricsCollectionInterval(60 * time.Second)
+
+		assert.Equal(t, 60*time.Second, got)
+	})
+}
+
+func TestInitReplicationMetrics(t *testing.T) {
+	originalNew := newMetricsServerFunc
+	originalStart := startMetricsServerFunc
+	defer func() {
+		newMetricsServerFunc = originalNew
+		startMetricsServerFunc = originalStart
+	}()
+
+	tests := []struct {
+		name        string
+		envEnabled  string
+		envPort     string
+		envCertFile string
+		envKeyFile  string
+		startErr    error
+	}{
+		{
+			name:       "metrics disabled",
+			envEnabled: "false",
+		},
+		{
+			name:       "metrics enabled without TLS",
+			envEnabled: "true",
+			envPort:    "0",
+		},
+		{
+			name:        "metrics enabled with TLS",
+			envEnabled:  "true",
+			envPort:     "8445",
+			envCertFile: "/tmp/tls.crt",
+			envKeyFile:  "/tmp/tls.key",
+		},
+		{
+			name:       "metrics server start fails",
+			envEnabled: "true",
+			envPort:    "0",
+			startErr:   errors.New("start failed"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(constants.EnvReplicationMetricsEnabled, tt.envEnabled)
+			t.Setenv(constants.EnvReplicationMetricsPort, tt.envPort)
+			t.Setenv(constants.EnvReplicationMetricsTLSCertFile, tt.envCertFile)
+			t.Setenv(constants.EnvReplicationMetricsTLSKeyFile, tt.envKeyFile)
+
+			started := make(chan struct{}, 1)
+			newMetricsServerFunc = func(_ ...interface{}) *metricscommon.MetricsServer {
+				return &metricscommon.MetricsServer{}
+			}
+			startMetricsServerFunc = func(_ *metricscommon.MetricsServer) error {
+				started <- struct{}{}
+				return tt.startErr
+			}
+
+			initReplicationMetrics("test-driver")
+
+			if tt.envEnabled == "true" {
+				select {
+				case <-started:
+				case <-time.After(time.Second):
+					t.Fatal("metrics server was not started")
+				}
+			}
+		})
 	}
 }

@@ -19,7 +19,6 @@ import (
 	"time"
 
 	csiext "github.com/dell/dell-csi-extensions/migration"
-	"github.com/go-logr/logr"
 	"google.golang.org/grpc"
 )
 
@@ -30,17 +29,15 @@ type Migration interface {
 }
 
 // New returns new implementation of Replication interface
-func New(conn *grpc.ClientConn, log logr.Logger, timeout time.Duration) Migration {
+func New(conn *grpc.ClientConn, timeout time.Duration) Migration {
 	return &migration{
 		conn:    conn,
-		log:     log,
 		timeout: timeout,
 	}
 }
 
 type migration struct {
 	conn    *grpc.ClientConn
-	log     logr.Logger
 	timeout time.Duration
 }
 

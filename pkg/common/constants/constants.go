@@ -35,4 +35,12 @@ const (
 	// DellCSINodeReScanner - Name of the node sidecar manager
 	DellCSINodeReScanner = "dell-csi-node-rescanner"
 	EnvNodeName          = "X_CSI_NODE_NAME"
+
+	// Replication metrics environment variables
+	EnvReplicationMetricsEnabled            = "X_CSI_REPLICATION_METRICS_ENABLED"
+	EnvReplicationMetricsPort               = "X_CSI_REPLICATION_METRICS_PORT"
+	EnvReplicationMetricsCollectionInterval = "X_CSI_REPLICATION_METRICS_COLLECTION_INTERVAL"
+	EnvReplicationMetricsTLSCertFile        = "X_CSI_REPLICATION_METRICS_TLS_CERT_FILE"
+	EnvReplicationMetricsTLSKeyFile         = "X_CSI_REPLICATION_METRICS_TLS_KEY_FILE"
+	DefaultMetricsPort                      = "8445"
 )

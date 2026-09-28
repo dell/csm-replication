@@ -17,15 +17,15 @@ package csimigrator
 import (
 	"context"
 
+	"github.com/dell/csmlog"
+
 	migration "github.com/dell/dell-csi-extensions/migration"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	controller "github.com/dell/csm-replication/controllers"
-	"github.com/dell/csm-replication/pkg/common/logger"
 	csimigration "github.com/dell/csm-replication/pkg/csi-clients/migration"
-	"github.com/go-logr/logr"
 	"golang.org/x/sync/singleflight"
 	v1 "k8s.io/api/core/v1"
 	storageV1 "k8s.io/api/storage/v1"
@@ -44,7 +44,6 @@ import (
 // PersistentVolumeReconciler reconciles PersistentVolume resources
 type PersistentVolumeReconciler struct {
 	client.Client
-	Log               logr.Logger
 	Scheme            *runtime.Scheme
 	EventRecorder     record.EventRecorder
 	DriverName        string
@@ -59,10 +58,7 @@ const protectionIndexKey = "protection_id"
 
 // Reconcile contains reconciliation logic that updates PersistentVolume depending on it's current state
 func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("persistentvolume", req.NamespacedName)
-	ctx = context.WithValue(ctx, logger.LoggerContextKey, log)
-
-	log.V(logger.InfoLevel).Info("Begin reconcile - PV Controller")
+	csmlog.Info("Begin reconcile - PV Controller")
 
 	pv := new(v1.PersistentVolume)
 	if err := r.Get(ctx, req.NamespacedName, pv); err != nil {
@@ -75,10 +71,10 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}, storageClass)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			log.Error(err, "The storage class specified in the PV doesn't exist", "StorageClassName", pv.Spec.StorageClassName)
+			csmlog.WithFields(csmlog.Fields{"storageClassName": pv.Spec.StorageClassName}).Error("The storage class specified in the PV doesn't exist")
 			return ctrl.Result{}, nil
 		}
-		log.Error(err, "Failed to fetch storage class of the PV", "StorageClassName", pv.Spec.StorageClassName)
+		csmlog.WithFields(csmlog.Fields{"storageClassName": pv.Spec.StorageClassName}).Errorf("Failed to fetch storage class of the PV: %v", err)
 		return ctrl.Result{}, err
 	}
 	targetStorageClassName := pv.Annotations[controller.MigrationRequested]
@@ -86,16 +82,19 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	targetStorageClass := new(storageV1.StorageClass)
 	if err := r.Get(ctx, targetStorageClassNameSpaced, targetStorageClass); err != nil {
 		if errors.IsNotFound(err) {
-			log.Error(err, "The storage class specified for migration doesn't exist", "StorageClassName", targetStorageClassName)
+			csmlog.WithFields(csmlog.Fields{"storageClassName": targetStorageClassName}).Error("The storage class specified for migration doesn't exist")
 			return ctrl.Result{}, nil
 		}
-		log.Error(err, "Failed to fetch target storage class", "StorageClassName", targetStorageClassName)
+		csmlog.WithFields(csmlog.Fields{"storageClassName": targetStorageClassName}).Errorf("Failed to fetch target storage class: %v", err)
 		return ctrl.Result{}, err
 	}
 
 	// TODO:  check both SC's parameters, detect behavior
 	if storageClass.Name == targetStorageClassName {
-		log.Error(errors.NewBadRequest("Source SC == Target SC"), "Unable to migrate withing single SC")
+		csmlog.WithFields(csmlog.Fields{
+			"sourceStorageClassName": storageClass.Name,
+			"targetStorageClassName": targetStorageClassName,
+		}).Error("Unable to migrate within a single storage class")
 		return ctrl.Result{}, nil
 	}
 
@@ -111,7 +110,7 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	case isSourceReplicated && !isTargetReplicated:
 		migrateType = migration.MigrateTypes_REPL_TO_NON_REPL
 	default:
-		log.Info("Strange migration type..")
+		csmlog.Info("Strange migration type..")
 
 	}
 	migrateReq := &migration.VolumeMigrateRequest_Type{
@@ -123,7 +122,7 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	} else if pv.Spec.ClaimRef != nil {
 		targetPVCNamespace = pv.Spec.ClaimRef.Namespace
 	} else {
-		log.Error(errors.NewBadRequest("Unable to detect target NS"), "No annotation for target NS specified and unable to retrieve information from PVC")
+		csmlog.WithFields(csmlog.Fields{"pvName": pv.Name}).Error("No target namespace annotation found and unable to derive namespace from PVC claim reference")
 		return ctrl.Result{}, nil
 	}
 	targetStorageClass.Parameters["csi.storage.k8s.io/pvc/namespace"] = targetPVCNamespace
@@ -132,16 +131,16 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	log.V(logger.DebugLevel).Info("Checking if a Migrated PV instance already exists")
+	csmlog.Info("Checking if a Migrated PV instance already exists")
 
 	gotPv := new(v1.PersistentVolume)
 	if err = r.Get(ctx, client.ObjectKey{
 		Name: pv.Name + "-to-" + targetStorageClassName,
 	}, gotPv); err != nil && !errors.IsNotFound(err) {
-		log.Error(err, "Failed to check for a pre-existing PV")
+		csmlog.Errorf("Failed to check for a pre-existing PV: %v", err)
 		return ctrl.Result{}, err
 	}
-	log.V(logger.InfoLevel).Info("checked for already created PV. Result: ", err)
+	csmlog.Info("checked for already created PV")
 	if _, ok := gotPv.Annotations[controller.CreatedByMigrator]; !ok {
 		pvT := &v1.PersistentVolume{
 			ObjectMeta: metav1.ObjectMeta{
@@ -169,23 +168,23 @@ func (r *PersistentVolumeReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				Capacity:                      v1.ResourceList{v1.ResourceStorage: bytesToQuantity(migrate.GetMigratedVolume().CapacityBytes)},
 			},
 		}
-		log.V(logger.InfoLevel).Info("trying to create migrated PV")
+		csmlog.Info("trying to create migrated PV")
 		err = r.Create(ctx, pvT, &client.CreateOptions{})
 		if err != nil {
-			log.V(logger.ErrorLevel).Error(err, "migrated PV creation failed")
+			csmlog.Errorf("migrated PV creation failed: %v", err)
 			return ctrl.Result{}, err
 		}
 	}
 
 	pv.Spec.PersistentVolumeReclaimPolicy = v1.PersistentVolumeReclaimRetain
-	log.V(logger.InfoLevel).Info("removing annotation..")
+	csmlog.Info("removing annotation..")
 	delete(pv.Annotations, controller.MigrationRequested)
 	err = r.Update(ctx, pv, &client.UpdateOptions{})
 	if err != nil {
-		log.V(logger.ErrorLevel).Error(err, "failed to update the PV")
+		csmlog.Errorf("failed to update the PV: %v", err)
 		return ctrl.Result{}, err
 	}
-	log.V(logger.InfoLevel).Info("Successfully created PV, publishing event..")
+	csmlog.Info("Successfully created PV, publishing event..")
 	r.EventRecorder.Eventf(pv, "Normal", "Migrated", "This PV has been successfully migrated to SC %s,"+
 		" consider using new PV %s.", targetStorageClassName, pv.Name+"-to-"+targetStorageClassName)
 	return ctrl.Result{}, nil

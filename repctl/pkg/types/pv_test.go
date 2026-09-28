@@ -127,7 +127,7 @@ func TestGetPV(t *testing.T) {
 	}
 }
 
-func TestPersistentVolumeList_Print(t *testing.T) {
+func TestPersistentVolumeList_Print(_ *testing.T) {
 	pvList := &PersistentVolumeList{
 		PVList: []PersistentVolume{
 			{

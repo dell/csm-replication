@@ -25,9 +25,9 @@ import (
 	"testing"
 
 	fake_client "github.com/dell/csm-replication/test/e2e-framework/fake-client"
-	"github.com/dell/repctl/mocks"
-	cmdMocks "github.com/dell/repctl/pkg/cmd/mocks"
-	"github.com/dell/repctl/pkg/k8s"
+	"github.com/dell/csm-replication/repctl/mocks"
+	cmdMocks "github.com/dell/csm-replication/repctl/pkg/cmd/mocks"
+	"github.com/dell/csm-replication/repctl/pkg/k8s"
 	"github.com/golang/mock/gomock"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
@@ -228,7 +228,7 @@ func (suite *ClusterTestSuite) TestInjectCluster() {
 		},
 		{
 			name: "Error due to incorrect path",
-			getClustersFolderPathFunction: func(path string) (string, error) {
+			getClustersFolderPathFunction: func(_ string) (string, error) {
 				return "", errors.New("error")
 			},
 			expectError: true,
@@ -241,7 +241,7 @@ func (suite *ClusterTestSuite) TestInjectCluster() {
 	}
 
 	for _, tt := range tests {
-		suite.Suite.T().Run(tt.name, func(t *testing.T) {
+		suite.Suite.T().Run(tt.name, func(_ *testing.T) {
 			mcMock := new(mocks.MultiClusterConfiguratorInterface)
 			mcMock.On("GetAllClusters", tt.clusterIDs, mock.Anything).Return(tt.clusters, tt.getAllClustersError)
 
@@ -338,7 +338,7 @@ func (suite *ClusterTestSuite) TestAddClusterCommand() {
 	}{
 		{
 			name: "Successful",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				filePath, err := os.Getwd()
 				if err != nil {
 					return "", err
@@ -395,7 +395,7 @@ func (suite *ClusterTestSuite) TestAddClusterCommand() {
 
 			cmd.Run(nil, nil)
 
-			w.Close()
+			_ = w.Close()
 			out, _ := io.ReadAll(r)
 			os.Stdout = rescueStdout
 
@@ -412,7 +412,7 @@ func (suite *ClusterTestSuite) TestRemoveClusterCommand() {
 	}{
 		{
 			name: "Successful",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				filePath, err := os.Getwd()
 				if err != nil {
 					return "", err
@@ -440,7 +440,7 @@ func (suite *ClusterTestSuite) TestRemoveClusterCommand() {
 			assert.Nil(t, err)
 			filePath += "/testdata/remove-cluster-sample"
 
-			_, err = os.Create(filePath)
+			_, err = os.Create(filePath) // #nosec G304 -- controlled test fixture path
 			assert.Nil(t, err)
 
 			viper.Set("remove-name", "remove-cluster-sample")
@@ -456,7 +456,7 @@ func (suite *ClusterTestSuite) TestRemoveClusterCommand() {
 
 			cmd.Run(nil, nil)
 
-			w.Close()
+			_ = w.Close()
 			out, _ := io.ReadAll(r)
 			os.Stdout = rescueStdout
 
@@ -474,7 +474,7 @@ func (suite *ListTestSuite) TestGetListClustersCommand() {
 	}{
 		{
 			name: "Successful",
-			getClustersFolderPath: func(path string) (string, error) {
+			getClustersFolderPath: func(_ string) (string, error) {
 				return clusterPath, nil
 			},
 			clusters: &k8s.Clusters{
@@ -513,7 +513,7 @@ func (suite *ListTestSuite) TestGetListClustersCommand() {
 
 			cmd.Run(nil, nil)
 
-			w.Close()
+			_ = w.Close()
 			out, _ := io.ReadAll(r)
 			os.Stdout = rescueStdout
 

@@ -12,6 +12,7 @@
  limitations under the License.
 */
 
+// Package display renders repctl resources as tables.
 package display
 
 import (

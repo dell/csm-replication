@@ -20,13 +20,13 @@ WORKDIR /go/src/csm-replication
 
 # Build specific image.
 RUN if [ "$IMAGE" = "dell-replication-controller" ]; then \
-    make build-controller-manager IMAGE_VERSION=$VERSION; \
+    make build-binary-controller-manager IMAGE_VERSION=$VERSION; \
 elif [ "$IMAGE" = "dell-csi-replicator" ]; then \
-    make build-sidecar-manager IMAGE_VERSION=$VERSION; \
+    make build-binary-sidecar-manager IMAGE_VERSION=$VERSION; \
 elif [ "$IMAGE" = "dell-csi-migrator" ]; then \
-    make build-sidecar-migrator IMAGE_VERSION=$VERSION; \
+    make build-binary-sidecar-migrator IMAGE_VERSION=$VERSION; \
 elif [ "$IMAGE" = "dell-csi-node-rescanner" ]; then \
-    make build-sidecar-node-rescanner IMAGE_VERSION=$VERSION; \
+    make build-binary-sidecar-node-rescanner IMAGE_VERSION=$VERSION; \
 else \
     echo "IMAGE supplied is $IMAGE. Not supported."; \
 fi
@@ -36,7 +36,7 @@ FROM $BASEIMAGE AS container-base
 ARG VERSION
 LABEL vendor="Dell Technologies" \
       maintainer="Dell Technologies" \
-      release="1.17.0" \
+      release="1.18.0" \
       license="Apache-2.0"
 
 FROM container-base AS controller

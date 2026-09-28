@@ -23,8 +23,7 @@ import (
 	s1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
-	"github.com/dell/csm-replication/pkg/common/logger"
-	"github.com/go-logr/logr"
+	"github.com/dell/csmlog"
 	corev1 "k8s.io/api/core/v1"
 	storageV1 "k8s.io/api/storage/v1"
 	apiExtensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -54,20 +53,20 @@ func (k8sConnHandler *RemoteK8sConnHandler) init() {
 }
 
 // AddOrUpdateConfig adds (or updates) config to the list of managed clusters
-func (k8sConnHandler *RemoteK8sConnHandler) AddOrUpdateConfig(clusterID string, config *rest.Config, log logr.Logger) {
+func (k8sConnHandler *RemoteK8sConnHandler) AddOrUpdateConfig(clusterID string, config *rest.Config) {
 	k8sConnHandler.lock.Lock()
 	defer k8sConnHandler.lock.Unlock()
 	k8sConnHandler.init()
 	if _, ok := k8sConnHandler.configs[clusterID]; ok {
-		log.V(logger.DebugLevel).Info(fmt.Sprintf("Updating REST config for ClusterId: %s", clusterID))
+		csmlog.Infof("Updating REST config for ClusterId: %s", clusterID)
 		delete(k8sConnHandler.configs, clusterID)
 		// Also delete any cached clients
 		if _, ok := k8sConnHandler.cachedClients[clusterID]; ok {
-			log.V(logger.DebugLevel).Info(fmt.Sprintf("Deleting cached client for ClusterId: %s", clusterID))
+			csmlog.Infof("Deleting cached client for ClusterId: %s", clusterID)
 			delete(k8sConnHandler.cachedClients, clusterID)
 		}
 	} else {
-		log.V(logger.InfoLevel).Info(fmt.Sprintf("Adding REST config for ClusterId: %s\n", clusterID))
+		csmlog.Infof("Adding REST config for ClusterId: %s", clusterID)
 	}
 	k8sConnHandler.configs[clusterID] = config
 }

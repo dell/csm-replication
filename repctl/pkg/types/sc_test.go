@@ -88,7 +88,7 @@ func TestGetSC(t *testing.T) {
 	}
 }
 
-func TestSCList_Print(t *testing.T) {
+func TestSCList_Print(_ *testing.T) {
 	scl := &SCList{
 		SCList: []StorageClass{
 			{

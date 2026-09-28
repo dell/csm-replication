@@ -12,6 +12,7 @@
  limitations under the License.
 */
 
+// Package k8s provides Kubernetes client abstractions for repctl.
 package k8s
 
 import (
@@ -23,10 +24,10 @@ import (
 	"strings"
 
 	repv1 "github.com/dell/csm-replication/api/v1"
-	"github.com/dell/repctl/pkg/display"
-	"github.com/dell/repctl/pkg/metadata"
-	"github.com/dell/repctl/pkg/types"
-	log "github.com/sirupsen/logrus"
+	csmlog "github.com/dell/csmlog"
+	"github.com/dell/csm-replication/repctl/pkg/display"
+	"github.com/dell/csm-replication/repctl/pkg/metadata"
+	"github.com/dell/csm-replication/repctl/pkg/types"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -54,7 +55,8 @@ var (
 	displayNewTableWriter         = display.NewTableWriter
 	clientcmdBuildConfigFromFlags = clientcmd.BuildConfigFromFlags
 	kubernetesNewForConfig        = kubernetes.NewForConfig
-	GetCtrlRuntimeClient          = func(kubeconfig string) (client.Client, error) {
+	// GetCtrlRuntimeClient creates a controller-runtime client for the given kubeconfig.
+	GetCtrlRuntimeClient = func(kubeconfig string) (client.Client, error) {
 		return getControllerRuntimeClient(kubeconfig)
 	}
 	newClntSet = func(kubeconfig string) (*kubernetes.Clientset, *rest.Config, error) {
@@ -397,10 +399,10 @@ func (c *Cluster) CreatePersistentVolumeClaimsFromPVs(ctx context.Context, names
 			err = c.client.Create(ctx, &pvcObj)
 		}
 		if err != nil {
-			log.Printf("Dry-run: %v. Failed to create PVC for PV: %s. Error: %s\n", dryRun, pv.Name, err.Error())
+			csmlog.Infof("Dry-run: %v. Failed to create PVC for PV: %s. Error: %s\n", dryRun, pv.Name, err.Error())
 			return err
 		}
-		log.Printf("Dry-Run: %v. Successfully created PVC with name: %s using PV: %s in the namespace: %s\n",
+		csmlog.Infof("Dry-Run: %v. Successfully created PVC with name: %s using PV: %s in the namespace: %s\n",
 			dryRun, pv.RemotePVCName, pv.Name, namespace)
 	}
 	return nil
@@ -426,7 +428,7 @@ func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object
 		if err != nil {
 			return nil, err
 		}
-		log.Print("Successfully created storage class: ", obj.Name)
+		csmlog.Infof("Successfully created storage class: %s", obj.Name)
 	case *v1.Namespace:
 		err := c.client.Create(ctx, obj)
 		if err != nil {
@@ -437,7 +439,7 @@ func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object
 		if err != nil {
 			return nil, err
 		}
-		log.Print("Successfully created crds: ", obj.Name)
+		csmlog.Infof("Successfully created crds: %s", obj.Name)
 	case *rbacv1.ClusterRole:
 		err := c.client.Create(ctx, obj)
 		if err != nil {
@@ -446,12 +448,12 @@ func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object
 				if err != nil {
 					return nil, err
 				}
-				log.Print("Successfully updated existing cluster role: ", obj.Name)
+				csmlog.Infof("Successfully updated existing cluster role: %s", obj.Name)
 			} else {
 				return nil, err
 			}
 		} else {
-			log.Print("Successfully created cluster role: ", obj.Name)
+			csmlog.Infof("Successfully created cluster role: %s", obj.Name)
 		}
 	case *rbacv1.Role:
 		crObj, ok := runtimeObj.(*rbacv1.Role)
@@ -465,12 +467,12 @@ func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object
 				if err != nil {
 					return nil, err
 				}
-				log.Print("Successfully updated existing role: ", crObj.Name)
+				csmlog.Infof("Successfully updated existing role: %s", crObj.Name)
 			} else {
 				return nil, err
 			}
 		} else {
-			log.Print("Successfully created role: ", crObj.Name)
+			csmlog.Infof("Successfully created role: %s", crObj.Name)
 		}
 	case *rbacv1.ClusterRoleBinding:
 		err := c.client.Create(ctx, obj)
@@ -480,12 +482,12 @@ func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object
 				if err != nil {
 					return nil, err
 				}
-				log.Print("Successfully updated existing cluster role binding: ", obj.Name)
+				csmlog.Infof("Successfully updated existing cluster role binding: %s", obj.Name)
 			} else {
 				return nil, err
 			}
 		} else {
-			log.Print("Successfully created cluster role binding: ", obj.Name)
+			csmlog.Infof("Successfully created cluster role binding: %s", obj.Name)
 		}
 	case *rbacv1.RoleBinding:
 		crbObj, ok := runtimeObj.(*rbacv1.RoleBinding)
@@ -499,12 +501,12 @@ func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object
 				if err != nil {
 					return nil, err
 				}
-				log.Print("Successfully updated existing role binding: ", crbObj.Name)
+				csmlog.Infof("Successfully updated existing role binding: %s", crbObj.Name)
 			} else {
 				return nil, err
 			}
 		} else {
-			log.Print("Successfully created role binding: ", crbObj.Name)
+			csmlog.Infof("Successfully created role binding: %s", crbObj.Name)
 		}
 	case *v1.Service:
 		err := c.client.Create(ctx, obj)
@@ -519,31 +521,31 @@ func (c *Cluster) CreateObject(ctx context.Context, data []byte) (runtime.Object
 				if err != nil {
 					return nil, err
 				}
-				log.Print("Successfully updated existing deployment: ", obj.Name)
+				csmlog.Infof("Successfully updated existing deployment: %s", obj.Name)
 			} else {
 				return nil, err
 			}
 		} else {
-			log.Print("Successfully created deployment: ", obj.Name)
+			csmlog.Infof("Successfully created deployment: %s", obj.Name)
 		}
 	case *v1.ConfigMap:
 		err := c.client.Create(ctx, obj)
 		if err != nil {
 			return nil, err
 		}
-		log.Print("Successfully created config map: ", obj.Name)
+		csmlog.Infof("Successfully created config map: %s", obj.Name)
 	case *v1.ServiceAccount:
 		err := c.client.Create(ctx, obj)
 		if err != nil {
 			return nil, err
 		}
-		log.Print("Successfully created ServiceAccount: ", obj.Name)
+		csmlog.Infof("Successfully created ServiceAccount: %s", obj.Name)
 	case *v1.Secret:
 		err := c.client.Create(ctx, obj)
 		if err != nil {
 			return nil, err
 		}
-		log.Print("Successfully created Secret: ", obj.Name)
+		csmlog.Infof("Successfully created Secret: %s", obj.Name)
 	default:
 		return nil, fmt.Errorf("unsupported object type %+v", obj.GetObjectKind())
 	}
@@ -621,13 +623,12 @@ func (*MultiClusterConfigurator) GetAllClusters(clusterIDs []string, configDir s
 			}
 			c, err := CreateCluster(clusterID, kubeConfigFile)
 			if err != nil {
-				log.Printf("Error encountered in creating kube client for ClusterId: %s. Error: %s\n",
+				csmlog.Infof("Error encountered in creating kube client for ClusterId: %s. Error: %s\n",
 					clusterID, err.Error())
-				log.Printf("Output will not include results from ClusterId: %s\n", clusterID)
+				csmlog.Infof("Output will not include results from ClusterId: %s\n", clusterID)
 				continue
-			} else {
-				clusters = append(clusters, c)
 			}
+			clusters = append(clusters, c)
 		}
 	}
 	if len(clusters) == 0 {
@@ -663,14 +664,10 @@ func CreateCluster(clusterID, kubeconfig string) (ClusterInterface, error) {
 	// Create a temporary clientset to get the server version
 	// controller runtime client doesnt provide the discovery interface
 	clientset, restConfig, err := newClntSet(kubeconfig)
-	if err != nil {
-		// We can silently ignore this error
-	} else {
+	if err == nil {
 		host = restConfig.Host
 		version, err := getServiceVersion(clientset)
-		if err != nil {
-			// We can silently ignore this error
-		} else {
+		if err == nil {
 			versionString = fmt.Sprintf("v%s.%s", version.Major, version.Minor)
 		}
 	}

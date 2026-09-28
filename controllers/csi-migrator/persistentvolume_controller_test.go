@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -73,7 +72,6 @@ func (suite *PersistentVolumeControllerTestSuite) initReconciler() {
 
 	suite.reconciler = &PersistentVolumeReconciler{
 		Client:          suite.client,
-		Log:             ctrl.Log.WithName("controllers").WithName("PersistentVolumeClaim"),
 		Scheme:          utils.Scheme,
 		EventRecorder:   fakeRecorder,
 		DriverName:      suite.driver.DriverName,

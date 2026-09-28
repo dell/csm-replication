@@ -25,15 +25,13 @@ import (
 
 	"github.com/dell/csm-replication/controllers"
 	"github.com/dell/csm-replication/pkg/common/constants"
-	"github.com/dell/csm-replication/pkg/common/logger"
 	"github.com/dell/csm-replication/pkg/connection"
-	"github.com/go-logr/logr"
+	"github.com/dell/csmlog"
 	"github.com/spf13/viper"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/record"
 	certutil "k8s.io/client-go/util/cert"
 	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -87,6 +85,7 @@ type replicationConfigMap struct {
 	ClusterID string   `yaml:"clusterId"`
 	Targets   []target `yaml:"targets"`
 	LogLevel  string   `yaml:"CSI_LOG_LEVEL"`
+	LogFormat string   `yaml:"CSI_LOG_FORMAT"`
 }
 
 // replicationConfig - represents the configuration of Replication (formed using replicationConfigMap)
@@ -100,11 +99,12 @@ type replicationConfig struct {
 type Config struct {
 	repConfig *replicationConfig
 	LogLevel  string
+	LogFormat string
 	Lock      sync.Mutex
 }
 
 // UpdateConfigOnSecretEvent updates config instance if update to currently used secret was made
-func (c *Config) UpdateConfigOnSecretEvent(ctx context.Context, client ctrlClient.Client, opts ControllerManagerOpts, secretName string, recorder record.EventRecorder, log logr.Logger) error {
+func (c *Config) UpdateConfigOnSecretEvent(ctx context.Context, client ctrlClient.Client, opts ControllerManagerOpts, secretName string, recorder record.EventRecorder) error {
 	c.Lock.Lock()
 	defer c.Lock.Unlock()
 	// First check if we are interested in this secret
@@ -112,37 +112,38 @@ func (c *Config) UpdateConfigOnSecretEvent(ctx context.Context, client ctrlClien
 	for _, target := range c.repConfig.Targets {
 		if secretName == target.SecretRef {
 			found = true
-			log.V(logger.DebugLevel).Info(fmt.Sprintf("Received event for secret: %s configured for ClusterId: %s\n", secretName, target.ClusterID))
+			csmlog.Infof("Received event for secret: %s configured for ClusterId: %s", secretName, target.ClusterID)
 			break
 		}
 	}
 	if found {
 		// This secret is relevant to us
 		// Lets update the entire config
-		err := c.updateConfig(ctx, client, opts, recorder, log)
+		err := c.updateConfig(ctx, client, opts, recorder)
 		return err
 	}
-	log.V(logger.DebugLevel).Info("Ignoring event for secret as it is not related to us")
+	csmlog.Infof("Ignoring event for secret as it is not related to us")
 	return nil
 }
 
 // UpdateConfigMap updates config instance by reading mounted config
-func (c *Config) UpdateConfigMap(ctx context.Context, client ctrlClient.Client, opts ControllerManagerOpts, recorder record.EventRecorder, log logr.Logger) error {
+func (c *Config) UpdateConfigMap(ctx context.Context, client ctrlClient.Client, opts ControllerManagerOpts, recorder record.EventRecorder) error {
 	c.Lock.Lock()
 	defer c.Lock.Unlock()
 
-	err := c.updateConfig(ctx, client, opts, recorder, log)
+	err := c.updateConfig(ctx, client, opts, recorder)
 	return err
 }
 
-func (c *Config) updateConfig(ctx context.Context, client ctrlClient.Client, opts ControllerManagerOpts, recorder record.EventRecorder, log logr.Logger) error {
-	cmap, replicationConfig, err := getReplicationConfig(ctx, client, opts, recorder, log)
+func (c *Config) updateConfig(ctx context.Context, client ctrlClient.Client, opts ControllerManagerOpts, recorder record.EventRecorder) error {
+	cmap, replicationConfig, err := getReplicationConfig(ctx, client, opts, recorder)
 	if err != nil {
 		return err
 	}
 	c.repConfig = replicationConfig
 	c.LogLevel = cmap.LogLevel
-	log.V(logger.InfoLevel).Info("Updated config")
+	c.LogFormat = cmap.LogFormat
+	csmlog.Infof("Updated config")
 	return nil
 }
 
@@ -164,30 +165,31 @@ func (c *Config) GetClusterID() string {
 	return c.repConfig.ClusterID
 }
 
-// PrintConfig prints current config information using provided logger interface
-func (c *Config) PrintConfig(log logr.Logger) {
+// PrintConfig prints current config information.
+func (c *Config) PrintConfig() {
 	c.Lock.Lock()
 	defer c.Lock.Unlock()
-	c.repConfig.Print(log)
+	c.repConfig.Print()
 }
 
 // GetConfig returns new instance of replication config
-func GetConfig(ctx context.Context, client ctrlClient.Client, opts ControllerManagerOpts, recorder record.EventRecorder, log logr.Logger) (*Config, error) {
-	cmap, repConfig, err := getReplicationConfig(ctx, client, opts, recorder, log)
+func GetConfig(ctx context.Context, client ctrlClient.Client, opts ControllerManagerOpts, recorder record.EventRecorder) (*Config, error) {
+	cmap, repConfig, err := getReplicationConfig(ctx, client, opts, recorder)
 	if err != nil {
 		return nil, err
 	}
 	return &Config{
 		repConfig: repConfig,
 		LogLevel:  cmap.LogLevel,
+		LogFormat: cmap.LogFormat,
 	}, nil
 }
 
-// Print prints current config information using provided logger interface
-func (config *replicationConfig) Print(log logr.Logger) {
-	log.Info(fmt.Sprintf("Source ClusterId: %s", config.ClusterID))
+// Print prints current config information.
+func (config *replicationConfig) Print() {
+	csmlog.Infof("Source ClusterId: %s", config.ClusterID)
 	for _, target := range config.Targets {
-		log.Info(fmt.Sprintf("ClusterId: %s, Secret Ref: %s", target.ClusterID, target.SecretRef))
+		csmlog.Infof("ClusterId: %s, Secret Ref: %s", target.ClusterID, target.SecretRef)
 	}
 }
 
@@ -236,16 +238,17 @@ func readConfigFile(configFile, configPath string) (*replicationConfigMap, error
 		return nil, err
 	}
 	configMap.LogLevel = viper.GetString("CSI_LOG_LEVEL")
+	configMap.LogFormat = viper.GetString("CSI_LOG_FORMAT")
 	return &configMap, nil
 }
 
-func getReplicationConfig(ctx context.Context, client ctrlClient.Client, opts ControllerManagerOpts, recorder record.EventRecorder, log logr.Logger) (*replicationConfigMap, *replicationConfig, error) {
+func getReplicationConfig(ctx context.Context, client ctrlClient.Client, opts ControllerManagerOpts, recorder record.EventRecorder) (*replicationConfigMap, *replicationConfig, error) {
 	configMap, err := readConfigFile(opts.ConfigFileName, opts.ConfigDir)
 	if err != nil {
 		return nil, nil, err
 	}
 	if client != nil {
-		connHandler, err := getConnHandler(ctx, configMap.Targets, client, opts, log)
+		connHandler, err := getConnHandler(ctx, configMap.Targets, client, opts)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -253,7 +256,7 @@ func getReplicationConfig(ctx context.Context, client ctrlClient.Client, opts Co
 		repConfig := newReplicationConfig(configMap, connHandler)
 		err = repConfig.VerifyConfig(ctx)
 		if err != nil && opts.Mode == "controller" {
-			log.V(logger.InfoLevel).Info("Wrong config, publishing event. ", err.Error(), isInInvalidState)
+			csmlog.Infof("Wrong config, publishing event. %s", err.Error())
 			err := controllers.PublishControllerEvent(ctx, client, recorder, "Warning", "Invalid", "Config update won't be applied because of invalid configmap/secrets. Please fix the invalid configuration.")
 			isInInvalidState = true
 			if err != nil {
@@ -262,11 +265,11 @@ func getReplicationConfig(ctx context.Context, client ctrlClient.Client, opts Co
 		} else {
 			if isInInvalidState == true && opts.Mode == "controller" {
 
-				log.V(logger.InfoLevel).Info("Correct config, publishing event. ")
+				csmlog.Infof("Correct config, publishing event")
 				err := controllers.PublishControllerEvent(ctx, client, recorder, "Normal", "Correct config applied", "Correct configuration has been applied to cluster.")
 				isInInvalidState = false
 				if err != nil {
-					log.V(logger.InfoLevel).Info(err.Error())
+					csmlog.Infof(err.Error())
 					return nil, nil, err
 				}
 			}
@@ -282,26 +285,26 @@ var InClusterConfig = func() (*rest.Config, error) {
 
 // Returns a connection handler for the remote clusters
 // Currently only returns the k8s conn handler
-func getConnHandler(ctx context.Context, targets []target, client ctrlClient.Client, opts ControllerManagerOpts, log logr.Logger) (connection.ConnHandler, error) {
+func getConnHandler(ctx context.Context, targets []target, client ctrlClient.Client, opts ControllerManagerOpts) (connection.ConnHandler, error) {
 	var k8sConnHandler connection.RemoteK8sConnHandler
 	var restConfig *rest.Config
 	var err error
 	for _, target := range targets {
 		if opts.UseConfFileFormat {
-			log.V(logger.DebugLevel).Info("Expecting secret data to be in format of conf file")
+			csmlog.Infof("Expecting secret data to be in format of conf file")
 			restConfig, err = buildRestConfigFromSecretConfFileFormat(ctx, target.SecretRef, opts.WatchNamespace, client)
 			if err != nil {
 				return nil, err
 			}
 		} else {
-			log.V(logger.InfoLevel).Info("Expecting secret data to be in form of a service account token/custom format")
+			csmlog.Infof("Expecting secret data to be in form of a service account token/custom format")
 			// restConfig, err = buildRestConfigFromCustomFormat(target.SecretRef, opts.WatchNamespace, client)
 			restConfig, err = buildRestConfigFromServiceAccountToken(ctx, target.SecretRef, opts.WatchNamespace, client, target.Address)
 			if err != nil {
 				return nil, err
 			}
 		}
-		k8sConnHandler.AddOrUpdateConfig(target.ClusterID, restConfig, log)
+		k8sConnHandler.AddOrUpdateConfig(target.ClusterID, restConfig)
 	}
 	// Let's add a connection handler by default for self (single cluster scenario)
 	inCluster, _ := strconv.ParseBool(getEnv(constants.EnvInClusterConfig, "false"))
@@ -325,7 +328,7 @@ func getConnHandler(ctx context.Context, targets []target, client ctrlClient.Cli
 			return nil, err
 		}
 	}
-	k8sConnHandler.AddOrUpdateConfig(controllers.Self, restConfig, log)
+	k8sConnHandler.AddOrUpdateConfig(controllers.Self, restConfig)
 
 	return &k8sConnHandler, nil
 }
@@ -364,20 +367,14 @@ func buildRestConfigFromCustomFormat(ctx context.Context, secretName string, nam
 	if err != nil {
 		return nil, err
 	}
-	server := string(secret.Data["server"])
-	rules := clientcmd.NewDefaultClientConfigLoadingRules()
-	overrides := &clientcmd.ConfigOverrides{
-		ClusterDefaults: api.Cluster{
-			CertificateAuthorityData: secret.Data["ca"],
-			Server:                   server,
+	return &rest.Config{
+		Host: string(secret.Data["server"]),
+		TLSClientConfig: rest.TLSClientConfig{
+			CAData:   secret.Data["ca"],
+			KeyData:  secret.Data["clientkey"],
+			CertData: secret.Data["clientcert"],
 		},
-		AuthInfo: api.AuthInfo{
-			ClientKeyData:         secret.Data["clientkey"],
-			ClientCertificateData: secret.Data["clientcert"],
-		},
-	}
-	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, overrides)
-	return kubeConfig.ClientConfig()
+	}, nil
 }
 
 // buildRestConfigFromSecretConfFileFormat - Builds a REST config from a secret created using a kubeconfig file
