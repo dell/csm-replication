@@ -52,11 +52,12 @@ repctl will patch CR at cluster1 with action SWAP_LOCAL.`,
 			if err != nil {
 				csmlog.Fatalf("swap: error getting clusters folder path: %s", err.Error())
 			}
-			if input == "cluster" {
+			switch input {
+			case "cluster":
 				swapAtCluster(configFolder, res, rgName, verbose, wait)
-			} else if input == "rg" {
+			case "rg":
 				swapAtRG(configFolder, res, verbose, wait)
-			} else {
+			default:
 				csmlog.Errorf("Unexpected input received")
 				return
 			}

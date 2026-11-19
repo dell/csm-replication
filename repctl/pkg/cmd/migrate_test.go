@@ -264,7 +264,7 @@ func TestMigratePVCCommand(t *testing.T) {
 				},
 			}
 			if tt.pvcNamespace != "" {
-				persistentVolumeClaim.ObjectMeta.Namespace = tt.pvcNamespace
+				persistentVolumeClaim.Namespace = tt.pvcNamespace
 			}
 
 			persistentVolume := &v1.PersistentVolume{

@@ -211,7 +211,9 @@ func (suite *CreateTestSuite) TestCreateSCs() {
 
 	file, err := os.OpenFile("testdata/test.yaml", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 	suite.Nil(err)
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	enc := yaml.NewEncoder(file)
 	err = enc.Encode(config)

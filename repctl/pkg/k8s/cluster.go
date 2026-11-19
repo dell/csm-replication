@@ -145,7 +145,6 @@ type Cluster struct {
 	Host           string `display:"URL"`
 	kubeConfigFile string
 	client         ClientInterface
-	restClient     ClientInterface
 }
 
 // GetID returns id of the cluster
