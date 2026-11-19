@@ -65,11 +65,12 @@ With --unplanned, this command will perform an unplanned failover to given clust
 				return
 			}
 
-			if target == "cluster" {
+			switch target {
+			case "cluster":
 				failoverToCluster(configFolder, inputTargetCluster, rgName, unplanned, verbose, wait)
-			} else if target == "rg" {
+			case "rg":
 				failoverToRG(configFolder, inputTargetCluster, unplanned, verbose, wait)
-			} else {
+			default:
 				csmlog.Error("unexpected input")
 				return
 			}

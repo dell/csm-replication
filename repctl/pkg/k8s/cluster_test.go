@@ -47,8 +47,7 @@ import (
 
 type ClusterTestSuite struct {
 	suite.Suite
-	cluster    ClusterInterface
-	fakeClient ClientInterface
+	cluster ClusterInterface
 }
 
 // blank assignment to verify client.Client method implementations
@@ -522,7 +521,9 @@ func (suite *ClusterTestSuite) TestCreateObject() {
 
 	file, fileErr := os.Open("testdata/test-ns.yaml")
 	suite.NoError(fileErr)
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	data, err := io.ReadAll(file)
 	suite.NoError(err)

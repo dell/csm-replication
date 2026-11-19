@@ -49,11 +49,12 @@ repctl will patch CR at cluster1 with action REPROTECT_LOCAL.`,
 			if err != nil {
 				csmlog.Fatalf("reprotect: error getting clusters folder path: %s\n", err.Error())
 			}
-			if input == "cluster" {
+			switch input {
+			case "cluster":
 				reprotectAtCluster(configFolder, res, rgName, verbose, wait)
-			} else if input == "rg" {
+			case "rg":
 				reprotectAtRG(configFolder, res, verbose, wait)
-			} else {
+			default:
 				csmlog.Error("unexpected input received")
 				return
 			}

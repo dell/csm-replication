@@ -170,7 +170,9 @@ func getInjectClustersCommand(mc GetClustersInterface) *cobra.Command {
 
 			if useSA {
 				generatedConfigs, err := generateConfigsFromSA(mc, clusterIDs)
-				defer os.RemoveAll("/tmp/repctl")
+				defer func() {
+					_ = os.RemoveAll("/tmp/repctl")
+				}()
 				if err != nil {
 					csmlog.Fatalf("cluster inject: generate cfg: %s", err.Error())
 				}

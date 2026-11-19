@@ -79,10 +79,10 @@ func (s *Secret) ToDecodedSecret() *DecodedSecret {
 
 	meta := metav1.TypeMeta{Kind: "Secret", APIVersion: "v1"}
 	objectMeta := metav1.ObjectMeta{
-		Name:        s.ObjectMeta.Name,
-		Namespace:   s.ObjectMeta.Namespace,
-		Labels:      s.ObjectMeta.Labels,
-		Annotations: s.ObjectMeta.Annotations,
+		Name:        s.Name,
+		Namespace:   s.Namespace,
+		Labels:      s.Labels,
+		Annotations: s.Annotations,
 	}
 
 	return &DecodedSecret{
@@ -167,7 +167,9 @@ func editSecretCommand() *cobra.Command {
 				csmlog.Fatalf("edit secret: error in creating temp file with secret data: %s", err.Error())
 			}
 
-			defer os.Remove(tmpFile.Name())
+			defer func() {
+				_ = os.Remove(tmpFile.Name())
+			}()
 
 			if _, err := tmpFile.Write([]byte(data)); err != nil {
 				csmlog.Fatalf("edit secret: error in writing temp file with secret data: %s", err.Error())

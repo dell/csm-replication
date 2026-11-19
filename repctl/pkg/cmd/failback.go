@@ -64,11 +64,12 @@ With --discard, this command will perform an failback but discard any writes at 
 				csmlog.Fatalf("failback: error getting clusters folder path: %s\n", err.Error())
 			}
 
-			if input == "cluster" {
+			switch input {
+			case "cluster":
 				failbackToCluster(configFolder, inputSourceCluster, rgName, discard, verbose, wait)
-			} else if input == "rg" {
+			case "rg":
 				failbackToRG(configFolder, inputSourceCluster, discard, verbose, wait)
-			} else {
+			default:
 				csmlog.Error("unexpected input")
 				return
 			}

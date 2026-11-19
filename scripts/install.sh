@@ -21,7 +21,7 @@ MODE="install"
 NS="dell-replication-controller"
 RELEASE="replication"
 MODULE="csm-replication"
-DEFAULT_VERSION="v1.16.0"
+DEFAULT_VERSION="v1.16.1"
 
 # Derive HELMCHARTVERSION from DEFAULT_VERSION (single source of truth)
 HELMCHARTVERSION="${MODULE}-${DEFAULT_VERSION#v}"
